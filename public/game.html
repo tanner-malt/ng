@@ -5,14 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Village Defense: Idleo</title>
     <link rel="stylesheet" href="game.css">
+    <link rel="stylesheet" href="progress-icons.css">
 </head>
 <body>
+    <div id="top-right-icons">
+      <button id="sound-btn" class="icon-btn" title="Sound">
+        <span>🔊</span>
+      </button>
+      <button id="settings-btn" class="icon-btn" title="Settings">
+        <span>⚙️</span>
+      </button>
+      <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
+        <span id="progress-icon">🗺️</span>
+      </button>
+    </div>
     <div id="game-container">
         <nav id="view-navigation">
-            <button class="nav-btn active" data-view="village">Village</button>
-            <button class="nav-btn" data-view="battle">Battle</button>
-            <button class="nav-btn" data-view="monarch">Monarch</button>
-            <button class="nav-btn" data-view="throne">Throne</button>
+            <button class="nav-btn active" data-view="village" id="village-tab">Village</button>
+            <button class="nav-btn" data-view="battle" id="battle-tab">Battle</button>
+            <button class="nav-btn" data-view="monarch" id="monarch-tab">Monarch</button>
+            <button class="nav-btn" data-view="throne" id="throne-tab">Throne</button>
         </nav>
         
         <main id="game-content">
@@ -118,11 +130,21 @@
         </main>
     </div>
     
+    <div id="settings-popup" class="popup-modal" style="display:none;">
+      <div class="popup-content">
+        <h3>Menu</h3>
+        <div id="game-version" style="margin-bottom:1rem; color:#bdc3c7; font-size:0.95rem;"></div>
+        <button id="quit-btn">Quit to Title</button>
+        <button class="popup-close" onclick="document.getElementById('settings-popup').style.display='none'">Close</button>
+      </div>
+    </div>
+    
     <script src="../src/gameState.js"></script>
     <script src="../src/village.js"></script>
     <script src="../src/battle.js"></script>
     <script src="../src/monarch.js"></script>
     <script src="../src/throne.js"></script>
+    <script src="../src/tutorial.js"></script>
     <script src="../src/app.js"></script>
 </body>
 </html>

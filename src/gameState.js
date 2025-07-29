@@ -133,7 +133,7 @@ class GameState {
         this.season = seasons[(currentIndex + 1) % seasons.length];
         
         // Notify players of season change
-        this.logBattleEvent(`🌱 Season changed to ${this.season}! Resource production affected.`);
+        // ...
     }
     
     updateBuildButtons() {
@@ -155,19 +155,7 @@ class GameState {
     }
     
     logBattleEvent(message) {
-        const battleLog = document.getElementById('battle-log');
-        if (battleLog) {
-            const logEntry = document.createElement('div');
-            logEntry.className = 'battle-log-entry';
-            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            battleLog.appendChild(logEntry);
-            battleLog.scrollTop = battleLog.scrollHeight;
-            
-            // Keep only last 10 entries
-            while (battleLog.children.length > 10) {
-                battleLog.removeChild(battleLog.firstChild);
-            }
-        }
+        // ...
     }
     
     update() {
@@ -262,7 +250,7 @@ class GameState {
         };
         
         localStorage.setItem('villageDefenseIdleo', JSON.stringify(saveData));
-        console.log('Game saved!');
+        // ...
     }
     
     load() {
@@ -270,19 +258,44 @@ class GameState {
         if (saveData) {
             try {
                 const data = JSON.parse(saveData);
+                if (!this.validateSaveData(data)) {
+                    throw new Error('Invalid or corrupted save data.');
+                }
                 Object.keys(data).forEach(key => {
                     if (this[key] !== undefined) {
                         this[key] = data[key];
                     }
                 });
-                console.log('Game loaded!');
+                // ...
                 return true;
             } catch (error) {
-                console.error('Failed to load save data:', error);
+                // ...
                 return false;
             }
         }
         return false;
+    }
+
+    validateSaveData(data) {
+        // Basic structure check
+        if (typeof data !== 'object' || data === null) return false;
+        // Required top-level fields
+        const requiredFields = [
+            'resources', 'population', 'gold', 'wave', 'season',
+            'buildings', 'army', 'investments', 'mergeItems', 'activeBonuses'
+        ];
+        for (const field of requiredFields) {
+            if (!(field in data)) return false;
+        }
+        // Check types
+        if (typeof data.resources !== 'object' || typeof data.population !== 'number') return false;
+        if (!Array.isArray(data.buildings) || !Array.isArray(data.army)) return false;
+        if (typeof data.gold !== 'number' || typeof data.wave !== 'number') return false;
+        if (typeof data.season !== 'string') return false;
+        if (typeof data.investments !== 'object') return false;
+        if (!Array.isArray(data.mergeItems) || !Array.isArray(data.activeBonuses)) return false;
+        // Optionally, add more detailed checks here
+        return true;
     }
 }
 

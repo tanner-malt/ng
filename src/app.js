@@ -1,380 +1,450 @@
+
+
 // Main application initialization and view management
+// Use global TutorialManager for browser compatibility
+// tutorial.js must be loaded before app.js in HTML
+
+
+
 class Game {
-    tutorialActive = true;
-    constructor() {
-        this.gameState = gameState;
-        this.villageManager = new VillageManager(this.gameState);
-        this.battleManager = new BattleManager(this.gameState);
-        this.monarchManager = new MonarchManager(this.gameState);
-        this.throneManager = new ThroneManager(this.gameState);
-        this.currentView = 'village';
-        this.gameLoopId = null;
-    }
-    
-    init() {
-        console.log('🏰 Initializing Village Defense: Idleo...');
-        
-        // Try to load saved game
-        const loadedSuccessfully = this.gameState.load();
-        if (loadedSuccessfully) {
-            console.log('📁 Loaded saved game');
-            this.tutorialActive = false;
-        } else {
-            console.log('🆕 Starting new game');
-            this.tutorialActive = true;
-            setTimeout(() => this.showTutorialIntro(), 500);
+    // Popup/modal logic is now in uiPopups.js
+    bindTopRightPopups() {
+        if (window.bindTopRightPopups) {
+            window.bindTopRightPopups(this);
         }
-    showTutorialIntro() {
-    
-    showTutorialIntro() {
-        // Create chatbox if it doesn't exist
-        let chatbox = document.getElementById('tutorial-chatbox');
-        if (!chatbox) {
-            chatbox = document.createElement('div');
-            chatbox.id = 'tutorial-chatbox';
-            chatbox.style.position = 'fixed';
-            chatbox.style.bottom = '32px';
-            chatbox.style.left = '32px';
-            chatbox.style.maxWidth = '340px';
-            chatbox.style.background = 'rgba(30,34,44,0.98)';
-            chatbox.style.color = '#fff';
-            chatbox.style.borderRadius = '12px';
-            chatbox.style.boxShadow = '0 4px 24px #0008';
-            chatbox.style.padding = '1.2rem 1.5rem 1.2rem 1.5rem';
-            chatbox.style.fontSize = '1.08rem';
-            chatbox.style.zIndex = '1000';
-            chatbox.style.display = 'flex';
-            chatbox.style.flexDirection = 'column';
-            chatbox.style.gap = '1rem';
-            document.body.appendChild(chatbox);
-        }
-        chatbox.innerHTML = '';
-        // Tutorial message
-        const msg = document.createElement('div');
-        msg.innerHTML = `<b>Welcome!</b><br>This is your <b>village view mode</b>, where you will manage the logistics of your kingdom!<br><br>You are the son of the king, and the king sent you to establish a new village to defend!<br><br><b>First, place your Town Center.</b>`;
-        chatbox.appendChild(msg);
-        // Next button
-        const nextBtn = document.createElement('button');
-        nextBtn.textContent = 'Got it!';
-        nextBtn.style.background = 'linear-gradient(90deg, #4e54c8, #8f94fb)';
-        nextBtn.style.color = '#fff';
-        nextBtn.style.border = 'none';
-        nextBtn.style.borderRadius = '8px';
-        nextBtn.style.padding = '0.6rem 1.5rem';
-        nextBtn.style.fontWeight = '600';
-        nextBtn.style.cursor = 'pointer';
-        nextBtn.onclick = () => {
-            chatbox.style.display = 'none';
-            this.highlightTownCenterButton();
-        };
-        chatbox.appendChild(nextBtn);
-        chatbox.style.display = 'flex';
     }
 
-    highlightTownCenterButton() {
-        // Highlight the Town Center build button
-        const btn = document.querySelector('.build-btn[data-building="townCenter"]');
-        if (btn) {
-            btn.classList.add('tutorial-highlight');
-            btn.scrollIntoView({behavior: 'smooth', block: 'center'});
-            // Remove highlight after first click
-            const removeHighlight = () => {
-                btn.classList.remove('tutorial-highlight');
-                btn.removeEventListener('click', removeHighlight);
-            };
-            btn.addEventListener('click', removeHighlight);
+    updateProgressPopup() {
+        // Update the progression popup icons
+        const battle = document.getElementById('progress-battle');
+        const monarch = document.getElementById('progress-monarch');
+        const throne = document.getElementById('progress-throne');
+        if (battle) battle.innerHTML = `Battle: <span>${this.unlockedViews.battle ? '✅' : '🔒'}</span>`;
+        if (monarch) monarch.innerHTML = `Monarch: <span>${this.unlockedViews.monarch ? '✅' : '🔒'}</span>`;
+        if (throne) throne.innerHTML = `Throne: <span>${this.unlockedViews.throne ? '✅' : '🔒'}</span>`;
+    }
+    updateProgressIcon() {
+        // Progress: battle, monarch, throne
+        const progressBtn = document.getElementById('progress-btn');
+        const progressIcon = document.getElementById('progress-icon');
+        if (!progressBtn || !progressIcon) return;
+        let unlocked = 0;
+        if (this.unlockedViews.battle) unlocked++;
+        if (this.unlockedViews.monarch) unlocked++;
+        if (this.unlockedViews.throne) unlocked++;
+        if (unlocked === 3) {
+            progressBtn.classList.remove('progress-incomplete', 'progress-locked');
+            progressBtn.classList.add('progress-complete');
+            progressIcon.textContent = '✅';
+            progressBtn.title = 'All milestones complete!';
+        } else if (unlocked === 0) {
+            progressBtn.classList.remove('progress-incomplete', 'progress-complete');
+            progressBtn.classList.add('progress-locked');
+            progressIcon.textContent = '🗺️';
+            progressBtn.title = 'No milestones unlocked yet.';
+        } else {
+            progressBtn.classList.remove('progress-complete', 'progress-locked');
+            progressBtn.classList.add('progress-incomplete');
+            progressIcon.textContent = '🗺️';
+            progressBtn.title = `${unlocked}/3 milestones unlocked.`;
         }
     }
-        
-        // Initialize all managers
-        this.villageManager.init();
-        this.battleManager.init();
-        this.monarchManager.init();
-        this.throneManager.init();
-        
-        // Setup navigation
-        this.setupNavigation();
-        
-        // Update initial UI
-        this.gameState.updateUI();
-        
-        // Start game loop
-        this.startGameLoop();
-        
-        // Setup autosave
-        this.setupAutosave();
-        
-        // Setup keyboard shortcuts
-        this.setupKeyboardShortcuts();
-        
-        // Make game globally accessible for debugging
-        window.game = this;
-        window.gameState = this.gameState;
-        
-        console.log('✅ Game initialized successfully!');
-        this.gameState.logBattleEvent('🏰 Welcome to Village Defense: Idleo!');
+    // Capitalize the first letter of a string
+    capitalize(str) {
+        if (!str) return '';
+        return str.charAt(0).toUpperCase() + str.slice(1);
     }
-    
+
+    // Stub for overlays (implement UI if needed)
+    updateLockedOverlays() {
+        // This can be implemented to show/hide overlays for locked views if desired
+    }
+    constructor() {
+        try {
+            this.tutorialActive = true;
+            this.currentView = 'village';
+            this.gameLoopId = null;
+            this.gameState = gameState;
+            this.villageManager = new VillageManager(this.gameState, this);
+            this.battleManager = new BattleManager(this.gameState);
+            this.monarchManager = new MonarchManager(this.gameState);
+            this.throneManager = new ThroneManager(this.gameState);
+            // Milestone-based view unlocking
+            this.unlockedViews = { village: true, battle: false, monarch: false, throne: false };
+            this.tutorialManager = new window.TutorialManager(this);
+            // ...
+        } catch (err) {
+            // ...
+        }
+    }
+
+    init() {
+        try {
+            // ...
+            const loadedSuccessfully = this.gameState.load();
+            if (loadedSuccessfully) {
+                this.tutorialActive = false;
+            } else {
+                this.tutorialActive = true;
+                setTimeout(() => {
+                    try {
+                        this.tutorialManager.showIntro();
+                    } catch (err) {
+                        // ...
+                    }
+                }, 500);
+            }
+            this.villageManager.init();
+            this.battleManager.init();
+            this.monarchManager.init();
+            this.throneManager.init();
+            this.setupNavigation();
+            this.gameState.updateUI();
+            this.updateProgressIcon();
+            this.bindTopRightPopups();
+            this.startGameLoop();
+            this.setupAutosave();
+            this.setupKeyboardShortcuts();
+            window.game = this;
+            window.gameState = this.gameState;
+            // ...
+        } catch (err) {
+            // ...
+        }
+    }
+
+
     setupNavigation() {
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const targetView = btn.dataset.view;
-                if (this.tutorialActive && targetView !== 'village') {
-                    this.showTutorialLockMessage(targetView);
-                    return;
-                }
-                this.switchView(targetView);
+        try {
+            // ...
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    try {
+                        const targetView = btn.dataset.view;
+                        if (this.tutorialActive && targetView !== 'village') {
+                            this.showTutorialLockMessage(targetView);
+                            return;
+                        }
+                        this.switchView(targetView);
+                    } catch (err) {
+                        // ...
+                    }
+                });
             });
-        });
-        this.updateTabLocks();
+            this.updateTabLocks();
+        } catch (err) {
+            // ...
+        }
     }
 
     updateTabLocks() {
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            const targetView = btn.dataset.view;
-            if (this.tutorialActive && targetView !== 'village') {
-                btn.disabled = true;
-                btn.classList.add('locked');
-            } else {
-                btn.disabled = false;
-                btn.classList.remove('locked');
-            }
-        });
+        try {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const targetView = btn.dataset.view;
+                if (!this.unlockedViews[targetView]) {
+                    btn.classList.add('locked');
+                    btn.textContent = this.capitalize(targetView) + ' (LOCKED)';
+                } else {
+                    btn.classList.remove('locked');
+                    btn.textContent = this.capitalize(targetView);
+                }
+            });
+        } catch (err) {
+            // ...
+        }
     }
 
     showTutorialLockMessage(view) {
-        alert('Complete the tutorial in the Village view before accessing other areas!');
+        // replaced by showUnlockRequirement
+        this.tutorialManager.showUnlockRequirement(view);
     }
 
+    // Called when all milestones are complete
     completeTutorial() {
-        this.tutorialActive = false;
-        this.updateTabLocks();
-        this.gameState.logBattleEvent('🎉 Tutorial complete! All views unlocked.');
+        try {
+            this.tutorialActive = false;
+            this.updateTabLocks();
+            this.updateLockedOverlays();
+            // ...
+        } catch (err) {
+            // ...
+        }
     }
-    
+
+    // Called by VillageManager when a milestone is reached
+    unlockView(view) {
+        if (!this.unlockedViews[view]) {
+            this.unlockedViews[view] = true;
+            this.updateTabLocks();
+            this.updateLockedOverlays();
+            this.updateProgressIcon();
+        }
+        // If all are unlocked, complete tutorial
+        if (this.unlockedViews.battle && this.unlockedViews.monarch && this.unlockedViews.throne) {
+            this.completeTutorial();
+        }
+    }
+
     switchView(viewName) {
-        // Validate view name
-        const validViews = ['village', 'battle', 'monarch', 'throne'];
-        if (!validViews.includes(viewName)) {
-            console.error(`Invalid view name: ${viewName}`);
-            return;
-        }
-        
-        // Exit build mode when switching from village
-        if (this.currentView === 'village' && viewName !== 'village') {
-            this.villageManager.exitBuildMode();
-        }
-        
-        // Hide all views
-        document.querySelectorAll('.game-view').forEach(view => {
-            view.classList.remove('active');
-        });
-        
-        // Remove active from all nav buttons
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        
-        // Show target view
-        const targetViewElement = document.getElementById(`${viewName}-view`);
-        const targetNavButton = document.querySelector(`[data-view="${viewName}"]`);
-        
-        if (targetViewElement && targetNavButton) {
-            targetViewElement.classList.add('active');
-            targetNavButton.classList.add('active');
-            
-            this.currentView = viewName;
-            
-            // Perform view-specific initialization
-            this.onViewSwitch(viewName);
-            
-            this.gameState.logBattleEvent(`📍 Switched to ${viewName} view`);
-        }
-    }
-    
-    onViewSwitch(viewName) {
-        switch (viewName) {
-            case 'village':
-                this.villageManager.renderBuildings();
-                this.gameState.updateBuildButtons();
-                break;
-            case 'battle':
-                this.battleManager.renderBattleField();
-                break;
-            case 'monarch':
-                this.monarchManager.updateInvestmentDisplay();
-                this.monarchManager.generateAdvisorAdvice();
-                break;
-            case 'throne':
-                this.throneManager.updateActiveBonuses();
-                break;
-        }
-    }
-    
-    startGameLoop() {
-        const gameLoop = () => {
-            // Update game state
-            this.gameState.update();
-            
-            // Update view-specific logic
-            if (this.currentView === 'battle' && this.gameState.battleInProgress) {
-                // Battle updates are handled by the battle manager's own timer
-            }
-            
-            // Continue loop
-            this.gameLoopId = requestAnimationFrame(gameLoop);
-        };
-        
-        gameLoop();
-        console.log('🔄 Game loop started');
-    }
-    
-    stopGameLoop() {
-        if (this.gameLoopId) {
-            cancelAnimationFrame(this.gameLoopId);
-            this.gameLoopId = null;
-            console.log('⏹️ Game loop stopped');
-        }
-    }
-    
-    setupAutosave() {
-        // Autosave every 30 seconds
-        setInterval(() => {
-            this.gameState.save();
-        }, 30000);
-        
-        // Save on page unload
-        window.addEventListener('beforeunload', () => {
-            this.gameState.save();
-        });
-        
-        console.log('💾 Autosave enabled (30s intervals)');
-    }
-    
-    setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // Only handle shortcuts if not typing in an input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        try {
+            const validViews = ['village', 'battle', 'monarch', 'throne'];
+            if (!validViews.includes(viewName)) {
+                // ...
                 return;
             }
-            
-            switch (e.key) {
-                case '1':
-                    this.switchView('village');
-                    break;
-                case '2':
-                    this.switchView('battle');
-                    break;
-                case '3':
-                    this.switchView('monarch');
-                    break;
-                case '4':
-                    this.switchView('throne');
-                    break;
-                case 'Escape':
-                    if (this.currentView === 'village') {
-                        this.villageManager.exitBuildMode();
-                    }
-                    break;
-                case 's':
-                    if (e.ctrlKey) {
-                        e.preventDefault();
-                        this.gameState.save();
-                        this.gameState.logBattleEvent('💾 Game saved manually');
-                    }
-                    break;
-                case 'b':
-                    if (this.currentView === 'battle' && !this.gameState.battleInProgress) {
-                        this.battleManager.startBattle();
-                    }
-                    break;
+            if (!this.unlockedViews[viewName]) {
+                this.tutorialManager.showUnlockRequirement(viewName);
+                return;
             }
-        });
-        
-        console.log('⌨️ Keyboard shortcuts enabled (1-4 for views, Esc to exit build mode, Ctrl+S to save, B to start battle)');
-    }
-    
-    // Debug and utility methods
-    resetGame() {
-        if (confirm('Are you sure you want to reset the game? This cannot be undone.')) {
-            localStorage.removeItem('villageDefenseIdleo');
-            location.reload();
+            // Update current view
+            this.currentView = viewName;
+            // Update active tab UI
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.view === viewName) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            // Call view-specific logic
+            this.onViewSwitch(viewName);
+        } catch (err) {
+            // ...
         }
     }
-    
-    exportSave() {
-        const saveData = localStorage.getItem('villageDefenseIdleo');
-        if (saveData) {
-            const blob = new Blob([saveData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'village-defense-save.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            console.log('💾 Save exported');
+
+    onViewSwitch(viewName) {
+        try {
+            switch (viewName) {
+                case 'village':
+                    this.villageManager.renderBuildings();
+                    this.gameState.updateBuildButtons();
+                    break;
+                case 'battle':
+                    this.battleManager.renderBattleField();
+                    break;
+                case 'monarch':
+                    this.monarchManager.updateInvestmentDisplay();
+                    this.monarchManager.generateAdvisorAdvice();
+                    break;
+                case 'throne':
+                    this.throneManager.updateActiveBonuses();
+                    break;
+            this.updateProgressIcon();
+            }
+            // ...
+        } catch (err) {
+            // ...
         }
     }
-    
-    importSave(fileInput) {
-        const file = fileInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
+
+    startGameLoop() {
+        try {
+            const gameLoop = () => {
                 try {
-                    const saveData = e.target.result;
-                    localStorage.setItem('villageDefenseIdleo', saveData);
-                    location.reload();
-                } catch (error) {
-                    alert('Invalid save file');
-                    console.error('Failed to import save:', error);
+                    this.gameState.update();
+                    if (this.currentView === 'battle' && this.gameState.battleInProgress) {
+                        // Battle updates are handled by the battle manager's own timer
+                    }
+                    this.gameLoopId = requestAnimationFrame(gameLoop);
+                } catch (err) {
+                    // ...
                 }
             };
-            reader.readAsText(file);
+            gameLoop();
+            // ...
+        } catch (err) {
+            // ...
         }
     }
-    
-    // Performance monitoring
+
+    stopGameLoop() {
+        try {
+            if (this.gameLoopId) {
+                cancelAnimationFrame(this.gameLoopId);
+                this.gameLoopId = null;
+                console.log('[Game] Game loop stopped');
+            }
+        } catch (err) {
+            // ...
+        }
+    }
+
+    setupAutosave() {
+        try {
+            setInterval(() => {
+                try {
+                    this.gameState.save();
+                } catch (err) {
+                    // ...
+                }
+            }, 30000);
+            window.addEventListener('beforeunload', () => {
+                try {
+                    this.gameState.save();
+                } catch (err) {
+                    // ...
+                }
+            });
+            // ...
+        } catch (err) {
+            // ...
+        }
+    }
+
+    setupKeyboardShortcuts() {
+        try {
+            document.addEventListener('keydown', (e) => {
+                try {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                        return;
+                    }
+                    switch (e.key) {
+                        case '1':
+                            this.switchView('village');
+                            break;
+                        case '2':
+                            this.switchView('battle');
+                            break;
+                        case '3':
+                            this.switchView('monarch');
+                            break;
+                        case '4':
+                            this.switchView('throne');
+                            break;
+                        case 'Escape':
+                            if (this.currentView === 'village') {
+                                this.villageManager.exitBuildMode();
+                            }
+                            break;
+                        case 's':
+                            if (e.ctrlKey) {
+                                e.preventDefault();
+                                this.gameState.save();
+                                this.gameState.logBattleEvent('💾 Game saved manually');
+                            }
+                            break;
+                        case 'b':
+                            if (this.currentView === 'battle' && !this.gameState.battleInProgress) {
+                                this.battleManager.startBattle();
+                            }
+                            break;
+                    }
+                } catch (err) {
+                    // ...
+                }
+            });
+            // ...
+        } catch (err) {
+            // ...
+        }
+    }
+
+    resetGame() {
+        try {
+            if (confirm('Are you sure you want to reset the game? This cannot be undone.')) {
+                localStorage.removeItem('villageDefenseIdleo');
+                location.reload();
+            }
+        } catch (err) {
+            // ...
+        }
+    }
+
+    exportSave() {
+        try {
+            const saveData = localStorage.getItem('villageDefenseIdleo');
+            if (saveData) {
+                const blob = new Blob([saveData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'village-defense-save.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            // ...
+            }
+        } catch (err) {
+            // ...
+        }
+    }
+
+    importSave(fileInput) {
+        try {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const saveData = e.target.result;
+                        localStorage.setItem('villageDefenseIdleo', saveData);
+                        location.reload();
+                    } catch (error) {
+                        // ...
+                    }
+                };
+                reader.readAsText(file);
+            }
+        } catch (err) {
+            // ...
+        }
+    }
+
     getPerformanceStats() {
-        return {
-            buildings: this.gameState.buildings.length,
-            army: this.gameState.army.length,
-            mergeItems: this.gameState.mergeItems.length,
-            currentView: this.currentView,
-            battleInProgress: this.gameState.battleInProgress,
-            wave: this.gameState.wave,
-            gold: this.gameState.gold
-        };
+        try {
+            return {
+                buildings: this.gameState.buildings.length,
+                army: this.gameState.army.length,
+                mergeItems: this.gameState.mergeItems.length,
+                currentView: this.currentView,
+                battleInProgress: this.gameState.battleInProgress,
+                wave: this.gameState.wave,
+                gold: this.gameState.gold
+            };
+        } catch (err) {
+            // ...
+            return {};
+        }
     }
-    
-    // Cheat methods for testing (remove in production)
+
     cheat_addGold(amount = 1000) {
-        this.gameState.gold += amount;
-        this.gameState.updateUI();
-        console.log(`Added ${amount} gold`);
+        try {
+            this.gameState.gold += amount;
+            this.gameState.updateUI();
+            // ...
+        } catch (err) {
+            // ...
+        }
     }
-    
+
     cheat_addResources(amount = 100) {
-        this.gameState.resources.food += amount;
-        this.gameState.resources.wood += amount;
-        this.gameState.resources.stone += amount;
-        this.gameState.updateUI();
-        console.log(`Added ${amount} of each resource`);
+        try {
+            this.gameState.resources.food += amount;
+            this.gameState.resources.wood += amount;
+            this.gameState.resources.stone += amount;
+            this.gameState.updateUI();
+            // ...
+        } catch (err) {
+            // ...
+        }
     }
-    
+
     cheat_skipWave() {
-        this.gameState.wave++;
-        this.battleManager.generateEnemies();
-        this.gameState.updateUI();
-        console.log(`Skipped to wave ${this.gameState.wave}`);
+        try {
+            this.gameState.wave++;
+            this.battleManager.generateEnemies();
+            this.gameState.updateUI();
+            // ...
+        } catch (err) {
+            // ...
+        }
     }
 }
 
-// Initialize game when page loads
-document.addEventListener('DOMContentLoaded', () => {
+// Attach startGame to window after class definition
+window.startGame = function() {
     const game = new Game();
     game.init();
-    
     // Add CSS animations that weren't included in the CSS file
     const style = document.createElement('style');
     style.textContent = `
@@ -383,21 +453,17 @@ document.addEventListener('DOMContentLoaded', () => {
             50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.8; }
             100% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
         }
-        
         .drag-over {
             background: rgba(26, 188, 156, 0.3) !important;
             border-color: #1abc9c !important;
         }
-        
         .merge-item {
             transition: all 0.3s ease;
         }
-        
         .merge-item:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
         }
-        
         .army-unit {
             display: flex;
             align-items: center;
@@ -406,24 +472,28 @@ document.addEventListener('DOMContentLoaded', () => {
             background: rgba(255,255,255,0.1);
             border-radius: 5px;
         }
-        
         .unit-icon {
             margin-right: 10px;
             font-size: 1.2rem;
         }
-        
         .unit-stats {
             font-size: 0.8rem;
             color: #ecf0f1;
         }
     `;
     document.head.appendChild(style);
+    window._gameInstance = game;
+}
+
+// Auto-start the game on DOMContentLoaded if not already started
+document.addEventListener('DOMContentLoaded', () => {
+    if (!window._gameInstance) {
+        console.log('[Game] DOMContentLoaded: auto-starting game');
+        window.startGame();
+    }
 });
 
 // Global error handling
-window.addEventListener('error', (e) => {
-    console.error('Game error:', e.error);
-    // You might want to send this to an error tracking service
-});
+//
 
 console.log('🎮 Village Defense: Idleo - Game script loaded');

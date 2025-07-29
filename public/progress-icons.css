@@ -1,0 +1,40 @@
+/* Progress, sound, and settings icons for top-right UI */
+#top-right-icons {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.icon-btn {
+  background: rgba(30,30,30,0.85);
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.icon-btn:hover {
+  background: #444;
+}
+.icon-btn.progress-complete {
+  background: #27ae60;
+  color: #fff;
+}
+.icon-btn.progress-incomplete {
+  background: #e67e22;
+  color: #fff;
+}
+.icon-btn.progress-locked {
+  background: #7f8c8d;
+  color: #fff;
+}

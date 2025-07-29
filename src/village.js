@@ -1,7 +1,8 @@
 // Village management system
 class VillageManager {
-    constructor(gameState) {
+    constructor(gameState, game) {
         this.gameState = gameState;
+        this.game = game;
         this.villageGrid = null;
         this.gridSize = 50; // Size of each grid cell
         this.supplyChains = []; // For carriages/runners visualization
@@ -150,22 +151,20 @@ class VillageManager {
         this.gameState.addBuilding(building);
         this.renderBuildings();
         // Log building placement
-        this.gameState.logBattleEvent(`🏗️ Built ${type} at position (${x}, ${y})`);
+        // ...
         // Start production animation
         this.startBuildingProduction(building.id);
 
-        // Tutorial progression: track house, farm, townCenter
-        if (window.game && window.game.tutorialActive) {
-            if (["house", "farm", "townCenter"].includes(type)) {
-                this.tutorialBuildings.add(type);
-                if (
-                    this.tutorialBuildings.has("house") &&
-                    this.tutorialBuildings.has("farm") &&
-                    this.tutorialBuildings.has("townCenter")
-                ) {
-                    window.game.completeTutorial();
-                    window.game.gameState.logBattleEvent('🗝️ Tutorial complete! Battle mode unlocked.');
-                }
+        // Milestone-based unlocking
+        if (this.game && this.game.tutorialActive) {
+            if (type === 'townCenter') {
+                this.game.unlockView('battle');
+            }
+            if (type === 'farm') {
+                this.game.unlockView('monarch');
+            }
+            if (type === 'house') {
+                this.game.unlockView('throne');
             }
         }
     }
@@ -342,7 +341,7 @@ class VillageManager {
         // Implementation depends on automation level from prestige
         if (this.getAutomationLevel() !== 'manual') {
             // Auto-assign logic here
-            console.log('Auto-assigning citizens based on current needs...');
+            // ...
         }
     }
 }
