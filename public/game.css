@@ -1,0 +1,505 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #2c3e50;
+    color: #ecf0f1;
+    overflow: hidden;
+}
+
+#game-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Navigation */
+#view-navigation {
+    background: #34495e;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    border-bottom: 3px solid #1abc9c;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.nav-btn {
+    padding: 0.75rem 1.5rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.nav-btn:hover {
+    background: #2980b9;
+    transform: translateY(-2px);
+}
+
+.nav-btn.active {
+    background: #1abc9c;
+    box-shadow: 0 4px 15px rgba(26, 188, 156, 0.3);
+}
+
+/* Game Views */
+#game-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.game-view {
+    display: none;
+    height: 100%;
+    padding: 1rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.game-view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Village View */
+.village-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.village-header h2 {
+    color: #1abc9c;
+    font-size: 1.5rem;
+}
+
+.resource-panel {
+    display: flex;
+    gap: 2rem;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.resource-panel span {
+    color: #ecf0f1;
+}
+
+.village-content {
+    display: flex;
+    height: calc(100% - 100px);
+    gap: 1rem;
+}
+
+.village-grid {
+    flex: 1;
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    border-radius: 8px;
+    position: relative;
+    min-height: 500px;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+    cursor: default;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.village-grid.build-mode {
+    cursor: crosshair;
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    box-shadow: inset 0 0 20px rgba(255,255,255,0.2);
+}
+
+.village-sidebar {
+    width: 280px;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.building-menu h3,
+.village-info h3 {
+    margin-bottom: 1rem;
+    color: #1abc9c;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #1abc9c;
+    padding-bottom: 0.5rem;
+}
+
+.build-btn {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+}
+
+.build-btn:hover {
+    background: #2980b9;
+    transform: translateX(5px);
+}
+
+.build-btn:disabled {
+    background: #7f8c8d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.build-btn.selected {
+    background: #e74c3c;
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+}
+
+.village-info {
+    margin-top: 2rem;
+}
+
+.village-info p {
+    margin-bottom: 0.5rem;
+    color: #bdc3c7;
+}
+
+/* Building Styles */
+.building {
+    position: absolute;
+    width: 45px;
+    height: 45px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.building:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+.building.house { 
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.building.farm { 
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+}
+
+.building.townCenter { 
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+
+.building.barracks { 
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+}
+
+/* Battle View */
+.battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #8b4513, #a0522d);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.battle-header h2 {
+    color: #fff;
+    font-size: 1.5rem;
+}
+
+.action-btn {
+    padding: 0.75rem 1.5rem;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    background: #c0392b;
+    transform: scale(1.05);
+}
+
+.battle-content {
+    display: flex;
+    height: calc(100% - 100px);
+    gap: 1rem;
+}
+
+#battle-field {
+    flex: 1;
+    background: linear-gradient(135deg, #8b4513, #a0522d);
+    border-radius: 8px;
+    position: relative;
+    min-height: 400px;
+    padding: 2rem;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.battle-info {
+    color: #fff;
+    text-align: center;
+}
+
+.battle-info p {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+#battle-log {
+    background: rgba(0,0,0,0.3);
+    border-radius: 5px;
+    padding: 1rem;
+    margin-top: 1rem;
+    min-height: 200px;
+    color: #ecf0f1;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.army-panel {
+    width: 250px;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.army-panel h3 {
+    color: #1abc9c;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #1abc9c;
+    padding-bottom: 0.5rem;
+}
+
+/* Monarch View */
+.monarch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #8e44ad, #9b59b6);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.monarch-header h2 {
+    color: #fff;
+    font-size: 1.5rem;
+}
+
+.gold-display {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #f1c40f;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.monarch-content {
+    height: calc(100% - 100px);
+    overflow-y: auto;
+}
+
+.investment-categories {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.investment-category {
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.investment-category h3 {
+    color: #1abc9c;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #1abc9c;
+    padding-bottom: 0.5rem;
+}
+
+.investment-btn {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: #f39c12;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+    text-align: left;
+}
+
+.investment-btn:hover {
+    background: #e67e22;
+    transform: translateX(5px);
+}
+
+.investment-btn:disabled {
+    background: #7f8c8d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Throne View */
+.throne-header {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.throne-header h2 {
+    color: #f1c40f;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.throne-header p {
+    color: #bdc3c7;
+}
+
+.throne-content {
+    display: flex;
+    height: calc(100% - 100px);
+    gap: 2rem;
+}
+
+.merge-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 10px;
+    background: linear-gradient(135deg, #2c3e50, #34495e);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+
+.merge-slot {
+    background: rgba(255,255,255,0.1);
+    border-radius: 5px;
+    border: 2px dashed rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.merge-slot:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: #1abc9c;
+}
+
+.merge-info {
+    width: 300px;
+    background: linear-gradient(135deg, #34495e, #2c3e50);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.merge-info h3 {
+    color: #1abc9c;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #1abc9c;
+    padding-bottom: 0.5rem;
+}
+
+#active-bonuses p {
+    color: #bdc3c7;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .village-content,
+    .battle-content,
+    .throne-content {
+        flex-direction: column;
+    }
+    
+    .village-sidebar,
+    .army-panel,
+    .merge-info {
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .investment-categories {
+        grid-template-columns: 1fr;
+    }
+    
+    .resource-panel {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.building.producing {
+    animation: pulse 2s infinite;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.battle-log-entry {
+    animation: slideIn 0.5s ease;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem;
+    border-left: 3px solid #1abc9c;
+    padding-left: 0.5rem;
+}

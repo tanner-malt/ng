@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Village Defense: Idleo</title>
+    <link rel="stylesheet" href="game.css">
+</head>
+<body>
+    <div id="game-container">
+        <nav id="view-navigation">
+            <button class="nav-btn active" data-view="village">Village</button>
+            <button class="nav-btn" data-view="battle">Battle</button>
+            <button class="nav-btn" data-view="monarch">Monarch</button>
+            <button class="nav-btn" data-view="throne">Throne</button>
+        </nav>
+        
+        <main id="game-content">
+            <!-- Village View -->
+            <div id="village-view" class="game-view active">
+                <div class="village-header">
+                    <h2>Village Management</h2>
+                    <div class="resource-panel">
+                        <span>Food: <span id="food-count">100</span></span>
+                        <span>Wood: <span id="wood-count">50</span></span>
+                        <span>Stone: <span id="stone-count">25</span></span>
+                        <span>Population: <span id="population-count">10</span></span>
+                        <span>Season: <span id="season-display">Spring</span></span>
+                    </div>
+                </div>
+                <div class="village-content">
+                    <div id="village-grid" class="village-grid"></div>
+                    <div class="village-sidebar">
+                        <div class="building-menu">
+                            <h3>Buildings</h3>
+                            <button class="build-btn" data-building="house">House (10 Wood)</button>
+                            <button class="build-btn" data-building="farm">Farm (15 Wood, 5 Stone)</button>
+                            <button class="build-btn" data-building="townCenter">Town Center (50 Wood, 25 Stone)</button>
+                            <button class="build-btn" data-building="barracks">Barracks (30 Wood, 20 Stone)</button>
+                        </div>
+                        <div class="village-info">
+                            <h3>Village Stats</h3>
+                            <p>Buildings: <span id="building-count">2</span></p>
+                            <p>Supply Routes: <span id="supply-routes">Active</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Battle View -->
+            <div id="battle-view" class="game-view">
+                <div class="battle-header">
+                    <h2>Automated Battle - Wave <span id="wave-count">1</span></h2>
+                    <button id="start-battle-btn" class="action-btn">Start Battle</button>
+                </div>
+                <div class="battle-content">
+                    <div id="battle-field">
+                        <div class="battle-info">
+                            <p>🛡️ Watch your army automatically strategize and fight!</p>
+                            <p>⚔️ Battle outcomes depend on your village preparation</p>
+                            <div id="battle-log"></div>
+                        </div>
+                    </div>
+                    <div class="army-panel">
+                        <h3>Your Army</h3>
+                        <div id="army-units"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Monarch View -->
+            <div id="monarch-view" class="game-view">
+                <div class="monarch-header">
+                    <h2>Royal Court</h2>
+                    <div class="gold-display">Gold: <span id="gold-count">1000</span></div>
+                </div>
+                <div class="monarch-content">
+                    <div class="investment-categories">
+                        <div class="investment-category">
+                            <h3>Village Improvements</h3>
+                            <button class="investment-btn" data-cost="100">Production Boost (+10% efficiency) - 100 Gold</button>
+                            <button class="investment-btn" data-cost="250">New Building Types - 250 Gold</button>
+                            <button class="investment-btn" data-cost="500">Automation Level Up - 500 Gold</button>
+                        </div>
+                        <div class="investment-category">
+                            <h3>Military Upgrades</h3>
+                            <button class="investment-btn" data-cost="200">Army Scouts (Better AI) - 200 Gold</button>
+                            <button class="investment-btn" data-cost="400">Elite Generals - 400 Gold</button>
+                            <button class="investment-btn" data-cost="800">Tactical Academy - 800 Gold</button>
+                        </div>
+                        <div class="investment-category">
+                            <h3>Legacy Systems</h3>
+                            <button class="investment-btn" data-cost="1000">Parallel Villages - 1000 Gold</button>
+                            <button class="investment-btn" data-cost="2000">Prestige Automation - 2000 Gold</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Throne View -->
+            <div id="throne-view" class="game-view">
+                <div class="throne-header">
+                    <h2>Throne Room</h2>
+                    <p>Merge ceremonial items for permanent bonuses</p>
+                </div>
+                <div class="throne-content">
+                    <div id="merge-grid" class="merge-grid">
+                        <!-- Merge items will be dynamically added here -->
+                    </div>
+                    <div class="merge-info">
+                        <h3>Active Bonuses</h3>
+                        <div id="active-bonuses">
+                            <p>No bonuses yet - start merging!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="../src/gameState.js"></script>
+    <script src="../src/village.js"></script>
+    <script src="../src/battle.js"></script>
+    <script src="../src/monarch.js"></script>
+    <script src="../src/throne.js"></script>
+    <script src="../src/app.js"></script>
+</body>
+</html>
