@@ -8,6 +8,70 @@
 </head>
 <body>
   <h1>Welcome to My Game!</h1>
-  <script src="../src/main.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NG: Monarch's Gambit</title>
+  <link rel="stylesheet" href="public/game.css">
+  <style>
+    body {
+      background: #181c24;
+      color: #f5f5f5;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: rgba(30,34,44,0.95);
+      border-radius: 16px;
+      box-shadow: 0 4px 32px #0008;
+      padding: 2.5rem 2.5rem 2rem 2.5rem;
+      max-width: 420px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      letter-spacing: 1px;
+    }
+    p {
+      font-size: 1.1rem;
+      margin-bottom: 2rem;
+      color: #bfc7d5;
+    }
+    .start-btn {
+      background: linear-gradient(90deg, #4e54c8, #8f94fb);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.9rem 2.2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      box-shadow: 0 2px 8px #0004;
+    }
+    .start-btn:hover {
+      background: linear-gradient(90deg, #8f94fb, #4e54c8);
+      transform: translateY(-2px) scale(1.04);
+    }
+    .footer {
+      margin-top: 2.5rem;
+      color: #6c7a99;
+      font-size: 0.95rem;
+    }
+  </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Monarch's Gambit</h1>
+      <p>Lead your village, command armies, and shape the fate of your kingdom. Will you rise to the throne or fall to your rivals? Experience a deep strategy game with AI battles, resource management, and prestige mechanics—all in your browser.</p>
+      <a href="public/game.html"><button class="start-btn">Start Game</button></a>
+    </div>
+    <div class="footer">&copy; 2025 Monarch's Gambit &mdash; Created by tanner-malt</div>
+  </body>
+  </html>
 </body>
 </html>

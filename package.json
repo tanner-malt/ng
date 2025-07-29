@@ -1,0 +1,23 @@
+{
+  "name": "ng-monarchs-gambit",
+  "version": "1.0.0",
+  "description": "A browser-based strategy game: manage your village, battle AI, and ascend the throne.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "npx serve . -l 8000",
+    "dev": "npx serve . -l 8000 --no-clipboard"
+  },
+  "keywords": [
+    "strategy",
+    "browser-game",
+    "village",
+    "ai-battle",
+    "monarch",
+    "kingdom"
+  ],
+  "author": "tanner-malt",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}
