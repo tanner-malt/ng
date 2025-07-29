@@ -1,5 +1,6 @@
 // Main application initialization and view management
 class Game {
+    tutorialActive = true;
     constructor() {
         this.gameState = gameState;
         this.villageManager = new VillageManager(this.gameState);
@@ -17,9 +18,73 @@ class Game {
         const loadedSuccessfully = this.gameState.load();
         if (loadedSuccessfully) {
             console.log('📁 Loaded saved game');
+            this.tutorialActive = false;
         } else {
             console.log('🆕 Starting new game');
+            this.tutorialActive = true;
+            setTimeout(() => this.showTutorialIntro(), 500);
         }
+    showTutorialIntro() {
+    
+    showTutorialIntro() {
+        // Create chatbox if it doesn't exist
+        let chatbox = document.getElementById('tutorial-chatbox');
+        if (!chatbox) {
+            chatbox = document.createElement('div');
+            chatbox.id = 'tutorial-chatbox';
+            chatbox.style.position = 'fixed';
+            chatbox.style.bottom = '32px';
+            chatbox.style.left = '32px';
+            chatbox.style.maxWidth = '340px';
+            chatbox.style.background = 'rgba(30,34,44,0.98)';
+            chatbox.style.color = '#fff';
+            chatbox.style.borderRadius = '12px';
+            chatbox.style.boxShadow = '0 4px 24px #0008';
+            chatbox.style.padding = '1.2rem 1.5rem 1.2rem 1.5rem';
+            chatbox.style.fontSize = '1.08rem';
+            chatbox.style.zIndex = '1000';
+            chatbox.style.display = 'flex';
+            chatbox.style.flexDirection = 'column';
+            chatbox.style.gap = '1rem';
+            document.body.appendChild(chatbox);
+        }
+        chatbox.innerHTML = '';
+        // Tutorial message
+        const msg = document.createElement('div');
+        msg.innerHTML = `<b>Welcome!</b><br>This is your <b>village view mode</b>, where you will manage the logistics of your kingdom!<br><br>You are the son of the king, and the king sent you to establish a new village to defend!<br><br><b>First, place your Town Center.</b>`;
+        chatbox.appendChild(msg);
+        // Next button
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Got it!';
+        nextBtn.style.background = 'linear-gradient(90deg, #4e54c8, #8f94fb)';
+        nextBtn.style.color = '#fff';
+        nextBtn.style.border = 'none';
+        nextBtn.style.borderRadius = '8px';
+        nextBtn.style.padding = '0.6rem 1.5rem';
+        nextBtn.style.fontWeight = '600';
+        nextBtn.style.cursor = 'pointer';
+        nextBtn.onclick = () => {
+            chatbox.style.display = 'none';
+            this.highlightTownCenterButton();
+        };
+        chatbox.appendChild(nextBtn);
+        chatbox.style.display = 'flex';
+    }
+
+    highlightTownCenterButton() {
+        // Highlight the Town Center build button
+        const btn = document.querySelector('.build-btn[data-building="townCenter"]');
+        if (btn) {
+            btn.classList.add('tutorial-highlight');
+            btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+            // Remove highlight after first click
+            const removeHighlight = () => {
+                btn.classList.remove('tutorial-highlight');
+                btn.removeEventListener('click', removeHighlight);
+            };
+            btn.addEventListener('click', removeHighlight);
+        }
+    }
         
         // Initialize all managers
         this.villageManager.init();
@@ -54,9 +119,37 @@ class Game {
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const targetView = btn.dataset.view;
+                if (this.tutorialActive && targetView !== 'village') {
+                    this.showTutorialLockMessage(targetView);
+                    return;
+                }
                 this.switchView(targetView);
             });
         });
+        this.updateTabLocks();
+    }
+
+    updateTabLocks() {
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            const targetView = btn.dataset.view;
+            if (this.tutorialActive && targetView !== 'village') {
+                btn.disabled = true;
+                btn.classList.add('locked');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('locked');
+            }
+        });
+    }
+
+    showTutorialLockMessage(view) {
+        alert('Complete the tutorial in the Village view before accessing other areas!');
+    }
+
+    completeTutorial() {
+        this.tutorialActive = false;
+        this.updateTabLocks();
+        this.gameState.logBattleEvent('🎉 Tutorial complete! All views unlocked.');
     }
     
     switchView(viewName) {

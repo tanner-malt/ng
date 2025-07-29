@@ -1,18 +1,19 @@
 {
-  "name": "ng-monarchs-gambit",
+  "name": "idle-dynasty",
   "version": "1.0.0",
-  "description": "A browser-based strategy game: manage your village, battle AI, and ascend the throne.",
+  "description": "Idle Dynasty: Lead your people from humble beginnings to a thriving dynasty in this idle strategy game.",
   "main": "src/main.js",
   "scripts": {
     "start": "npx serve . -l 8000",
     "dev": "npx serve . -l 8000 --no-clipboard"
   },
   "keywords": [
+    "idle",
     "strategy",
     "browser-game",
     "village",
     "ai-battle",
-    "monarch",
+    "dynasty",
     "kingdom"
   ],
   "author": "tanner-malt",
