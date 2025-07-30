@@ -1,47 +1,79 @@
-// Chatbox/modal styles for unlock/tutorial messages
-.game-chatbox {
+// Notification overlay for modal effect
+#notification-overlay {
   position: fixed;
-  background: rgba(44, 62, 80, 0.98);
-  color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
-  font-size: 1.1em;
-  z-index: 9999;
-  max-width: 340px;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 34, 44, 0.55);
+  z-index: 9998;
+  display: none;
+}
+
+#notification-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  align-items: center;
+  pointer-events: none;
+}
+.game-notification {
+  pointer-events: auto;
+}
+// Emoji-friendly font stack for game tiles and icons
+.game-tile, .merge-item, .army-unit, .unit-icon, .icon-btn, .game-notification span:first-child {
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', 'Segoe UI', Arial, sans-serif !important;
+  font-size: 1.5em;
+  line-height: 1.2;
+  text-align: center;
+  vertical-align: middle;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 28px 18px 18px;
+  justify-content: center;
 }
-.unlock-chatbox {
-  bottom: 30px;
-  right: 30px;
+.game-notification-info {
+  border-left: 5px solid #8f94fb;
 }
-.tutorial-chatbox {
-  bottom: 32px;
-  left: 32px;
-  flex-direction: column;
+.game-notification-success {
+  border-left: 5px solid #27ae60;
+  background: #233b2c;
+}
+.game-notification-warning {
+  border-left: 5px solid #f1c40f;
+  background: #3b3623;
+}
+.game-notification-error {
+  border-left: 5px solid #e74c3c;
+  background: #3b2323;
+}
+// Chatbox/modal styles for unlock/tutorial messages
+
+// Notification/toast for tutorial/milestone
+.game-notification {
+  background: #232c3b;
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  font-size: 1.08em;
+  padding: 1.1rem 1.7rem;
+  margin: 0;
+  min-width: 220px;
+  max-width: 350px;
+  display: flex;
+  align-items: center;
   gap: 1rem;
-  padding: 1.2rem 1.5rem 1.2rem 1.5rem;
-  font-size: 1.08rem;
+  border-left: 5px solid #8f94fb;
+  animation: fadeInUp 0.4s;
 }
-.chatbox-close {
-  background: none;
-  border: none;
-  color: #fff;
-  font-size: 1.5em;
-  cursor: pointer;
-  margin-left: auto;
-}
-.chatbox-btn {
-  background: linear-gradient(90deg, #4e54c8, #8f94fb);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 0.6rem 1.5rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 0.5rem;
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 // Locked navigation button style

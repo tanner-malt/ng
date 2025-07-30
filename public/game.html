@@ -1,3 +1,28 @@
+    <!-- Main Menu Popup (styled with .popup-modal and .popup-content from style.less) -->
+    <div id="main-menu-popup" class="popup-modal" style="display:none;">
+      <div class="popup-content">
+        <h3>Main Menu</h3>
+        <button id="resume-btn">Resume Game</button>
+        <button id="settings-menu-btn">Settings</button>
+        <button id="quit-menu-btn">Quit to Title</button>
+        <button class="popup-close" onclick="document.getElementById('main-menu-popup').style.display='none'">Close</button>
+      </div>
+    </div>
+
+
+    <!-- Notification overlay and container for tutorial/milestone notifications -->
+    <div id="notification-overlay" style="display:none;"></div>
+    <div id="notification-container" style="display:flex;"></div>
+    <!-- Progression Popup -->
+    <div id="progress-popup" class="popup-modal" style="display:none;">
+      <div class="popup-content">
+        <h3>Progression</h3>
+        <div id="progress-battle"></div>
+        <div id="progress-monarch"></div>
+        <div id="progress-throne"></div>
+        <button class="popup-close" onclick="document.getElementById('progress-popup').style.display='none'">Close</button>
+      </div>
+    </div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,12 +164,28 @@
       </div>
     </div>
     
-    <script src="../src/gameState.js"></script>
-    <script src="../src/village.js"></script>
-    <script src="../src/battle.js"></script>
-    <script src="../src/monarch.js"></script>
-    <script src="../src/throne.js"></script>
-    <script src="../src/tutorial.js"></script>
-    <script src="../src/app.js"></script>
+</main>
+</div>
+
+<div id="settings-popup" class="popup-modal" style="display:none;">
+  <div class="popup-content">
+    <h3>Menu</h3>
+    <div id="game-version" style="margin-bottom:1rem; color:#bdc3c7; font-size:0.95rem;"></div>
+    <button id="quit-btn">Quit to Title</button>
+    <button class="popup-close" onclick="document.getElementById('settings-popup').style.display='none'">Close</button>
+  </div>
+</div>
+
+<!-- Move all scripts to the very end of <body> so all DOM is loaded first -->
+<script src="../src/gameState.js"></script>
+<script src="../src/village.js"></script>
+<script src="../src/battle.js"></script>
+<script src="../src/monarch.js"></script>
+<script src="../src/throne.js"></script>
+<script src="../src/tutorial.js"></script>
+<script src="../src/uiPopups.js"></script>
+<script src="../src/app.js"></script>
+</body>
+</html>
 </body>
 </html>

@@ -10,7 +10,10 @@ class Game {
     // Popup/modal logic is now in uiPopups.js
     bindTopRightPopups() {
         if (window.bindTopRightPopups) {
+            console.log('[Game] window.bindTopRightPopups exists, calling it');
             window.bindTopRightPopups(this);
+        } else {
+            console.log('[Game] window.bindTopRightPopups is NOT defined');
         }
     }
 
@@ -80,6 +83,7 @@ class Game {
 
     init() {
         try {
+            console.log('[Game] Game.init called');
             // ...
             const loadedSuccessfully = this.gameState.load();
             if (loadedSuccessfully) {
@@ -101,6 +105,7 @@ class Game {
             this.setupNavigation();
             this.gameState.updateUI();
             this.updateProgressIcon();
+            console.log('[Game] Calling bindTopRightPopups from Game.init');
             this.bindTopRightPopups();
             this.startGameLoop();
             this.setupAutosave();
