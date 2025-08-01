@@ -67,39 +67,76 @@
     <!-- Game Container -->
     <div id="game-container">
         <!-- Navigation -->
-        <nav id="game-nav">
+        <nav id="view-navigation">
             <button class="nav-btn active" data-view="village">Village</button>
             <button class="nav-btn locked" data-view="world">World</button>
             <button class="nav-btn locked" data-view="monarch">Monarch</button>
             <button class="nav-btn locked" data-view="throne">Throne</button>
         </nav>
 
-        <!-- Views Container -->
-        <div id="views-container">
+        <!-- Game Content -->
+        <div id="game-content">
             <!-- Village View -->
-            <div id="village-view" class="view-container active">
-                <div class="village-header">
+            <div id="village-view" class="game-view active">
+                                <div class="village-header">
                     <h2>🏘️ Your Village</h2>
-                    <div id="village-resources" class="resource-display">
-                        <div class="resource-item">
-                            <span class="resource-icon">💰</span>
-                            <span id="gold-amount">100</span>
+                    <div class="resource-panel">
+                        <span>💰 Gold: <span id="gold-count">100</span></span>
+                        <span>🌾 Food: <span id="food-count">50</span></span>
+                        <span>🌲 Wood: <span id="wood-count">50</span></span>
+                        <span>🪨 Stone: <span id="stone-count">30</span></span>
+                        <span>🪙 Metal: <span id="metal-count">10</span></span>
+                        <span>👥 Population: <span id="population-count">1</span></span>
+                        <span>🌸 Season: <span id="season-count">Spring</span></span>
+                    </div>
+                </div>
+
+                <!-- Scout Report Bar -->
+                <div class="scout-report-bar">
+                    <div class="scout-info">
+                        <span class="day-counter">Day <span id="current-day">1</span></span>
+                        <div class="scout-progress-container">
+                            <span class="scout-status" id="scout-status">Scouts gathering intelligence...</span>
+                            <div class="scout-progress-bar">
+                                <div class="scout-progress-fill" id="scout-progress-fill"></div>
+                                <span class="scout-progress-text" id="scout-progress-text">Day 1 of 5</span>
+                            </div>
                         </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🌾</span>
-                            <span id="food-amount">50</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🌲</span>
-                            <span id="wood-amount">50</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">🪨</span>
-                            <span id="stone-amount">30</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-icon">👥</span>
-                            <span id="population-amount">1</span>
+                    </div>
+                    <div class="day-controls">
+                        <button id="auto-play-btn" class="auto-play-btn" title="Auto-advance days (20s interval)">
+                            <span id="auto-play-icon">▶️</span>
+                            <span id="auto-play-text">Play</span>
+                        </button>
+                        <button id="end-day-btn" class="end-day-btn" title="Advance to next day">
+                            End Day 🌅
+                        </button>
+                    </div>
+                </div>
+
+                <div class="village-content">
+                    <div id="village-grid" class="village-grid"></div>
+                    
+                    <div class="village-sidebar">
+                        <div class="village-info">
+                            <h3>🏗️ Buildings</h3>
+                            <div class="building-list">
+                                <button id="build-townCenter" class="building-btn" data-building="townCenter" title="Cost: 💰 100 🌲 50 🪨 30">
+                                    🏛️ Town Center (💰 100 🌲 50 🪨 30)
+                                </button>
+                                <button id="build-house" class="building-btn" data-building="house" title="Cost: 💰 50 🌲 25">
+                                    🏠 House (💰 50 🌲 25)
+                                </button>
+                                <button id="build-farm" class="building-btn" data-building="farm" title="Cost: 💰 75 🌲 40">
+                                    🌾 Farm (💰 75 🌲 40)
+                                </button>
+                                <button id="build-barracks" class="building-btn" data-building="barracks" title="Cost: 💰 150 🌲 75 🪨 50">
+                                    ⚔️ Barracks (� 150 🌲 75 🪨 50)
+                                </button>
+                                <button id="build-workshop" class="building-btn" data-building="workshop" title="Cost: 💰 125 🌲 60 🪨 40">
+                                    🔧 Workshop (💰 125 🌲 60 🪨 40)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -159,7 +196,7 @@
             </div>
 
             <!-- World View -->
-            <div id="world-view" class="view-container">
+            <div id="world-view" class="game-view">
                 <div class="locked-view">
                     <h2>🗺️ World Map</h2>
                     <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
@@ -167,7 +204,7 @@
             </div>
 
             <!-- Monarch View -->
-            <div id="monarch-view" class="view-container">
+            <div id="monarch-view" class="game-view">
                 <div class="locked-view">
                     <h2>👑 Monarch's Court</h2>
                     <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
@@ -175,7 +212,7 @@
             </div>
 
             <!-- Throne View -->
-            <div id="throne-view" class="view-container">
+            <div id="throne-view" class="game-view">
                 <div class="locked-view">
                     <h2>🏰 The Throne</h2>
                     <p class="lock-message">This feature will be unlocked as you progress through the game.</p>

@@ -11,42 +11,6 @@ body {
     overflow: hidden;
 }
 
-/* Top Right Icons */
-#top-right-icons {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    gap: 8px;
-    z-index: 1000;
-}
-
-.icon-btn {
-    width: 40px;
-    height: 40px;
-    border: none;
-    border-radius: 8px;
-    background: rgba(52, 73, 94, 0.9);
-    color: #ecf0f1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-}
-
-.icon-btn:hover {
-    background: rgba(52, 152, 219, 0.9);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-}
-
-.icon-btn span {
-    font-size: 16px;
-}
-
 #game-container {
     height: 100vh;
     display: flex;
@@ -54,16 +18,13 @@ body {
 }
 
 /* Navigation */
-#game-nav {
+#view-navigation {
     background: #34495e;
     padding: 1rem;
     display: flex;
     gap: 1rem;
     border-bottom: 3px solid #1abc9c;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-    height: 60px;
-    align-items: center;
-    flex-shrink: 0;
 }
 
 .nav-btn {
@@ -100,22 +61,21 @@ body {
 }
 
 /* Game Views */
-#views-container {
+#game-content {
     flex: 1;
     position: relative;
     overflow: hidden;
 }
 
-.view-container {
+.game-view {
     display: none;
-    height: calc(100vh - 60px); /* Account for navigation height */
-    overflow: hidden;
+    height: 100%;
+    padding: 1rem;
     animation: fadeIn 0.3s ease;
 }
 
-.view-container.active {
-    display: flex;
-    flex-direction: column;
+.game-view.active {
+    display: block;
 }
 
 @keyframes fadeIn {
@@ -123,166 +83,21 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Resource Display */
-.resource-display {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.resource-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: rgba(52, 73, 94, 0.6);
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(26, 188, 156, 0.3);
-}
-
-.resource-icon {
-    font-size: 1.2rem;
-}
-
-.resource-item span:last-child {
-    font-weight: bold;
-    color: #1abc9c;
-}
-
-/* Building Controls */
-.building-panel {
-    background: linear-gradient(135deg, #34495e, #2c3e50);
-    border-radius: 8px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.building-panel h3 {
-    color: #1abc9c;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
-}
-
-.building-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.building-btn {
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    border: none;
-    border-radius: 8px;
-    padding: 0.75rem;
-    color: white;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 60px;
-    text-align: left;
-}
-}
-
-.building-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.3);
-}
-
-.building-btn:disabled {
-    background: linear-gradient(135deg, #7f8c8d, #95a5a6);
-    cursor: not-allowed;
-    transform: none;
-}
-
-.building-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-}
-
-.building-name {
-    font-weight: bold;
-    font-size: 1rem;
-    flex: 1;
-}
-
-.building-cost {
-    font-size: 0.8rem;
-    opacity: 0.9;
-    flex-shrink: 0;
-}
-
-/* Locked Views */
-.locked-view {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 60vh;
-    text-align: center;
-}
-
-.locked-view h2 {
-    color: #3498db;
-    margin-bottom: 1rem;
-    font-size: 2rem;
-}
-
-.lock-message {
-    color: #bdc3c7;
-    font-size: 1.1rem;
-    max-width: 400px;
-    line-height: 1.6;
-}
-
-/* Village View Layout */
-#village-view {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    padding: 0;
-}
-
+/* Village View */
 .village-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 1rem;
     padding: 1rem;
     background: linear-gradient(135deg, #34495e, #2c3e50);
-    border-bottom: 2px solid #1abc9c;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    z-index: 100;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 .village-header h2 {
     color: #1abc9c;
     font-size: 1.5rem;
-}
-
-.village-content {
-    flex: 1;
-    display: flex;
-    gap: 1rem;
-    padding: 1rem;
-    overflow: hidden;
-}
-
-.village-left-panel {
-    width: 300px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.village-main-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
 }
 
 .resource-panel {
@@ -318,38 +133,8 @@ body {
 
 .day-controls {
     display: flex;
-    flex-direction: column;
     gap: 0.5rem;
-    padding: 1rem;
-    background: linear-gradient(135deg, #34495e, #2c3e50);
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-}
-
-.current-day {
-    text-align: center;
-    font-weight: bold;
-    color: #1abc9c;
-    margin-bottom: 0.5rem;
-}
-
-.end-day-button, .auto-play-button {
-    padding: 0.75rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.end-day-button {
-    background: linear-gradient(135deg, #e74c3c, #c0392b);
-    color: white;
-}
-
-.auto-play-button {
-    background: linear-gradient(135deg, #f39c12, #e67e22);
-    color: white;
+    align-items: center;
 }
 
 .scout-progress-container {
@@ -2443,4 +2228,85 @@ body {
 .mini-modal-body::-webkit-scrollbar-thumb {
     background: #3498db;
     border-radius: 3px;
+}
+
+/* Village Content Layout */
+.village-content {
+    display: flex;
+    gap: 1rem;
+    height: calc(100% - 200px); /* Adjust for header and scout bar */
+}
+
+.village-grid {
+    flex: 1;
+    background: rgba(52, 73, 94, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 400px;
+}
+
+.village-sidebar {
+    width: 300px;
+    background: rgba(52, 73, 94, 0.5);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.village-info h3 {
+    color: #1abc9c;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.building-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.building-btn {
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+.building-btn:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    transform: translateY(-2px);
+}
+
+.building-btn:disabled {
+    background: #7f8c8d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.building-btn:disabled:hover {
+    background: #7f8c8d;
+    transform: none;
+}
+
+/* End Day Button */
+.end-day-btn {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    font-size: 0.9rem;
+}
+
+.end-day-btn:hover {
+    background: linear-gradient(135deg, #d35400, #c0392b);
+    transform: translateY(-2px);
 }

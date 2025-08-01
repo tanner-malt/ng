@@ -420,6 +420,15 @@ class Game {
                     btn.classList.remove('active');
                 }
             });
+
+            // Show/hide views
+            document.querySelectorAll('.game-view').forEach(view => {
+                view.classList.remove('active');
+            });
+            const targetView = document.getElementById(`${viewName}-view`);
+            if (targetView) {
+                targetView.classList.add('active');
+            }
             // Call view-specific logic
             this.onViewSwitch(viewName);
         } catch (err) {
