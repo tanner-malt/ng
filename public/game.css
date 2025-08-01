@@ -128,6 +128,93 @@ body {
     display: flex;
     gap: 1.5rem;
     align-items: center;
+    flex: 1;
+}
+
+.day-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.scout-progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 200px;
+}
+
+.scout-progress-bar {
+    position: relative;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.scout-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1abc9c, #16a085);
+    border-radius: 10px;
+    transition: width 0.5s ease;
+    width: 20%; /* Default to day 1 of 5 */
+    position: relative;
+}
+
+.scout-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.scout-progress-text {
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.9);
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.auto-play-btn {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    color: white;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 70px;
+    height: 40px;
+}
+
+.auto-play-btn:hover {
+    background: linear-gradient(135deg, #8e44ad, #7d3c98);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.auto-play-btn.active {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.auto-play-btn.active:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
 }
 
 .day-counter {
@@ -1398,7 +1485,36 @@ body {
     transform: translateY(-1px);
 }
 
-/* Notification System */
+/* Toast Notification System */
+#notification-container {
+    position: fixed;
+    top: 80px; /* Below the top-right icons */
+    right: 20px;
+    z-index: 1100;
+    pointer-events: none;
+    display: flex !important; /* Override inline style */
+    flex-direction: column;
+    gap: 8px;
+    max-width: 320px;
+}
+
+.toast-notification {
+    pointer-events: auto;
+    font-family: inherit;
+}
+
+.toast-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.3;
+}
+
+/* Legacy notification styles (keeping for compatibility) */
 .notification-container {
     position: fixed;
     top: 20px;
@@ -1638,6 +1754,87 @@ body {
     /* Tutorial Modal Styles */
     .tutorial-modal .tutorial-content {
         padding: 1rem;
+    }
+
+    /* Story-driven tutorial styles */
+    .story-panel {
+        background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.95));
+        border: 2px solid #3498db;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .story-panel p {
+        margin-bottom: 1rem;
+        line-height: 1.6;
+        font-size: 1.05em;
+    }
+
+    .story-panel em {
+        color: #f39c12;
+        font-style: italic;
+        font-weight: 500;
+    }
+
+    .story-panel .highlight {
+        background: rgba(241, 196, 15, 0.3);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #f1c40f;
+        font-weight: bold;
+    }
+
+    .tutorial-instruction {
+        background: rgba(46, 204, 113, 0.2);
+        border: 1px solid #2ecc71;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        text-align: center;
+    }
+
+    .tutorial-instruction strong {
+        color: #2ecc71;
+        font-size: 1.1em;
+    }
+
+    .tutorial-complete-stats {
+        background: rgba(230, 126, 34, 0.2);
+        border: 1px solid #e67e22;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+        text-align: center;
+    }
+
+    .tutorial-complete-stats h4 {
+        color: #e67e22;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Enhanced highlight animation */
+    @keyframes tutorial-pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.7);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 0 10px rgba(241, 196, 15, 0.3);
+            transform: scale(1.05);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(241, 196, 15, 0);
+            transform: scale(1);
+        }
+    }
+
+    .tutorial-highlight {
+        border: 3px solid #f1c40f !important;
+        background: rgba(241, 196, 15, 0.2) !important;
+        position: relative;
+        z-index: 1000;
     }
 
     .tutorial-section {
@@ -1976,4 +2173,59 @@ body {
     .notification {
         max-width: calc(100vw - 40px);
     }
+}
+
+/* Mini Modal Animations */
+@keyframes miniModalSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes miniModalSlideOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+}
+
+/* Mini Modal Styles */
+.mini-modal {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.mini-modal-header {
+    user-select: none;
+}
+
+.mini-modal-close:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 50%;
+}
+
+.mini-modal-body {
+    scrollbar-width: thin;
+    scrollbar-color: #3498db #2c3e50;
+}
+
+.mini-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.mini-modal-body::-webkit-scrollbar-track {
+    background: #2c3e50;
+}
+
+.mini-modal-body::-webkit-scrollbar-thumb {
+    background: #3498db;
+    border-radius: 3px;
 }

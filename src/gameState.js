@@ -4,7 +4,8 @@ class GameState {
         this.resources = {
             food: 100,
             wood: 50,
-            stone: 25
+            stone: 25,
+            metal: 10
         };
         
         this.population = 10;
@@ -29,7 +30,7 @@ class GameState {
             house: { wood: 10 },
             farm: { wood: 15, stone: 5 },
             townCenter: { wood: 50, stone: 25 },
-            barracks: { wood: 30, stone: 20 }
+            barracks: { wood: 30, stone: 20, metal: 10 }
         };
         
         this.buildingProduction = {
@@ -69,6 +70,14 @@ class GameState {
         this.accumulatedTime = 0;
         this.buildingQueue = []; // Buildings under construction
         this.populationGrowthTimer = 0;
+        
+        // Auto-play and progress tracking
+        this.autoPlayActive = false;
+        this.autoPlayInterval = null;
+        this.autoPlaySpeed = 20000; // 20 seconds per day
+        this.scoutReportDay = 5; // First important event on day 5
+        this.scoutReportShown = false; // Flag to prevent spam
+        this.scoutReportReady = false; // Flag to track if report is ready
     }
     
     canAfford(buildingType) {
@@ -105,7 +114,13 @@ class GameState {
         }
         
         Object.keys(cost).forEach(resource => {
-            this.resources[resource] -= cost[resource];
+            const amount = cost[resource];
+            this.resources[resource] -= amount;
+            
+            // Show mini toast for resource spent
+            if (window.showResourceChange) {
+                setTimeout(() => window.showResourceChange(resource, -amount), Math.random() * 200);
+            }
         });
         this.updateUI();
         this.updateBuildButtons();
@@ -127,21 +142,74 @@ class GameState {
         const productionMultiplier = 1 + (this.investments.productionBoost * 0.1);
         const seasonMultiplier = this.getSeasonMultiplier();
         
-        this.buildings.forEach(building => {
+        let totalGenerated = { food: 0, wood: 0, stone: 0 };
+        
+        this.buildings.forEach((building, index) => {
             const production = this.buildingProduction[building.type];
             if (production) {
                 Object.keys(production).forEach(resource => {
                     if (this.resources[resource] !== undefined) {
-                        const amount = production[resource] * productionMultiplier * seasonMultiplier * building.level;
-                        this.resources[resource] += Math.floor(amount);
+                        const amount = production[resource] * productionMultiplier * seasonMultiplier[resource] * building.level;
+                        const roundedAmount = Math.floor(amount);
+                        this.resources[resource] += roundedAmount;
+                        totalGenerated[resource] += roundedAmount;
+                        
+                        // Show mini toast for individual building production (occasionally)
+                        if (roundedAmount > 0 && Math.random() < 0.1 && window.showResourceChange) {
+                            setTimeout(() => {
+                                window.showResourceChange(resource, roundedAmount);
+                            }, index * 50); // Stagger toasts by 50ms per building
+                        }
                     } else if (resource === 'population') {
-                        this.population += production[resource] * building.level;
+                        const popGrowth = production[resource] * building.level;
+                        this.population += popGrowth;
+                        
+                        // Show mini toast for population growth
+                        if (popGrowth > 0 && Math.random() < 0.15 && window.showResourceChange) {
+                            setTimeout(() => {
+                                window.showResourceChange('population', popGrowth);
+                            }, (index + this.buildings.length) * 50);
+                        }
                     }
                 });
             }
         });
         
-        // Cap resources
+        // Show toast for significant resource generation (only occasionally to avoid spam)
+        const totalResourcesGenerated = totalGenerated.food + totalGenerated.wood + totalGenerated.stone;
+        if (totalResourcesGenerated >= 20 && Math.random() < 0.3) { // 30% chance when generating 20+ resources
+            const resourceSummary = [];
+            if (totalGenerated.food > 0) resourceSummary.push(`${totalGenerated.food} food`);
+            if (totalGenerated.wood > 0) resourceSummary.push(`${totalGenerated.wood} wood`);
+            if (totalGenerated.stone > 0) resourceSummary.push(`${totalGenerated.stone} stone`);
+            
+            if (resourceSummary.length > 0 && window.showToast) {
+                window.showToast(`Village produced: ${resourceSummary.join(', ')}`, {
+                    icon: '🏭',
+                    type: 'success',
+                    timeout: 2000
+                });
+            }
+        }
+        
+        // Cap resources and show mini toasts when caps are hit
+        const resourceCaps = {
+            food: { max: 999, current: this.resources.food },
+            wood: { max: 999, current: this.resources.wood },
+            stone: { max: 999, current: this.resources.stone },
+            population: { max: 100, current: this.population }
+        };
+        
+        Object.keys(resourceCaps).forEach(resource => {
+            const cap = resourceCaps[resource];
+            if (cap.current > cap.max) {
+                // Show mini toast when hitting resource cap (occasionally)
+                if (Math.random() < 0.2 && window.showMiniToast) {
+                    window.showMiniToast('⚠️', `${resource} maxed`);
+                }
+            }
+        });
+        
         this.resources.food = Math.min(this.resources.food, 999);
         this.resources.wood = Math.min(this.resources.wood, 999);
         this.resources.stone = Math.min(this.resources.stone, 999);
@@ -161,10 +229,38 @@ class GameState {
     updateSeason() {
         const seasons = ['Spring', 'Summer', 'Autumn', 'Winter'];
         const currentIndex = seasons.indexOf(this.season);
-        this.season = seasons[(currentIndex + 1) % seasons.length];
+        const newSeason = seasons[(currentIndex + 1) % seasons.length];
+        this.season = newSeason;
         
-        // Notify players of season change
-        // ...
+        // Show mini toast for season change
+        if (window.showMiniToast) {
+            const seasonIcons = {
+                'Spring': '🌸',
+                'Summer': '☀️', 
+                'Autumn': '🍂',
+                'Winter': '❄️'
+            };
+            window.showMiniToast(seasonIcons[newSeason] || '🗓️', newSeason);
+        }
+        
+        // Notify players of season change via regular toast for important gameplay info
+        if (window.showToast) {
+            const multipliers = this.getSeasonMultiplier();
+            const effects = [];
+            Object.keys(multipliers).forEach(resource => {
+                const mult = multipliers[resource];
+                if (mult > 1.0) effects.push(`+${Math.round((mult - 1) * 100)}% ${resource}`);
+                else if (mult < 1.0) effects.push(`${Math.round((mult - 1) * 100)}% ${resource}`);
+            });
+            
+            if (effects.length > 0) {
+                window.showToast(`${newSeason} has arrived! ${effects.join(', ')}`, {
+                    icon: seasonIcons[newSeason] || '🗓️',
+                    type: 'info',
+                    timeout: 4000
+                });
+            }
+        }
     }
 
     // Expedition time flow management
@@ -223,6 +319,11 @@ class GameState {
                 
                 console.log(`[GameState] Building completed: ${buildingProject.type}`);
                 
+                // Show mini toast for building completion
+                if (window.showBuildingComplete) {
+                    window.showBuildingComplete(buildingProject.type);
+                }
+                
                 // Use the village manager's notification system
                 if (window.villageManager) {
                     const buildingName = buildingProject.type.charAt(0).toUpperCase() + buildingProject.type.slice(1);
@@ -273,6 +374,12 @@ class GameState {
         
         if (populationIncrease > 0) {
             this.population = Math.min(this.population + populationIncrease, 100);
+            
+            // Show mini toast for population growth
+            if (window.showResourceChange) {
+                window.showResourceChange('population', populationIncrease);
+            }
+            
             window.showNotification(
                 `👥 Population grew by ${populationIncrease} while you were away!`,
                 { timeout: 4000, icon: '👶' }
@@ -313,13 +420,16 @@ class GameState {
         
         this.buildingQueue.push(buildingProject);
         
-        // Use modal system for construction notifications
-        if (window.modalSystem) {
-            console.log('[GameState] Using modal system for construction notification');
-            window.modalSystem.showConstructionQueuedModal(buildingType, constructionHours);
+        // Use toast notification for construction - brief, informational, doesn't interrupt gameplay
+        const buildingName = buildingType.charAt(0).toUpperCase() + buildingType.slice(1);
+        if (window.showToast) {
+            window.showToast(`${buildingName} construction queued! Click "End Day" to progress.`, {
+                icon: '🏗️',
+                type: 'building',
+                timeout: 4000
+            });
         } else {
-            console.log('[GameState] Modal system not available, using notification fallback');
-            // Fallback to notification if modal system isn't available
+            // Fallback for legacy compatibility
             window.showNotification(
                 `🏗️ ${buildingType} construction queued! Will complete in ${constructionHours} hours of expedition time.`,
                 { timeout: 5000, icon: '📋' }
@@ -333,7 +443,7 @@ class GameState {
         const constructionTimes = {
             house: 6,         // 6 hours
             farm: 8,          // 8 hours  
-            townCenter: 24,   // 24 hours (1 day)
+            townCenter: 72,   // 72 hours (3 days)
             barracks: 16      // 16 hours
         };
         return constructionTimes[buildingType] || 12;
@@ -388,6 +498,7 @@ class GameState {
             'food-count': this.resources.food,
             'wood-count': this.resources.wood,
             'stone-count': this.resources.stone,
+            'metal-count': this.resources.metal,
             'population-count': this.population,
             'gold-count': this.gold,
             'wave-count': this.wave,
@@ -410,6 +521,9 @@ class GameState {
         if (supplyElement) {
             supplyElement.textContent = this.buildings.length > 2 ? 'Active' : 'Limited';
         }
+        
+        // Update scout progress
+        this.updateScoutProgress();
     }
     
     updateArmyDisplay() {
@@ -517,6 +631,14 @@ class GameState {
         // Process daily resource generation
         this.processDailyResources();
         
+        // Update scout progress
+        this.updateScoutProgress();
+        
+        // Trigger tutorial event for day ending
+        if (window.eventBus) {
+            window.eventBus.emit('day_ended', { day: this.currentDay });
+        }
+        
         // Refresh building sites display
         if (window.villageManager) {
             window.villageManager.renderBuildingSites();
@@ -566,21 +688,38 @@ class GameState {
             }
         });
         
-        // Base resource generation (representing villagers working)
-        const baseFood = Math.floor(this.population * 0.5);
-        const baseWood = Math.floor(this.population * 0.3);
-        const baseStone = Math.floor(this.population * 0.2);
+        // Base resource generation - set to 0 (no base income)
+        const baseFood = 0;
+        const baseWood = 0;
+        const baseStone = 0;
         
         // Apply resources
-        this.resources.food += foodGenerated + baseFood;
-        this.resources.wood += woodGenerated + baseWood;
-        this.resources.stone += stoneGenerated + baseStone;
+        const totalFood = foodGenerated + baseFood;
+        const totalWood = woodGenerated + baseWood; 
+        const totalStone = stoneGenerated + baseStone;
+        
+        this.resources.food += totalFood;
+        this.resources.wood += totalWood;
+        this.resources.stone += totalStone;
+        
+        // Show mini toasts for resource gains (only if positive)
+        if (window.showResourceChange) {
+            if (totalFood > 0) {
+                setTimeout(() => window.showResourceChange('food', totalFood), 100);
+            }
+            if (totalWood > 0) {
+                setTimeout(() => window.showResourceChange('wood', totalWood), 200);
+            }
+            if (totalStone > 0) {
+                setTimeout(() => window.showResourceChange('stone', totalStone), 300);
+            }
+        }
         
         // Store for scout report
         this.lastDayProduction = {
-            food: foodGenerated + baseFood,
-            wood: woodGenerated + baseWood,
-            stone: stoneGenerated + baseStone
+            food: totalFood,
+            wood: totalWood,
+            stone: totalStone
         };
     }
 
@@ -611,6 +750,172 @@ class GameState {
             setTimeout(() => {
                 scoutStatus.textContent = 'Scouts ready to report';
             }, 3000);
+        }
+    }
+
+    resetToDefaults() {
+        // Reset all properties to their initial state
+        this.resources = {
+            food: 100,
+            wood: 50,
+            stone: 25,
+            metal: 10
+        };
+        
+        this.population = 10;
+        this.gold = 1000;
+        this.wave = 1;
+        this.season = 'Spring';
+        
+        // Time progression
+        this.currentDay = 1;
+        this.daysInSeason = 30;
+        this.currentSeasonIndex = 0;
+        
+        this.buildings = [];
+        
+        this.army = [
+            { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
+            { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
+        ];
+        
+        this.selectedBuilding = null;
+        this.buildMode = null;
+        this.battleInProgress = false;
+        this.automationLevel = 'manual';
+        
+        // Prestige/Monarch investments
+        this.investments = {
+            productionBoost: 0,
+            automationLevel: 0,
+            armyScouts: false,
+            eliteGenerals: false,
+            parallelVillages: false,
+            prestigeAutomation: false
+        };
+        
+        // Throne room merge items
+        this.mergeItems = [];
+        this.activeBonuses = [];
+        
+        // Game loop and time management
+        this.lastUpdate = Date.now();
+        this.seasonTimer = 0;
+        this.seasonDuration = 60000;
+        
+        // Expedition time flow
+        this.expeditionTimeFlow = false;
+        this.expeditionStartTime = null;
+        this.accumulatedTime = 0;
+        this.buildingQueue = [];
+        this.populationGrowthTimer = 0;
+        
+        // Stop auto-play if active
+        this.stopAutoPlay();
+        
+        // Reset scout report flags
+        this.scoutReportShown = false;
+        this.scoutReportReady = false;
+        
+        console.log('[GameState] Game state reset to defaults');
+    }
+
+    // Auto-play functionality
+    toggleAutoPlay() {
+        if (this.autoPlayActive) {
+            this.stopAutoPlay();
+        } else {
+            this.startAutoPlay();
+        }
+    }
+
+    startAutoPlay() {
+        if (this.autoPlayActive) return;
+        
+        this.autoPlayActive = true;
+        this.autoPlayInterval = setInterval(() => {
+            this.endDay();
+        }, this.autoPlaySpeed);
+        
+        console.log(`[GameState] Auto-play started - advancing every ${this.autoPlaySpeed/1000} seconds`);
+        this.updateAutoPlayUI();
+    }
+
+    stopAutoPlay() {
+        if (!this.autoPlayActive) return;
+        
+        this.autoPlayActive = false;
+        if (this.autoPlayInterval) {
+            clearInterval(this.autoPlayInterval);
+            this.autoPlayInterval = null;
+        }
+        
+        console.log('[GameState] Auto-play stopped');
+        this.updateAutoPlayUI();
+    }
+
+    updateAutoPlayUI() {
+        const autoPlayBtn = document.getElementById('auto-play-btn');
+        const autoPlayIcon = document.getElementById('auto-play-icon');
+        const autoPlayText = document.getElementById('auto-play-text');
+        
+        if (autoPlayBtn && autoPlayIcon && autoPlayText) {
+            if (this.autoPlayActive) {
+                autoPlayBtn.classList.add('active');
+                autoPlayIcon.textContent = '⏸️';
+                autoPlayText.textContent = 'Pause';
+                autoPlayBtn.title = 'Pause auto-advance';
+            } else {
+                autoPlayBtn.classList.remove('active');
+                autoPlayIcon.textContent = '▶️';
+                autoPlayText.textContent = 'Play';
+                autoPlayBtn.title = 'Auto-advance days (20s interval)';
+            }
+        }
+    }
+
+    // Scout progress tracking
+    updateScoutProgress() {
+        const progressFill = document.getElementById('scout-progress-fill');
+        const progressText = document.getElementById('scout-progress-text');
+        const scoutStatus = document.getElementById('scout-status');
+        
+        if (progressFill && progressText && scoutStatus) {
+            const progress = Math.min((this.currentDay / this.scoutReportDay) * 100, 100);
+            progressFill.style.width = `${progress}%`;
+            
+            if (this.currentDay < this.scoutReportDay) {
+                progressText.textContent = `Day ${this.currentDay} of ${this.scoutReportDay}`;
+                scoutStatus.textContent = 'Scouts gathering intelligence...';
+                scoutStatus.style.color = '#f8f9fa';
+                this.scoutReportReady = false;
+            } else if (this.currentDay === this.scoutReportDay) {
+                progressText.textContent = 'Report Ready!';
+                scoutStatus.textContent = '⚠️ Scouts ready to report - Critical intelligence available!';
+                scoutStatus.style.color = '#f1c40f';
+                this.scoutReportReady = true;
+                
+                // Pause auto-play when intelligence is ready
+                if (this.autoPlayActive) {
+                    this.stopAutoPlay();
+                    console.log('[GameState] Auto-play paused - Scout report ready');
+                }
+                
+                // Show notification only once
+                if (!this.scoutReportShown && window.showToast) {
+                    this.scoutReportShown = true;
+                    window.showToast('🚨 Scout Report Available! Game paused for your decision.', {
+                        icon: '🔍',
+                        type: 'warning',
+                        timeout: 5000
+                    });
+                }
+            } else {
+                progressText.textContent = 'Awaiting Orders';
+                scoutStatus.textContent = '📋 Strategic intelligence ready - Awaiting your command!';
+                scoutStatus.style.color = '#2ecc71';
+                this.scoutReportReady = true;
+            }
         }
     }
 }

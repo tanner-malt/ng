@@ -68,6 +68,23 @@ class Game {
             this.currentView = 'village';
             this.gameLoopId = null;
             this.gameState = gameState;
+            
+            // Initialize core systems first
+            if (window.EventBus) {
+                window.eventBus = new window.EventBus();
+                console.log('[Game] EventBus initialized');
+            } else {
+                console.error('[Game] EventBus not available');
+            }
+            
+            // Initialize modal system (needed by tutorial and other systems)
+            if (window.ModalSystem) {
+                this.modalSystem = new window.ModalSystem();
+                console.log('[Game] Modal system initialized');
+            } else {
+                console.error('[Game] ModalSystem not available');
+            }
+            
             this.villageManager = new VillageManager(this.gameState, this);
             this.battleManager = new BattleManager(this.gameState);
             this.monarchManager = new MonarchManager(this.gameState);
@@ -83,7 +100,7 @@ class Game {
             
             // Milestone-based view unlocking
             this.unlockedViews = { village: true, battle: false, monarch: false, throne: false };
-            this.tutorialManager = new window.TutorialManager(this);
+            this.tutorialManager = new window.TutorialManager();
             // ...
         } catch (err) {
             // ...
@@ -94,18 +111,52 @@ class Game {
         try {
             console.log('[Game] Game.init called');
             // ...
+            // Force tutorial for new users (reset localStorage for testing)
             const loadedSuccessfully = this.gameState.load();
+            console.log('[Game] Save data loaded:', loadedSuccessfully);
+            
             if (loadedSuccessfully) {
                 this.tutorialActive = false;
+                console.log('[Game] Tutorial disabled - save data found');
             } else {
                 this.tutorialActive = true;
+                console.log('[Game] Tutorial enabled - no save data found');
+                // Clear localStorage to force tutorial on refresh during development
+                localStorage.removeItem('villageDefenseIdleo');
                 setTimeout(() => {
                     try {
-                        this.tutorialManager.showIntro();
+                        console.log('[Game] Attempting to show tutorial intro...');
+                        console.log('[Game] Tutorial manager available:', !!this.tutorialManager);
+                        console.log('[Game] showModal available:', !!window.showModal);
+                        console.log('[Game] eventBus available:', !!window.eventBus);
+                        
+                        if (this.tutorialManager && this.tutorialManager.showIntro) {
+                            console.log('[Game] Tutorial manager available, calling showIntro()');
+                            this.tutorialManager.showIntro();
+                        } else {
+                            console.error('[Game] Tutorial manager not available:', this.tutorialManager);
+                            // Fallback tutorial
+                            if (window.showModal) {
+                                console.log('[Game] Using fallback modal');
+                                window.showModal(
+                                    'Welcome to Village Defense: Idleo!',
+                                    '<p>Build your village, train your army, and defend against waves of enemies!</p><p>Start by placing buildings in your village.</p>',
+                                    { type: 'info', icon: '👑' }
+                                );
+                            } else {
+                                console.error('[Game] showModal not available');
+                            }
+                        }
                     } catch (err) {
-                        // ...
+                        console.error('[Game] Tutorial error:', err);
+                        // Fallback tutorial
+                        window.showModal(
+                            'Welcome to Village Defense: Idleo!',
+                            '<p>Build your village, train your army, and defend against waves of enemies!</p><p>Start by placing buildings in your village.</p>',
+                            { type: 'info', icon: '👑' }
+                        );
                     }
-                }, 500);
+                }, 1000); // Increased delay to ensure everything is loaded
             }
             this.villageManager.init();
             this.battleManager.init();
@@ -119,6 +170,10 @@ class Game {
             this.startGameLoop();
             this.setupAutosave();
             this.setupKeyboardShortcuts();
+            this.setupAutoPlayButton();
+            
+            // Initialize scout progress
+            this.gameState.updateScoutProgress();
             
             // Ensure window.game is always set, even if there are errors above
             window.game = this;
@@ -223,6 +278,12 @@ class Game {
             }
             // Update current view
             this.currentView = viewName;
+            
+            // Trigger tutorial event for view switching
+            if (window.eventBus) {
+                window.eventBus.emit('view_switched', { view: viewName });
+            }
+            
             // Update active tab UI
             document.querySelectorAll('.nav-btn').forEach(btn => {
                 if (btn.dataset.view === viewName) {
@@ -299,14 +360,20 @@ class Game {
         try {
             setInterval(() => {
                 try {
-                    this.gameState.save();
+                    // Don't autosave if we're resetting
+                    if (!this.isResetting) {
+                        this.gameState.save();
+                    }
                 } catch (err) {
                     // ...
                 }
             }, 30000);
             window.addEventListener('beforeunload', () => {
                 try {
-                    this.gameState.save();
+                    // Don't save on unload if we're resetting
+                    if (!this.isResetting) {
+                        this.gameState.save();
+                    }
                 } catch (err) {
                     // ...
                 }
@@ -354,6 +421,26 @@ class Game {
                                 this.battleManager.startBattle();
                             }
                             break;
+                        case 't':
+                            // Demo: Press 'T' to show a toast notification
+                            if (!e.ctrlKey && !e.altKey) {
+                                window.showToast('This is a toast notification! 🍞', {
+                                    icon: '💬',
+                                    type: 'info',
+                                    timeout: 3000
+                                });
+                            }
+                            break;
+                        case 'm':
+                            // Demo: Press 'M' to show a modal dialog
+                            if (!e.ctrlKey && !e.altKey) {
+                                window.showModal(
+                                    'Modal Dialog Example',
+                                    'This is a modal dialog that requires your attention. It dominates the screen and must be dismissed before you can continue.',
+                                    { type: 'info', icon: '📢' }
+                                );
+                            }
+                            break;
                     }
                 } catch (err) {
                     // ...
@@ -365,14 +452,75 @@ class Game {
         }
     }
 
+    setupAutoPlayButton() {
+        try {
+            const autoPlayBtn = document.getElementById('auto-play-btn');
+            if (autoPlayBtn) {
+                autoPlayBtn.addEventListener('click', () => {
+                    this.gameState.toggleAutoPlay();
+                });
+                console.log('[Game] Auto-play button initialized');
+            } else {
+                console.warn('[Game] Auto-play button not found in DOM');
+            }
+        } catch (err) {
+            console.error('[Game] Error setting up auto-play button:', err);
+        }
+    }
+
     resetGame() {
         try {
             if (confirm('Are you sure you want to reset the game? This cannot be undone.')) {
-                localStorage.removeItem('idleDynastyBuilder');
-                location.reload();
+                // Set a flag to prevent autosave during reset
+                this.isResetting = true;
+                
+                // Clear all localStorage data
+                localStorage.clear();
+                
+                // Reset game state to initial values
+                this.gameState.resetToDefaults();
+                
+                // Clear any visual elements
+                this.clearGameUI();
+                
+                // Reset tutorial state
+                this.tutorialActive = true;
+                
+                // Reload the page after a short delay to ensure everything is cleared
+                setTimeout(() => {
+                    location.reload();
+                }, 100);
             }
         } catch (err) {
             // ...
+        }
+    }
+
+    clearGameUI() {
+        try {
+            // Clear village buildings visual
+            if (this.villageManager && this.villageManager.villageGrid) {
+                const buildingElements = this.villageManager.villageGrid.querySelectorAll('.building, .building-site');
+                buildingElements.forEach(el => el.remove());
+            }
+            
+            // Reset UI displays
+            this.gameState.updateUI();
+            
+            // Clear any active notifications
+            const toasts = document.querySelectorAll('.toast-notification');
+            toasts.forEach(toast => toast.remove());
+            
+            // Clear any highlights
+            const highlights = document.querySelectorAll('.tutorial-highlight');
+            highlights.forEach(el => {
+                el.classList.remove('tutorial-highlight');
+                el.style.animation = '';
+            });
+            
+            console.log('[Game] UI cleared for reset');
+        } catch (err) {
+            console.error('[Game] Error clearing UI:', err);
         }
     }
 

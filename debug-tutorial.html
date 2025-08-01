@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEBUG: Dynasty Builder - Tutorial Mode</title>
+    <link rel="stylesheet" href="public/game.css">
+    <link rel="stylesheet" href="public/progress-icons.css">
+    
+    <!-- Debug CSS -->
+    <style>
+        body::before {
+            content: "🐛 DEBUG MODE: Tutorial Always Active";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            text-align: center;
+            padding: 5px;
+            font-weight: bold;
+            z-index: 10000;
+            font-size: 14px;
+        }
+        
+        #game-container {
+            margin-top: 30px;
+        }
+        
+        .debug-controls {
+            position: fixed;
+            top: 35px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 9999;
+        }
+        
+        .debug-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        
+        .debug-btn:hover {
+            background: #2980b9;
+        }
+    </style>
+    
+    <!-- Game Scripts -->
+    <script src="src/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/modalSystem.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/app.js"></script>
+</head>
+<body>
+    <!-- Debug Controls -->
+    <div class="debug-controls">
+        <div>🐛 Debug Controls</div>
+        <button class="debug-btn" onclick="debugRestartTutorial()">Restart Tutorial</button>
+        <button class="debug-btn" onclick="debugSkipToDay(5)">Skip to Day 5</button>
+        <button class="debug-btn" onclick="debugAddResources()">Add Resources</button>
+        <button class="debug-btn" onclick="debugClearSave()">Clear Save</button>
+    </div>
+
+    <!-- Top Right Icons -->
+    <div id="top-right-icons">
+        <button id="sound-btn" class="icon-btn" title="Sound">
+            <span>🔊</span>
+        </button>
+        <button id="tutorial-btn" class="icon-btn" title="Tutorial & Help">
+            <span>📚</span>
+        </button>
+        <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
+            <span>🗺️</span>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings">
+            <span>⚙️</span>
+        </button>
+        <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
+            <span id="progress-icon">🏆</span>
+        </button>
+    </div>
+
+    <!-- Notification overlay and container for tutorial/milestone notifications -->
+    <div id="notification-overlay" style="display:none;"></div>
+    <div id="notification-container" style="display:flex;"></div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <nav id="view-navigation">
+            <button class="nav-btn active" data-view="village" id="village-tab">Village</button>
+            <button class="nav-btn locked" data-view="battle" id="battle-tab">Battle (LOCKED)</button>
+            <button class="nav-btn locked" data-view="monarch" id="monarch-tab">Monarch (LOCKED)</button>
+            <button class="nav-btn locked" data-view="throne" id="throne-tab">Throne (LOCKED)</button>
+        </nav>
+        
+        <main id="game-content">
+            <!-- Village View -->
+            <div id="village-view" class="game-view active">
+                <div class="village-header">
+                    <h2>Village Management</h2>
+                    <div class="resource-panel">
+                        <span>Food: <span id="food-count">100</span></span>
+                        <span>Wood: <span id="wood-count">50</span></span>
+                        <span>Stone: <span id="stone-count">25</span></span>
+                        <span>Metal: <span id="metal-count">10</span></span>
+                        <span>Population: <span id="population-count">10</span></span>
+                        <span>Season: <span id="season-count">Spring</span></span>
+                    </div>
+                </div>
+                
+                <!-- Scout Report Bar -->
+                <div class="scout-report-bar">
+                    <div class="scout-info">
+                        <span class="day-counter">Day <span id="current-day">1</span></span>
+                        <div class="scout-progress-container">
+                            <span class="scout-status" id="scout-status">Scouts gathering intelligence...</span>
+                            <div class="scout-progress-bar">
+                                <div class="scout-progress-fill" id="scout-progress-fill"></div>
+                                <span class="scout-progress-text" id="scout-progress-text">Day 1 of 5</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="day-controls">
+                        <button id="auto-play-btn" class="auto-play-btn" title="Auto-advance days (20s interval)">
+                            <span id="auto-play-icon">▶️</span>
+                            <span id="auto-play-text">Play</span>
+                        </button>
+                        <button id="end-day-btn" class="end-day-btn" title="Advance to next day">
+                            End Day 🌅
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="village-content">
+                    <div id="village-grid" class="village-grid"></div>
+                    
+                    <div class="village-sidebar">
+                        <div class="village-info">
+                            <h3>Buildings</h3>
+                            <div class="building-list">
+                                <button class="building-btn" data-building="house" title="Cost: 10 Wood">
+                                    House (10 Wood)
+                                </button>
+                                <button class="building-btn" data-building="farm" title="Cost: 15 Wood, 5 Stone">
+                                    Farm (15 Wood, 5 Stone)
+                                </button>
+                                <button class="building-btn" data-building="townCenter" title="Cost: 30 Wood, 25 Stone">
+                                    Town Center (30 Wood, 25 Stone)
+                                </button>
+                                <button class="building-btn" data-building="barracks" title="Cost: 30 Wood, 20 Stone">
+                                    Barracks (30 Wood, 20 Stone)
+                                </button>
+                            </div>
+                            
+                            <div class="village-stats">
+                                <h3>Village Stats</h3>
+                                <p>Buildings: <span id="building-count">0</span></p>
+                                <p>Supply Routes: <span id="supply-routes">Limited</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Battle View -->
+            <div id="battle-view" class="game-view">
+                <div class="battle-header">
+                    <h2>Battle Arena</h2>
+                    <div class="battle-info">
+                        <span>Wave: <span id="battle-wave">1</span></span>
+                        <span>Army Size: <span id="army-size">2</span></span>
+                        <span>Gold: <span id="battle-gold">1000</span></span>
+                    </div>
+                </div>
+                
+                <div class="battle-content">
+                    <p>Battle system coming soon!</p>
+                </div>
+            </div>
+
+            <!-- Monarch View -->
+            <div id="monarch-view" class="game-view">
+                <div class="locked-view">
+                    <h2>👑 Monarch's Court</h2>
+                    <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
+                </div>
+            </div>
+
+            <!-- Throne View -->
+            <div id="throne-view" class="game-view">
+                <div class="throne-header">
+                    <h2>🏰 The Throne</h2>
+                    <p>Manage your kingdom's power and influence</p>
+                </div>
+                
+                <div class="throne-content">
+                    <p>Throne management coming soon!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals (same as main game) -->
+    <div id="tutorial-modal" class="modal-overlay tutorial-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Tutorial & Help</h3>
+                <button class="modal-close tutorial-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tutorial-content">
+                    <h4>Getting Started</h4>
+                    <p>Welcome to Idle: Dynasty Builder! Here's how to play:</p>
+                    <ul>
+                        <li><strong>Village:</strong> Build houses for population, farms for food, and other structures</li>
+                        <li><strong>Battle:</strong> Recruit and manage your army to defend against waves</li>
+                        <li><strong>Throne:</strong> Use royal decrees to boost your kingdom</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Debug Functions
+        function debugRestartTutorial() {
+            console.log('[DEBUG] Restarting tutorial...');
+            if (window._gameInstance && window._gameInstance.tutorialManager) {
+                localStorage.removeItem('tutorialCompleted');
+                localStorage.removeItem('dynastyName');
+                window._gameInstance.tutorialManager.showIntro();
+            }
+        }
+        
+        function debugSkipToDay(day) {
+            console.log(`[DEBUG] Skipping to day ${day}...`);
+            if (window._gameInstance && window._gameInstance.gameState) {
+                window._gameInstance.gameState.currentDay = day;
+                window._gameInstance.gameState.updateScoutProgress();
+                window._gameInstance.gameState.updateUI();
+            }
+        }
+        
+        function debugAddResources() {
+            console.log('[DEBUG] Adding resources...');
+            if (window._gameInstance && window._gameInstance.gameState) {
+                const gameState = window._gameInstance.gameState;
+                gameState.resources.food += 100;
+                gameState.resources.wood += 100;
+                gameState.resources.stone += 100;
+                gameState.resources.metal += 100;
+                gameState.updateUI();
+            }
+        }
+        
+        function debugClearSave() {
+            console.log('[DEBUG] Clearing save data...');
+            localStorage.clear();
+            location.reload();
+        }
+
+        // Override the game initialization to always start tutorial
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[DEBUG] Debug mode initializing...');
+            
+            // Clear tutorial completion flag to force tutorial
+            localStorage.removeItem('tutorialCompleted');
+            
+            // Wait for game to initialize, then force tutorial
+            setTimeout(() => {
+                if (window._gameInstance) {
+                    console.log('[DEBUG] Forcing tutorial start...');
+                    window._gameInstance.tutorialActive = true;
+                    
+                    if (window._gameInstance.tutorialManager) {
+                        window._gameInstance.tutorialManager.showIntro();
+                    } else {
+                        console.warn('[DEBUG] Tutorial manager not found');
+                    }
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

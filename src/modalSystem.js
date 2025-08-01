@@ -912,6 +912,165 @@ class ModalSystem {
     getModalCount() {
         return this.modalStack.length;
     }
+
+    // Show a mini modal (smaller, positioned near cursor or element)
+    showMiniModal(options = {}) {
+        const {
+            id = `mini-modal-${Date.now()}`,
+            title = 'Info',
+            content = '',
+            width = '300px',
+            height = 'auto',
+            x = null,
+            y = null,
+            targetElement = null,
+            className = '',
+            closable = true,
+            autoClose = false,
+            autoCloseDelay = 3000,
+            onClose = null,
+            modalType = 'mini-modal'
+        } = options;
+
+        // Close any existing mini modals first
+        this.closeMiniModals();
+
+        // Create mini modal element
+        const miniModal = document.createElement('div');
+        miniModal.id = id;
+        miniModal.className = `mini-modal ${className}`;
+        miniModal.style.cssText = `
+            position: fixed;
+            width: ${width};
+            height: ${height};
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 0;
+            z-index: 10000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            font-family: 'Segoe UI', sans-serif;
+            color: #ecf0f1;
+            animation: miniModalSlideIn 0.2s ease-out;
+        `;
+
+        // Create mini modal HTML
+        miniModal.innerHTML = `
+            <div class="mini-modal-header" style="
+                background: linear-gradient(90deg, #3498db, #2980b9);
+                padding: 8px 12px;
+                border-radius: 6px 6px 0 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 14px;
+                font-weight: bold;
+            ">
+                <span class="mini-modal-title">${title}</span>
+                ${closable ? '<button class="mini-modal-close" style="background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 0; line-height: 1;">×</button>' : ''}
+            </div>
+            <div class="mini-modal-body" style="
+                padding: 12px;
+                font-size: 13px;
+                line-height: 1.4;
+                max-height: 250px;
+                overflow-y: auto;
+            ">
+                ${content}
+            </div>
+        `;
+
+        // Position the mini modal
+        if (targetElement) {
+            const rect = targetElement.getBoundingClientRect();
+            miniModal.style.left = `${rect.right + 10}px`;
+            miniModal.style.top = `${rect.top}px`;
+            
+            // Adjust if going off screen
+            setTimeout(() => {
+                const modalRect = miniModal.getBoundingClientRect();
+                if (modalRect.right > window.innerWidth - 10) {
+                    miniModal.style.left = `${rect.left - modalRect.width - 10}px`;
+                }
+                if (modalRect.bottom > window.innerHeight - 10) {
+                    miniModal.style.top = `${window.innerHeight - modalRect.height - 10}px`;
+                }
+            }, 10);
+        } else if (x !== null && y !== null) {
+            miniModal.style.left = `${x}px`;
+            miniModal.style.top = `${y}px`;
+        } else {
+            // Center on screen
+            miniModal.style.left = '50%';
+            miniModal.style.top = '50%';
+            miniModal.style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Add to DOM
+        document.body.appendChild(miniModal);
+
+        // Setup close functionality
+        if (closable) {
+            const closeBtn = miniModal.querySelector('.mini-modal-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    this.closeMiniModal(id);
+                    if (onClose) onClose();
+                });
+            }
+        }
+
+        // Auto close if specified
+        if (autoClose) {
+            setTimeout(() => {
+                this.closeMiniModal(id);
+                if (onClose) onClose();
+            }, autoCloseDelay);
+        }
+
+        // Close on click outside
+        setTimeout(() => {
+            const clickOutsideHandler = (e) => {
+                if (!miniModal.contains(e.target)) {
+                    this.closeMiniModal(id);
+                    if (onClose) onClose();
+                    document.removeEventListener('click', clickOutsideHandler);
+                }
+            };
+            document.addEventListener('click', clickOutsideHandler);
+        }, 100);
+
+        // Store reference
+        this.activeMiniModals = this.activeMiniModals || new Set();
+        this.activeMiniModals.add(id);
+
+        return id;
+    }
+
+    // Close specific mini modal
+    closeMiniModal(id) {
+        const miniModal = document.getElementById(id);
+        if (miniModal) {
+            miniModal.style.animation = 'miniModalSlideOut 0.2s ease-in';
+            setTimeout(() => {
+                if (miniModal.parentNode) {
+                    miniModal.parentNode.removeChild(miniModal);
+                }
+                if (this.activeMiniModals) {
+                    this.activeMiniModals.delete(id);
+                }
+            }, 200);
+        }
+    }
+
+    // Close all mini modals
+    closeMiniModals() {
+        if (this.activeMiniModals) {
+            this.activeMiniModals.forEach(id => {
+                this.closeMiniModal(id);
+            });
+        }
+    }
 }
 
 // Create global modal system instance

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Debug Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #2c3e50; 
+            color: white; 
+        }
+        .debug-section { 
+            margin: 20px 0; 
+            padding: 15px; 
+            background: #34495e; 
+            border-radius: 5px; 
+        }
+        .test-btn { 
+            background: #3498db; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            border-radius: 3px; 
+            cursor: pointer; 
+        }
+        .test-btn:hover { background: #2980b9; }
+        .error { color: #e74c3c; }
+        .success { color: #2ecc71; }
+        .warning { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Tutorial System Debug</h1>
+    
+    <div class="debug-section">
+        <h2>1. Script Loading Test</h2>
+        <button class="test-btn" onclick="testScriptLoading()">Test Script Loading</button>
+        <div id="script-results"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>2. Class Availability Test</h2>
+        <button class="test-btn" onclick="testClasses()">Test Classes</button>
+        <div id="class-results"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>3. Modal System Test</h2>
+        <button class="test-btn" onclick="testModal()">Test Modal</button>
+        <div id="modal-results"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>4. Tutorial Manager Test</h2>
+        <button class="test-btn" onclick="testTutorial()">Test Tutorial</button>
+        <div id="tutorial-results"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>5. EventBus Test</h2>
+        <button class="test-btn" onclick="testEventBus()">Test EventBus</button>
+        <div id="eventbus-results"></div>
+    </div>
+
+    <!-- Load game scripts -->
+    <script src="src/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/modalSystem.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/app.js"></script>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : '';
+            element.innerHTML += `<div class="${className}">[${new Date().toLocaleTimeString()}] ${message}</div>`;
+        }
+        
+        function testScriptLoading() {
+            const results = document.getElementById('script-results');
+            results.innerHTML = '<h3>Script Loading Results:</h3>';
+            
+            const scripts = [
+                'EventBus', 'GameState', 'ModalSystem', 'VillageManager', 
+                'BattleManager', 'ThroneManager', 'MonarchManager', 
+                'QuestManager', 'TutorialManager', 'Game'
+            ];
+            
+            scripts.forEach(scriptName => {
+                if (window[scriptName]) {
+                    log('script-results', `✅ ${scriptName} loaded successfully`, 'success');
+                } else {
+                    log('script-results', `❌ ${scriptName} not found in window`, 'error');
+                }
+            });
+        }
+        
+        function testClasses() {
+            const results = document.getElementById('class-results');
+            results.innerHTML = '<h3>Class Instantiation Results:</h3>';
+            
+            try {
+                // Test EventBus
+                if (window.EventBus) {
+                    const eventBus = new window.EventBus();
+                    log('class-results', '✅ EventBus can be instantiated', 'success');
+                } else {
+                    log('class-results', '❌ EventBus class not available', 'error');
+                }
+                
+                // Test ModalSystem
+                if (window.ModalSystem) {
+                    const modalSystem = new window.ModalSystem();
+                    log('class-results', '✅ ModalSystem can be instantiated', 'success');
+                } else {
+                    log('class-results', '❌ ModalSystem class not available', 'error');
+                }
+                
+                // Test TutorialManager
+                if (window.TutorialManager) {
+                    const tutorialManager = new window.TutorialManager();
+                    log('class-results', '✅ TutorialManager can be instantiated', 'success');
+                    log('class-results', `Tutorial has ${tutorialManager.steps.length} steps`, 'info');
+                } else {
+                    log('class-results', '❌ TutorialManager class not available', 'error');
+                }
+                
+            } catch (error) {
+                log('class-results', `❌ Error during class testing: ${error.message}`, 'error');
+            }
+        }
+        
+        function testModal() {
+            const results = document.getElementById('modal-results');
+            results.innerHTML = '<h3>Modal System Results:</h3>';
+            
+            try {
+                if (window.showModal) {
+                    log('modal-results', '✅ showModal function available', 'success');
+                    
+                    // Test showing a modal
+                    window.showModal('Test Modal', 'This is a test modal to verify the modal system works.', {
+                        icon: '🧪',
+                        type: 'info'
+                    }).then(() => {
+                        log('modal-results', '✅ Modal shown and dismissed successfully', 'success');
+                    }).catch(error => {
+                        log('modal-results', `❌ Modal error: ${error.message}`, 'error');
+                    });
+                    
+                } else {
+                    log('modal-results', '❌ showModal function not available', 'error');
+                }
+            } catch (error) {
+                log('modal-results', `❌ Modal test error: ${error.message}`, 'error');
+            }
+        }
+        
+        function testTutorial() {
+            const results = document.getElementById('tutorial-results');
+            results.innerHTML = '<h3>Tutorial System Results:</h3>';
+            
+            try {
+                if (window.TutorialManager) {
+                    const tutorial = new window.TutorialManager();
+                    log('tutorial-results', '✅ TutorialManager created', 'success');
+                    log('tutorial-results', `Dynasty name: ${tutorial.getDynastyName()}`, 'info');
+                    log('tutorial-results', `Steps available: ${tutorial.steps?.length || 0}`, 'info');
+                    
+                    if (tutorial.showIntro) {
+                        log('tutorial-results', '✅ showIntro method available', 'success');
+                        
+                        // Test showing tutorial intro
+                        try {
+                            tutorial.showIntro();
+                            log('tutorial-results', '✅ Tutorial intro called', 'success');
+                        } catch (error) {
+                            log('tutorial-results', `❌ Tutorial intro error: ${error.message}`, 'error');
+                        }
+                    } else {
+                        log('tutorial-results', '❌ showIntro method not available', 'error');
+                    }
+                } else {
+                    log('tutorial-results', '❌ TutorialManager not available', 'error');
+                }
+            } catch (error) {
+                log('tutorial-results', `❌ Tutorial test error: ${error.message}`, 'error');
+            }
+        }
+        
+        function testEventBus() {
+            const results = document.getElementById('eventbus-results');
+            results.innerHTML = '<h3>EventBus Results:</h3>';
+            
+            try {
+                if (window.EventBus) {
+                    const eventBus = new window.EventBus();
+                    window.eventBus = eventBus; // Set global instance
+                    
+                    log('eventbus-results', '✅ EventBus created', 'success');
+                    
+                    // Test event emission and listening
+                    eventBus.on('test_event', (data) => {
+                        log('eventbus-results', `✅ Event received: ${data.message}`, 'success');
+                    });
+                    
+                    eventBus.emit('test_event', { message: 'Test successful!' });
+                    
+                } else {
+                    log('eventbus-results', '❌ EventBus not available', 'error');
+                }
+            } catch (error) {
+                log('eventbus-results', `❌ EventBus test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-run basic tests on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                console.log('Running automatic tests...');
+                testScriptLoading();
+                testClasses();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

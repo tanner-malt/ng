@@ -114,7 +114,7 @@ class VillageManager {
         this.villageGrid.style.cursor = 'default';
         
         // Remove selection from all buttons
-        document.querySelectorAll('.build-btn').forEach(btn => {
+        document.querySelectorAll('.building-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
         
@@ -202,17 +202,19 @@ class VillageManager {
                     return;
                 }
                 
-                this.placeBuilding(this.gameState.buildMode, x, y);
-                const spendSuccess = this.gameState.spend(this.gameState.buildMode);
-                
-                if (spendSuccess) {
-                    this.exitBuildMode();
-                    // Start supply chain if applicable
-                    this.updateSupplyChains();
-                } else {
-                    console.error('[Village] Failed to spend resources for building');
-                    // Maybe remove the building that was placed if spending failed
+                // Check if we can afford the building before proceeding
+                if (!this.gameState.canAfford(this.gameState.buildMode)) {
+                    console.log('[Village] Cannot afford building');
+                    this.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.');
+                    return;
                 }
+                
+                // Place the building (this handles spending resources internally)
+                this.placeBuilding(this.gameState.buildMode, x, y);
+                this.exitBuildMode();
+                
+                // Start supply chain if applicable
+                this.updateSupplyChains();
             }
         });
     }
@@ -246,8 +248,13 @@ class VillageManager {
         // Queue building for construction
         const buildingId = this.gameState.queueBuilding(type, x, y);
         
-        // Show construction confirmation modal
-        this.showConstructionModal(type, x, y);
+        // Trigger tutorial event for building placement
+        if (window.eventBus) {
+            window.eventBus.emit('building_placed', { type: type, x: x, y: y, id: buildingId });
+        }
+        
+        // Toast notification is now handled by gameState.queueBuilding()
+        // No need for duplicate notifications here
         
         // Render building sites to show construction progress
         this.renderBuildingSites();
@@ -536,17 +543,112 @@ class VillageManager {
     showBuildingInfo(building) {
         if (this.gameState.buildMode) return; // Don't show info in build mode
         
-        // Simple building info display
+        // Get building details
         const production = this.gameState.buildingProduction[building.type];
-        let productionText = 'No production';
+        const buildingCost = this.gameState.buildingCosts[building.type];
+        const isUnderConstruction = this.gameState.buildingQueue.some(b => b.id === building.id);
         
-        if (production) {
-            productionText = Object.keys(production).map(resource => 
-                `+${production[resource]} ${resource}/5s`
-            ).join(', ');
+        let contentHTML = `
+            <div style="text-align: center; margin-bottom: 10px;">
+                <div style="font-size: 24px; margin-bottom: 5px;">${this.getBuildingSymbol(building.type)}</div>
+                <div style="font-weight: bold; color: #3498db;">${building.type.toUpperCase()}</div>
+                <div style="color: #bdc3c7; font-size: 12px;">Level ${building.level}</div>
+            </div>
+        `;
+
+        if (isUnderConstruction) {
+            const constructionProject = this.gameState.buildingQueue.find(b => b.id === building.id);
+            const hoursLeft = Math.ceil(constructionProject.hoursRemaining);
+            contentHTML += `
+                <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
+                    <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
+                    <div style="color: #ecf0f1; font-size: 11px;">${hoursLeft} hours remaining</div>
+                </div>
+            `;
         }
-        
-        alert(`${building.type.toUpperCase()} (Level ${building.level})\n\nProduction: ${productionText}\n\nUpgrade feature coming soon!`);
+
+        // Production info
+        if (production) {
+            contentHTML += `<div style="margin-bottom: 10px;">
+                <div style="color: #2ecc71; font-weight: bold; font-size: 12px; margin-bottom: 4px;">📊 PRODUCTION:</div>
+            `;
+            Object.keys(production).forEach(resource => {
+                const amount = production[resource] * building.level;
+                const resourceIcon = {
+                    food: '🌾',
+                    wood: '🪵', 
+                    stone: '🪨',
+                    population: '👥',
+                    efficiency: '⚡',
+                    soldiers: '⚔️'
+                }[resource] || '📦';
+                
+                contentHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <span style="color: #ecf0f1; font-size: 11px;">${resourceIcon} ${resource}</span>
+                        <span style="color: #2ecc71; font-weight: bold; font-size: 11px;">+${amount}</span>
+                    </div>
+                `;
+            });
+            contentHTML += `</div>`;
+        }
+
+        // Building cost (for reference)
+        if (buildingCost) {
+            contentHTML += `<div style="margin-bottom: 10px;">
+                <div style="color: #e67e22; font-weight: bold; font-size: 12px; margin-bottom: 4px;">💰 COST:</div>
+            `;
+            Object.keys(buildingCost).forEach(resource => {
+                const amount = buildingCost[resource];
+                const resourceIcon = {
+                    food: '🌾',
+                    wood: '🪵', 
+                    stone: '🪨',
+                    metal: '⚒️',
+                    gold: '💰'
+                }[resource] || '📦';
+                
+                contentHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <span style="color: #ecf0f1; font-size: 11px;">${resourceIcon} ${resource}</span>
+                        <span style="color: #e67e22; font-size: 11px;">${amount}</span>
+                    </div>
+                `;
+            });
+            contentHTML += `</div>`;
+        }
+
+        // Upgrade info (coming soon)
+        contentHTML += `
+            <div style="background: rgba(52, 152, 219, 0.2); padding: 6px; border-radius: 4px; text-align: center; border: 1px solid #3498db;">
+                <div style="color: #3498db; font-size: 11px;">🔧 Upgrade feature coming soon!</div>
+            </div>
+        `;
+
+        // Get the building element for positioning
+        const buildingElements = document.querySelectorAll(`[data-building-id="${building.id}"]`);
+        const targetElement = buildingElements.length > 0 ? buildingElements[0] : null;
+
+        // Show mini modal
+        if (window.modalSystem && window.modalSystem.showMiniModal) {
+            window.modalSystem.showMiniModal({
+                title: `${building.type} Info`,
+                content: contentHTML,
+                width: '280px',
+                targetElement: targetElement,
+                className: 'building-info-modal',
+                closable: true
+            });
+        } else {
+            // Fallback to alert if modal system not available
+            let productionText = 'No production';
+            if (production) {
+                productionText = Object.keys(production).map(resource => 
+                    `+${production[resource] * building.level} ${resource}`
+                ).join(', ');
+            }
+            alert(`${building.type.toUpperCase()} (Level ${building.level})\n\nProduction: ${productionText}\n\nUpgrade feature coming soon!`);
+        }
     }
     
     getBuildingSymbol(type) {

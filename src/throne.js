@@ -89,6 +89,11 @@ class ThroneManager {
     
     init() {
         this.mergeGrid = document.getElementById('merge-grid');
+        if (!this.mergeGrid) {
+            console.warn('[Throne] merge-grid element not found, skipping throne initialization');
+            return;
+        }
+        
         this.setupMergeGrid();
         this.loadMergeItems();
         this.updateActiveBonuses();

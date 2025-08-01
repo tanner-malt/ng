@@ -116,6 +116,15 @@ class BattleManager {
         
         this.gameState.logBattleEvent(`⚔️ Battle begins! ${this.activeCommander.name} takes command with ${this.activeCommander.strategy} strategy`);
         
+        // Show toast for battle start - it's informational but not critical
+        if (window.showToast) {
+            window.showToast(`Battle started! ${this.activeCommander.name} commanding`, {
+                icon: '⚔️',
+                type: 'info',
+                timeout: 2500
+            });
+        }
+        
         // Update UI
         const startButton = document.getElementById('start-battle-btn');
         if (startButton) {
@@ -409,8 +418,22 @@ class BattleManager {
             } else {
                 // Regular battle completion
                 this.gameState.wave++;
-                this.gameState.gold += Math.floor(50 * (1 + this.gameState.wave * 0.2));
+                const goldReward = Math.floor(50 * (1 + this.gameState.wave * 0.2));
+                this.gameState.gold += goldReward;
                 this.gameState.logBattleEvent(`🎉 Victory! Advancing to wave ${this.gameState.wave}`);
+                
+                // Show important battle victory modal
+                if (window.showModal) {
+                    window.showModal(
+                        '🎉 Victory!',
+                        `<p><strong>Wave ${this.gameState.wave - 1} completed!</strong></p>
+                        <p>💰 Gold earned: ${goldReward}</p>
+                        <p>⚔️ Commander ${this.activeCommander.name} gained experience</p>
+                        <p>🏥 Surviving units healed</p>
+                        <p>Next: Prepare for Wave ${this.gameState.wave}</p>`,
+                        { type: 'success', icon: '🏆' }
+                    );
+                }
                 
                 // Heal surviving units
                 this.gameState.army.forEach(unit => {
@@ -446,13 +469,31 @@ class BattleManager {
             } else {
                 this.gameState.logBattleEvent(`💀 Defeat! Retreating to monarch view...`);
                 
+                // Show important defeat modal 
+                if (window.showModal) {
+                    window.showModal(
+                        '💀 Defeat!',
+                        `<p><strong>Your army has been defeated on Wave ${this.gameState.wave}</strong></p>
+                        <p>⚰️ Army has fallen but will be restored</p>
+                        <p>🏰 Retreat to the Monarch view to spend gold on improvements</p>
+                        <p>💡 Invest in better commanders, equipment, or village upgrades</p>
+                        <p><em>This is how you grow stronger for the next attempt!</em></p>`,
+                        { type: 'warning', icon: '⚔️' }
+                    ).then(() => {
+                        // Switch to monarch view after user acknowledges
+                        if (window.game) {
+                            window.game.switchView('monarch');
+                        }
+                    });
+                }
+                
                 // Reset army
                 this.gameState.army = [
                     { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
                     { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
                 ];
                 
-                // Trigger monarch view transition after short delay
+                // Trigger monarch view transition after short delay (fallback if modal not shown)
                 setTimeout(() => {
                     if (window.game) {
                         window.game.switchView('monarch');
