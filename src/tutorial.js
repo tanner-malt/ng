@@ -1,4 +1,4 @@
-// Tutorial and milestone progression logic for Village Defense: Idleo
+// Tutorial and milestone progression logic for Idle: Dynasty Builder
 
 class TutorialManager {
     constructor(game) {
@@ -7,10 +7,21 @@ class TutorialManager {
     }
 
     showIntro() {
-        window.showNotification(
-            `<b>Welcome!</b><br>This is your <b>village view mode</b>, where you will manage the logistics of your kingdom!<br><br>You are the son of the king, and the king sent you to establish a new village to defend!<br><br><b>First, place your Town Center.</b>`,
-            { timeout: 7000, icon: '👑' }
-        );
+        // Add a small delay to ensure modal system is initialized
+        setTimeout(() => {
+            if (window.modalSystem) {
+                console.log('[Tutorial] Using modal system for intro');
+                window.modalSystem.showTutorialModal();
+            } else {
+                console.log('[Tutorial] Modal system not available, using notification');
+                // Fallback to notification if modal system isn't available
+                window.showNotification(
+                    `<b>Welcome!</b><br>This is your <b>village view mode</b>, where you will manage the logistics of your kingdom!<br><br>You are the son of the king, and the king sent you to establish a new village to defend!<br><br><b>First, place your Town Center.</b>`,
+                    { timeout: 7000, icon: '👑' }
+                );
+            }
+        }, 100);
+        
         // Optionally, highlight the Town Center button after a delay
         setTimeout(() => this.highlightTownCenterButton(), 7000);
     }
@@ -29,23 +40,31 @@ class TutorialManager {
     }
 
     showUnlockRequirement(view) {
-        let msg = 'This view is locked. Complete the required milestone in the Village view to unlock it!';
-        let icon = '🔒';
-        switch (view) {
-            case 'battle':
-                msg = 'Build your Town Center to unlock Battle mode!';
-                icon = '⚔️';
-                break;
-            case 'monarch':
-                msg = 'Build a Farm to unlock Monarch mode!';
-                icon = '👑';
-                break;
-            case 'throne':
-                msg = 'Build a House to unlock Throne mode!';
-                icon = '🏰';
-                break;
+        // Use the modal system for unlock requirements
+        if (window.modalSystem) {
+            console.log('[Tutorial] Using modal system for unlock requirement');
+            window.modalSystem.showUnlockRequirementModal(view);
+        } else {
+            console.log('[Tutorial] Modal system not available, using notification fallback');
+            // Fallback to notification if modal system isn't available
+            let msg = 'This view is locked. Complete the required milestone in the Village view to unlock it!';
+            let icon = '🔒';
+            switch (view) {
+                case 'battle':
+                    msg = 'Build your Town Center to unlock Battle mode!';
+                    icon = '⚔️';
+                    break;
+                case 'monarch':
+                    msg = 'Build a Farm to unlock Monarch mode!';
+                    icon = '👑';
+                    break;
+                case 'throne':
+                    msg = 'Build a House to unlock Throne mode!';
+                    icon = '🏰';
+                    break;
+            }
+            window.showNotification(msg, { timeout: 5000, icon });
         }
-        window.showNotification(msg, { timeout: 5000, icon });
     }
 
     // No longer needed; replaced by notification system

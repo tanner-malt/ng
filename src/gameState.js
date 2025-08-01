@@ -12,10 +12,13 @@ class GameState {
         this.wave = 1;
         this.season = 'Spring';
         
-        this.buildings = [
-            { id: 'house1', type: 'house', x: 100, y: 100, level: 1 },
-            { id: 'farm1', type: 'farm', x: 200, y: 150, level: 1 }
-        ];
+        // Time progression
+        this.currentDay = 1;
+        this.daysInSeason = 30;
+        this.seasons = ['Spring', 'Summer', 'Fall', 'Winter'];
+        this.currentSeasonIndex = 0;
+        
+        this.buildings = [];
         
         this.army = [
             { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
@@ -55,14 +58,31 @@ class GameState {
         this.mergeItems = [];
         this.activeBonuses = [];
         
-        // Game loop
+        // Game loop and time management
         this.lastUpdate = Date.now();
         this.seasonTimer = 0;
         this.seasonDuration = 60000; // 60 seconds per season
+        
+        // Expedition time flow
+        this.expeditionTimeFlow = false;
+        this.expeditionStartTime = null;
+        this.accumulatedTime = 0;
+        this.buildingQueue = []; // Buildings under construction
+        this.populationGrowthTimer = 0;
     }
     
     canAfford(buildingType) {
+        if (!buildingType) {
+            console.error('[GameState] canAfford() called with invalid buildingType:', buildingType);
+            return false;
+        }
+        
         const cost = this.buildingCosts[buildingType];
+        if (!cost) {
+            console.error('[GameState] No cost defined for building type:', buildingType);
+            return false;
+        }
+        
         return Object.keys(cost).every(resource => 
             this.resources[resource] >= cost[resource]
         );
@@ -73,12 +93,23 @@ class GameState {
     }
     
     spend(buildingType) {
+        if (!buildingType) {
+            console.error('[GameState] spend() called with invalid buildingType:', buildingType);
+            return false;
+        }
+        
         const cost = this.buildingCosts[buildingType];
+        if (!cost) {
+            console.error('[GameState] No cost defined for building type:', buildingType);
+            return false;
+        }
+        
         Object.keys(cost).forEach(resource => {
             this.resources[resource] -= cost[resource];
         });
         this.updateUI();
         this.updateBuildButtons();
+        return true;
     }
     
     spendGold(amount) {
@@ -135,6 +166,178 @@ class GameState {
         // Notify players of season change
         // ...
     }
+
+    // Expedition time flow management
+    startExpeditionTimeFlow() {
+        this.expeditionTimeFlow = true;
+        this.expeditionStartTime = Date.now();
+        console.log('[GameState] Expedition time flow started');
+    }
+
+    stopExpeditionTimeFlow() {
+        if (this.expeditionTimeFlow) {
+            const expeditionDuration = Date.now() - this.expeditionStartTime;
+            this.processExpeditionTime(expeditionDuration);
+            this.expeditionTimeFlow = false;
+            this.expeditionStartTime = null;
+            console.log('[GameState] Expedition time flow stopped, processed', expeditionDuration, 'ms');
+        }
+    }
+
+    processExpeditionTime(duration) {
+        // Convert real time to game time (1 real minute = 1 game hour for now)
+        const gameHours = Math.floor(duration / (1000 * 60)); // 1 minute real = 1 hour game
+        
+        console.log('[GameState] Processing', gameHours, 'game hours of expedition time');
+        
+        // Process building construction
+        this.processBuildingConstruction(gameHours);
+        
+        // Process resource generation for the entire expedition duration
+        this.processExpeditionResourceGeneration(gameHours);
+        
+        // Process population growth
+        this.processPopulationGrowth(gameHours);
+        
+        // Process seasonal changes
+        this.processSeasonalChanges(gameHours);
+        
+        this.updateUI();
+    }
+
+    processBuildingConstruction(hours) {
+        if (this.buildingQueue.length === 0) return;
+        
+        this.buildingQueue = this.buildingQueue.filter(buildingProject => {
+            buildingProject.hoursRemaining -= hours;
+            
+            if (buildingProject.hoursRemaining <= 0) {
+                // Building completed!
+                this.buildings.push({
+                    id: buildingProject.id,
+                    type: buildingProject.type,
+                    x: buildingProject.x,
+                    y: buildingProject.y,
+                    level: 1
+                });
+                
+                console.log(`[GameState] Building completed: ${buildingProject.type}`);
+                
+                // Use the village manager's notification system
+                if (window.villageManager) {
+                    const buildingName = buildingProject.type.charAt(0).toUpperCase() + buildingProject.type.slice(1);
+                    window.villageManager.showNotification(
+                        'Construction Complete!',
+                        `${buildingName} is now operational and producing resources`,
+                        'construction',
+                        3500
+                    );
+                    
+                    // Trigger building completion animation
+                    setTimeout(() => {
+                        window.villageManager.renderBuildingSites();
+                        window.villageManager.renderBuildings();
+                        window.villageManager.showBuildingCompletionEffect(buildingProject.x, buildingProject.y);
+                    }, 100);
+                } else if (window.showNotification) {
+                    window.showNotification(
+                        `🏗️ Construction Complete: ${buildingProject.type} is now operational!`,
+                        { timeout: 5000, icon: '✅' }
+                    );
+                }
+                
+                return false; // Remove from queue
+            }
+            return true; // Keep in queue
+        });
+    }
+
+    processExpeditionResourceGeneration(hours) {
+        // Generate resources for each hour of expedition time
+        for (let hour = 0; hour < hours; hour++) {
+            this.generateResources();
+        }
+        
+        if (hours > 0) {
+            window.showNotification(
+                `🏭 Village produced resources during your ${hours}-hour absence!`,
+                { timeout: 4000, icon: '📈' }
+            );
+        }
+    }
+
+    processPopulationGrowth(hours) {
+        // Population grows slowly over time
+        const growthRate = 0.1; // 0.1 population per hour with good conditions
+        const populationIncrease = Math.floor(hours * growthRate);
+        
+        if (populationIncrease > 0) {
+            this.population = Math.min(this.population + populationIncrease, 100);
+            window.showNotification(
+                `👥 Population grew by ${populationIncrease} while you were away!`,
+                { timeout: 4000, icon: '👶' }
+            );
+        }
+    }
+
+    processSeasonalChanges(hours) {
+        // Check if seasons should change during expedition
+        const hoursPerSeason = 24 * 30; // 30 days per season in game time
+        const seasonChanges = Math.floor(hours / hoursPerSeason);
+        
+        for (let i = 0; i < seasonChanges; i++) {
+            this.updateSeason();
+        }
+        
+        if (seasonChanges > 0) {
+            window.showNotification(
+                `🍂 Season changed to ${this.season} during your expedition!`,
+                { timeout: 4000, icon: '🌍' }
+            );
+        }
+    }
+
+    // Queue a building for construction (takes time during expeditions)
+    queueBuilding(buildingType, x, y) {
+        const buildingId = `${buildingType}_${Date.now()}`;
+        const constructionHours = this.getBuildingConstructionTime(buildingType);
+        
+        const buildingProject = {
+            id: buildingId,
+            type: buildingType,
+            x: x,
+            y: y,
+            hoursRemaining: constructionHours,
+            startTime: Date.now()
+        };
+        
+        this.buildingQueue.push(buildingProject);
+        
+        // Use modal system for construction notifications
+        if (window.modalSystem) {
+            console.log('[GameState] Using modal system for construction notification');
+            window.modalSystem.showConstructionQueuedModal(buildingType, constructionHours);
+        } else {
+            console.log('[GameState] Modal system not available, using notification fallback');
+            // Fallback to notification if modal system isn't available
+            window.showNotification(
+                `🏗️ ${buildingType} construction queued! Will complete in ${constructionHours} hours of expedition time.`,
+                { timeout: 5000, icon: '📋' }
+            );
+        }
+        
+        return buildingId;
+    }
+
+    getBuildingConstructionTime(buildingType) {
+        const constructionTimes = {
+            house: 6,         // 6 hours
+            farm: 8,          // 8 hours  
+            townCenter: 24,   // 24 hours (1 day)
+            barracks: 16      // 16 hours
+        };
+        return constructionTimes[buildingType] || 12;
+    }
     
     updateBuildButtons() {
         document.querySelectorAll('.build-btn').forEach(btn => {
@@ -170,9 +373,12 @@ class GameState {
             this.updateSeason();
         }
         
-        // Generate resources every 5 seconds
-        if (Math.floor(now / 5000) !== Math.floor((now - deltaTime) / 5000)) {
-            this.generateResources();
+        // IMPORTANT: Only generate resources during expeditions now!
+        // Resources are generated during expedition time flow instead of continuously
+        // This makes village optimization much more meaningful
+        
+        // Still update UI regularly to show current state
+        if (Math.floor(now / 1000) !== Math.floor((now - deltaTime) / 1000)) {
             this.updateUI();
         }
     }
@@ -249,12 +455,12 @@ class GameState {
             automationLevel: this.automationLevel
         };
         
-        localStorage.setItem('villageDefenseIdleo', JSON.stringify(saveData));
+        localStorage.setItem('idleDynastyBuilder', JSON.stringify(saveData));
         // ...
     }
     
     load() {
-        const saveData = localStorage.getItem('villageDefenseIdleo');
+        const saveData = localStorage.getItem('idleDynastyBuilder');
         if (saveData) {
             try {
                 const data = JSON.parse(saveData);
@@ -296,6 +502,116 @@ class GameState {
         if (!Array.isArray(data.mergeItems) || !Array.isArray(data.activeBonuses)) return false;
         // Optionally, add more detailed checks here
         return true;
+    }
+
+    // Time progression system
+    endDay() {
+        console.log(`[GameState] Ending day ${this.currentDay}...`);
+        
+        // Advance day counter
+        this.currentDay++;
+        
+        // Process building construction (8 hours per day)
+        this.processBuildingConstruction(8);
+        
+        // Process daily resource generation
+        this.processDailyResources();
+        
+        // Refresh building sites display
+        if (window.villageManager) {
+            window.villageManager.renderBuildingSites();
+            window.villageManager.renderBuildings();
+            console.log('[GameState] Building displays refreshed after day progression');
+        }
+        
+        // Check for season change
+        if (this.currentDay > this.daysInSeason) {
+            this.advanceSeason();
+            this.currentDay = 1;
+        }
+        
+        // Update UI and refresh building sites
+        this.updateUI();
+        this.updateDayCounter();
+        
+        // Update village view if it exists
+        if (window.villageManager) {
+            window.villageManager.renderBuildings();
+            window.villageManager.renderBuildingSites();
+        }
+        
+        // Show scout report with what happened
+        this.showScoutReport();
+        
+        console.log(`[GameState] Day ${this.currentDay} of ${this.season} begins`);
+    }
+
+    processDailyResources() {
+        // Calculate daily resource generation from buildings
+        let foodGenerated = 0;
+        let woodGenerated = 0;
+        let stoneGenerated = 0;
+        
+        this.buildings.forEach(building => {
+            switch (building.type) {
+                case 'farm':
+                    foodGenerated += 10;
+                    break;
+                case 'townCenter':
+                    // Town center boosts all production by 20%
+                    foodGenerated = Math.floor(foodGenerated * 1.2);
+                    woodGenerated += 5;
+                    stoneGenerated += 3;
+                    break;
+            }
+        });
+        
+        // Base resource generation (representing villagers working)
+        const baseFood = Math.floor(this.population * 0.5);
+        const baseWood = Math.floor(this.population * 0.3);
+        const baseStone = Math.floor(this.population * 0.2);
+        
+        // Apply resources
+        this.resources.food += foodGenerated + baseFood;
+        this.resources.wood += woodGenerated + baseWood;
+        this.resources.stone += stoneGenerated + baseStone;
+        
+        // Store for scout report
+        this.lastDayProduction = {
+            food: foodGenerated + baseFood,
+            wood: woodGenerated + baseWood,
+            stone: stoneGenerated + baseStone
+        };
+    }
+
+    advanceSeason() {
+        this.currentSeasonIndex = (this.currentSeasonIndex + 1) % this.seasons.length;
+        this.season = this.seasons[this.currentSeasonIndex];
+        
+        console.log(`[GameState] Season changed to ${this.season}`);
+        
+        // Seasonal effects could be added here
+        // e.g., Winter reduces food production, Spring boosts growth, etc.
+    }
+
+    updateDayCounter() {
+        const dayElement = document.getElementById('current-day');
+        if (dayElement) {
+            dayElement.textContent = this.currentDay;
+        }
+    }
+
+    showScoutReport() {
+        const scoutStatus = document.getElementById('scout-status');
+        if (scoutStatus && this.lastDayProduction) {
+            const prod = this.lastDayProduction;
+            scoutStatus.textContent = `Generated: +${prod.food} food, +${prod.wood} wood, +${prod.stone} stone`;
+            
+            // Reset status after a few seconds
+            setTimeout(() => {
+                scoutStatus.textContent = 'Scouts ready to report';
+            }, 3000);
+        }
     }
 }
 

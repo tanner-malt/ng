@@ -39,6 +39,10 @@ class BattleManager {
     
     init() {
         this.battleField = document.getElementById('battle-field');
+        if (!this.battleField) {
+            console.warn('[Battle] battle-field element not found, skipping battle initialization');
+            return;
+        }
         this.setupBattleControls();
         this.generateEnemies();
         this.updateWeatherAndTerrain();
@@ -118,13 +122,69 @@ class BattleManager {
             startButton.textContent = 'Stop Battle';
             startButton.style.background = '#e74c3c';
         }
-        
-        // Start battle simulation
+
+        // Start battle timer
         this.battleTimer = setInterval(() => {
             this.updateBattle();
         }, 1000);
-        
+    }
+
+    // New method for expedition battles
+    startExpeditionBattle(location) {
+        // Generate enemies based on location difficulty
+        this.generateExpeditionEnemies(location);
+        this.updateWeatherAndTerrain();
         this.renderBattleField();
+        
+        // Start the battle automatically
+        this.startBattle();
+        
+        // Set expedition battle flag
+        this.isExpeditionBattle = true;
+        this.expeditionLocation = location;
+        
+        window.showNotification(
+            `⚔️ Expedition battle at ${location.name} begins!`,
+            { timeout: 4000, icon: '🏰' }
+        );
+    }
+
+    generateExpeditionEnemies(location) {
+        const difficultyMultipliers = {
+            'easy': 1.0,
+            'medium': 1.5,
+            'hard': 2.0,
+            'extreme': 3.0
+        };
+        
+        const multiplier = difficultyMultipliers[location.difficulty] || 1.0;
+        const enemyCount = Math.floor((2 + Math.random() * 4) * multiplier);
+        
+        this.enemies = [];
+        for (let i = 0; i < enemyCount; i++) {
+            let enemyTypes = ['goblin', 'orc', 'skeleton'];
+            
+            // Add stronger enemies for harder locations
+            if (location.difficulty === 'medium' || location.difficulty === 'hard') {
+                enemyTypes.push('troll', 'ogre');
+            }
+            if (location.difficulty === 'extreme') {
+                enemyTypes.push('dragon', 'lich');
+            }
+            
+            const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            
+            this.enemies.push({
+                id: `enemy_${i}`,
+                type: type,
+                health: Math.floor((30 + Math.random() * 40) * multiplier),
+                maxHealth: Math.floor((30 + Math.random() * 40) * multiplier),
+                attack: Math.floor((8 + Math.random() * 12) * multiplier),
+                x: Math.random() * 400 + 450,
+                y: Math.random() * 300 + 50,
+                ai: this.generateEnemyAI(type)
+            });
+        }
     }
     
     selectOptimalCommander() {
@@ -322,40 +382,83 @@ class BattleManager {
         // Update commander experience
         if (result === 'victory') {
             this.activeCommander.experience += 10;
-            this.gameState.wave++;
-            this.gameState.gold += Math.floor(50 * (1 + this.gameState.wave * 0.2));
-            this.gameState.logBattleEvent(`🎉 Victory! Advancing to wave ${this.gameState.wave}`);
             
-            // Heal surviving units
-            this.gameState.army.forEach(unit => {
-                if (unit.health > 0) {
-                    unit.health = Math.min(100, unit.health + 20);
-                    unit.experience = (unit.experience || 0) + 5;
-                }
-            });
-            
-            // Generate new enemies for next wave
-            setTimeout(() => {
-                this.generateEnemies();
-                this.updateWeatherAndTerrain();
-            }, 2000);
+            // Handle expedition battle completion differently
+            if (this.isExpeditionBattle && this.expeditionLocation) {
+                this.gameState.logBattleEvent(`🎉 Victory at ${this.expeditionLocation.name}! Beginning return journey...`);
+                
+                // Heal surviving units
+                this.gameState.army.forEach(unit => {
+                    if (unit.health > 0) {
+                        unit.health = Math.min(100, unit.health + 20);
+                        unit.experience = (unit.experience || 0) + 5;
+                    }
+                });
+                
+                // Start return journey via quest manager
+                setTimeout(() => {
+                    if (window.game && window.game.questManager) {
+                        window.game.questManager.startReturnJourney();
+                    }
+                }, 2000);
+                
+                // Clear expedition flags
+                this.isExpeditionBattle = false;
+                this.expeditionLocation = null;
+                
+            } else {
+                // Regular battle completion
+                this.gameState.wave++;
+                this.gameState.gold += Math.floor(50 * (1 + this.gameState.wave * 0.2));
+                this.gameState.logBattleEvent(`🎉 Victory! Advancing to wave ${this.gameState.wave}`);
+                
+                // Heal surviving units
+                this.gameState.army.forEach(unit => {
+                    if (unit.health > 0) {
+                        unit.health = Math.min(100, unit.health + 20);
+                        unit.experience = (unit.experience || 0) + 5;
+                    }
+                });
+                
+                // Generate new enemies for next wave
+                setTimeout(() => {
+                    this.generateEnemies();
+                    this.updateWeatherAndTerrain();
+                }, 2000);
+            }
             
         } else {
             this.activeCommander.experience += 2; // Small experience for trying
-            this.gameState.logBattleEvent(`💀 Defeat! Retreating to monarch view...`);
             
-            // Reset army
-            this.gameState.army = [
-                { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
-                { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
-            ];
-            
-            // Trigger monarch view transition after short delay
-            setTimeout(() => {
-                if (window.game) {
-                    window.game.switchView('monarch');
-                }
-            }, 3000);
+            if (this.isExpeditionBattle) {
+                this.gameState.logBattleEvent(`💀 Defeat at ${this.expeditionLocation.name}! Army retreats...`);
+                
+                // For expedition defeats, still start return journey but with reduced rewards
+                setTimeout(() => {
+                    if (window.game && window.game.questManager) {
+                        window.game.questManager.startReturnJourney(true); // true = defeated
+                    }
+                }, 2000);
+                
+                this.isExpeditionBattle = false;
+                this.expeditionLocation = null;
+                
+            } else {
+                this.gameState.logBattleEvent(`💀 Defeat! Retreating to monarch view...`);
+                
+                // Reset army
+                this.gameState.army = [
+                    { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
+                    { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
+                ];
+                
+                // Trigger monarch view transition after short delay
+                setTimeout(() => {
+                    if (window.game) {
+                        window.game.switchView('monarch');
+                    }
+                }, 3000);
+            }
         }
         
         // Update UI
@@ -387,6 +490,11 @@ class BattleManager {
     }
     
     renderBattleField() {
+        if (!this.battleField) {
+            console.warn('[Battle] Cannot render battle field - element not found');
+            return;
+        }
+        
         // Clear battlefield
         const existingUnits = this.battleField.querySelectorAll('.battle-unit, .battle-enemy');
         existingUnits.forEach(unit => unit.remove());

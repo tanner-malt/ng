@@ -1,55 +1,43 @@
-    <!-- Main Menu Popup (styled with .popup-modal and .popup-content from style.less) -->
-    <div id="main-menu-popup" class="popup-modal" style="display:none;">
-      <div class="popup-content">
-        <h3>Main Menu</h3>
-        <button id="resume-btn">Resume Game</button>
-        <button id="settings-menu-btn">Settings</button>
-        <button id="quit-menu-btn">Quit to Title</button>
-        <button class="popup-close" onclick="document.getElementById('main-menu-popup').style.display='none'">Close</button>
-      </div>
-    </div>
-
-
-    <!-- Notification overlay and container for tutorial/milestone notifications -->
-    <div id="notification-overlay" style="display:none;"></div>
-    <div id="notification-container" style="display:flex;"></div>
-    <!-- Progression Popup -->
-    <div id="progress-popup" class="popup-modal" style="display:none;">
-      <div class="popup-content">
-        <h3>Progression</h3>
-        <div id="progress-battle"></div>
-        <div id="progress-monarch"></div>
-        <div id="progress-throne"></div>
-        <button class="popup-close" onclick="document.getElementById('progress-popup').style.display='none'">Close</button>
-      </div>
-    </div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Village Defense: Idleo</title>
+    <title>Idle: Dynasty Builder</title>
     <link rel="stylesheet" href="game.css">
     <link rel="stylesheet" href="progress-icons.css">
 </head>
 <body>
+    <!-- Top Right Icons -->
     <div id="top-right-icons">
-      <button id="sound-btn" class="icon-btn" title="Sound">
-        <span>🔊</span>
-      </button>
-      <button id="settings-btn" class="icon-btn" title="Settings">
-        <span>⚙️</span>
-      </button>
-      <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
-        <span id="progress-icon">🗺️</span>
-      </button>
+        <button id="sound-btn" class="icon-btn" title="Sound">
+            <span>🔊</span>
+        </button>
+        <button id="tutorial-btn" class="icon-btn" title="Tutorial & Help">
+            <span>📚</span>
+        </button>
+        <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
+            <span>🗺️</span>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings">
+            <span>⚙️</span>
+        </button>
+        <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
+            <span id="progress-icon">🏆</span>
+        </button>
     </div>
+
+    <!-- Notification overlay and container for tutorial/milestone notifications -->
+    <div id="notification-overlay" style="display:none;"></div>
+    <div id="notification-container" style="display:flex;"></div>
+
+    <!-- Game Container -->
     <div id="game-container">
         <nav id="view-navigation">
             <button class="nav-btn active" data-view="village" id="village-tab">Village</button>
-            <button class="nav-btn" data-view="battle" id="battle-tab">Battle</button>
-            <button class="nav-btn" data-view="monarch" id="monarch-tab">Monarch</button>
-            <button class="nav-btn" data-view="throne" id="throne-tab">Throne</button>
+            <button class="nav-btn locked" data-view="battle" id="battle-tab">Battle (LOCKED)</button>
+            <button class="nav-btn locked" data-view="monarch" id="monarch-tab">Monarch (LOCKED)</button>
+            <button class="nav-btn locked" data-view="throne" id="throne-tab">Throne (LOCKED)</button>
         </nav>
         
         <main id="game-content">
@@ -62,130 +50,302 @@
                         <span>Wood: <span id="wood-count">50</span></span>
                         <span>Stone: <span id="stone-count">25</span></span>
                         <span>Population: <span id="population-count">10</span></span>
-                        <span>Season: <span id="season-display">Spring</span></span>
+                        <span>Season: <span id="season-count">Spring</span></span>
                     </div>
                 </div>
+                
+                <!-- Scout Report Bar -->
+                <div class="scout-report-bar">
+                    <div class="scout-info">
+                        <span class="day-counter">Day <span id="current-day">1</span></span>
+                        <span class="scout-status" id="scout-status">Scouts ready to report</span>
+                    </div>
+                    <button id="end-day-btn" class="end-day-btn" title="Advance to next day">
+                        End Day 🌅
+                    </button>
+                </div>
+                
                 <div class="village-content">
                     <div id="village-grid" class="village-grid"></div>
+                    
                     <div class="village-sidebar">
-                        <div class="building-menu">
-                            <h3>Buildings</h3>
-                            <button class="build-btn" data-building="house">House (10 Wood)</button>
-                            <button class="build-btn" data-building="farm">Farm (15 Wood, 5 Stone)</button>
-                            <button class="build-btn" data-building="townCenter">Town Center (50 Wood, 25 Stone)</button>
-                            <button class="build-btn" data-building="barracks">Barracks (30 Wood, 20 Stone)</button>
-                        </div>
                         <div class="village-info">
-                            <h3>Village Stats</h3>
-                            <p>Buildings: <span id="building-count">2</span></p>
-                            <p>Supply Routes: <span id="supply-routes">Active</span></p>
+                            <h3>Buildings</h3>
+                            <div class="building-list">
+                                <button class="building-btn" data-building="house" title="Cost: 10 Wood">
+                                    House (10 Wood)
+                                </button>
+                                <button class="building-btn" data-building="farm" title="Cost: 15 Wood, 5 Stone">
+                                    Farm (15 Wood, 5 Stone)
+                                </button>
+                                <button class="building-btn" data-building="townCenter" title="Cost: 30 Wood, 25 Stone">
+                                    Town Center (30 Wood, 25 Stone)
+                                </button>
+                                <button class="building-btn" data-building="barracks" title="Cost: 30 Wood, 20 Stone">
+                                    Barracks (30 Wood, 20 Stone)
+                                </button>
+                            </div>
+                            
+                            <div class="village-stats">
+                                <h3>Village Stats</h3>
+                                <p>Buildings: <span id="building-count">0</span></p>
+                                <p>Supply Routes: <span id="supply-routes">Limited</span></p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Battle View -->
             <div id="battle-view" class="game-view">
                 <div class="battle-header">
-                    <h2>Automated Battle - Wave <span id="wave-count">1</span></h2>
-                    <button id="start-battle-btn" class="action-btn">Start Battle</button>
+                    <h2>Battle Arena</h2>
+                    <div class="battle-info">
+                        <span>Wave: <span id="battle-wave">1</span></span>
+                        <span>Army Size: <span id="army-size">2</span></span>
+                        <span>Gold: <span id="battle-gold">1000</span></span>
+                    </div>
                 </div>
+                
                 <div class="battle-content">
-                    <div id="battle-field">
-                        <div class="battle-info">
-                            <p>🛡️ Watch your army automatically strategize and fight!</p>
-                            <p>⚔️ Battle outcomes depend on your village preparation</p>
-                            <div id="battle-log"></div>
-                        </div>
-                    </div>
-                    <div class="army-panel">
-                        <h3>Your Army</h3>
-                        <div id="army-units"></div>
-                    </div>
+                    <p>Battle system coming soon!</p>
                 </div>
             </div>
-            
+
             <!-- Monarch View -->
             <div id="monarch-view" class="game-view">
-                <div class="monarch-header">
-                    <h2>Royal Court</h2>
-                    <div class="gold-display">Gold: <span id="gold-count">1000</span></div>
-                </div>
-                <div class="monarch-content">
-                    <div class="investment-categories">
-                        <div class="investment-category">
-                            <h3>Village Improvements</h3>
-                            <button class="investment-btn" data-cost="100">Production Boost (+10% efficiency) - 100 Gold</button>
-                            <button class="investment-btn" data-cost="250">New Building Types - 250 Gold</button>
-                            <button class="investment-btn" data-cost="500">Automation Level Up - 500 Gold</button>
-                        </div>
-                        <div class="investment-category">
-                            <h3>Military Upgrades</h3>
-                            <button class="investment-btn" data-cost="200">Army Scouts (Better AI) - 200 Gold</button>
-                            <button class="investment-btn" data-cost="400">Elite Generals - 400 Gold</button>
-                            <button class="investment-btn" data-cost="800">Tactical Academy - 800 Gold</button>
-                        </div>
-                        <div class="investment-category">
-                            <h3>Legacy Systems</h3>
-                            <button class="investment-btn" data-cost="1000">Parallel Villages - 1000 Gold</button>
-                            <button class="investment-btn" data-cost="2000">Prestige Automation - 2000 Gold</button>
-                        </div>
-                    </div>
+                <div class="locked-view">
+                    <h2>👑 Monarch's Court</h2>
+                    <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
                 </div>
             </div>
-            
+
             <!-- Throne View -->
             <div id="throne-view" class="game-view">
                 <div class="throne-header">
-                    <h2>Throne Room</h2>
-                    <p>Merge ceremonial items for permanent bonuses</p>
+                    <h2>🏰 The Throne</h2>
+                    <p>Manage your kingdom's power and influence</p>
                 </div>
+                
                 <div class="throne-content">
-                    <div id="merge-grid" class="merge-grid">
-                        <!-- Merge items will be dynamically added here -->
-                    </div>
-                    <div class="merge-info">
-                        <h3>Active Bonuses</h3>
-                        <div id="active-bonuses">
-                            <p>No bonuses yet - start merging!</p>
-                        </div>
-                    </div>
+                    <p>Throne management coming soon!</p>
                 </div>
             </div>
         </main>
     </div>
-    
-    <div id="settings-popup" class="popup-modal" style="display:none;">
-      <div class="popup-content">
-        <h3>Menu</h3>
-        <div id="game-version" style="margin-bottom:1rem; color:#bdc3c7; font-size:0.95rem;"></div>
-        <button id="quit-btn">Quit to Title</button>
-        <button class="popup-close" onclick="document.getElementById('settings-popup').style.display='none'">Close</button>
-      </div>
+
+    <!-- Tutorial Modal -->
+    <div id="tutorial-modal" class="modal-overlay tutorial-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Tutorial & Help</h3>
+                <button class="modal-close tutorial-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tutorial-content">
+                    <h4>Getting Started</h4>
+                    <p>Welcome to Idle: Dynasty Builder! Here's how to play:</p>
+                    <ul>
+                        <li><strong>Village:</strong> Build houses for population, farms for food, and other structures</li>
+                        <li><strong>Battle:</strong> Recruit and manage your army to defend against waves</li>
+                        <li><strong>Throne:</strong> Use royal decrees to boost your kingdom</li>
+                    </ul>
+                    <h4>Building Guide</h4>
+                    <ul>
+                        <li><strong>House:</strong> Increases population (+5 people)</li>
+                        <li><strong>Farm:</strong> Produces food (+10 food/turn)</li>
+                        <li><strong>Town Center:</strong> Boosts all production (+20%)</li>
+                        <li><strong>Barracks:</strong> Allows training better units</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay settings-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close settings-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-content">
+                    <div class="setting-group">
+                        <label>Sound Effects</label>
+                        <button id="sound-toggle" class="toggle-btn">On</button>
+                    </div>
+                    <div class="setting-group">
+                        <label>Auto-save</label>
+                        <button id="autosave-toggle" class="toggle-btn">On</button>
+                    </div>
+                    <div class="setting-group">
+                        <button id="reset-game-btn" class="btn btn-danger">Reset Game</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quest Modal -->
+    <div id="quest-modal" class="modal-overlay quest-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Expeditions & Quests</h3>
+                <button class="modal-close quest-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="quest-content">
+                    <div class="quest-list">
+                        <h4>Available Expeditions</h4>
+                        <p>Expedition system coming soon!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progression Modal -->
+    <div id="progression-modal" class="modal-overlay progression-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Progression & Achievements</h3>
+                <button class="modal-close progression-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="progression-content">
+                    <div class="achievement-list">
+                        <h4>Achievements</h4>
+                        <div class="achievement">
+                            <span class="achievement-icon">🏠</span>
+                            <div class="achievement-info">
+                                <h5>First Builder</h5>
+                                <p>Build your first structure</p>
+                            </div>
+                            <span class="achievement-status incomplete">Incomplete</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Construction Confirmation Modal -->
+    <div id="construction-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🏗️ Construction Queued!</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="construction-info">
+                    <div class="construction-icon">🔨</div>
+                    <p id="construction-message">Your building has been placed and construction has begun!</p>
+                    <div class="resource-spent">
+                        <h4>Resources Spent:</h4>
+                        <div id="resource-spent-list"></div>
+                    </div>
+                    <div class="construction-time">
+                        <h4>Construction Time:</h4>
+                        <p id="construction-time-text">Will complete during your next expedition</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../src/gameState.js"></script>
+    <script src="../src/modalSystem.js"></script>
+    <script src="../src/village.js"></script>
+    <script src="../src/battle.js"></script>
+    <script src="../src/throne.js"></script>
+    <script src="../src/monarch.js"></script>
+    <script src="../src/quest.js"></script>
+    <script src="../src/quests.js"></script>
+    <script src="../src/tutorial.js"></script>
+    <script src="../src/uiPopups.js"></script>
+    <script src="../src/app.js"></script>
     
-</main>
-</div>
-
-<div id="settings-popup" class="popup-modal" style="display:none;">
-  <div class="popup-content">
-    <h3>Menu</h3>
-    <div id="game-version" style="margin-bottom:1rem; color:#bdc3c7; font-size:0.95rem;"></div>
-    <button id="quit-btn">Quit to Title</button>
-    <button class="popup-close" onclick="document.getElementById('settings-popup').style.display='none'">Close</button>
-  </div>
-</div>
-
-<!-- Move all scripts to the very end of <body> so all DOM is loaded first -->
-<script src="../src/gameState.js"></script>
-<script src="../src/village.js"></script>
-<script src="../src/battle.js"></script>
-<script src="../src/monarch.js"></script>
-<script src="../src/throne.js"></script>
-<script src="../src/tutorial.js"></script>
-<script src="../src/uiPopups.js"></script>
-<script src="../src/app.js"></script>
-</body>
-</html>
+    <script>
+        // Simple modal functionality
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.classList.add('show');
+            }
+        }
+        
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+            }
+        }
+        
+        // Wait for DOM to load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Tutorial button
+            const tutorialBtn = document.getElementById('tutorial-btn');
+            if (tutorialBtn) {
+                tutorialBtn.onclick = () => {
+                    console.log('Tutorial button clicked');
+                    showModal('tutorial-modal');
+                };
+            }
+            
+            // Settings button
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                settingsBtn.onclick = () => {
+                    console.log('Settings button clicked');
+                    showModal('settings-modal');
+                };
+            }
+            
+            // Quest button
+            const questBtn = document.getElementById('quest-btn');
+            if (questBtn) {
+                questBtn.onclick = () => {
+                    console.log('Quest button clicked');
+                    showModal('quest-modal');
+                };
+            }
+            
+            // Progress button
+            const progressBtn = document.getElementById('progress-btn');
+            if (progressBtn) {
+                progressBtn.onclick = () => {
+                    console.log('Progress button clicked');
+                    showModal('progression-modal');
+                };
+            }
+            
+            // Close button handlers
+            document.querySelectorAll('.modal-close').forEach(closeBtn => {
+                closeBtn.onclick = (e) => {
+                    console.log('Close button clicked');
+                    const modal = e.target.closest('.modal-overlay');
+                    if (modal) {
+                        modal.style.display = 'none';
+                        modal.classList.remove('show');
+                    }
+                };
+            });
+            
+            // Click outside to close
+            document.querySelectorAll('.modal-overlay').forEach(modal => {
+                modal.onclick = (e) => {
+                    if (e.target === modal) {
+                        console.log('Clicked outside modal');
+                        modal.style.display = 'none';
+                        modal.classList.remove('show');
+                    }
+                };
+            });
+        });
+    </script>
 </body>
 </html>

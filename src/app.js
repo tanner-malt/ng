@@ -43,12 +43,12 @@ class Game {
         } else if (unlocked === 0) {
             progressBtn.classList.remove('progress-incomplete', 'progress-complete');
             progressBtn.classList.add('progress-locked');
-            progressIcon.textContent = '🗺️';
+            progressIcon.textContent = '�';
             progressBtn.title = 'No milestones unlocked yet.';
         } else {
             progressBtn.classList.remove('progress-complete', 'progress-locked');
             progressBtn.classList.add('progress-incomplete');
-            progressIcon.textContent = '🗺️';
+            progressIcon.textContent = '�';
             progressBtn.title = `${unlocked}/3 milestones unlocked.`;
         }
     }
@@ -72,6 +72,15 @@ class Game {
             this.battleManager = new BattleManager(this.gameState);
             this.monarchManager = new MonarchManager(this.gameState);
             this.throneManager = new ThroneManager(this.gameState);
+            
+            // Initialize quest manager with error handling
+            if (window.QuestManager) {
+                this.questManager = new window.QuestManager(this.gameState, this);
+            } else {
+                console.warn('[Game] QuestManager not available, quest functionality disabled');
+                this.questManager = null;
+            }
+            
             // Milestone-based view unlocking
             this.unlockedViews = { village: true, battle: false, monarch: false, throne: false };
             this.tutorialManager = new window.TutorialManager(this);
@@ -110,11 +119,22 @@ class Game {
             this.startGameLoop();
             this.setupAutosave();
             this.setupKeyboardShortcuts();
+            
+            // Ensure window.game is always set, even if there are errors above
             window.game = this;
             window.gameState = this.gameState;
-            // ...
+            window.villageManager = this.villageManager;
+            
+            console.log('[Game] Game initialization completed successfully');
         } catch (err) {
-            // ...
+            console.error('[Game] Error during game initialization:', err);
+            
+            // Even if there's an error, set window.game so the game is accessible
+            window.game = this;
+            window.gameState = this.gameState;
+            
+            // Try to continue with basic functionality
+            console.log('[Game] Continuing with partial initialization...');
         }
     }
 
@@ -235,8 +255,8 @@ class Game {
                 case 'throne':
                     this.throneManager.updateActiveBonuses();
                     break;
-            this.updateProgressIcon();
             }
+            this.updateProgressIcon();
             // ...
         } catch (err) {
             // ...
@@ -348,7 +368,7 @@ class Game {
     resetGame() {
         try {
             if (confirm('Are you sure you want to reset the game? This cannot be undone.')) {
-                localStorage.removeItem('villageDefenseIdleo');
+                localStorage.removeItem('idleDynastyBuilder');
                 location.reload();
             }
         } catch (err) {
@@ -358,13 +378,13 @@ class Game {
 
     exportSave() {
         try {
-            const saveData = localStorage.getItem('villageDefenseIdleo');
+            const saveData = localStorage.getItem('idleDynastyBuilder');
             if (saveData) {
                 const blob = new Blob([saveData], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'village-defense-save.json';
+                a.download = 'dynasty-builder-save.json';
                 a.click();
                 URL.revokeObjectURL(url);
             // ...
@@ -382,7 +402,7 @@ class Game {
                 reader.onload = (e) => {
                     try {
                         const saveData = e.target.result;
-                        localStorage.setItem('villageDefenseIdleo', saveData);
+                        localStorage.setItem('idleDynastyBuilder', saveData);
                         location.reload();
                     } catch (error) {
                         // ...
@@ -501,4 +521,4 @@ document.addEventListener('DOMContentLoaded', () => {
 // Global error handling
 //
 
-console.log('🎮 Village Defense: Idleo - Game script loaded');
+console.log('🎮 Idle: Dynasty Builder - Game script loaded');

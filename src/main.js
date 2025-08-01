@@ -1,6 +1,4 @@
 // Main entry point: initialize and start the game when DOM is ready
-import { startGame } from './app.js';
+// Note: startGame is already auto-started in app.js via DOMContentLoaded
 
-document.addEventListener('DOMContentLoaded', () => {
-  startGame();
-});
+console.log('[Main] Main.js loaded - game initialization handled by app.js');

@@ -49,106 +49,101 @@ function bindTopRightPopups(game) {
     console.log('[UI] bindTopRightPopups called');
     console.log('[UI] progress-btn:', document.getElementById('progress-btn'));
     console.log('[UI] progress-popup:', document.getElementById('progress-popup'));
+    console.log('[UI] quest-btn:', document.getElementById('quest-btn'));
     console.log('[UI] settings-btn:', document.getElementById('settings-btn'));
     console.log('[UI] settings-popup:', document.getElementById('settings-popup'));
     console.log('[UI] quit-btn:', document.getElementById('quit-btn'));
     // Progression popup
     const progressBtn = document.getElementById('progress-btn');
-    const progressPopup = document.getElementById('progress-popup');
-    if (progressBtn && progressPopup) {
-        let lastFocusedElement = null;
-        const showProgress = () => {
-            console.log('[UI] Progression popup triggered');
-            progressPopup.style.display = 'flex';
-            if (game && typeof game.updateProgressPopup === 'function') {
-                game.updateProgressPopup();
-            }
-            // Focus management: save last focused and focus first button
-            lastFocusedElement = document.activeElement;
-            const firstBtn = progressPopup.querySelector('button, [tabindex="0"]');
-            if (firstBtn) firstBtn.focus();
+    if (progressBtn && window.modalSystem) {
+        progressBtn.onclick = () => {
+            console.log('[UI] Progression modal triggered');
+            window.modalSystem.showProgressionModal(game);
         };
-        const closeProgress = () => {
-            progressPopup.style.display = 'none';
-            if (lastFocusedElement) lastFocusedElement.focus();
-        };
-        progressBtn.onclick = showProgress;
         progressBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-                showProgress();
+                e.preventDefault();
+                progressBtn.click();
             }
         });
-        // Accessibility: close on Escape
-        document.addEventListener('keydown', (e) => {
-            if (progressPopup.style.display === 'flex' && e.key === 'Escape') {
-                closeProgress();
-                console.log('[UI] Progression popup closed with Escape');
-            }
-        });
-        // Accessibility: close on overlay click
-        progressPopup.addEventListener('click', (e) => {
-            if (e.target === progressPopup) {
-                closeProgress();
-                console.log('[UI] Progression popup closed by overlay click');
-            }
-        });
-        // ARIA attributes
-        progressPopup.setAttribute('role', 'dialog');
-        progressPopup.setAttribute('aria-modal', 'true');
     } else {
         if (!progressBtn) console.log('[UI] progress-btn not found');
-        if (!progressPopup) console.log('[UI] progress-popup not found');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+    }
+
+    // Tutorial button
+    const tutorialBtn = document.getElementById('tutorial-btn');
+    if (tutorialBtn && window.modalSystem) {
+        tutorialBtn.onclick = () => {
+            console.log('[UI] Tutorial modal triggered');
+            window.modalSystem.showTutorialModal();
+        };
+        tutorialBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                tutorialBtn.click();
+            }
+        });
+    } else {
+        if (!tutorialBtn) console.log('[UI] tutorial-btn not found');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+    }
+
+    // Quest menu button
+    const questBtn = document.getElementById('quest-btn');
+    if (questBtn && game && game.questManager && window.modalSystem) {
+        questBtn.onclick = () => {
+            console.log('[UI] Quest menu triggered');
+            window.modalSystem.showQuestMenu(game.questManager);
+        };
+        questBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                questBtn.click();
+            }
+        });
+    } else {
+        if (!questBtn) console.log('[UI] quest-btn not found');
+        if (!game.questManager) console.log('[UI] questManager not available');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
     // Settings/menu popup
     const settingsBtn = document.getElementById('settings-btn');
-    const settingsPopup = document.getElementById('settings-popup');
-    if (settingsBtn && settingsPopup) {
-        let lastFocusedElement = null;
+    if (settingsBtn && window.modalSystem) {
         settingsBtn.onclick = () => {
-            console.log('[UI] Settings popup triggered');
-            settingsPopup.style.display = 'flex';
-            // Show version from version.json
-            const versionEl = document.getElementById('game-version');
-            if (versionEl) {
-                fetch('version.json')
-                    .then(res => res.json())
-                    .then(data => {
-                        versionEl.textContent = `Version: ${data.version}`;
-                    })
-                    .catch(() => {
-                        versionEl.textContent = 'Version: unknown';
-                    });
-            }
-            // Focus management: save last focused and focus first button
-            lastFocusedElement = document.activeElement;
-            const firstBtn = settingsPopup.querySelector('button, [tabindex="0"]');
-            if (firstBtn) firstBtn.focus();
+            console.log('[UI] Settings modal triggered');
+            window.modalSystem.showSettingsModal();
         };
-        const closeSettings = () => {
-            settingsPopup.style.display = 'none';
-            if (lastFocusedElement) lastFocusedElement.focus();
-        };
-        // Accessibility: close on Escape
-        document.addEventListener('keydown', (e) => {
-            if (settingsPopup.style.display === 'flex' && e.key === 'Escape') {
-                closeSettings();
-                console.log('[UI] Settings popup closed with Escape');
+        settingsBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                settingsBtn.click();
             }
         });
-        // Accessibility: close on overlay click
-        settingsPopup.addEventListener('click', (e) => {
-            if (e.target === settingsPopup) {
-                closeSettings();
-                console.log('[UI] Settings popup closed by overlay click');
-            }
-        });
-        // ARIA attributes
-        settingsPopup.setAttribute('role', 'dialog');
-        settingsPopup.setAttribute('aria-modal', 'true');
     } else {
         if (!settingsBtn) console.log('[UI] settings-btn not found');
-        if (!settingsPopup) console.log('[UI] settings-popup not found');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+    }
+
+    // Sound button
+    const soundBtn = document.getElementById('sound-btn');
+    if (soundBtn) {
+        let soundEnabled = true;
+        soundBtn.onclick = () => {
+            soundEnabled = !soundEnabled;
+            soundBtn.querySelector('span').textContent = soundEnabled ? '🔊' : '🔇';
+            soundBtn.title = soundEnabled ? 'Sound: On' : 'Sound: Off';
+            console.log('[UI] Sound toggled:', soundEnabled ? 'ON' : 'OFF');
+        };
+        soundBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                soundBtn.click();
+            }
+        });
+    } else {
+        console.log('[UI] sound-btn not found');
     }
 
     // Quit button

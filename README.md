@@ -1,6 +1,6 @@
-# VILLAGE DEFENSE: Idleo
+# IDLE: DYNASTY BUILDER
 
-**Idleo** is a new genre combining automated strategy, village management, and prestige progression. Watch AI-driven battles while managing the systems that make them possible.
+**Idle: Dynasty Builder** is a new genre combining automated strategy, village management, and prestige progression. Watch AI-driven battles while managing the systems that make them possible.
 
 ## Core Gameplay Loops
 
@@ -45,7 +45,7 @@ Ceremonial reward system. Merge items earned through progression.
 - **Ceremonial Progression**: Unlock new merge categories through achievements
 - **Royal Artifacts**: High-level merges provide permanent global bonuses
 
-## Core "Idleo" Philosophy
+## Core "Dynasty Builder" Philosophy
 
 **Intelligent Automation**: AI behavior feels smart, not random
 **Cross-View Synergy**: Each view meaningfully impacts others
