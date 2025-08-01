@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Auto-Start Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #2c3e50; 
+            color: white; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        .success { background: #27ae60; }
+        .error { background: #e74c3c; }
+        .warning { background: #f39c12; }
+        .info { background: #3498db; }
+        
+        /* Include basic modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        .modal {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .modal-title {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+        
+        .modal-close {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .modal-content {
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            text-align: right;
+        }
+        
+        .modal-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-left: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Tutorial Auto-Start Debug</h1>
+    <div id="status-container"></div>
+    <div id="log-container" style="margin-top: 20px; font-family: monospace; font-size: 12px;"></div>
+
+    <!-- Load game scripts in correct order -->
+    <script src="src/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/modalSystem.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/worldManager.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/app.js"></script>
+
+    <script>
+        const statusContainer = document.getElementById('status-container');
+        const logContainer = document.getElementById('log-container');
+        
+        function addStatus(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            statusContainer.appendChild(div);
+        }
+        
+        function addLog(message) {
+            const div = document.createElement('div');
+            div.style.margin = '2px 0';
+            div.style.color = '#ecf0f1';
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        // Capture console output
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog('[LOG] ' + args.join(' '));
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog('[ERROR] ' + args.join(' '));
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLog('[WARN] ' + args.join(' '));
+        };
+        
+        // Track initialization steps
+        let game;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            addStatus('DOM Content Loaded', 'info');
+            
+            // Wait a moment for all scripts to load
+            setTimeout(() => {
+                addStatus('Testing script availability...', 'info');
+                
+                // Check if classes are available
+                if (typeof Game !== 'undefined') {
+                    addStatus('✅ Game class available', 'success');
+                } else {
+                    addStatus('❌ Game class not available', 'error');
+                    return;
+                }
+                
+                if (typeof TutorialManager !== 'undefined') {
+                    addStatus('✅ TutorialManager class available', 'success');
+                } else {
+                    addStatus('❌ TutorialManager class not available', 'error');
+                    return;
+                }
+                
+                if (typeof showModal !== 'undefined') {
+                    addStatus('✅ showModal function available', 'success');
+                } else {
+                    addStatus('❌ showModal function not available', 'error');
+                    return;
+                }
+                
+                // Now create and initialize game
+                addStatus('Creating Game instance...', 'info');
+                try {
+                    game = new Game();
+                    addStatus('✅ Game instance created', 'success');
+                    
+                    addStatus('Initializing game...', 'info');
+                    game.init();
+                    addStatus('✅ Game initialized', 'success');
+                    
+                    // Check tutorial status
+                    setTimeout(() => {
+                        if (game.tutorialActive) {
+                            addStatus('✅ Tutorial is active', 'success');
+                        } else {
+                            addStatus('❌ Tutorial is not active', 'error');
+                        }
+                        
+                        if (game.tutorialManager) {
+                            addStatus('✅ Tutorial manager exists', 'success');
+                        } else {
+                            addStatus('❌ Tutorial manager missing', 'error');
+                        }
+                        
+                        // Check if any modals are visible
+                        const overlay = document.getElementById('modal-overlay');
+                        if (overlay && overlay.style.display !== 'none') {
+                            addStatus('✅ Modal is visible', 'success');
+                        } else {
+                            addStatus('❌ No modal is visible', 'warning');
+                        }
+                    }, 2000);
+                    
+                } catch (error) {
+                    addStatus('❌ Error creating/initializing game: ' + error.message, 'error');
+                    console.error('Game initialization error:', error);
+                }
+                
+            }, 500);
+        });
+    </script>
+</body>
+</html>

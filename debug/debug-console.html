@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynasty Builder - Debug Console</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.4;
+        }
+
+        .debug-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+
+        .debug-panel {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .debug-panel h2 {
+            color: #00ccff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .status-healthy { background: rgba(0, 255, 0, 0.1); }
+        .status-warning { background: rgba(255, 255, 0, 0.1); }
+        .status-error { background: rgba(255, 0, 0, 0.1); }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .healthy { background: #00ff00; }
+        .warning { background: #ffff00; }
+        .error { background: #ff0000; }
+
+        .debug-button {
+            background: #444;
+            color: #00ff00;
+            border: 1px solid #666;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .debug-button:hover {
+            background: #555;
+            border-color: #00ccff;
+        }
+
+        .debug-button.danger {
+            border-color: #ff6666;
+            color: #ff6666;
+        }
+
+        .debug-button.danger:hover {
+            background: rgba(255, 102, 102, 0.1);
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #666;
+            font-size: 0.9rem;
+        }
+
+        .log-error { border-left-color: #ff0000; color: #ff6666; }
+        .log-warning { border-left-color: #ffff00; color: #ffff66; }
+        .log-info { border-left-color: #00ccff; color: #66ccff; }
+
+        .snapshot-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .snapshot-item {
+            background: rgba(0, 204, 255, 0.1);
+            margin: 5px 0;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .snapshot-item:hover {
+            background: rgba(0, 204, 255, 0.2);
+        }
+
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .metric {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .console-output {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .command-input {
+            width: 100%;
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #666;
+            padding: 8px;
+            font-family: inherit;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <!-- System Health Panel -->
+        <div class="debug-panel">
+            <h2>🔧 System Health Monitor</h2>
+            <div id="system-health">
+                <div class="system-status status-healthy">
+                    <div class="status-indicator healthy"></div>
+                    <span>EventBus: Healthy (12 events)</span>
+                </div>
+                <div class="system-status status-healthy">
+                    <div class="status-indicator healthy"></div>
+                    <span>GameState: Healthy (Saved 5s ago)</span>
+                </div>
+                <div class="system-status status-warning">
+                    <div class="status-indicator warning"></div>
+                    <span>Tutorial: Warning (Step 2/2)</span>
+                </div>
+                <div class="system-status status-healthy">
+                    <div class="status-indicator healthy"></div>
+                    <span>Village: Healthy (3 buildings)</span>
+                </div>
+            </div>
+            
+            <div class="performance-metrics">
+                <div class="metric">
+                    <div>Memory Usage</div>
+                    <div>12.5 MB</div>
+                </div>
+                <div class="metric">
+                    <div>FPS</div>
+                    <div>60</div>
+                </div>
+                <div class="metric">
+                    <div>Event/sec</div>
+                    <div>2.3</div>
+                </div>
+                <div class="metric">
+                    <div>Errors</div>
+                    <div>0</div>
+                </div>
+            </div>
+
+            <div>
+                <button class="debug-button" onclick="refreshHealth()">Refresh Health</button>
+                <button class="debug-button" onclick="exportDiagnostics()">Export Diagnostics</button>
+            </div>
+        </div>
+
+        <!-- Recovery & Snapshots Panel -->
+        <div class="debug-panel">
+            <h2>💾 State Management</h2>
+            
+            <h3>Quick Actions</h3>
+            <div>
+                <button class="debug-button" onclick="createSnapshot()">Create Snapshot</button>
+                <button class="debug-button danger" onclick="resetTutorial()">Reset Tutorial</button>
+                <button class="debug-button danger" onclick="resetGameState()">Reset Game State</button>
+            </div>
+
+            <h3>Snapshots</h3>
+            <div class="snapshot-list" id="snapshot-list">
+                <div class="snapshot-item" onclick="restoreSnapshot(0)">
+                    <div>Initial State</div>
+                    <div style="font-size: 0.8em; opacity: 0.7;">2025-08-01 14:30:25</div>
+                </div>
+                <div class="snapshot-item" onclick="restoreSnapshot(1)">
+                    <div>After Tutorial</div>
+                    <div style="font-size: 0.8em; opacity: 0.7;">2025-08-01 14:32:15</div>
+                </div>
+                <div class="snapshot-item" onclick="restoreSnapshot(2)">
+                    <div>Emergency_1722526785432</div>
+                    <div style="font-size: 0.8em; opacity: 0.7;">2025-08-01 14:33:05</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Log Panel -->
+        <div class="debug-panel">
+            <h2>⚠️ Error Monitor</h2>
+            <div id="error-log">
+                <div class="log-entry log-info">
+                    [14:30:25] System initialized successfully
+                </div>
+                <div class="log-entry log-warning">
+                    [14:32:18] Tutorial: No dynasty name provided, using default
+                </div>
+                <div class="log-entry log-info">
+                    [14:33:05] Snapshot created: Emergency_1722526785432
+                </div>
+            </div>
+            
+            <div>
+                <button class="debug-button" onclick="clearErrorLog()">Clear Log</button>
+                <button class="debug-button" onclick="exportErrorLog()">Export Log</button>
+            </div>
+        </div>
+
+        <!-- Console Panel -->
+        <div class="debug-panel">
+            <h2>🖥️ Debug Console</h2>
+            <div class="console-output" id="console-output">
+Dynasty Builder Debug Console v1.0
+Type 'help' for available commands.
+
+> debugCommands.health()
+System health check completed:
+✅ EventBus: 12 events registered
+✅ GameState: Resources valid, last save 5s ago
+⚠️  Tutorial: Step 2/2, requires completion
+✅ Village: 3 buildings, grid stable
+
+> debugCommands.listSnapshots()
+Available snapshots:
+0: Initial State (2025-08-01 14:30:25)
+1: After Tutorial (2025-08-01 14:32:15)  
+2: Emergency_1722526785432 (2025-08-01 14:33:05)
+
+>
+            </div>
+            <input type="text" class="command-input" id="command-input" placeholder="Enter debug command..." onkeypress="handleCommand(event)">
+        </div>
+
+        <!-- Game Preview Panel -->
+        <div class="debug-panel full-width">
+            <h2>🎮 Live Game Preview</h2>
+            <iframe src="../public/game.html" style="width: 100%; height: calc(100% - 50px); border: 1px solid #666; background: white;"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // Debug interface functionality
+        function refreshHealth() {
+            if (window.parent && window.parent.debugCommands) {
+                const health = window.parent.debugCommands.health();
+                updateHealthDisplay(health);
+            }
+            console.log('Health check refreshed');
+        }
+
+        function createSnapshot() {
+            if (window.parent && window.parent.debugCommands) {
+                const snapshot = window.parent.debugCommands.snapshot(`Manual_${Date.now()}`);
+                updateSnapshotList();
+                addLogEntry('info', `Snapshot created: ${snapshot.name}`);
+            }
+        }
+
+        function restoreSnapshot(index) {
+            if (window.parent && window.parent.debugCommands) {
+                const success = window.parent.debugCommands.restore(index);
+                if (success) {
+                    addLogEntry('info', `Snapshot ${index} restored successfully`);
+                } else {
+                    addLogEntry('error', `Failed to restore snapshot ${index}`);
+                }
+            }
+        }
+
+        function resetTutorial() {
+            if (confirm('Reset tutorial? This will restart tutorial progress.')) {
+                if (window.parent && window.parent.debugCommands) {
+                    window.parent.debugCommands.reset('simpleTutorial');
+                    addLogEntry('warning', 'Tutorial system reset');
+                }
+            }
+        }
+
+        function resetGameState() {
+            if (confirm('Reset game state? This will delete all progress!')) {
+                if (window.parent && window.parent.debugCommands) {
+                    window.parent.debugCommands.reset('gameState');
+                    addLogEntry('warning', 'Game state reset to defaults');
+                }
+            }
+        }
+
+        function clearErrorLog() {
+            document.getElementById('error-log').innerHTML = '';
+            addLogEntry('info', 'Error log cleared');
+        }
+
+        function exportDiagnostics() {
+            const diagnostics = {
+                timestamp: new Date().toISOString(),
+                health: window.parent?.debugCommands?.health() || 'Not available',
+                snapshots: window.parent?.debugCommands?.listSnapshots() || [],
+                errors: window.parent?.debugCommands?.errors() || []
+            };
+            
+            const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dynasty-builder-diagnostics-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addLogEntry('info', 'Diagnostics exported');
+        }
+
+        function exportErrorLog() {
+            const logEntries = Array.from(document.getElementById('error-log').children)
+                .map(entry => entry.textContent);
+            
+            const blob = new Blob([logEntries.join('\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dynasty-builder-errors-${Date.now()}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            addLogEntry('info', 'Error log exported');
+        }
+
+        function handleCommand(event) {
+            if (event.key === 'Enter') {
+                const input = event.target;
+                const command = input.value.trim();
+                
+                if (command) {
+                    executeCommand(command);
+                    input.value = '';
+                }
+            }
+        }
+
+        function executeCommand(command) {
+            const output = document.getElementById('console-output');
+            output.textContent += `\n> ${command}\n`;
+            
+            try {
+                if (window.parent && window.parent.debugCommands) {
+                    const result = eval(`window.parent.${command}`);
+                    output.textContent += `${JSON.stringify(result, null, 2)}\n`;
+                } else {
+                    output.textContent += 'Debug commands not available\n';
+                }
+            } catch (error) {
+                output.textContent += `Error: ${error.message}\n`;
+            }
+            
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function addLogEntry(type, message) {
+            const log = document.getElementById('error-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateHealthDisplay(health) {
+            // Update health display based on actual health data
+            // This would be called when refreshHealth() gets real data
+        }
+
+        function updateSnapshotList() {
+            // Update snapshot list based on actual snapshot data
+            // This would be called when snapshots are created/deleted
+        }
+
+        // Auto-refresh health every 5 seconds
+        setInterval(refreshHealth, 5000);
+
+        // Initialize
+        console.log('Debug console initialized');
+    </script>
+</body>
+</html>

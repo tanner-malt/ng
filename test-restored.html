@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idle: Dynasty Builder - Restoration Test</title>
+    <link rel="stylesheet" href="public/game.css">
+    <link rel="stylesheet" href="public/progress-icons.css">
+    
+    <style>
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+            max-width: 300px;
+        }
+        .debug-status {
+            margin: 2px 0;
+        }
+        .status-ok { color: #2ecc71; }
+        .status-error { color: #e74c3c; }
+        .status-warning { color: #f39c12; }
+    </style>
+    
+    <!-- Game Scripts in proper order -->
+    <script src="src/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/modalSystem.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/worldManager.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/app.js"></script>
+</head>
+<body>
+    <!-- Debug Panel -->
+    <div class="debug-panel">
+        <h4>🔧 Restoration Status</h4>
+        <div id="debug-status">Loading...</div>
+    </div>
+
+    <!-- Top Right Icons -->
+    <div id="top-right-icons">
+        <button id="sound-btn" class="icon-btn" title="Sound">
+            <span>🔊</span>
+        </button>
+        <button id="tutorial-btn" class="icon-btn" title="Tutorial & Help">
+            <span>📚</span>
+        </button>
+        <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
+            <span>🗺️</span>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings">
+            <span>⚙️</span>
+        </button>
+        <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
+            <span id="progress-icon">🏆</span>
+        </button>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <nav id="view-navigation">
+            <button class="nav-btn active" data-view="village" id="village-tab">Village</button>
+            <button class="nav-btn locked" data-view="battle" id="battle-tab">Battle (LOCKED)</button>
+            <button class="nav-btn locked" data-view="monarch" id="monarch-tab">Monarch (LOCKED)</button>
+            <button class="nav-btn locked" data-view="throne" id="throne-tab">Throne (LOCKED)</button>
+            <button class="nav-btn locked" data-view="world" id="world-tab">World (LOCKED)</button>
+        </nav>
+        
+        <main id="game-content">
+            <!-- Village View -->
+            <div id="village-view" class="game-view active">
+                <div class="village-header">
+                    <h2>Village Management</h2>
+                    <div class="resource-panel">
+                        <span>Food: <span id="food-count">100</span></span>
+                        <span>Wood: <span id="wood-count">50</span></span>
+                        <span>Stone: <span id="stone-count">25</span></span>
+                        <span>Metal: <span id="metal-count">10</span></span>
+                        <span>Population: <span id="population-count">10</span></span>
+                        <span>Season: <span id="season-count">Spring</span></span>
+                    </div>
+                </div>
+                
+                <div class="village-content">
+                    <div id="village-grid" class="village-grid"></div>
+                    
+                    <div class="village-sidebar">
+                        <div class="village-info">
+                            <h3>Build Structures</h3>
+                            <div class="building-buttons">
+                                <button class="building-btn" data-building="house">
+                                    <span class="building-icon">🏠</span>
+                                    <span>House</span>
+                                    <small>Cost: 20 Wood</small>
+                                </button>
+                                <button class="building-btn" data-building="farm">
+                                    <span class="building-icon">🌾</span>
+                                    <span>Farm</span>
+                                    <small>Cost: 30 Wood</small>
+                                </button>
+                                <button class="building-btn" data-building="townCenter">
+                                    <span class="building-icon">🏛️</span>
+                                    <span>Town Center</span>
+                                    <small>Cost: 100 Wood, 50 Stone</small>
+                                </button>
+                                <button class="building-btn" data-building="barracks">
+                                    <span class="building-icon">⚔️</span>
+                                    <span>Barracks</span>
+                                    <small>Cost: 50 Wood, 30 Stone</small>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Battle View -->
+            <div id="battle-view" class="game-view">
+                <div class="battle-header">
+                    <h2>⚔️ Military Command</h2>
+                    <p>Train units and prepare for battle</p>
+                </div>
+                
+                <div class="battle-content">
+                    <p>Battle system ready for commands!</p>
+                </div>
+            </div>
+
+            <!-- Monarch View -->
+            <div id="monarch-view" class="game-view">
+                <div class="monarch-header">
+                    <h2>👑 Royal Court</h2>
+                    <p>Manage your royal influence and advisors</p>
+                </div>
+                
+                <div class="monarch-content">
+                    <p>Royal court awaits your presence!</p>
+                </div>
+            </div>
+
+            <!-- Throne View -->
+            <div id="throne-view" class="game-view">
+                <div class="throne-header">
+                    <h2>🏰 The Throne</h2>
+                    <p>Command your kingdom's power and influence</p>
+                </div>
+                
+                <div class="throne-content">
+                    <p>Your throne room stands ready!</p>
+                </div>
+            </div>
+            
+            <!-- World View -->
+            <div id="world-view" class="game-view">
+                <div class="world-header">
+                    <h2>🗺️ World Map</h2>
+                    <p>Explore the world, manage armies, and command expeditions</p>
+                </div>
+                
+                <div class="world-content">
+                    <!-- World content will be dynamically generated by WorldManager -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Debug system to verify restoration
+        function updateDebugStatus() {
+            const statusEl = document.getElementById('debug-status');
+            const checks = [
+                { name: 'EventBus', check: () => !!window.eventBus },
+                { name: 'GameState', check: () => !!window.GameState },
+                { name: 'ModalSystem', check: () => !!window.modalSystem },
+                { name: 'showModal', check: () => !!window.showModal },
+                { name: 'VillageManager', check: () => !!window.VillageManager },
+                { name: 'WorldManager', check: () => !!window.WorldManager },
+                { name: 'TutorialManager', check: () => !!window.TutorialManager },
+                { name: 'Game Instance', check: () => !!window.game },
+                { name: 'Tutorial Active', check: () => window.game && window.game.tutorialActive }
+            ];
+
+            let statusHTML = '';
+            checks.forEach(({ name, check }) => {
+                const status = check();
+                const className = status ? 'status-ok' : 'status-error';
+                const icon = status ? '✅' : '❌';
+                statusHTML += `<div class="debug-status ${className}">${icon} ${name}</div>`;
+            });
+
+            statusEl.innerHTML = statusHTML;
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[Debug] DOM loaded, initializing...');
+            
+            // Give a moment for all scripts to load
+            setTimeout(() => {
+                updateDebugStatus();
+                
+                // Update every 2 seconds
+                setInterval(updateDebugStatus, 2000);
+                
+                console.log('[Debug] Starting game initialization...');
+                if (window.Game) {
+                    const game = new Game();
+                    window.game = game;
+                    console.log('[Debug] Game instance created:', game);
+                } else {
+                    console.error('[Debug] Game class not available');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

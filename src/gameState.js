@@ -1,15 +1,36 @@
-// Global game state management
+/**
+ * gameState.js - Game State Management and Persistence
+ * 
+ * Central game state manager that handles all persistent data including resources,
+ * buildings, progress, and save/load functionality. This is the single source of
+ * truth for all game data.
+ * 
+ * Key Responsibilities:
+ * - Resource management (food, wood, stone, gold)
+ * - Building state tracking and persistence
+ * - Save/load system using localStorage
+ * - Day/time progression and seasonal changes
+ * - Auto-save functionality
+ * - Scout progress and world exploration state
+ * 
+ * Data Structure:
+ * - Resources: Real-time resource tracking with generation rates
+ * - Buildings: Complete building state with construction timers
+ * - Progress: Player advancement and unlock states
+ * - Persistence: Automatic saves with version control
+ */
+
 class GameState {
     constructor() {
         this.resources = {
-            food: 100,
+            food: 50,
             wood: 50,
-            stone: 25,
-            metal: 10
+            stone: 30,
+            metal: 0
         };
         
-        this.population = 10;
-        this.gold = 1000;
+        this.population = 1;
+        this.gold = 100;
         this.wave = 1;
         this.season = 'Spring';
         
@@ -922,3 +943,7 @@ class GameState {
 
 // Initialize global game state
 const gameState = new GameState();
+
+// Make GameState class and instance globally available
+window.GameState = GameState;
+window.gameState = gameState;

@@ -410,3 +410,6 @@ class MonarchManager {
         });
     }
 }
+
+// Make MonarchManager globally available
+window.MonarchManager = MonarchManager;

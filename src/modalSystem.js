@@ -1,4 +1,23 @@
-// Comprehensive modal and popup system for Idle: Dynasty Builder
+/**
+ * modalSystem.js - Modal Dialog and Popup System
+ * 
+ * Comprehensive modal system supporting various dialog types including tutorial
+ * modals, confirmations, notifications, and complex user interactions.
+ * 
+ * Key Features:
+ * - Promise-based modal handling for async interactions
+ * - Multiple modal types (info, warning, error, confirmation)
+ * - Rich content support with HTML formatting
+ * - Keyboard and click handling for accessibility
+ * - Modal stacking and overlay management
+ * - Integration with tutorial system
+ * 
+ * Usage:
+ * - window.showModal(title, content, options) - Main modal function
+ * - window.showNotification(message, options) - Quick notifications
+ * - Automatic DOM container creation and management
+ */
+
 class ModalSystem {
     constructor() {
         this.activeModals = new Set();
@@ -7,11 +26,26 @@ class ModalSystem {
     }
 
     init() {
-        this.createModalContainer();
-        this.setupEventListeners();
+        // Ensure DOM is ready before creating modal containers
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.createModalContainer();
+                this.setupEventListeners();
+            });
+        } else {
+            this.createModalContainer();
+            this.setupEventListeners();
+        }
     }
 
     createModalContainer() {
+        // Ensure document.body exists
+        if (!document.body) {
+            console.warn('[ModalSystem] document.body not available, retrying...');
+            setTimeout(() => this.createModalContainer(), 100);
+            return;
+        }
+
         // Create main modal overlay if it doesn't exist
         if (!document.getElementById('modal-overlay')) {
             const overlay = document.createElement('div');
@@ -31,23 +65,48 @@ class ModalSystem {
     }
 
     setupEventListeners() {
-        // Close modal when clicking overlay
+        // Close modal when clicking overlay (only for closable modals)
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal-overlay')) {
-                this.closeTopModal();
+            if (e.target.classList.contains('modal-overlay') && this.modalStack.length > 0) {
+                const topModal = this.modalStack[this.modalStack.length - 1];
+                if (topModal.closable !== false) {
+                    if (topModal.resolve) {
+                        topModal.resolve(null);
+                    }
+                    this.closeTopModal();
+                }
             }
         });
 
-        // Close modal with Escape key
+        // Close modal with Escape key (only for closable modals)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modalStack.length > 0) {
-                this.closeTopModal();
+                const topModal = this.modalStack[this.modalStack.length - 1];
+                if (topModal.closable !== false) {
+                    if (topModal.resolve) {
+                        topModal.resolve(null);
+                    }
+                    this.closeTopModal();
+                }
             }
         });
     }
 
-    // Show a modal with custom content
+    // Show a modal with custom content and return a Promise
     showModal(options = {}) {
+        return new Promise((resolve, reject) => {
+            // Ensure DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this._showModalInternal(options, resolve, reject);
+                });
+            } else {
+                this._showModalInternal(options, resolve, reject);
+            }
+        });
+    }
+
+    _showModalInternal(options, resolve, reject) {
         const {
             id = `modal-${Date.now()}`,
             title = 'Modal',
@@ -64,6 +123,7 @@ class ModalSystem {
         // Prevent multiple instances of the same modal type
         if (modalType && this.activeModals.has(modalType)) {
             console.log(`[ModalSystem] Modal type '${modalType}' already active`);
+            resolve(null);
             return;
         }
 
@@ -76,11 +136,15 @@ class ModalSystem {
         modal.style.width = width;
         modal.style.height = height;
 
+        // Store resolve/reject for this modal
+        modal._resolve = resolve;
+        modal._reject = reject;
+
         // Create modal HTML
         modal.innerHTML = `
             <div class="modal-header">
                 <h3 class="modal-title">${title}</h3>
-                ${showCloseButton ? '<button class="modal-close-btn" aria-label="Close">×</button>' : ''}
+                ${showCloseButton && closable ? '<button class="modal-close-btn" aria-label="Close">×</button>' : ''}
             </div>
             <div class="modal-body">
                 ${content}
@@ -88,7 +152,15 @@ class ModalSystem {
         `;
 
         // Add to modal stack
-        this.modalStack.push({ id: modalId, element: modal, onClose, modalType });
+        this.modalStack.push({ 
+            id: modalId, 
+            element: modal, 
+            onClose, 
+            modalType, 
+            closable,
+            resolve,
+            reject
+        });
         this.activeModals.add(modalId);
 
         // Show overlay and modal
@@ -96,11 +168,25 @@ class ModalSystem {
         overlay.appendChild(modal);
         overlay.style.display = 'flex';
 
+        // Setup event listeners
+        this._setupModalEventListeners(modal, closable);
+
+        return modalId;
+    }
+
+    _setupModalEventListeners(modal, closable) {
         // Setup close button if enabled
-        if (showCloseButton && closable) {
+        if (closable) {
             const closeBtn = modal.querySelector('.modal-close-btn');
             if (closeBtn) {
-                closeBtn.addEventListener('click', () => this.closeModal(modalId));
+                closeBtn.addEventListener('click', () => {
+                    const modalId = modal.id;
+                    const modalData = this.modalStack.find(m => m.id === modalId);
+                    if (modalData && modalData.resolve) {
+                        modalData.resolve(null);
+                    }
+                    this.closeModal(modalId);
+                });
             }
         }
 
@@ -108,8 +194,6 @@ class ModalSystem {
         requestAnimationFrame(() => {
             modal.classList.add('modal-enter');
         });
-
-        return id;
     }
 
     // Close specific modal
@@ -1075,6 +1159,15 @@ class ModalSystem {
 
 // Create global modal system instance
 window.modalSystem = new ModalSystem();
+
+// Global showModal function for backwards compatibility
+window.showModal = (title, content, options = {}) => {
+    return window.modalSystem.showModal({
+        title: title,
+        content: content,
+        ...options
+    });
+};
 
 // Backwards compatibility - replace old showNotification function
 window.showNotification = (message, options = {}) => {

@@ -1,4 +1,24 @@
-// Tutorial and story progression logic for Village Defense: Idleo
+/**
+ * tutorial.js - Tutorial System and User Guidance
+ * 
+ * Comprehensive tutorial system that guides new players through the core game
+ * mechanics using modal dialogs and interactive elements. The tutorial is
+ * story-driven with dynasty-specific content.
+ * 
+ * Key Features:
+ * - Auto-starts for new players
+ * - Dynasty naming system with persistence
+ * - 12-step progressive tutorial covering all core mechanics
+ * - Modal-based UI with rich formatting
+ * - Building challenges and resource grants
+ * - Integration with all game systems
+ * 
+ * Tutorial Flow:
+ * 1. Dynasty naming → 2. Story introduction → 3. Building tutorial
+ * 4. Settlement establishment → 5. Royal resource grant → 6. Housing
+ * 7. Agriculture → 8. Time management → 9. World exploration
+ * 10. Military preparation → 11. Battle system → 12. Completion
+ */
 
 class TutorialManager {
     constructor() {
@@ -13,6 +33,47 @@ class TutorialManager {
         
         this.steps = this.createSteps();
         this.setupEventListeners();
+    }
+
+    // Get dynasty name with fallback
+    getDynastyName() {
+        return this.dynastyName || 'Noble House';
+    }
+
+    // Load dynasty name from localStorage
+    loadDynastyName() {
+        try {
+            const saved = localStorage.getItem('dynastyName');
+            if (saved) {
+                this.dynastyName = saved;
+                console.log('[Tutorial] Loaded dynasty name:', this.dynastyName);
+            }
+        } catch (err) {
+            console.warn('[Tutorial] Could not load dynasty name:', err);
+        }
+    }
+
+    // Save dynasty name to localStorage
+    saveDynastyName(name) {
+        try {
+            this.dynastyName = name;
+            localStorage.setItem('dynastyName', name);
+            console.log('[Tutorial] Saved dynasty name:', name);
+        } catch (err) {
+            console.warn('[Tutorial] Could not save dynasty name:', err);
+        }
+    }
+
+    // Get tutorial steps (lazy loading with dynasty name)
+    getSteps() {
+        // Return cached steps if already created and dynasty name is set
+        if (this.steps && this.dynastyName) {
+            return this.steps;
+        }
+
+        // Create steps with current dynasty name
+        this.steps = this.createSteps();
+        return this.steps;
     }
 
     createSteps() {
@@ -87,6 +148,25 @@ class TutorialManager {
                 highlight: '.building-btn[data-building="townCenter"]',
                 waitFor: 'building_placed',
                 buildingType: 'townCenter',
+                action: () => this.startStep('royal_grant')
+            },
+            {
+                id: 'royal_grant',
+                title: 'Royal Decree',
+                story: `<div class="story-panel">
+                    <p>As the Town Center construction begins, a royal messenger arrives bearing your father's seal. <em>"By decree of the Crown, these resources are granted to House ${this.getDynastyName()} for the establishment of the frontier settlement."</em></p>
+                    <p><strong>Royal Grant Received:</strong></p>
+                    <ul style="text-align: left; margin: 15px 0; color: #2ecc71;">
+                        <li>+150 Food (Royal Provisions)</li>
+                        <li>+100 Wood (Crown Timber)</li>
+                        <li>+75 Stone (Quarry Rights)</li>
+                        <li>+500 Gold (Treasury Allocation)</li>
+                    </ul>
+                    <p><em>"Use these resources wisely, heir of ${this.getDynastyName()}. The crown's support is not limitless."</em></p>
+                </div>`,
+                instruction: 'Resources have been granted! Continue building your settlement',
+                icon: '👑',
+                requiresResourceGrant: true,
                 action: () => this.startStep('first_citizens')
             },
             {
@@ -106,21 +186,38 @@ class TutorialManager {
             },
             {
                 id: 'sustenance',
-                title: 'Ensuring Survival',
+                title: 'The Housing Challenge',
                 story: `<div class="story-panel">
-                    <p>Your citizens are settled, but they need food to survive and thrive. The northern frontier is harsh, and supply lines from the ${this.getDynastyName()} homeland are unreliable.</p>
-                    <p><strong>Build a Farm</strong> to produce food for your growing community. A well-fed population is a productive population, and you'll need their strength for the challenges ahead.</p>
-                    <p><em>"An army marches on its stomach, and a settlement thrives on full bellies,"</em> the ${this.getDynastyName()} military traditions teach.</p>
+                    <p>Citizens flock to House ${this.getDynastyName()}'s banner, but they need proper shelter. A growing population requires adequate housing to maintain loyalty and productivity.</p>
+                    <p><strong>Challenge:</strong> Build <span class="highlight">2 Houses</span> to provide shelter for your expanding population. Each house can accommodate 5 citizens who will serve your dynasty with dedication.</p>
+                    <p><em>"A ruler's strength lies not in gold or armies, but in the loyalty of their people,"</em> the old ${this.getDynastyName()} motto reminds you.</p>
                 </div>`,
-                instruction: 'Build a Farm to feed your people',
-                icon: '🌾',
-                highlight: '.building-btn[data-building="farm"]',
-                waitFor: 'building_placed',
-                buildingType: 'farm',
-                action: () => this.startStep('first_completion')
+                instruction: 'Build 2 Houses to complete the housing challenge',
+                icon: '🏠',
+                highlight: '.building-btn[data-building="house"]',
+                waitFor: 'building_challenge',
+                buildingType: 'house',
+                requiredCount: 2,
+                action: () => this.startStep('agricultural_expansion')
             },
             {
-                id: 'first_completion',
+                id: 'agricultural_expansion',
+                title: 'The Agricultural Challenge',
+                story: `<div class="story-panel">
+                    <p>With housing secured, your citizens need sustenance. The northern frontier is harsh, and supply lines from the ${this.getDynastyName()} homeland are unreliable.</p>
+                    <p><strong>Challenge:</strong> Build <span class="highlight">3 Farms</span> to ensure food security. Well-fed citizens are productive citizens, and you'll need their strength for the challenges ahead.</p>
+                    <p><em>"An army marches on its stomach, and a settlement thrives on full bellies,"</em> the ${this.getDynastyName()} military traditions teach.</p>
+                </div>`,
+                instruction: 'Build 3 Farms to complete the agricultural challenge',
+                icon: '🌾',
+                highlight: '.building-btn[data-building="farm"]',
+                waitFor: 'building_challenge',
+                buildingType: 'farm',
+                requiredCount: 3,
+                action: () => this.startStep('time_advancement')
+            },
+            {
+                id: 'time_advancement',
                 title: 'The Rhythm of Progress',
                 story: `<div class="story-panel">
                     <p>Your buildings are under construction, but progress takes time. In this harsh frontier, construction requires careful planning and patience - qualities that House ${this.getDynastyName()} has always possessed.</p>
@@ -131,6 +228,21 @@ class TutorialManager {
                 icon: '⏰',
                 highlight: '#end-day-btn',
                 waitFor: 'day_ended',
+                action: () => this.startStep('world_view_unlock')
+            },
+            {
+                id: 'world_view_unlock',
+                title: 'Beyond the Village Walls',
+                story: `<div class="story-panel">
+                    <p>Your settlement prospers, but reports from the frontier grow troubling. Scouts speak of strange movements in the wilderness, and the ancient threats your father warned about stir in the darkness.</p>
+                    <p><strong>The time has come to look beyond your village walls.</strong> Click the "World" tab to unlock the world map and begin planning expeditions beyond your borders.</p>
+                    <p><em>"A true leader of House ${this.getDynastyName()} does not wait for danger to arrive at the gates,"</em> your father's final counsel echoes in your mind.</p>
+                </div>`,
+                instruction: 'Click the "World" tab to unlock the world map',
+                icon: '🗺️',
+                highlight: '#world-tab',
+                waitFor: 'view_switched',
+                targetView: 'world',
                 action: () => this.startStep('military_preparation')
             },
             {
@@ -170,26 +282,34 @@ class TutorialManager {
         return this.dynastyName || 'Noble';
     }
 
-    showIntro() {
-        console.log('[Tutorial] showIntro called');
-        console.log('[Tutorial] Steps available:', this.steps?.length || 0);
+    // Show welcome/tutorial start
+    showWelcome() {
+        console.log('[Tutorial] showWelcome called');
+        console.log('[Tutorial] Steps available:', this.getSteps()?.length || 0);
         console.log('[Tutorial] showModal available:', !!window.showModal);
         
+        this.isActive = true;
         this.startStep('dynasty_name');
+    }
+
+    showIntro() {
+        console.log('[Tutorial] showIntro called (deprecated - use showWelcome)');
+        this.showWelcome();
     }
 
     startStep(stepId) {
         console.log('[Tutorial] startStep called with:', stepId);
-        const step = this.steps.find(s => s.id === stepId);
+        const steps = this.getSteps(); // Use lazy loading
+        const step = steps.find(s => s.id === stepId);
         
         if (!step) {
             console.error('[Tutorial] Step not found:', stepId);
-            console.log('[Tutorial] Available steps:', this.steps.map(s => s.id));
+            console.log('[Tutorial] Available steps:', steps.map(s => s.id));
             return;
         }
 
         console.log('[Tutorial] Found step:', step.title);
-        this.currentStep = this.steps.indexOf(step);
+        this.currentStep = steps.indexOf(step);
         
         // Check if showModal is available
         if (!window.showModal) {
@@ -197,28 +317,50 @@ class TutorialManager {
             return;
         }
         
+        // For dynasty name input, show non-closable modal
+        const modalOptions = {
+            icon: step.icon,
+            type: 'info',
+            showCancel: false,
+            closable: step.id !== 'dynasty_name' // Dynasty name modal cannot be closed
+        };
+        
         // Show the story modal
-        console.log('[Tutorial] Calling showModal...');
-        window.showModal(
+        const modalResult = window.showModal(
             step.title,
             step.story + `<div class="tutorial-instruction"><strong>Next:</strong> ${step.instruction}</div>`,
-            {
-                icon: step.icon,
-                type: 'info',
-                showCancel: false
-            }
-        ).then(() => {
-            console.log('[Tutorial] Modal shown, setting up step requirements');
-            // Handle dynasty name input step
-            if (step.requiresInput && stepId === 'dynasty_name') {
-                this.handleDynastyNameInput(step);
-            } else {
-                // After modal is dismissed, set up the step requirements
-                this.setupStepRequirements(step);
-            }
-        }).catch(error => {
-            console.error('[Tutorial] Modal error:', error);
-        });
+            modalOptions
+        );
+
+        // Handle both Promise and non-Promise returns
+        if (modalResult && typeof modalResult.then === 'function') {
+            modalResult.then(() => {
+                console.log('[Tutorial] Modal shown, setting up step requirements');
+                // Handle dynasty name input step
+                if (step.requiresInput && stepId === 'dynasty_name') {
+                    this.handleDynastyNameInput(step);
+                } else if (step.requiresResourceGrant && stepId === 'royal_grant') {
+                    this.grantRoyalResources(step);
+                } else {
+                    // After modal is dismissed, set up the step requirements
+                    this.setupStepRequirements(step);
+                }
+            }).catch(error => {
+                console.error('[Tutorial] Modal error:', error);
+            });
+        } else {
+            // Fallback for non-Promise showModal
+            console.log('[Tutorial] Modal shown (non-Promise), setting up step requirements');
+            setTimeout(() => {
+                if (step.requiresInput && stepId === 'dynasty_name') {
+                    this.handleDynastyNameInput(step);
+                } else if (step.requiresResourceGrant && stepId === 'royal_grant') {
+                    this.grantRoyalResources(step);
+                } else {
+                    this.setupStepRequirements(step);
+                }
+            }, 100);
+        }
     }
 
     handleDynastyNameInput(step) {
@@ -277,6 +419,50 @@ class TutorialManager {
                 }
             }
         }
+    }
+
+    grantRoyalResources(step) {
+        console.log('[Tutorial] Granting royal resources...');
+        
+        // Grant the royal resources
+        if (this.game && this.game.gameState) {
+            const gameState = this.game.gameState;
+            
+            // Add the royal grant resources
+            gameState.resources.food += 150;
+            gameState.resources.wood += 100;
+            gameState.resources.stone += 75;
+            gameState.gold += 500;
+            
+            // Update UI to reflect new resources
+            gameState.updateUI();
+            
+            // Show resource change animations
+            if (window.showResourceChange) {
+                setTimeout(() => window.showResourceChange('food', 150), 100);
+                setTimeout(() => window.showResourceChange('wood', 100), 300);
+                setTimeout(() => window.showResourceChange('stone', 75), 500);
+                setTimeout(() => window.showResourceChange('gold', 500), 700);
+            }
+            
+            // Show confirmation toast
+            window.showToast('👑 Royal resources granted! Your treasury has been replenished.', {
+                icon: '💰',
+                type: 'success',
+                timeout: 4000
+            });
+            
+            console.log('[Tutorial] Royal resources granted successfully');
+        } else {
+            console.error('[Tutorial] Cannot grant resources - game state not available');
+        }
+        
+        // Continue to next step after delay
+        setTimeout(() => {
+            if (step.action) {
+                step.action();
+            }
+        }, 2000);
     }
 
     // Load dynasty name from localStorage if available
@@ -341,6 +527,30 @@ class TutorialManager {
                     }
                 };
                 eventBus.on('building_placed', buildingHandler);
+                break;
+
+            case 'building_challenge':
+                // Track multiple buildings of the same type
+                let buildingCount = 0;
+                const challengeHandler = (data) => {
+                    if (data.type === step.buildingType) {
+                        buildingCount++;
+                        console.log(`[Tutorial] Building challenge progress: ${buildingCount}/${step.requiredCount} ${step.buildingType}s`);
+                        
+                        // Show progress toast
+                        window.showToast(`${buildingCount}/${step.requiredCount} ${step.buildingType}s built`, {
+                            icon: '🏗️',
+                            type: 'info',
+                            timeout: 2000
+                        });
+                        
+                        if (buildingCount >= step.requiredCount) {
+                            eventBus.off('building_placed', challengeHandler);
+                            completeStep();
+                        }
+                    }
+                };
+                eventBus.on('building_placed', challengeHandler);
                 break;
 
             case 'day_ended':

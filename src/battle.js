@@ -599,3 +599,6 @@ class BattleManager {
         return icons[type] || '👾';
     }
 }
+
+// Make BattleManager globally available
+window.BattleManager = BattleManager;

@@ -521,3 +521,6 @@ class ThroneManager {
         return bonuses[bonusType] || 0;
     }
 }
+
+// Make ThroneManager globally available
+window.ThroneManager = ThroneManager;

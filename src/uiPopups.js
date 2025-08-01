@@ -209,9 +209,9 @@ function showNotification(message, opts = {}) {
     return showModal('Notification', message, opts);
 }
 
-// Export both functions
+// Export toast and notification functions (showModal comes from modalSystem.js)
 window.showToast = showToast;
-window.showModal = showModal;
+// window.showModal = showModal;  // REMOVED - use modalSystem.js version instead
 window.showNotification = showNotification;
 // Popup/modal UI logic for top-right icons (progression, settings, quit)
 // All DOM event binding and popup show/hide logic is here
@@ -242,22 +242,22 @@ function bindTopRightPopups(game) {
         if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
-    // Tutorial button
-    const tutorialBtn = document.getElementById('tutorial-btn');
-    if (tutorialBtn && window.modalSystem) {
-        tutorialBtn.onclick = () => {
-            console.log('[UI] Tutorial modal triggered');
-            window.modalSystem.showTutorialModal();
+    // Message History button
+    const messageHistoryBtn = document.getElementById('message-history-btn');
+    if (messageHistoryBtn && window.messageHistory) {
+        messageHistoryBtn.onclick = () => {
+            console.log('[UI] Message history triggered');
+            window.messageHistory.showHistory();
         };
-        tutorialBtn.addEventListener('keydown', (e) => {
+        messageHistoryBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                tutorialBtn.click();
+                messageHistoryBtn.click();
             }
         });
     } else {
-        if (!tutorialBtn) console.log('[UI] tutorial-btn not found');
-        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+        if (!messageHistoryBtn) console.log('[UI] message-history-btn not found');
+        if (!window.messageHistory) console.log('[UI] messageHistory not available');
     }
 
     // Quest menu button

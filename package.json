@@ -2,7 +2,6 @@
   "name": "idle-dynasty-builder",
   "version": "1.0.0",
   "description": "Idle: Dynasty Builder - Lead your people from humble beginnings to a thriving dynasty in this idle strategy game.",
-  "main": "src/main.js",
   "scripts": {
     "start": "npx serve . -l 8000",
     "dev": "npx serve . -l 8000 --no-clipboard"

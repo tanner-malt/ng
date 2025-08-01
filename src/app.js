@@ -1,4 +1,74 @@
 
+/**
+ * app.js - Main Game Initialization and Coordination
+ * 
+ * This is the central coordinator for Idle: Dynasty Builder. It initializes all
+ * game systems, manages        try {
+            // Initialize tutorial manager
+            try {
+                if (typeof SimpleTutorial !== 'undefined') {
+                    this.tutorialManager = new SimpleTutorial(this);
+                    console.log('[Game] Simple tutorial manager initialized successfully');
+                } else {
+                    console.error('[Game] SimpleTutorial class not available');
+                    this.tutorialManager = null;
+                }
+            } catch (tutorialError) {
+                console.error('[Game] Failed to initialize SimpleTutorial:', tutorialError);
+                this.tutorialManager = null;
+            }
+
+            // Initialize message history system
+            try {
+                if (typeof MessageHistory !== 'undefined') {
+                    this.messageHistory = new MessageHistory();
+                    window.messageHistory = this.messageHistory; // Global reference
+                    console.log('[Game] Message history system initialized');
+                } else {
+                    console.error('[Game] MessageHistory class not available');
+                    this.messageHistory = null;
+                }
+            } catch (err) {
+                console.error('[Game] Failed to initialize MessageHistory:', err);
+                this.messageHistory = null;
+            }
+
+            // Initialize achievement system
+            try {
+                if (typeof AchievementSystem !== 'undefined') {
+                    this.achievementSystem = new AchievementSystem();
+                    window.achievementSystem = this.achievementSystem; // Global reference
+                    console.log('[Game] Achievement system initialized');
+                    
+                    // Start periodic achievement checking
+                    this.achievementSystem.startPeriodicCheck();
+                } else {
+                    console.error('[Game] AchievementSystem class not available');
+                    this.achievementSystem = null;
+                }
+            } catch (err) {
+                console.error('[Game] Failed to initialize AchievementSystem:', err);
+                this.achievementSystem = null;
+            }
+        } catch (err) {
+            console.error('[Game] Error initializing tutorial manager:', err);
+            this.tutorialManager = null;
+        }state, and coordinates communication
+ * between different game modules.
+ * 
+ * Key Responsibilities:
+ * - Initialize all game managers (Village, Battle, World, etc.)
+ * - Set up event listeners and UI interactions
+ * - Coordinate tutorial system startup
+ * - Manage view switching and navigation
+ * - Handle auto-save and game persistence
+ * 
+ * Architecture:
+ * - Game class serves as the main controller
+ * - Initializes managers in dependency order
+ * - Sets up global window references for debugging
+ * - Coordinates tutorial system for new players
+ */
 
 // Main application initialization and view management
 // Use global TutorialManager for browser compatibility
@@ -19,20 +89,20 @@ class Game {
 
     updateProgressPopup() {
         // Update the progression popup icons
-        const battle = document.getElementById('progress-battle');
+        const world = document.getElementById('progress-world');
         const monarch = document.getElementById('progress-monarch');
         const throne = document.getElementById('progress-throne');
-        if (battle) battle.innerHTML = `Battle: <span>${this.unlockedViews.battle ? '✅' : '🔒'}</span>`;
+        if (world) world.innerHTML = `World: <span>${this.unlockedViews.world ? '✅' : '🔒'}</span>`;
         if (monarch) monarch.innerHTML = `Monarch: <span>${this.unlockedViews.monarch ? '✅' : '🔒'}</span>`;
         if (throne) throne.innerHTML = `Throne: <span>${this.unlockedViews.throne ? '✅' : '🔒'}</span>`;
     }
     updateProgressIcon() {
-        // Progress: battle, monarch, throne
+        // Progress: world, monarch, throne
         const progressBtn = document.getElementById('progress-btn');
         const progressIcon = document.getElementById('progress-icon');
         if (!progressBtn || !progressIcon) return;
         let unlocked = 0;
-        if (this.unlockedViews.battle) unlocked++;
+        if (this.unlockedViews.world) unlocked++;
         if (this.unlockedViews.monarch) unlocked++;
         if (this.unlockedViews.throne) unlocked++;
         if (unlocked === 3) {
@@ -43,7 +113,7 @@ class Game {
         } else if (unlocked === 0) {
             progressBtn.classList.remove('progress-incomplete', 'progress-complete');
             progressBtn.classList.add('progress-locked');
-            progressIcon.textContent = '�';
+            progressIcon.textContent = '🔒';
             progressBtn.title = 'No milestones unlocked yet.';
         } else {
             progressBtn.classList.remove('progress-complete', 'progress-locked');
@@ -69,108 +139,166 @@ class Game {
             this.gameLoopId = null;
             this.gameState = gameState;
             
-            // Initialize core systems first
-            if (window.EventBus) {
-                window.eventBus = new window.EventBus();
-                console.log('[Game] EventBus initialized');
-            } else {
+            // Initialize view unlocking system first
+            this.unlockedViews = { village: true, world: false, monarch: false, throne: false };
+            
+            // EventBus should already be initialized by eventBus.js
+            if (!window.eventBus) {
                 console.error('[Game] EventBus not available');
+            } else {
+                console.log('[Game] EventBus available');
             }
             
             // Initialize modal system (needed by tutorial and other systems)
-            if (window.ModalSystem) {
-                this.modalSystem = new window.ModalSystem();
+            if (typeof ModalSystem !== 'undefined') {
+                this.modalSystem = new ModalSystem();
                 console.log('[Game] Modal system initialized');
             } else {
                 console.error('[Game] ModalSystem not available');
             }
             
-            this.villageManager = new VillageManager(this.gameState, this);
-            this.battleManager = new BattleManager(this.gameState);
-            this.monarchManager = new MonarchManager(this.gameState);
-            this.throneManager = new ThroneManager(this.gameState);
+            // Initialize managers with error handling
+            try {
+                this.villageManager = new VillageManager(this.gameState, this);
+                console.log('[Game] VillageManager initialized');
+            } catch (err) {
+                console.error('[Game] Failed to initialize VillageManager:', err);
+                this.villageManager = null;
+            }
+
+            try {
+                this.battleManager = new BattleManager(this.gameState);
+                console.log('[Game] BattleManager initialized');
+            } catch (err) {
+                console.error('[Game] Failed to initialize BattleManager:', err);
+                this.battleManager = null;
+            }
+
+            try {
+                this.monarchManager = new MonarchManager(this.gameState);
+                console.log('[Game] MonarchManager initialized');
+            } catch (err) {
+                console.error('[Game] Failed to initialize MonarchManager:', err);
+                this.monarchManager = null;
+            }
+
+            try {
+                this.throneManager = new ThroneManager(this.gameState);
+                console.log('[Game] ThroneManager initialized');
+            } catch (err) {
+                console.error('[Game] Failed to initialize ThroneManager:', err);
+                this.throneManager = null;
+            }
+
+            try {
+                if (typeof WorldManager !== 'undefined') {
+                    this.worldManager = new WorldManager(this.gameState, this);
+                    console.log('[Game] WorldManager initialized');
+                } else {
+                    console.warn('[Game] WorldManager class not available');
+                    this.worldManager = null;
+                }
+            } catch (err) {
+                console.error('[Game] Failed to initialize WorldManager:', err);
+                this.worldManager = null;
+            }
             
             // Initialize quest manager with error handling
-            if (window.QuestManager) {
-                this.questManager = new window.QuestManager(this.gameState, this);
-            } else {
-                console.warn('[Game] QuestManager not available, quest functionality disabled');
+            try {
+                if (typeof QuestManager !== 'undefined') {
+                    this.questManager = new QuestManager(this.gameState, this);
+                    console.log('[Game] QuestManager initialized');
+                } else {
+                    console.warn('[Game] QuestManager not available, quest functionality disabled');
+                    this.questManager = null;
+                }
+            } catch (err) {
+                console.error('[Game] Failed to initialize QuestManager:', err);
                 this.questManager = null;
             }
             
-            // Milestone-based view unlocking
-            this.unlockedViews = { village: true, battle: false, monarch: false, throne: false };
-            this.tutorialManager = new window.TutorialManager();
-            // ...
+            // Initialize tutorial manager
+            try {
+                if (typeof SimpleTutorial !== 'undefined') {
+                    this.tutorialManager = new SimpleTutorial(this);
+                    console.log('[Game] SimpleTutorial manager initialized successfully');
+                } else {
+                    console.error('[Game] SimpleTutorial class not available');
+                    this.tutorialManager = null;
+                }
+            } catch (tutorialError) {
+                console.error('[Game] Failed to initialize SimpleTutorial:', tutorialError);
+                this.tutorialManager = null;
+            }
         } catch (err) {
-            // ...
+            console.error('[Game] Constructor error:', err);
+            this.tutorialManager = null;
         }
     }
 
     init() {
         try {
             console.log('[Game] Game.init called');
-            // ...
-            // Force tutorial for new users (reset localStorage for testing)
+            // Force tutorial for new users and development testing
             const loadedSuccessfully = this.gameState.load();
             console.log('[Game] Save data loaded:', loadedSuccessfully);
             
-            if (loadedSuccessfully) {
+            // Always show tutorial during development - comment out for production
+            const forceTutorial = true; // Set to false for production
+            
+            if (loadedSuccessfully && !forceTutorial) {
                 this.tutorialActive = false;
                 console.log('[Game] Tutorial disabled - save data found');
             } else {
                 this.tutorialActive = true;
-                console.log('[Game] Tutorial enabled - no save data found');
-                // Clear localStorage to force tutorial on refresh during development
-                localStorage.removeItem('villageDefenseIdleo');
+                console.log('[Game] Tutorial enabled - no save data found or forced tutorial');
+                // Clear localStorage to ensure clean tutorial experience
+                if (forceTutorial) {
+                    localStorage.removeItem('idleDynastyBuilder');
+                    localStorage.removeItem('villageDefenseIdleo'); // Legacy key
+                }
+                
                 setTimeout(() => {
                     try {
-                        console.log('[Game] Attempting to show tutorial intro...');
+                        console.log('[Game] Attempting to show tutorial welcome...');
                         console.log('[Game] Tutorial manager available:', !!this.tutorialManager);
                         console.log('[Game] showModal available:', !!window.showModal);
-                        console.log('[Game] eventBus available:', !!window.eventBus);
                         
-                        if (this.tutorialManager && this.tutorialManager.showIntro) {
-                            console.log('[Game] Tutorial manager available, calling showIntro()');
-                            this.tutorialManager.showIntro();
+                        if (this.tutorialManager && this.tutorialManager.start) {
+                            console.log('[Game] Starting tutorial...');
+                            this.tutorialManager.start();
                         } else {
-                            console.error('[Game] Tutorial manager not available:', this.tutorialManager);
-                            // Fallback tutorial
-                            if (window.showModal) {
-                                console.log('[Game] Using fallback modal');
-                                window.showModal(
-                                    'Welcome to Village Defense: Idleo!',
-                                    '<p>Build your village, train your army, and defend against waves of enemies!</p><p>Start by placing buildings in your village.</p>',
-                                    { type: 'info', icon: '👑' }
-                                );
-                            } else {
-                                console.error('[Game] showModal not available');
-                            }
+                            console.error('[Game] Tutorial manager not available or invalid');
                         }
                     } catch (err) {
-                        console.error('[Game] Tutorial error:', err);
-                        // Fallback tutorial
-                        window.showModal(
-                            'Welcome to Village Defense: Idleo!',
-                            '<p>Build your village, train your army, and defend against waves of enemies!</p><p>Start by placing buildings in your village.</p>',
-                            { type: 'info', icon: '👑' }
-                        );
+                        console.error('[Game] Tutorial start error:', err);
                     }
-                }, 1000); // Increased delay to ensure everything is loaded
+                }, 1000); // Give everything time to load
             }
-            this.villageManager.init();
-            this.battleManager.init();
-            this.monarchManager.init();
-            this.throneManager.init();
-            this.setupNavigation();
-            this.gameState.updateUI();
-            this.updateProgressIcon();
-            console.log('[Game] Calling bindTopRightPopups from Game.init');
-            this.bindTopRightPopups();
+            
+            // Initialize managers safely
+            if (this.villageManager && this.villageManager.init) {
+                this.villageManager.init();
+            }
+            if (this.battleManager && this.battleManager.init) {
+                this.battleManager.init();
+            }
+            if (this.monarchManager && this.monarchManager.init) {
+                this.monarchManager.init();
+            }
+            if (this.throneManager && this.throneManager.init) {
+                this.throneManager.init();
+            }
+            if (this.worldManager && this.worldManager.init) {
+                this.worldManager.init(); // Initialize WorldManager
+            }
+            
             this.startGameLoop();
             this.setupAutosave();
             this.setupKeyboardShortcuts();
             this.setupAutoPlayButton();
+            this.setupMessageHistoryButton();
+            this.setupTutorialTestButton();
             
             // Initialize scout progress
             this.gameState.updateScoutProgress();
@@ -260,14 +388,14 @@ class Game {
             this.updateProgressIcon();
         }
         // If all are unlocked, complete tutorial
-        if (this.unlockedViews.battle && this.unlockedViews.monarch && this.unlockedViews.throne) {
+        if (this.unlockedViews.world && this.unlockedViews.monarch && this.unlockedViews.throne) {
             this.completeTutorial();
         }
     }
 
     switchView(viewName) {
         try {
-            const validViews = ['village', 'battle', 'monarch', 'throne'];
+            const validViews = ['village', 'world', 'monarch', 'throne'];
             if (!validViews.includes(viewName)) {
                 // ...
                 return;
@@ -465,6 +593,75 @@ class Game {
             }
         } catch (err) {
             console.error('[Game] Error setting up auto-play button:', err);
+        }
+    }
+
+    setupMessageHistoryButton() {
+        try {
+            const messageHistoryBtn = document.getElementById('message-history-btn');
+            if (messageHistoryBtn) {
+                messageHistoryBtn.addEventListener('click', () => {
+                    console.log('[Game] Message history button clicked');
+                    if (window.messageHistory && window.messageHistory.showHistory) {
+                        window.messageHistory.showHistory();
+                    } else if (this.messageHistory && this.messageHistory.showHistory) {
+                        this.messageHistory.showHistory();
+                    } else {
+                        console.error('[Game] Message history system not available');
+                    }
+                });
+                console.log('[Game] Message history button initialized');
+                
+                // Update icon with any unread messages
+                if (window.messageHistory) {
+                    window.messageHistory.updateIcon();
+                } else if (this.messageHistory) {
+                    this.messageHistory.updateIcon();
+                }
+            } else {
+                console.warn('[Game] Message history button not found in DOM');
+            }
+        } catch (err) {
+            console.error('[Game] Error setting up message history button:', err);
+        }
+    }
+
+    setupTutorialTestButton() {
+        try {
+            const tutorialTestButton = document.getElementById('tutorial-test-btn');
+            if (tutorialTestButton) {
+                tutorialTestButton.addEventListener('click', () => {
+                    console.log('[Game] Tutorial test button clicked');
+                    
+                    // Try multiple ways to start tutorial
+                    if (this.tutorialManager && this.tutorialManager.start) {
+                        console.log('[Game] Starting tutorial via this.tutorialManager');
+                        this.tutorialActive = true;
+                        this.tutorialManager.start();
+                    } else if (window.tutorialSystem && window.tutorialSystem.start) {
+                        console.log('[Game] Starting tutorial via window.tutorialSystem');
+                        window.tutorialSystem.start();
+                    } else if (window.SimpleTutorial) {
+                        console.log('[Game] Creating new tutorial instance');
+                        try {
+                            const tutorial = new window.SimpleTutorial(this);
+                            tutorial.start();
+                        } catch (error) {
+                            console.error('[Game] Error creating tutorial:', error);
+                        }
+                    } else {
+                        console.error('[Game] No tutorial system available');
+                        window.showModal('Tutorial Not Available', 
+                            'The tutorial system is not currently available. Please check the console for errors.', 
+                            { icon: '❌' });
+                    }
+                });
+                console.log('[Game] Tutorial test button initialized');
+            } else {
+                console.warn('[Game] Tutorial test button not found');
+            }
+        } catch (err) {
+            console.error('[Game] Error setting up tutorial test button:', err);
         }
     }
 

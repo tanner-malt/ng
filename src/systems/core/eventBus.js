@@ -1,4 +1,27 @@
-// Simple event bus for game-wide event communication
+/**
+ * eventBus.js - Event System for Component Communication
+ * 
+ * Simple but effective event bus system that enables decoupled communication
+ * between different game components without direct dependencies.
+ * 
+ * Key Features:
+ * - Event subscription with callback registration
+ * - Event broadcasting to all subscribers
+ * - Unsubscription support for cleanup
+ * - Global event bus instance for game-wide communication
+ * 
+ * Common Events:
+ * - 'buildingPlaced': When buildings are constructed
+ * - 'resourcesChanged': When resource values update
+ * - 'dayEnded': When time progresses
+ * - 'tutorialStep': Tutorial progress events
+ * 
+ * Usage:
+ * - eventBus.on('eventName', callback) - Subscribe to events
+ * - eventBus.emit('eventName', data) - Broadcast events
+ * - eventBus.off('eventName', callback) - Unsubscribe
+ */
+
 class EventBus {
     constructor() {
         this.events = {};
