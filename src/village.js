@@ -906,6 +906,3 @@ class VillageManager {
         return terrainType ? this.terrainTypes[terrainType].modifier : 'none';
     }
 }
-
-// Make VillageManager globally available
-window.VillageManager = VillageManager;
