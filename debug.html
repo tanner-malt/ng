@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Dynasty Builder</title>
+    <link rel="stylesheet" href="public/game.css">
+    <link rel="stylesheet" href="public/progress-icons.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #2c3e50, #4a6741);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            color: #ecf0f1;
+        }
+        
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(44, 62, 80, 0.95);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            z-index: 10000;
+            border: 2px solid #3498db;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            min-width: 180px;
+        }
+        
+        .debug-info h4 {
+            margin: 0 0 10px 0;
+            color: #3498db;
+            text-align: center;
+            font-size: 12px;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        .debug-info button {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px 12px;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .debug-info button:hover {
+            background: linear-gradient(145deg, #2980b9, #1f5f8b);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        .debug-info button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        
+        #system-status {
+            font-size: 10px;
+            margin-bottom: 8px;
+            padding: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+        
+        .debug-log {
+            position: fixed;
+            top: 60px;
+            left: 10px;
+            bottom: 10px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.95);
+            color: #00ff41;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-y: auto;
+            border: 2px solid #00ff41;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .debug-log h4 {
+            margin: 0 0 8px 0;
+            color: #00ff41;
+            font-size: 11px;
+            text-align: center;
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 5px;
+        }
+        
+        .debug-log::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .debug-log::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+        }
+        
+        .debug-log::-webkit-scrollbar-thumb {
+            background: #00ff41;
+            border-radius: 3px;
+        }
+        
+        .debug-log::-webkit-scrollbar-thumb:hover {
+            background: #00cc33;
+        }
+        
+        /* Adjust main content to account for debug log */
+        .main-content {
+            margin-left: 320px !important;
+        }
+        
+        /* Clean up the main game UI to match production */
+        .game-title {
+            font-size: 28px !important;
+            margin: 0 !important;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .top-bar {
+            padding: 15px 20px !important;
+            background: linear-gradient(135deg, #2c3e50, #34495e) !important;
+            border-bottom: 3px solid #3498db !important;
+        }
+        
+        .building-panel h3, .time-controls h3 {
+            margin-bottom: 12px !important;
+            color: #ecf0f1 !important;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .building-btn {
+            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        }
+        
+        .building-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+        }
+        
+        .village-grid {
+            border: 2px solid #34495e !important;
+            border-radius: 8px !important;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3) !important;
+        }
+        
+        .sidebar {
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3) !important;
+        }
+        
+        /* Status indicator styling */
+        .debug-status {
+            font-size: 11px !important;
+            color: #00ff41 !important;
+            text-align: center !important;
+            margin-top: 3px !important;
+            text-shadow: 0 0 5px rgba(0,255,65,0.5) !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-info">
+        <h4>⚙️ Debug</h4>
+        <div id="system-status" style="font-size: 10px; margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.3); border-radius: 4px;">
+            <div>Tutorial: <span id="tutorial-status">❓</span></div>
+            <div>Messages: <span id="message-status">❓</span></div>
+            <div>Modal: <span id="modal-status">❓</span></div>
+        </div>
+        <button onclick="testTutorial()" id="test-tutorial-btn">🎓 Tutorial</button>
+                                <button onclick="forceTutorialStart()" style="background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; margin: 2px; font-weight: bold;">
+                            🚀 Force Start
+                        </button>
+                        <button onclick="clearTutorialState()" style="background: linear-gradient(135deg, #f39c12, #e67e22); color: white; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; margin: 2px; font-weight: bold;">
+                            🗑️ Clear Tutorial
+                        </button>
+        <button onclick="testMessageHistory()" id="test-message-btn">📜 Messages</button>
+        <button onclick="clearStorage()" id="clear-storage-btn">🗑️ Reset</button>
+        <button onclick="showDebugInfo()" id="debug-info-btn">📊 Info</button>
+    </div>
+
+    <!-- Debug Log Panel -->
+    <div class="debug-log" id="debug-log">
+        <h4>🔍 Live Console Log</h4>
+        <div id="log-content"></div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-left">
+                <div class="resource-display">
+                    <span class="resource-item">
+                        <span class="resource-icon">👑</span>
+                        <span id="population-count">0</span>
+                    </span>
+                    <span class="resource-item">
+                        <span class="resource-icon">🌾</span>
+                        <span id="food-count">100</span>
+                    </span>
+                    <span class="resource-item">
+                        <span class="resource-icon">🪵</span>
+                        <span id="wood-count">50</span>
+                    </span>
+                    <span class="resource-item">
+                        <span class="resource-icon">🪨</span>
+                        <span id="stone-count">30</span>
+                    </span>
+                </div>
+            </div>
+            
+            <div class="top-center">
+                <h1 class="game-title">🏰 Dynasty Builder</h1>
+                <div class="debug-status">
+                    <span id="debug-status">🔧 Debug Mode | Live Console Active</span>
+                </div>
+            </div>
+            
+            <div class="top-right">
+                <button id="message-history-btn" class="icon-btn" title="Message History">
+                    <span class="icon">📜</span>
+                </button>
+                <button id="progress-btn" class="icon-btn progress-locked" title="No milestones unlocked yet.">
+                    <span class="icon">🏆</span>
+                </button>
+                <div id="progress-popup" class="popup-panel" style="display: none;">
+                    <h3>🏆 Progress & Milestones</h3>
+                    <div id="progress-content">
+                        <p>No milestones unlocked yet. Continue building your village!</p>
+                    </div>
+                </div>
+                <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
+                    <span class="icon">⚔️</span>
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <span class="icon">⚙️</span>
+                </button>
+                <div id="settings-popup" class="popup-panel" style="display: none;">
+                    <h3>⚙️ Game Settings</h3>
+                    <div id="settings-content">
+                        <label>
+                            <input type="checkbox" id="auto-play-toggle"> Auto-play mode
+                        </label>
+                        <hr>
+                        <button id="reset-game-btn" class="danger-btn">Reset Game</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="building-panel">
+                    <h3>🏗️ Buildings</h3>
+                    <div class="building-buttons">
+                        <button class="building-btn" data-building="house" title="House - Provides population">
+                            <span class="building-icon">🏠</span>
+                            <span class="building-name">House</span>
+                            <span class="building-cost">🪵50</span>
+                        </button>
+                        <button class="building-btn" data-building="farm" title="Farm - Produces food">
+                            <span class="building-icon">🚜</span>
+                            <span class="building-name">Farm</span>
+                            <span class="building-cost">🪵30</span>
+                        </button>
+                        <button class="building-btn" data-building="townCenter" title="Town Center - Main building">
+                            <span class="building-icon">🏛️</span>
+                            <span class="building-name">Town Center</span>
+                            <span class="building-cost">🪵100 🪨50</span>
+                        </button>
+                        <button class="building-btn" data-building="barracks" title="Barracks - Trains soldiers">
+                            <span class="building-icon">🛡️</span>
+                            <span class="building-name">Barracks</span>
+                            <span class="building-cost">🪵75 🪨25</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="time-controls">
+                    <h3>⏰ Time Control</h3>
+                    <div class="time-display">
+                        <span>Day <span id="current-day">1</span></span>
+                    </div>
+                    <button id="end-day-btn" class="action-btn">
+                        <span class="icon">🌅</span>
+                        End Day
+                    </button>
+                </div>
+            </div>
+
+            <!-- Village Grid -->
+            <div class="village-container">
+                <div id="village-grid" class="village-grid">
+                    <!-- Village grid will be generated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load all JavaScript files -->
+    <script src="src/systems/core/eventBus.js"></script>
+    <script src="src/utils/debugTools.js"></script>
+    <script src="src/utils/errorRecovery.js"></script>
+    <script src="src/simpleModal.js"></script>
+    <script src="src/messageHistory.js"></script>
+    <script src="src/achievements.js"></script>
+    <script src="src/eventBusIntegrations.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/app.js"></script>
+    <script src="src/main.js"></script>
+
+    <script>
+        console.log('[DEBUG] Debug.html loaded');
+        
+        // Intercept console.log to display in debug panel
+        const logContent = document.getElementById('log-content');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        
+        function addToDebugLog(message, type = 'log') {
+            if (logContent) {
+                const timestamp = new Date().toLocaleTimeString();
+                const color = type === 'error' ? '#ff0000' : type === 'warn' ? '#ffff00' : '#00ff00';
+                logContent.innerHTML += `<div style="color: ${color}; margin: 2px 0;">[${timestamp}] ${message}</div>`;
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToDebugLog(args.join(' '), 'log');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToDebugLog('ERROR: ' + args.join(' '), 'error');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToDebugLog('WARN: ' + args.join(' '), 'warn');
+        };
+        
+        // Debug functions
+        function testTutorial() {
+            console.log('[DEBUG] Testing tutorial manually...');
+            if (window.testTutorial) {
+                window.testTutorial();
+            } else if (window.tutorialManager) {
+                console.log('[DEBUG] Using tutorialManager directly');
+                window.tutorialManager.showIntro();
+            } else {
+                console.error('[DEBUG] No tutorial system available');
+            }
+        }
+        
+        function forceTutorialStart() {
+            console.log('[DEBUG] Force starting tutorial...');
+            if (window.forceTutorial) {
+                window.forceTutorial();
+            } else {
+                console.log('[DEBUG] Clearing save data and reloading...');
+                localStorage.removeItem('villageDefenseIdleo');
+                localStorage.removeItem('idleDynastyBuilder');
+                window.location.reload();
+            }
+        }
+        
+        // Add clear tutorial state function
+        function clearTutorialState() {
+            console.log('[DEBUG] Clearing all tutorial and save data...');
+            localStorage.removeItem('tutorialComplete');
+            localStorage.removeItem('dynastyName');
+            localStorage.removeItem('idleDynastyBuilder');
+            localStorage.removeItem('villageDefenseIdleo');
+            console.log('[DEBUG] All data cleared. Refresh page to start fresh.');
+            
+            // Visual feedback
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Cleared!';
+            button.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)';
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = 'linear-gradient(135deg, #f39c12, #e67e22)';
+            }, 2000);
+        }
+        
+        function testMessageHistory() {
+            console.log('[DEBUG] Testing message history...');
+            if (window.messageHistory) {
+                window.messageHistory.addMessage(
+                    'Debug Test', 
+                    'This is a test message from debug mode!', 
+                    'info'
+                );
+                window.messageHistory.showHistory();
+            } else {
+                console.error('[DEBUG] Message history not available');
+            }
+        }
+        
+        function clearStorage() {
+            console.log('[DEBUG] Clearing localStorage...');
+            localStorage.clear();
+            console.log('[DEBUG] Storage cleared! Refreshing page...');
+            window.location.reload();
+        }
+        
+        function showDebugInfo() {
+            console.log('=== DEBUG INFO ===');
+            console.log('Tutorial Manager:', window.tutorialManager);
+            console.log('Message History:', window.messageHistory);
+            console.log('Show Modal:', window.showModal);
+            console.log('Event Bus:', window.eventBus);
+            console.log('Game:', window.game);
+            console.log('localStorage keys:', Object.keys(localStorage));
+            
+            // Update status indicators
+            updateSystemStatus();
+        }
+        
+        function updateSystemStatus() {
+            const tutorialStatus = document.getElementById('tutorial-status');
+            const messageStatus = document.getElementById('message-status');
+            const modalStatus = document.getElementById('modal-status');
+            
+            if (tutorialStatus) {
+                tutorialStatus.textContent = window.tutorialManager ? '✅' : '❌';
+                tutorialStatus.title = window.tutorialManager ? 'Tutorial Manager Available' : 'Tutorial Manager Missing';
+            }
+            
+            if (messageStatus) {
+                messageStatus.textContent = window.messageHistory ? '✅' : '❌';
+                messageStatus.title = window.messageHistory ? 'Message History Available' : 'Message History Missing';
+            }
+            
+            if (modalStatus) {
+                modalStatus.textContent = window.showModal ? '✅' : '❌';
+                modalStatus.title = window.showModal ? 'Modal System Available' : 'Modal System Missing';
+            }
+        }
+
+        // Auto-start the game when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('[DEBUG] DOMContentLoaded - Auto-starting game...');
+            
+            // Wait a moment for all scripts to load
+            setTimeout(() => {
+                try {
+                    console.log('[DEBUG] Attempting to start game directly...');
+                    
+                    // Initialize the game directly
+                    if (window.initializeGame) {
+                        console.log('[DEBUG] Using initializeGame function');
+                        window.initializeGame();
+                    } else if (window.Game) {
+                        console.log('[DEBUG] Creating Game instance');
+                        window.game = new window.Game();
+                        window.game.init();
+                    } else {
+                        console.log('[DEBUG] Trying main initialization');
+                        if (window.main && window.main.init) {
+                            window.main.init();
+                        }
+                    }
+                    
+                    // Add additional debugging info
+                    setTimeout(() => {
+                        console.log('[DEBUG] Systems check after 2 seconds:');
+                        showDebugInfo();
+                        
+                        // Auto-test tutorial if available
+                        if (window.tutorialManager && window.tutorialManager.showIntro) {
+                            console.log('[DEBUG] Auto-testing tutorial...');
+                            setTimeout(() => {
+                                testTutorial();
+                            }, 1000);
+                        }
+                    }, 2000);
+                    
+                    // Update status indicators periodically
+                    setInterval(updateSystemStatus, 1000);
+                    
+                } catch (error) {
+                    console.error('[DEBUG] Error starting game:', error);
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

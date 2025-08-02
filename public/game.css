@@ -1835,6 +1835,21 @@ body {
         background: rgba(241, 196, 15, 0.2) !important;
         position: relative;
         z-index: 1000;
+        animation: tutorial-pulse 2s infinite;
+        box-shadow: 0 0 20px rgba(241, 196, 15, 0.6) !important;
+    }
+
+    @keyframes tutorial-pulse {
+        0% { 
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
+        }
+        50% { 
+            box-shadow: 0 0 30px rgba(241, 196, 15, 0.9);
+            transform: scale(1.02);
+        }
+        100% { 
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
+        }
     }
 
     .tutorial-section {

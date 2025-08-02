@@ -15,37 +15,55 @@ class AchievementSystem {
     }
 
     initializeAchievements() {
-        // Tutorial-related achievements
-        this.defineAchievement('first_dynasty', {
+        // Tutorial progression achievements
+        this.defineAchievement('dynasty_founder', {
             title: 'Dynasty Founder',
-            description: 'Named your first dynasty',
+            description: 'Named your noble dynasty',
             icon: '👑',
             type: 'tutorial',
             hidden: false,
             reward: { prestige: 10 }
         });
 
-        this.defineAchievement('town_center_built', {
-            title: 'Center of Power',
+        this.defineAchievement('first_settlement', {
+            title: 'Settlement Founder',
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
             hidden: false,
-            reward: { gold: 100, influence: 5 }
+            reward: { gold: 50, influence: 5 }
         });
 
-        this.defineAchievement('first_battle', {
-            title: 'First Blood',
-            description: 'Won your first battle',
-            icon: '⚔️',
-            type: 'combat',
+        this.defineAchievement('sheltering_citizens', {
+            title: 'Sheltering Citizens',
+            description: 'Built your first House',
+            icon: '🏠',
+            type: 'building',
             hidden: false,
-            reward: { military_exp: 50 }
+            reward: { population: 2 }
+        });
+
+        this.defineAchievement('feeding_people', {
+            title: 'Feeding the People',
+            description: 'Built your first Farm',
+            icon: '🌾',
+            type: 'building',
+            hidden: false,
+            reward: { food: 50 }
+        });
+
+        this.defineAchievement('military_establishment', {
+            title: 'Military Establishment',
+            description: 'Built your first Barracks',
+            icon: '⚔️',
+            type: 'building',
+            hidden: false,
+            reward: { soldiers: 1 }
         });
 
         this.defineAchievement('tutorial_complete', {
-            title: 'Royal Education',
-            description: 'Completed the royal tutorial',
+            title: 'Royal Education Complete',
+            description: 'Completed the tutorial and unlocked Battle Mode',
             icon: '🎓',
             type: 'tutorial',
             hidden: false,
@@ -114,6 +132,31 @@ class AchievementSystem {
         });
 
         console.log('[Achievements] Initialized', Object.keys(this.achievements).length, 'achievements');
+    }
+
+    // Trigger achievement for dynasty naming
+    triggerDynastyNamed(dynastyName) {
+        this.unlockAchievement('dynasty_founder');
+    }
+
+    // Trigger achievement for building placement
+    triggerBuildingPlaced(buildingType) {
+        const achievementMap = {
+            'townCenter': 'first_settlement',
+            'house': 'sheltering_citizens', 
+            'farm': 'feeding_people',
+            'barracks': 'military_establishment'
+        };
+
+        const achievementId = achievementMap[buildingType];
+        if (achievementId) {
+            this.unlockAchievement(achievementId);
+        }
+    }
+
+    // Trigger achievement for tutorial completion
+    triggerTutorialComplete() {
+        this.unlockAchievement('tutorial_complete');
     }
 
     defineAchievement(id, config) {

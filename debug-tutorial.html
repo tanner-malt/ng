@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Debug - Idle Dynasty Builder</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            margin: 20px;
+        }
+        .debug-section {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 15px;
+        }
+        .status-ok { color: #4CAF50; }
+        .status-error { color: #f44336; }
+        .status-warning { color: #ff9800; }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        .console {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        .highlight { background: #ffff0040; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Tutorial Debug Console</h1>
+    
+    <div class="debug-section">
+        <h2>System Status</h2>
+        <div id="system-status">Loading...</div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Tutorial State</h2>
+        <div id="tutorial-status">Loading...</div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Event System</h2>
+        <div id="event-status">Loading...</div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Actions</h2>
+        <button onclick="clearStorage()">Clear All Storage</button>
+        <button onclick="startTutorial()">Force Start Tutorial</button>
+        <button onclick="testBuildingEvent()">Test Building Event</button>
+        <button onclick="debugEventBus()">Debug Event Bus</button>
+        <button onclick="testModal()">Test Modal System</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Console Output</h2>
+        <div id="debug-console" class="console"></div>
+    </div>
+
+    <!-- Load game scripts in correct order -->
+    <script src="src/systems/core/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/utils/debugTools.js"></script>
+    <script src="src/utils/errorRecovery.js"></script>
+    <script src="src/simpleModal.js"></script>
+    <script src="src/messageHistory.js"></script>
+    <script src="src/achievements.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/eventBusIntegrations.js"></script>
+    <script src="src/app.js"></script>
+
+    <script>
+        let debugConsole = document.getElementById('debug-console');
+        let game;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const typeClass = type === 'error' ? 'status-error' : 
+                             type === 'warning' ? 'status-warning' : 'status-ok';
+            debugConsole.innerHTML += `<span class="${typeClass}">[${timestamp}] ${message}</span>\n`;
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        }
+
+        // Override console methods to capture output
+        const originalConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn
+        };
+
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            log(args.join(' '), 'info');
+        };
+
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            log('ERROR: ' + args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            log('WARN: ' + args.join(' '), 'warning');
+        };
+
+        function updateSystemStatus() {
+            const systemStatus = document.getElementById('system-status');
+            let html = '';
+            
+            // Check core systems
+            html += `<div>EventBus: <span class="${window.eventBus ? 'status-ok' : 'status-error'}">${window.eventBus ? '✓' : '✗'}</span></div>`;
+            html += `<div>GameState: <span class="${window.gameState ? 'status-ok' : 'status-error'}">${window.gameState ? '✓' : '✗'}</span></div>`;
+            html += `<div>SimpleModal: <span class="${window.simpleModal ? 'status-ok' : 'status-error'}">${window.simpleModal ? '✓' : '✗'}</span></div>`;
+            html += `<div>showModal: <span class="${window.showModal ? 'status-ok' : 'status-error'}">${window.showModal ? '✓' : '✗'}</span></div>`;
+            html += `<div>TutorialManager: <span class="${window.TutorialManager ? 'status-ok' : 'status-error'}">${window.TutorialManager ? '✓' : '✗'}</span></div>`;
+            html += `<div>Game Instance: <span class="${game ? 'status-ok' : 'status-error'}">${game ? '✓' : '✗'}</span></div>`;
+            
+            systemStatus.innerHTML = html;
+        }
+
+        function updateTutorialStatus() {
+            const tutorialStatus = document.getElementById('tutorial-status');
+            let html = '';
+            
+            const tutorial = window.tutorialManager || (game && game.tutorialManager);
+            if (tutorial) {
+                html += `<div>Tutorial Active: <span class="${tutorial.isActive ? 'status-ok' : 'status-warning'}">${tutorial.isActive}</span></div>`;
+                html += `<div>Current Step: <span class="status-ok">${tutorial.currentStep}</span></div>`;
+                html += `<div>Dynasty Name: <span class="status-ok">${tutorial.dynastyName || 'None'}</span></div>`;
+                html += `<div>Completed Steps: <span class="status-ok">${tutorial.completedSteps.size}</span></div>`;
+                
+                if (tutorial.steps && tutorial.steps.length > 0) {
+                    html += '<div>Available Steps:</div>';
+                    tutorial.steps.forEach((step, index) => {
+                        const completed = tutorial.completedSteps.has(step.id) ? '✓' : '○';
+                        const current = index === tutorial.currentStep ? ' <span class="highlight">(current)</span>' : '';
+                        html += `<div style="margin-left: 20px;">${completed} ${step.id}${current}</div>`;
+                    });
+                }
+            } else {
+                html = '<div class="status-error">No tutorial manager found</div>';
+            }
+            
+            tutorialStatus.innerHTML = html;
+        }
+
+        function updateEventStatus() {
+            const eventStatus = document.getElementById('event-status');
+            let html = '';
+            
+            if (window.eventBus) {
+                const events = window.eventBus.getEvents();
+                html += `<div>Active Events: <span class="status-ok">${events.length}</span></div>`;
+                events.forEach(event => {
+                    const count = window.eventBus.listenerCount(event);
+                    html += `<div style="margin-left: 20px;">${event}: ${count} listeners</div>`;
+                });
+            } else {
+                html = '<div class="status-error">EventBus not available</div>';
+            }
+            
+            eventStatus.innerHTML = html;
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            log('All localStorage cleared');
+            location.reload();
+        }
+
+        function startTutorial() {
+            log('Attempting to start tutorial...');
+            
+            // Clear tutorial completion flag
+            localStorage.removeItem('tutorialComplete');
+            
+            if (game && game.tutorialManager) {
+                log('Using game tutorial manager');
+                game.tutorialManager.showIntro();
+            } else if (window.tutorialManager) {
+                log('Using global tutorial manager');
+                window.tutorialManager.showIntro();
+            } else {
+                log('Creating new tutorial manager...', 'warning');
+                if (window.TutorialManager) {
+                    const tutorial = new window.TutorialManager();
+                    tutorial.showIntro();
+                } else {
+                    log('TutorialManager class not available', 'error');
+                }
+            }
+        }
+
+        function testBuildingEvent() {
+            log('Testing building placement event...');
+            
+            if (window.eventBus) {
+                window.eventBus.emit('building_placed', {
+                    type: 'townCenter',
+                    x: 100,
+                    y: 100,
+                    id: 'test_building_' + Date.now()
+                });
+                log('Building placement event emitted successfully');
+            } else {
+                log('EventBus not available', 'error');
+            }
+        }
+
+        function debugEventBus() {
+            log('EventBus Debug Info:');
+            if (window.eventBus) {
+                const events = window.eventBus.getEvents();
+                log(`Active events: ${events.join(', ')}`);
+                
+                events.forEach(event => {
+                    const count = window.eventBus.listenerCount(event);
+                    log(`${event}: ${count} listeners`);
+                });
+            }
+        }
+
+        function testModal() {
+            log('Testing modal system...');
+            
+            if (window.showModal) {
+                window.showModal('Test Modal', 'This is a test modal to verify the modal system is working correctly.', {
+                    icon: '🧪',
+                    type: 'info'
+                });
+                log('Modal test completed');
+            } else {
+                log('showModal function not available', 'error');
+            }
+        }
+
+        // Initialize debug interface
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Debug interface loaded');
+            
+            // Wait for scripts to load
+            setTimeout(() => {
+                log('Initializing game...');
+                
+                try {
+                    game = new Game();
+                    window.debugGame = game;
+                    log('Game instance created successfully');
+                    
+                    // Initialize game
+                    game.init();
+                    log('Game initialized');
+                    
+                } catch (error) {
+                    log('Error creating game: ' + error.message, 'error');
+                }
+                
+                // Update status displays
+                updateSystemStatus();
+                updateTutorialStatus();
+                updateEventStatus();
+                
+                // Set up periodic updates
+                setInterval(() => {
+                    updateSystemStatus();
+                    updateTutorialStatus();
+                    updateEventStatus();
+                }, 2000);
+                
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

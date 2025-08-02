@@ -24,7 +24,7 @@ class EventBusIntegrations {
         });
 
         // Building events
-        window.eventBus.on('building-placed', (data) => {
+        window.eventBus.on('building_placed', (data) => {
             this.handleBuildingPlaced(data);
         });
 
@@ -65,6 +65,24 @@ class EventBusIntegrations {
 
     handleBuildingPlaced(data) {
         console.log('[EventBusIntegrations] Building placed:', data);
+        
+        // Show toast notification with proper emojis
+        if (window.showToast && data.type) {
+            const buildingInfo = {
+                'townCenter': { name: 'Town Center', emoji: '🏛️' },
+                'house': { name: 'House', emoji: '🏠' },
+                'farm': { name: 'Farm', emoji: '🌾' },
+                'barracks': { name: 'Barracks', emoji: '⚔️' },
+                'workshop': { name: 'Workshop', emoji: '🔧' }
+            };
+            
+            const building = buildingInfo[data.type] || { name: data.type, emoji: '🏗️' };
+            window.showToast(`${building.name} construction started!`, {
+                icon: building.emoji,
+                type: 'success',
+                timeout: 3000
+            });
+        }
         
         // Add message to history
         if (window.messageHistory && data.type) {

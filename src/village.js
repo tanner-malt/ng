@@ -54,10 +54,18 @@ class VillageManager {
     }
     
     setupBuildingButtons() {
-        document.querySelectorAll('.building-btn').forEach(btn => {
+        document.querySelectorAll('.build-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const buildingType = btn.dataset.building;
                 console.log(`[Village] Building button clicked: ${buildingType}`);
+                
+                // Check both affordability and unlock status
+                if (!this.gameState.isBuildingUnlocked(buildingType)) {
+                    console.log(`[Village] Building ${buildingType} is locked`);
+                    this.showMessage('Building Locked', `Complete prerequisite buildings to unlock ${buildingType}.`);
+                    return;
+                }
+                
                 if (this.gameState.canAfford(buildingType)) {
                     this.enterBuildMode(buildingType);
                 } else {
@@ -109,20 +117,28 @@ class VillageManager {
     }
     
     exitBuildMode() {
+        console.log('[Village] Exiting build mode...');
+        
         this.gameState.buildMode = null;
         this.villageGrid.classList.remove('build-mode');
-        this.villageGrid.style.cursor = 'default';
+        
+        // Remove any inline cursor styles and let CSS take over
+        this.villageGrid.style.removeProperty('cursor');
+        
+        // Also reset body cursor to ensure no ghost cursor
+        document.body.style.cursor = 'default';
         
         // Remove selection from all buttons
-        document.querySelectorAll('.building-btn').forEach(btn => {
+        document.querySelectorAll('.build-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
         
         // Remove ghost preview
-        const ghostBuilding = this.villageGrid.querySelector('.ghost-building');
-        if (ghostBuilding) {
-            ghostBuilding.remove();
-        }
+        const ghostBuildings = this.villageGrid.querySelectorAll('.ghost-building');
+        ghostBuildings.forEach(ghost => ghost.remove());
+        
+        console.log('[Village] Build mode exited, cursor reset to default');
+        console.log('[Village] Build mode class removed:', !this.villageGrid.classList.contains('build-mode'));
     }
     
     setupBuildPreview() {
@@ -217,6 +233,15 @@ class VillageManager {
                 this.updateSupplyChains();
             }
         });
+        
+        // Add right-click to exit build mode
+        this.villageGrid.addEventListener('contextmenu', (e) => {
+            if (this.gameState.buildMode) {
+                e.preventDefault(); // Prevent context menu
+                console.log('[Village] Right-click detected, exiting build mode');
+                this.exitBuildMode();
+            }
+        });
     }
     
     isPositionFree(x, y) {
@@ -231,8 +256,11 @@ class VillageManager {
     }
     
     placeBuilding(type, x, y) {
+        console.log('[Village] placeBuilding called with:', { type, x, y });
+        
         // Check if we can afford the building
         if (!this.gameState.canAfford(type)) {
+            console.log('[Village] Cannot afford building:', type);
             this.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.');
             return;
         }
@@ -247,10 +275,21 @@ class VillageManager {
         
         // Queue building for construction
         const buildingId = this.gameState.queueBuilding(type, x, y);
+        console.log('[Village] Building queued with ID:', buildingId);
         
         // Trigger tutorial event for building placement
         if (window.eventBus) {
-            window.eventBus.emit('building_placed', { type: type, x: x, y: y, id: buildingId });
+            const eventData = { type: type, x: x, y: y, id: buildingId };
+            console.log('[Village] Emitting building_placed event with data:', eventData);
+            window.eventBus.emit('building_placed', eventData);
+            console.log('[Village] building_placed event emitted successfully');
+        } else {
+            console.error('[Village] EventBus not available for building_placed event');
+        }
+
+        // Trigger building achievement
+        if (window.achievementSystem) {
+            window.achievementSystem.triggerBuildingPlaced(type);
         }
         
         // Toast notification is now handled by gameState.queueBuilding()

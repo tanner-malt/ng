@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Selector Test</title>
+    <link rel="stylesheet" href="public/game.css">
+    <style>
+        body {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #34495e;
+            border-radius: 8px;
+        }
+        .found { color: #2ecc71; }
+        .not-found { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h1>Tutorial Selector Test</h1>
+    
+    <div class="test-section">
+        <h2>Building Buttons (from game.html)</h2>
+        <button id="build-townCenter" class="build-btn" data-building="townCenter">
+            🏛️ Town Center (🌲 50 🪨 25) - 3 days
+        </button>
+        <button id="build-house" class="build-btn" data-building="house">
+            🏠 House (🌲 25) - 1 day
+        </button>
+        <button id="build-farm" class="build-btn" data-building="farm">
+            🌾 Farm (🌲 40 🪨 5) - 2 days
+        </button>
+        <button id="build-barracks" class="build-btn" data-building="barracks">
+            ⚔️ Barracks (🌲 75 🪨 50 🪙 10) - 3 days
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>Navigation Buttons (from game.html)</h2>
+        <nav id="view-navigation">
+            <button class="nav-btn active" data-view="village">Village</button>
+            <button class="nav-btn locked" data-view="world">World</button>
+            <button class="nav-btn locked" data-view="monarch">Monarch</button>
+            <button class="nav-btn locked" data-view="throne">Throne</button>
+        </nav>
+    </div>
+
+    <div class="test-section">
+        <h2>Selector Test Results</h2>
+        <div id="test-results"></div>
+        <button onclick="testSelectors()">Test All Selectors</button>
+        <button onclick="testHighlighting()">Test Highlighting</button>
+    </div>
+
+    <script>
+        function testSelectors() {
+            const results = document.getElementById('test-results');
+            results.innerHTML = '';
+            
+            const selectors = [
+                '#build-townCenter',
+                '#build-house', 
+                '#build-farm',
+                '#build-barracks',
+                '.nav-btn[data-view="world"]',
+                '.nav-btn[data-view="village"]',
+                '#end-day-btn'
+            ];
+            
+            selectors.forEach(selector => {
+                const element = document.querySelector(selector);
+                const status = element ? 'found' : 'not-found';
+                const statusText = element ? '✅ Found' : '❌ Not Found';
+                
+                results.innerHTML += `<div class="${status}">${selector}: ${statusText}</div>`;
+            });
+        }
+
+        function testHighlighting() {
+            // Test highlighting the town center button
+            const townCenterBtn = document.querySelector('#build-townCenter');
+            if (townCenterBtn) {
+                townCenterBtn.classList.add('tutorial-highlight');
+                setTimeout(() => {
+                    townCenterBtn.classList.remove('tutorial-highlight');
+                }, 3000);
+                document.getElementById('test-results').innerHTML += '<div class="found">✅ Highlighting test applied to Town Center button</div>';
+            } else {
+                document.getElementById('test-results').innerHTML += '<div class="not-found">❌ Could not find Town Center button to highlight</div>';
+            }
+        }
+
+        // Auto-run tests when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testSelectors, 500);
+        });
+    </script>
+</body>
+</html>

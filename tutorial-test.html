@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Test - Idle Dynasty Builder</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 15px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        .status { margin: 10px 0; }
+        .ok { color: #4CAF50; }
+        .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Tutorial System Test</h1>
+    
+    <div class="test-section">
+        <h2>Quick Tutorial Test</h2>
+        <div id="status">Loading...</div>
+        <button onclick="clearAndStartTutorial()">Clear Storage & Start Tutorial</button>
+        <button onclick="testBuildingEvent()">Test Building Event</button>
+        <button onclick="showCurrentState()">Show Current State</button>
+    </div>
+
+    <!-- Load game scripts -->
+    <script src="src/systems/core/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/utils/debugTools.js"></script>
+    <script src="src/utils/errorRecovery.js"></script>
+    <script src="src/simpleModal.js"></script>
+    <script src="src/messageHistory.js"></script>
+    <script src="src/achievements.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/eventBusIntegrations.js"></script>
+    <script src="src/app.js"></script>
+
+    <script>
+        let game;
+        let statusDiv = document.getElementById('status');
+
+        function updateStatus(message, isError = false) {
+            statusDiv.innerHTML += `<div class="${isError ? 'error' : 'ok'}">${message}</div>`;
+        }
+
+        function clearAndStartTutorial() {
+            updateStatus('Clearing localStorage...');
+            localStorage.clear();
+            
+            updateStatus('Creating new game instance...');
+            if (game) {
+                game = null;
+            }
+            
+            setTimeout(() => {
+                try {
+                    game = new Game();
+                    game.init();
+                    updateStatus('Game created and initialized successfully!');
+                    
+                    // Tutorial should auto-start for new players
+                    setTimeout(() => {
+                        if (game.tutorialActive) {
+                            updateStatus('✓ Tutorial is active!');
+                        } else {
+                            updateStatus('✗ Tutorial not active', true);
+                        }
+                    }, 2000);
+                    
+                } catch (error) {
+                    updateStatus('Error creating game: ' + error.message, true);
+                }
+            }, 100);
+        }
+
+        function testBuildingEvent() {
+            updateStatus('Testing building placement event...');
+            if (window.eventBus) {
+                window.eventBus.emit('building_placed', {
+                    type: 'townCenter',
+                    x: 100,
+                    y: 100,
+                    id: 'test_building_' + Date.now()
+                });
+                updateStatus('Building event emitted successfully!');
+            } else {
+                updateStatus('EventBus not available!', true);
+            }
+        }
+
+        function showCurrentState() {
+            updateStatus('=== CURRENT GAME STATE ===');
+            updateStatus('Game exists: ' + !!game);
+            updateStatus('Tutorial manager exists: ' + !!(game && game.tutorialManager));
+            updateStatus('Tutorial active: ' + !!(game && game.tutorialActive));
+            updateStatus('EventBus exists: ' + !!window.eventBus);
+            updateStatus('showModal exists: ' + !!window.showModal);
+            
+            if (game && game.tutorialManager) {
+                const tutorial = game.tutorialManager;
+                updateStatus('Tutorial isActive: ' + tutorial.isActive);
+                updateStatus('Current step: ' + tutorial.currentStep);
+                updateStatus('Dynasty name: ' + (tutorial.dynastyName || 'None'));
+                updateStatus('Completed steps: ' + tutorial.completedSteps.size);
+            }
+            updateStatus('=== END STATE ===');
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('Page loaded, systems ready');
+            updateStatus('Click "Clear Storage & Start Tutorial" to test');
+        });
+    </script>
+</body>
+</html>

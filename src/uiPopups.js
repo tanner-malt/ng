@@ -2,6 +2,8 @@
 // Brief, non-intrusive notifications (e.g., "Building placed", "Resource gained")
 // Usage: window.showToast('Building placed successfully!', {icon: '🏠', type: 'success'})
 function showToast(message, opts = {}) {
+    console.log('[UI] Toast:', message);
+    
     const container = document.getElementById('notification-container');
     if (!container) return;
     
@@ -226,10 +228,25 @@ function bindTopRightPopups(game) {
     console.log('[UI] quit-btn:', document.getElementById('quit-btn'));
     // Progression popup
     const progressBtn = document.getElementById('progress-btn');
-    if (progressBtn && window.modalSystem) {
+    if (progressBtn && window.simpleModal) {
         progressBtn.onclick = () => {
             console.log('[UI] Progression modal triggered');
-            window.modalSystem.showProgressionModal(game);
+            window.simpleModal.show('🏆 Progression', `
+                <div class="progression-content">
+                    <div class="progress-item">
+                        <span>🏘️ Village:</span> <span style="color: #27ae60;">✓ Established</span>
+                    </div>
+                    <div class="progress-item">
+                        <span>⚔️ Battle:</span> <span style="color: #e74c3c;">🔒 Locked</span>
+                    </div>
+                    <div class="progress-item">
+                        <span>👑 Monarch:</span> <span style="color: #e74c3c;">🔒 Locked</span>
+                    </div>
+                    <div class="progress-item">
+                        <span>🏰 Throne:</span> <span style="color: #e74c3c;">🔒 Locked</span>
+                    </div>
+                </div>
+            `, { icon: '🏆' });
         };
         progressBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -239,7 +256,7 @@ function bindTopRightPopups(game) {
         });
     } else {
         if (!progressBtn) console.log('[UI] progress-btn not found');
-        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+        if (!window.simpleModal) console.log('[UI] modalSystem not available');
     }
 
     // Message History button
@@ -276,15 +293,33 @@ function bindTopRightPopups(game) {
     } else {
         if (!questBtn) console.log('[UI] quest-btn not found');
         if (!game.questManager) console.log('[UI] questManager not available');
-        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+        if (!window.simpleModal) console.log('[UI] modalSystem not available');
     }
 
     // Settings/menu popup
     const settingsBtn = document.getElementById('settings-btn');
-    if (settingsBtn && window.modalSystem) {
+    if (settingsBtn && window.simpleModal) {
         settingsBtn.onclick = () => {
             console.log('[UI] Settings modal triggered');
-            window.modalSystem.showSettingsModal();
+            window.simpleModal.show('⚙️ Settings', `
+                <div class="settings-content">
+                    <div class="setting-item">
+                        <label>🔊 Sound:</label>
+                        <button id="sound-toggle-modal" onclick="toggleSound()" style="
+                            background: #27ae60;
+                            color: white;
+                            border: none;
+                            padding: 8px 16px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                        ">ON</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>🎮 Game Version:</label>
+                        <span>Dynasty Builder v1.0</span>
+                    </div>
+                </div>
+            `, { icon: '⚙️' });
         };
         settingsBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -294,7 +329,7 @@ function bindTopRightPopups(game) {
         });
     } else {
         if (!settingsBtn) console.log('[UI] settings-btn not found');
-        if (!window.modalSystem) console.log('[UI] modalSystem not available');
+        if (!window.simpleModal) console.log('[UI] modalSystem not available');
     }
 
     // Sound button

@@ -319,12 +319,13 @@ class DebugTools {
             this.registerSystem('GameState', () => {
                 try {
                     const state = window.gameState;
-                    const healthy = state.resources && typeof state.resources.gold === 'number';
+                    const healthy = state.resources && typeof state.gold === 'number';
                     
                     return {
                         healthy,
                         message: healthy ? 'State valid' : 'State corrupted',
                         resources: state.resources,
+                        gold: state.gold,
                         lastSave: state.lastSaveTime || 'never'
                     };
                 } catch (error) {

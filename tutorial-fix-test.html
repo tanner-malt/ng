@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Fix Verification - Idle Dynasty Builder</title>
+    <link rel="stylesheet" href="public/game.css">
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+        }
+        .debug-overlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 400px;
+            z-index: 10000;
+        }
+        .test-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 3px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .test-button:hover { background: #45a049; }
+        .status { 
+            margin: 5px 0; 
+            font-size: 12px;
+        }
+        .ok { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .log-area {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 10px;
+            margin-top: 10px;
+        }
+        /* Mock building buttons for testing */
+        .mock-building-panel {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+        .mock-building-panel button {
+            display: block;
+            margin: 5px 0;
+            padding: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .mock-building-panel button:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-overlay">
+        <h3>🔧 Tutorial Fix Test</h3>
+        <div id="status-area"></div>
+        <div>
+            <button class="test-button" onclick="clearAndTest()">🔄 Clear & Test</button>
+            <button class="test-button" onclick="forceStartTutorial()">▶️ Force Tutorial</button>
+            <button class="test-button" onclick="testBuildingEvent()">🏗️ Test Building</button>
+            <button class="test-button" onclick="showGameState()">📊 Show State</button>
+        </div>
+        <div id="log-area" class="log-area"></div>
+    </div>
+
+    <!-- Mock building panel for testing -->
+    <div class="mock-building-panel">
+        <h4>Test Buildings</h4>
+        <button id="build-townCenter" onclick="mockBuildingClick('townCenter')">🏛️ Town Center</button>
+        <button id="build-house" onclick="mockBuildingClick('house')">🏠 House</button>
+        <button id="build-farm" onclick="mockBuildingClick('farm')">🌾 Farm</button>
+        <button id="build-barracks" onclick="mockBuildingClick('barracks')">⚔️ Barracks</button>
+    </div>
+
+    <!-- Mock navigation for testing -->
+    <nav style="position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px;">
+        <button class="nav-btn" data-view="village" onclick="mockViewSwitch('village')">Village</button>
+        <button class="nav-btn" data-view="world" onclick="mockViewSwitch('world')">World</button>
+        <button class="nav-btn" data-view="monarch" onclick="mockViewSwitch('monarch')">Monarch</button>
+        <button class="nav-btn" data-view="throne" onclick="mockViewSwitch('throne')">Throne</button>
+    </nav>
+
+    <!-- Load all game scripts -->
+    <script src="src/systems/core/eventBus.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/utils/debugTools.js"></script>
+    <script src="src/utils/errorRecovery.js"></script>
+    <script src="src/simpleModal.js"></script>
+    <script src="src/messageHistory.js"></script>
+    <script src="src/achievements.js"></script>
+    <script src="src/tutorial.js"></script>
+    <script src="src/village.js"></script>
+    <script src="src/throne.js"></script>
+    <script src="src/battle.js"></script>
+    <script src="src/quest.js"></script>
+    <script src="src/quests.js"></script>
+    <script src="src/monarch.js"></script>
+    <script src="src/uiPopups.js"></script>
+    <script src="src/eventBusIntegrations.js"></script>
+    <script src="src/app.js"></script>
+
+    <script>
+        let game;
+        let statusArea = document.getElementById('status-area');
+        let logArea = document.getElementById('log-area');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'ok';
+            
+            // Add to log area
+            logArea.textContent += `[${timestamp}] ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+            
+            // Add to status area  
+            statusArea.innerHTML += `<div class="status ${className}">${message}</div>`;
+            
+            // Keep only last 5 status messages
+            const statusMessages = statusArea.children;
+            while (statusMessages.length > 5) {
+                statusArea.removeChild(statusMessages[0]);
+            }
+        }
+
+        // Override console to capture all logs
+        const originalConsole = {
+            log: console.log,
+            error: console.error,
+            warn: console.warn
+        };
+
+        console.log = function(...args) {
+            originalConsole.log.apply(console, args);
+            log('LOG: ' + args.join(' '), 'info');
+        };
+
+        console.error = function(...args) {
+            originalConsole.error.apply(console, args);
+            log('ERROR: ' + args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalConsole.warn.apply(console, args);
+            log('WARN: ' + args.join(' '), 'warning');
+        };
+
+        function clearAndTest() {
+            log('🔄 Clearing storage and restarting...');
+            localStorage.clear();
+            location.reload();
+        }
+
+        function forceStartTutorial() {
+            log('▶️ Force starting tutorial...');
+            localStorage.removeItem('tutorialComplete');
+            
+            if (window.tutorialDebug) {
+                window.tutorialDebug.forceStart();
+            } else if (game && game.tutorialManager) {
+                game.tutorialManager.isActive = true;
+                game.tutorialManager.showIntro();
+            } else {
+                log('❌ No tutorial manager available', 'error');
+            }
+        }
+
+        function testBuildingEvent() {
+            log('🏗️ Testing building placement event...');
+            if (window.eventBus) {
+                window.eventBus.emit('building_placed', {
+                    type: 'townCenter',
+                    x: 100,
+                    y: 100,
+                    id: 'test_' + Date.now()
+                });
+                log('✅ Building event emitted');
+            } else {
+                log('❌ EventBus not available', 'error');
+            }
+        }
+
+        function showGameState() {
+            log('📊 === GAME STATE ===');
+            log('Game exists: ' + !!game);
+            log('Tutorial manager: ' + !!(game && game.tutorialManager));
+            log('Tutorial active: ' + !!(game && game.tutorialActive));
+            log('EventBus: ' + !!window.eventBus);
+            log('showModal: ' + !!window.showModal);
+            
+            if (game && game.tutorialManager) {
+                const t = game.tutorialManager;
+                log('Tutorial isActive: ' + t.isActive);
+                log('Current step: ' + t.currentStep);
+                log('Dynasty: ' + (t.dynastyName || 'None'));
+                log('Completed: ' + t.completedSteps.size);
+            }
+            log('===================');
+        }
+
+        function mockBuildingClick(buildingType) {
+            log(`🏗️ Mock building click: ${buildingType}`);
+            
+            // Simulate the village manager building placement
+            if (window.eventBus) {
+                window.eventBus.emit('building_placed', {
+                    type: buildingType,
+                    x: Math.random() * 200,
+                    y: Math.random() * 200,
+                    id: 'mock_' + buildingType + '_' + Date.now()
+                });
+                log(`✅ Mock building event emitted for ${buildingType}`);
+            }
+        }
+
+        function mockViewSwitch(view) {
+            log(`📱 Mock view switch: ${view}`);
+            
+            if (window.eventBus) {
+                window.eventBus.emit('view_switched', {
+                    view: view,
+                    previousView: 'village'
+                });
+                log(`✅ Mock view switch event emitted for ${view}`);
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Tutorial test page loaded');
+            
+            setTimeout(() => {
+                log('🎮 Creating game instance...');
+                try {
+                    game = new Game();
+                    window.testGame = game;
+                    log('✅ Game instance created');
+                    
+                    game.init();
+                    log('✅ Game initialized');
+                    
+                    // Check if tutorial started automatically
+                    setTimeout(() => {
+                        if (game.tutorialActive) {
+                            log('🎓 Tutorial is active!');
+                        } else {
+                            log('⚠️ Tutorial not active (might be returning player)', 'warning');
+                        }
+                        
+                        showGameState();
+                    }, 1000);
+                    
+                } catch (error) {
+                    log('❌ Error creating game: ' + error.message, 'error');
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>
