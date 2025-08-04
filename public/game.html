@@ -25,6 +25,7 @@
     <script src="../src/monarch.js"></script>
     <script src="../src/uiPopups.js"></script>
     <script src="../src/eventBusIntegrations.js"></script>
+    <script src="../src/worldManager.js"></script>
     <script src="../src/app.js"></script>
     <script src="../src/main.js"></script>
 </head>
@@ -50,19 +51,6 @@
 
     <!-- Popup panels for top-right buttons -->
 
-    <div id="settings-popup" class="popup-panel" style="display: none;">
-        <h3>⚙️ Settings</h3>
-        <div id="settings-content">
-            <div class="setting-item">
-                <label>🔊 Sound:</label>
-                <button id="sound-toggle">ON</button>
-            </div>
-            <div class="setting-item">
-                <label>🌀 Restart:</label>
-                <button id="restart-game-btn">Restart Game</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Tutorial Highlight Overlay -->
     <div id="tutorial-highlight-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
@@ -373,6 +361,47 @@
             }
         }
     </style>
+</style>
+<script>
+// --- View Switching System ---
+let worldManager = null;
+let currentView = 'village';
+
+function switchView(view) {
+    // Hide all game views
+    document.querySelectorAll('.game-view').forEach(el => el.classList.remove('active'));
+    // Show selected view
+    const viewEl = document.getElementById(view + '-view');
+    if (viewEl) viewEl.classList.add('active');
+    currentView = view;
+
+    // Initialize WorldManager if switching to world view
+    if (view === 'world') {
+        if (!window.worldManager) {
+            if (window.WorldManager && window.gameState && window) {
+                window.worldManager = new window.WorldManager(window.gameState, window);
+            }
+        }
+        if (window.worldManager && typeof window.worldManager.init === 'function') {
+            window.worldManager.init();
+        }
+    }
+}
+
+// Navigation button event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#view-navigation .nav-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (btn.classList.contains('locked')) return;
+            const view = btn.getAttribute('data-view');
+            switchView(view);
+            // Update nav button active state
+            document.querySelectorAll('#view-navigation .nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+});
+</script>
 </body>
 </html>
 </script>

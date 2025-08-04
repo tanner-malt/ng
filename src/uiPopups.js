@@ -298,6 +298,8 @@ function bindTopRightPopups(game) {
 
     // Settings/menu popup
     const settingsBtn = document.getElementById('settings-btn');
+    // Define game version globally if not already
+    if (!window.GAME_VERSION) window.GAME_VERSION = '0.0.1';
     if (settingsBtn && window.simpleModal) {
         settingsBtn.onclick = () => {
             console.log('[UI] Settings modal triggered');
@@ -315,11 +317,27 @@ function bindTopRightPopups(game) {
                         ">ON</button>
                     </div>
                     <div class="setting-item">
-                        <label>🎮 Game Version:</label>
-                        <span>Dynasty Builder v1.0</span>
+                        <label>� Restart:</label>
+                        <button id="restart-game-modal" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Restart Game</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>�🎮 Game Version:</label>
+                        <span>Dynasty Builder v${window.GAME_VERSION}</span>
                     </div>
                 </div>
             `, { icon: '⚙️' });
+            // Add event listener for restart button after modal is shown
+            setTimeout(() => {
+                const restartBtn = document.getElementById('restart-game-modal');
+                if (restartBtn) {
+                    restartBtn.onclick = () => {
+                        if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
+                            localStorage.clear();
+                            location.reload();
+                        }
+                    };
+                }
+            }, 100);
         };
         settingsBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {

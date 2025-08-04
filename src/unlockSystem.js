@@ -119,21 +119,10 @@ class UnlockSystem {
             name: 'World Map',
             description: 'Explore the surrounding lands',
             conditions: [
-                { type: 'achievement', achievement: 'first_settlement' }
+                { type: 'achievement', achievement: 'feeding_people' }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('world')
-        });
-
-        this.registerUnlock('battle_view', {
-            type: 'view',
-            name: 'Battle Screen',
-            description: 'Manage your military forces',
-            conditions: [
-                { type: 'achievement', achievement: 'military_establishment' }
-            ],
-            autoUnlock: true,
-            callback: () => this.unlockView('battle')
         });
 
         this.registerUnlock('monarch_view', {

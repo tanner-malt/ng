@@ -51,7 +51,7 @@ class AchievementSystem {
             type: 'building',
             hidden: false,
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { population: 2 }
+            reward: { population: 2, wood: 500 }
         });
 
         this.defineAchievement('feeding_people', {
