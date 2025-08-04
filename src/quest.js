@@ -415,12 +415,19 @@ class QuestManager {
         const location = this.currentExpedition.location;
         const rewards = this.calculateExpeditionRewards(location);
         
-        // Apply rewards to game state
+        // Apply rewards to game state using GameData for caps
         Object.keys(rewards).forEach(resource => {
             if (this.gameState.resources[resource] !== undefined) {
                 this.gameState.resources[resource] += rewards[resource];
+                // Cap resource if defined in GameData
+                if (GameData.resourceCaps && GameData.resourceCaps[resource]) {
+                    this.gameState.resources[resource] = Math.min(this.gameState.resources[resource], GameData.resourceCaps[resource]);
+                }
             } else if (resource === 'gold') {
                 this.gameState.gold += rewards[resource];
+                if (GameData.resourceCaps && GameData.resourceCaps.gold) {
+                    this.gameState.gold = Math.min(this.gameState.gold, GameData.resourceCaps.gold);
+                }
             }
         });
 

@@ -299,11 +299,6 @@ class ErrorRecovery {
     async handleError(errorType, error, context = {}) {
         console.error(`[ErrorRecovery] Handling error: ${errorType}`, error);
         
-        // Log error for debugging
-        if (window.debugTools) {
-            window.debugTools.logError(`${errorType}: ${error.message || error}`, error);
-        }
-        
         // Attempt recovery based on error type
         const recovered = await this.attemptRecovery(errorType, error, context);
         
@@ -319,11 +314,6 @@ class ErrorRecovery {
     initializeGenericRecovery() {
         this.registerStrategy('generic_error', async (error, context) => {
             try {
-                // Create emergency snapshot
-                if (window.debugTools) {
-                    window.debugTools.createSnapshot(`Emergency_${Date.now()}`);
-                }
-                
                 // Try to stabilize the game state
                 const stabilized = await this.stabilizeGameState();
                 

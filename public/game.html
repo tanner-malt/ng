@@ -8,13 +8,14 @@
     <link rel="stylesheet" href="progress-icons.css">
     
     <!-- Game Scripts -->
+    <script src="../src/gameData.js"></script>
     <script src="../src/systems/core/eventBus.js"></script>
     <script src="../src/gameState.js"></script>
-    <script src="../src/utils/debugTools.js"></script>
     <script src="../src/utils/errorRecovery.js"></script>
     <script src="../src/simpleModal.js"></script>
     <script src="../src/messageHistory.js"></script>
     <script src="../src/achievements.js"></script>
+    <script src="../src/unlockSystem.js"></script>
     <script src="../src/tutorial.js"></script>
     <script src="../src/village.js"></script>
     <script src="../src/throne.js"></script>
@@ -36,32 +37,18 @@
         <button id="message-history-btn" class="icon-btn" title="Message History">
             <span>📜</span>
         </button>
-        <button id="debug-console-btn" class="icon-btn" title="Debug Console" style="background: linear-gradient(135deg, #8e44ad, #9b59b6);" onclick="openDebugConsole()">
-            <span>🔧</span>
-        </button>
-        <button id="tutorial-test-btn" class="icon-btn" title="Start Tutorial (Test)" style="background: linear-gradient(135deg, #e74c3c, #c0392b);">
-            <span>🎓</span>
-        </button>
         <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
             <span>🗺️</span>
         </button>
         <button id="settings-btn" class="icon-btn" title="Settings">
             <span>⚙️</span>
         </button>
-        <button id="progress-btn" class="icon-btn progress-incomplete" title="Progression">
-            <span id="progress-icon">🏆</span>
+        <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
+            <span id="achievements-icon">🏆</span>
         </button>
     </div>
 
     <!-- Popup panels for top-right buttons -->
-    <div id="progress-popup" class="popup-panel" style="display: none;">
-        <h3>🏆 Progression</h3>
-        <div id="progress-content">
-            <div id="progress-battle">Battle: <span>🔒</span></div>
-            <div id="progress-monarch">Monarch: <span>🔒</span></div>
-            <div id="progress-throne">Throne: <span>🔒</span></div>
-        </div>
-    </div>
 
     <div id="settings-popup" class="popup-panel" style="display: none;">
         <h3>⚙️ Settings</h3>
@@ -69,6 +56,10 @@
             <div class="setting-item">
                 <label>🔊 Sound:</label>
                 <button id="sound-toggle">ON</button>
+            </div>
+            <div class="setting-item">
+                <label>🌀 Restart:</label>
+                <button id="restart-game-btn">Restart Game</button>
             </div>
         </div>
     </div>
@@ -102,13 +93,13 @@
                                 <div class="village-header">
                     <h2>🏘️ Your Village</h2>
                     <div class="resource-panel">
-                        <span>💰 Gold: <span id="gold-count">100</span></span>
-                        <span>🌾 Food: <span id="food-count">50</span></span>
-                        <span>🌲 Wood: <span id="wood-count">50</span></span>
-                        <span>🪨 Stone: <span id="stone-count">30</span></span>
-                        <span>🪙 Metal: <span id="metal-count">10</span></span>
-                        <span>👥 Population: <span id="population-count">1</span></span>
-                        <span>🌸 Season: <span id="season-count">Spring</span></span>
+                        <span>💰 Gold: <span id="gold-count"></span></span>
+                        <span>🌾 Food: <span id="food-count"></span></span>
+                        <span>🌲 Wood: <span id="wood-count"></span></span>
+                        <span>🪨 Stone: <span id="stone-count"></span></span>
+                        <span>🪙 Metal: <span id="metal-count"></span></span>
+                        <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
+                        <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
                 </div>
 
@@ -135,22 +126,8 @@
                     <div class="village-sidebar">
                         <div class="building-menu">
                             <h3>🏗️ Buildings</h3>
-                            <div class="building-list">
-                                <button id="build-townCenter" class="build-btn" data-building="townCenter">
-                                    🏛️ Town Center (🌲 50 🪨 25) - 3 days
-                                </button>
-                                <button id="build-house" class="build-btn" data-building="house">
-                                    🏠 House (🌲 25) - 1 day
-                                </button>
-                                <button id="build-farm" class="build-btn" data-building="farm">
-                                    🌾 Farm (🌲 40 🪨 5) - 2 days
-                                </button>
-                                <button id="build-barracks" class="build-btn" data-building="barracks">
-                                    ⚔️ Barracks (🌲 75 🪨 50 🪙 10) - 3 days
-                                </button>
-                                <button id="build-workshop" class="build-btn" data-building="workshop">
-                                    🔧 Workshop (🌲 60 🪨 40 🪙 15) - 4 days
-                                </button>
+                            <div class="building-list" id="building-list">
+                                <!-- Building buttons will be generated dynamically by JavaScript -->
                             </div>
                         </div>
 
@@ -169,10 +146,7 @@
 
             <!-- World View -->
             <div id="world-view" class="game-view">
-                <div class="locked-view">
-                    <h2>🗺️ World Map</h2>
-                    <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
-                </div>
+                <!-- World content will be dynamically generated by worldManager -->
             </div>
 
             <!-- Monarch View -->
@@ -194,6 +168,43 @@
     </div>
 
     <style>
+        /* Enhanced Day Control Buttons */
+        .day-controls button.end-day-button, .day-controls button.auto-play-button {
+            background: #222;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 7px 16px;
+            font-size: 1em;
+            font-weight: 500;
+            margin: 8px 0 0 0;
+            box-shadow: none;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border 0.15s;
+            outline: none;
+            letter-spacing: 0.2px;
+            position: relative;
+        }
+        .day-controls button.end-day-button,
+        .day-controls button.auto-play-button {
+            margin-right: 6px;
+        }
+        .day-controls button.end-day-button:last-child,
+        .day-controls button.auto-play-button:last-child {
+            margin-right: 0;
+        }
+        .day-controls button.end-day-button:hover,
+        .day-controls button.auto-play-button:hover {
+            background: #292f36;
+            color: #fff;
+            border-color: #444;
+        }
+        .day-controls button.end-day-button:active,
+        .day-controls button.auto-play-button:active {
+            background: #181c20;
+            color: #b0b0b0;
+            border-color: #222;
+        }
         @keyframes bounce {
             0%, 20%, 50%, 80%, 100% {
                 transform: translateY(0);
@@ -261,27 +272,116 @@
             }
         }
     </style>
-
-    <script>
-        // Debug console functionality
-        function openDebugConsole() {
-            const debugWindow = window.open('../debug/debug-console.html', 'DebugConsole', 
-                'width=1200,height=800,scrollbars=yes,resizable=yes');
-            
-            if (debugWindow) {
-                debugWindow.focus();
-            } else {
-                alert('Debug console blocked by popup blocker. Please allow popups for this site.');
-            }
-        }
-        
-        // Add keyboard shortcut for debug console (Ctrl+D)
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'd') {
-                e.preventDefault();
-                openDebugConsole();
-            }
-        });
-    </script>
 </body>
 </html>
+</script>
+<script>
+// On hover, check if locked nav button can be unlocked and unlock if requirements are met
+document.addEventListener('DOMContentLoaded', function() {
+    const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
+    navBtns.forEach(btn => {
+        btn.addEventListener('mouseenter', function() {
+            if (btn.classList.contains('locked')) {
+                const view = btn.getAttribute('data-view');
+                if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
+                    // Check if requirements are now met
+                    const unlockId = view + '_view';
+                    if (window.unlockSystem.checkUnlockConditions && window.unlockSystem.checkUnlockConditions(unlockId)) {
+                        // Unlock it
+                        window.unlockSystem.unlock(unlockId);
+                        // UI will update via eventBus or polling
+                    }
+                }
+            }
+        });
+    });
+});
+// Dynamically update resource and season values from gameState and gameData
+function updateResourcePanel() {
+    if (!window.gameState || !window.GameData) return;
+    const resources = window.gameState.resources || {};
+    document.getElementById('gold-count').textContent = resources.gold ?? 0;
+    document.getElementById('food-count').textContent = resources.food ?? 0;
+    document.getElementById('wood-count').textContent = resources.wood ?? 0;
+    document.getElementById('stone-count').textContent = resources.stone ?? 0;
+    document.getElementById('metal-count').textContent = resources.metal ?? 0;
+    document.getElementById('population-count').textContent = window.gameState.population ?? 0;
+    // Use cap from GameData if available, else fallback to gameState
+    let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);
+    document.getElementById('population-cap').textContent = popCap;
+    // Season
+    let season = window.gameState.season || (window.GameData.seasons ? window.GameData.seasons[0] : 'Spring');
+    document.getElementById('season-count').textContent = season;
+}
+
+// Update on load and when resources change
+document.addEventListener('DOMContentLoaded', function() {
+    function tryUpdatePanel() {
+        if (window.gameState && window.GameData) {
+            updateResourcePanel();
+        } else {
+            setTimeout(tryUpdatePanel, 200);
+        }
+    }
+    tryUpdatePanel();
+    if (window.eventBus) {
+        window.eventBus.on && window.eventBus.on('resources-updated', updateResourcePanel);
+    }
+});
+</script>
+<script>
+// Ensure navigation buttons reflect unlock state on load and after unlocks
+function updateNavButtonLocks() {
+    if (!window.unlockSystem) return;
+    const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
+    navBtns.forEach(btn => {
+        const view = btn.getAttribute('data-view');
+        if (view === 'village') return; // Always unlocked
+        if (window.unlockSystem.isViewUnlocked(view)) {
+            btn.classList.remove('locked');
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        } else {
+            btn.classList.add('locked');
+            btn.style.opacity = '0.5';
+            btn.style.pointerEvents = 'none';
+        }
+    });
+}
+
+// Listen for unlock events and update nav buttons
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial update after unlockSystem is ready
+    function tryUpdateNav() {
+        if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
+            updateNavButtonLocks();
+        } else {
+            setTimeout(tryUpdateNav, 200);
+        }
+    }
+    tryUpdateNav();
+
+    // Listen for unlock events
+    if (window.eventBus) {
+        window.eventBus.on && window.eventBus.on('content_unlocked', updateNavButtonLocks);
+    } else {
+        // Fallback: poll every 2s if eventBus is not available
+        setInterval(updateNavButtonLocks, 2000);
+    }
+});
+</script>
+<script>
+// Add event listener for Restart Game button
+document.addEventListener('DOMContentLoaded', function() {
+    const restartBtn = document.getElementById('restart-game-btn');
+    if (restartBtn) {
+        restartBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
+                // Clear localStorage and reload
+                localStorage.clear();
+                location.reload();
+            }
+        });
+    }
+});
+</script>

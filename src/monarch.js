@@ -2,6 +2,7 @@
 class MonarchManager {
     constructor(gameState) {
         this.gameState = gameState;
+        // NOTE: For true centralization, investment costs should be managed in GameData (not hardcoded here)
         this.investmentCategories = {
             village: [
                 {

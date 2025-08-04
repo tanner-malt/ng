@@ -304,22 +304,6 @@ debugCommands.maxResources()           // Max all resources
 debugCommands.clearResources()         // Clear all resources
 ```
 
-### DebugTools Class Methods
-```javascript
-// Health monitoring
-debugTools.registerSystem(name, checkFn) → void
-debugTools.getSystemHealth() → Object
-
-// Error logging
-debugTools.logError(message, error) → void
-debugTools.getErrorLog() → Array<Error>
-
-// State snapshots
-debugTools.createSnapshot(name) → string
-debugTools.restoreSnapshot(id) → boolean
-debugTools.listSnapshots() → Array<Snapshot>
-```
-
 ## 🔄 Error Recovery API
 
 ### ErrorRecovery Class Methods

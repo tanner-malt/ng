@@ -3,12 +3,15 @@
  * 
  * Manages a history of important messages, notifications, and communications
  * that the player has received. Provides easy access to review past messages.
+ * Enhanced with persistent storage and seen/unseen tracking.
  */
 
 class MessageHistory {
     constructor() {
         this.messages = [];
         this.maxMessages = 50; // Keep last 50 messages
+        this.seenMessages = new Set(); // Track which messages user has actually seen in UI
+        this.lastViewedTimestamp = null; // Track when user last opened message history
         this.loadFromStorage();
         console.log('[MessageHistory] Message history system initialized');
     }
@@ -20,7 +23,8 @@ class MessageHistory {
             content: content,
             type: type, // 'info', 'achievement', 'warning', 'royal', 'tutorial'
             timestamp: timestamp || new Date(),
-            read: false
+            read: false,
+            seen: false // New field to track if user has seen this in the UI
         };
 
         this.messages.unshift(message); // Add to beginning
@@ -46,8 +50,35 @@ class MessageHistory {
         }
     }
 
+    markAsSeen(messageId) {
+        const message = this.messages.find(m => m.id === messageId);
+        if (message && !message.seen) {
+            message.seen = true;
+            this.seenMessages.add(messageId);
+            this.saveToStorage();
+            this.updateIcon();
+        }
+    }
+
     markAllAsRead() {
-        this.messages.forEach(message => message.read = true);
+        this.messages.forEach(message => {
+            message.read = true;
+            message.seen = true;
+            this.seenMessages.add(message.id);
+        });
+        this.lastViewedTimestamp = new Date();
+        this.saveToStorage();
+        this.updateIcon();
+    }
+
+    markAllAsSeen() {
+        this.messages.forEach(message => {
+            if (!message.seen) {
+                message.seen = true;
+                this.seenMessages.add(message.id);
+            }
+        });
+        this.lastViewedTimestamp = new Date();
         this.saveToStorage();
         this.updateIcon();
     }
@@ -60,8 +91,22 @@ class MessageHistory {
         return this.messages.filter(m => !m.read).length;
     }
 
+    getUnseenCount() {
+        return this.messages.filter(m => !m.seen).length;
+    }
+
+    getNewMessagesSince(timestamp) {
+        if (!timestamp) return this.messages;
+        return this.messages.filter(m => m.timestamp > timestamp && !m.seen);
+    }
+
     showHistory() {
         const unreadCount = this.getUnreadCount();
+        const unseenCount = this.getUnseenCount();
+        
+        // Mark all messages as seen when opening history
+        this.markAllAsSeen();
+        
         let content = '';
 
         if (this.messages.length === 0) {
@@ -74,13 +119,24 @@ class MessageHistory {
             `;
         } else {
             content = `
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <div style="background: rgba(52, 152, 219, 0.2); padding: 10px; border-radius: 5px;">
+                        Total Messages: ${this.messages.length} | 
+                        Unread: ${unreadCount} | 
+                        ${unseenCount > 0 ? `New: ${unseenCount}` : 'All caught up!'}
+                    </div>
+                </div>
                 <div style="max-height: 400px; overflow-y: auto;">
                     ${this.messages.map(message => this.formatMessage(message)).join('')}
                 </div>
                 <div style="text-align: center; padding: 15px; border-top: 2px solid rgba(52, 152, 219, 0.3); margin-top: 15px;">
                     <button onclick="window.messageHistory.markAllAsRead(); window.simpleModal.close();" 
-                            style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
+                            style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-right: 10px;">
                         Mark All as Read
+                    </button>
+                    <button onclick="window.messageHistory.clearOldMessages(); window.messageHistory.showHistory();" 
+                            style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
+                        Clear Old Messages
                     </button>
                 </div>
             `;
@@ -90,8 +146,6 @@ class MessageHistory {
             icon: '📜',
             closable: true,
             confirmText: 'Close'
-        }).then(() => {
-            this.markAllAsRead();
         });
     }
 
@@ -101,64 +155,101 @@ class MessageHistory {
             'achievement': '🏆',
             'warning': '⚠️',
             'royal': '👑',
-            'tutorial': '📚',
-            'grant': '🎁',
-            'quest': '🗺️'
-        };
-
-        const typeColors = {
-            'info': '#3498db',
-            'achievement': '#f39c12',
-            'warning': '#e74c3c',
-            'royal': '#9b59b6',
-            'tutorial': '#27ae60',
-            'grant': '#e67e22',
-            'quest': '#1abc9c'
+            'tutorial': '🎓',
+            'grant': '💰'
         };
 
         const icon = typeIcons[message.type] || '📋';
-        const color = typeColors[message.type] || '#3498db';
-        const readStyle = message.read ? 'opacity: 0.7;' : 'opacity: 1; border-left: 4px solid #f39c12;';
-        const date = new Date(message.timestamp).toLocaleDateString();
-        const time = new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const readStatus = message.read ? '' : ' style="font-weight: bold;"';
+        const newStatus = !message.seen ? '<span style="color: #e74c3c; font-weight: bold;">NEW</span> ' : '';
+        const timeString = message.timestamp.toLocaleDateString() + ' ' + 
+                          message.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
         return `
-            <div style="margin-bottom: 15px; padding: 15px; background: rgba(52, 73, 94, 0.3); 
-                        border-radius: 8px; ${readStyle}">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h4 style="margin: 0; color: ${color}; display: flex; align-items: center; gap: 8px;">
-                        ${icon} ${message.title}
+            <div style="margin-bottom: 12px; padding: 12px; background: rgba(52, 73, 94, 0.3); 
+                        border-radius: 8px; border-left: 4px solid ${this.getTypeColor(message.type)};"
+                 onclick="window.messageHistory.markAsRead('${message.id}')">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                    <h4${readStatus} style="margin: 0; color: #ecf0f1; display: flex; align-items: center; gap: 8px;">
+                        ${icon} ${newStatus}${message.title}
                     </h4>
-                    <small style="color: #95a5a6;">${date} ${time}</small>
+                    <small style="color: #95a5a6; white-space: nowrap; margin-left: 10px;">${timeString}</small>
                 </div>
-                <div style="color: #ecf0f1; line-height: 1.5;">
+                <div style="color: #bdc3c7; line-height: 1.4;">
                     ${message.content}
                 </div>
             </div>
         `;
     }
 
+    getTypeColor(type) {
+        const colors = {
+            'info': '#3498db',
+            'achievement': '#f39c12',
+            'warning': '#e74c3c',
+            'royal': '#9b59b6',
+            'tutorial': '#2ecc71',
+            'grant': '#f1c40f'
+        };
+        return colors[type] || '#3498db';
+    }
+
+    clearOldMessages() {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 7); // Keep messages from last 7 days
+        
+        const oldCount = this.messages.length;
+        this.messages = this.messages.filter(m => m.timestamp > cutoffDate || !m.read);
+        
+        const newCount = this.messages.length;
+        const deletedCount = oldCount - newCount;
+        
+        if (deletedCount > 0) {
+            this.saveToStorage();
+            this.updateIcon();
+            console.log(`[MessageHistory] Cleared ${deletedCount} old messages`);
+        }
+        
+        return deletedCount;
+    }
+
     updateIcon() {
         const button = document.getElementById('message-history-btn');
+        if (!button) return;
+
+        const span = button.querySelector('span');
+        if (!span) return;
+
         const unreadCount = this.getUnreadCount();
+        const unseenCount = this.getUnseenCount();
         
-        if (button) {
-            const span = button.querySelector('span');
-            if (unreadCount > 0) {
-                span.innerHTML = `📜<span style="position: absolute; top: -5px; right: -5px; 
-                    background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; 
-                    font-size: 10px; display: flex; align-items: center; justify-content: center;">
-                    ${unreadCount > 9 ? '9+' : unreadCount}</span>`;
-                button.style.position = 'relative';
-            } else {
-                span.innerHTML = '📜';
-            }
+        if (unseenCount > 0) {
+            // Show unseen count with red badge
+            span.innerHTML = `📜<span style="position: absolute; top: -5px; right: -5px; 
+                background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; 
+                font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                ${unseenCount > 9 ? '9+' : unseenCount}</span>`;
+            button.style.position = 'relative';
+        } else if (unreadCount > 0) {
+            // Show unread count with orange badge
+            span.innerHTML = `📜<span style="position: absolute; top: -5px; right: -5px; 
+                background: #f39c12; color: white; border-radius: 50%; width: 18px; height: 18px; 
+                font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                ${unreadCount > 9 ? '9+' : unreadCount}</span>`;
+            button.style.position = 'relative';
+        } else {
+            span.innerHTML = '📜';
         }
     }
 
     saveToStorage() {
         try {
-            localStorage.setItem('messageHistory', JSON.stringify(this.messages));
+            const saveData = {
+                messages: this.messages,
+                seenMessages: Array.from(this.seenMessages),
+                lastViewedTimestamp: this.lastViewedTimestamp
+            };
+            localStorage.setItem('messageHistory', JSON.stringify(saveData));
         } catch (error) {
             console.warn('[MessageHistory] Could not save to localStorage:', error);
         }
@@ -168,17 +259,27 @@ class MessageHistory {
         try {
             const saved = localStorage.getItem('messageHistory');
             if (saved) {
-                this.messages = JSON.parse(saved);
+                const data = JSON.parse(saved);
+                this.messages = data.messages || [];
+                this.seenMessages = new Set(data.seenMessages || []);
+                this.lastViewedTimestamp = data.lastViewedTimestamp ? new Date(data.lastViewedTimestamp) : null;
+                
                 // Convert timestamp strings back to Date objects
                 this.messages.forEach(message => {
                     if (typeof message.timestamp === 'string') {
                         message.timestamp = new Date(message.timestamp);
+                    }
+                    // Ensure seen property exists
+                    if (message.seen === undefined) {
+                        message.seen = this.seenMessages.has(message.id);
                     }
                 });
             }
         } catch (error) {
             console.warn('[MessageHistory] Could not load from localStorage:', error);
             this.messages = [];
+            this.seenMessages = new Set();
+            this.lastViewedTimestamp = null;
         }
     }
 
@@ -201,5 +302,5 @@ class MessageHistory {
 }
 
 // Create global instance
-window.MessageHistory = MessageHistory;
+window.messageHistory = new MessageHistory();
 console.log('[MessageHistory] Message history system ready');

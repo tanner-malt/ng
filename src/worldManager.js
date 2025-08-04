@@ -671,7 +671,8 @@ class WorldManager {
         if (!army) return;
         
         const costs = {
-            food: { amount: 3, resource: 'food' } // 3 food per day of supplies
+            // Use GameData for supply costs if available
+            food: GameData.supplyCosts && GameData.supplyCosts.food ? GameData.supplyCosts.food : { amount: 3, resource: 'food' } // 3 food per day of supplies
         };
         
         const cost = costs[supplyType];

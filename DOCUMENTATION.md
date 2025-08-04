@@ -13,7 +13,6 @@ ng/
 │   │   └── core/
 │   │       └── eventBus.js    # Event system backbone
 │   ├── utils/                 # Utility modules
-│   │   ├── debugTools.js      # Debug console and monitoring
 │   │   └── errorRecovery.js   # Auto error recovery system
 │   ├── app.js                 # Main game application
 │   ├── gameState.js           # Game state management
@@ -25,8 +24,6 @@ ng/
 │   ├── achievements.js        # Achievement system
 │   ├── eventBusIntegrations.js # Event system integrations
 │   └── main.js                # Application entry point
-├── debug/                     # Debug tools and consoles
-│   └── debug-console.html     # Debug console interface
 └── docs/                      # Documentation
     ├── SYSTEM_MAPPING.md      # System architecture
     └── REFACTORING_GUIDE.md   # Code organization guide
@@ -226,11 +223,10 @@ steps: [
 5. Update documentation
 
 ### Testing Features
-1. Use debug console commands
-2. Check browser developer tools
-3. Test error recovery scenarios
-4. Verify state persistence
-5. Test tutorial flow
+1. Check browser developer tools
+2. Test error recovery scenarios
+3. Verify state persistence
+4. Test tutorial flow
 
 ## 📝 Best Practices
 

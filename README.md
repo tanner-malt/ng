@@ -81,6 +81,10 @@ The tutorial guides new players through:
 - Quarries (stone production)
 - Markets (gold generation)
 - Barracks (military training)
+- Churches (gold generation)
+- Workshops (building enchantments)
+- Fortress (Fallback point and knights)
+- Blacksmiths (metal production)
 
 ### 3. Game State Management (`gameState.js`)
 - **Save/Load System**: Persistent game state using localStorage

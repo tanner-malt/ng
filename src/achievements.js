@@ -9,6 +9,14 @@ class AchievementSystem {
     constructor() {
         this.achievements = {};
         this.unlockedAchievements = [];
+        this.stats = {
+            buildings_built: 0,
+            battles_won: 0,
+            houses_built: 0,
+            farms_built: 0,
+            barracks_built: 0,
+            towncenters_built: 0
+        };
         this.loadFromStorage();
         this.initializeAchievements();
         console.log('[Achievements] Achievement system initialized');
@@ -22,7 +30,9 @@ class AchievementSystem {
             icon: '👑',
             type: 'tutorial',
             hidden: false,
-            reward: { prestige: 10 }
+            reward: { prestige: 10 },
+            unlocked: true, // Start unlocked for testing
+            unlockedAt: new Date()
         });
 
         this.defineAchievement('first_settlement', {
@@ -31,15 +41,16 @@ class AchievementSystem {
             icon: '🏛️',
             type: 'building',
             hidden: false,
-            reward: { gold: 50, influence: 5 }
+            reward: { wood: 75}
         });
 
         this.defineAchievement('sheltering_citizens', {
             title: 'Sheltering Citizens',
-            description: 'Built your first House',
+            description: 'Built 3 Houses',
             icon: '🏠',
             type: 'building',
             hidden: false,
+            requirement: { houses_built: 3 }, // Requires 3 houses built
             reward: { population: 2 }
         });
 
@@ -71,15 +82,6 @@ class AchievementSystem {
         });
 
         // Building achievements
-        this.defineAchievement('first_house', {
-            title: 'Home Builder',
-            description: 'Built your first house',
-            icon: '🏠',
-            type: 'building',
-            hidden: false,
-            reward: { gold: 50 }
-        });
-
         this.defineAchievement('first_farm', {
             title: 'Green Thumb',
             description: 'Built your first farm',
@@ -89,7 +91,18 @@ class AchievementSystem {
             reward: { food: 100 }
         });
 
-        // Resource achievements
+        // Building mastery achievements
+        this.defineAchievement('master_builder', {
+            title: 'Master Builder',
+            description: 'Built 10 buildings total',
+            icon: '🏗️',
+            type: 'building',
+            hidden: false,
+            requirement: { buildings_built: 10 },
+            reward: { gold: 200, prestige: 50 }
+        });
+
+        // Resource achievements with multiple conditions
         this.defineAchievement('wealthy_ruler', {
             title: 'Wealthy Ruler',
             description: 'Accumulated 1000 gold',
@@ -98,6 +111,20 @@ class AchievementSystem {
             hidden: false,
             requirement: { gold: 1000 },
             reward: { prestige: 25 }
+        });
+
+        this.defineAchievement('prosperous_kingdom', {
+            title: 'Prosperous Kingdom',
+            description: 'Have 500 gold, 200 food, and 50 population',
+            icon: '🏰',
+            type: 'resource',
+            hidden: false,
+            requirement: { 
+                gold: 500, 
+                food: 200, 
+                population: 50 
+            },
+            reward: { prestige: 50, influence: 25 }
         });
 
         this.defineAchievement('population_boom', {
@@ -136,27 +163,63 @@ class AchievementSystem {
 
     // Trigger achievement for dynasty naming
     triggerDynastyNamed(dynastyName) {
-        this.unlockAchievement('dynasty_founder');
+        this.unlock('dynasty_founder');
     }
 
     // Trigger achievement for building placement
     triggerBuildingPlaced(buildingType) {
+        // Track total buildings built
+        this.stats.buildings_built++;
+        
+        // Track specific building types
+        switch (buildingType) {
+            case 'house':
+                this.stats.houses_built++;
+                break;
+            case 'farm':
+                this.stats.farms_built++;
+                break;
+            case 'barracks':
+                this.stats.barracks_built++;
+                break;
+            case 'townCenter':
+                this.stats.towncenters_built++;
+                break;
+        }
+        
         const achievementMap = {
             'townCenter': 'first_settlement',
-            'house': 'sheltering_citizens', 
             'farm': 'feeding_people',
             'barracks': 'military_establishment'
         };
 
         const achievementId = achievementMap[buildingType];
         if (achievementId) {
-            this.unlockAchievement(achievementId);
+            this.unlock(achievementId);
         }
+
+        // Check master builder achievement
+        if (this.stats.buildings_built >= 10) {
+            this.unlock('master_builder');
+        }
+
+        // Check houses requirement for sheltering_citizens
+        if (this.stats.houses_built >= 3) {
+            this.unlock('sheltering_citizens');
+        }
+
+        this.saveToStorage();
     }
 
     // Trigger achievement for tutorial completion
     triggerTutorialComplete() {
-        this.unlockAchievement('tutorial_complete');
+        this.unlock('tutorial_complete');
+    }
+
+    // Check if an achievement is unlocked
+    isUnlocked(achievementId) {
+        const achievement = this.achievements[achievementId];
+        return achievement ? achievement.unlocked : false;
     }
 
     defineAchievement(id, config) {
@@ -166,7 +229,7 @@ class AchievementSystem {
             description: config.description,
             icon: config.icon || '🏆',
             type: config.type || 'general',
-            hidden: config.hidden || false,
+            hidden: false, // Always visible
             requirement: config.requirement || null,
             reward: config.reward || {},
             unlocked: false,
@@ -208,37 +271,34 @@ class AchievementSystem {
             this.showAchievementModal(achievement);
         }
 
+        // Trigger unlock system check
+        if (window.unlockSystem) {
+            setTimeout(() => {
+                window.unlockSystem.checkAllUnlocks();
+            }, 100);
+        }
+
         this.saveToStorage();
         console.log('[Achievements] Unlocked:', achievement.title);
         return true;
     }
 
     applyRewards(rewards) {
+
         if (!window.gameState) return;
 
         Object.entries(rewards).forEach(([resource, amount]) => {
-            switch (resource) {
-                case 'gold':
-                    window.gameState.resources.gold += amount;
-                    break;
-                case 'food':
-                    window.gameState.resources.food += amount;
-                    break;
-                case 'stone':
-                    window.gameState.resources.stone += amount;
-                    break;
-                case 'wood':
-                    window.gameState.resources.wood += amount;
-                    break;
-                case 'influence':
-                    window.gameState.influence += amount;
-                    break;
-                case 'prestige':
-                    window.gameState.prestige += amount;
-                    break;
-                case 'military_exp':
-                    window.gameState.militaryExperience = (window.gameState.militaryExperience || 0) + amount;
-                    break;
+            // Use GameData.resourceCaps to check if resource is valid and cap it if needed
+            if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
+                window.gameState.resources[resource] += amount;
+                // Cap resource if defined in GameData
+                if (GameData.resourceCaps && GameData.resourceCaps[resource]) {
+                    window.gameState.resources[resource] = Math.min(window.gameState.resources[resource], GameData.resourceCaps[resource]);
+                }
+            } else if (window.gameState.hasOwnProperty(resource)) {
+                window.gameState[resource] += amount;
+            } else if (resource === 'military_exp') {
+                window.gameState.militaryExperience = (window.gameState.militaryExperience || 0) + amount;
             }
         });
 
@@ -321,6 +381,13 @@ class AchievementSystem {
                         case 'prestige':
                             current = window.gameState.prestige || 0;
                             break;
+                        case 'buildings_built':
+                        case 'houses_built':
+                        case 'farms_built':
+                        case 'barracks_built':
+                        case 'towncenters_built':
+                            current = this.stats[resource] || 0;
+                            break;
                     }
 
                     if (current < required) {
@@ -364,6 +431,13 @@ class AchievementSystem {
                     break;
                 case 'prestige':
                     current = window.gameState.prestige || 0;
+                    break;
+                case 'buildings_built':
+                case 'houses_built':
+                case 'farms_built':
+                case 'barracks_built':
+                case 'towncenters_built':
+                    current = this.stats[resource] || 0;
                     break;
             }
 
@@ -416,8 +490,9 @@ class AchievementSystem {
         const isUnlocked = achievement.unlocked;
         const opacity = isUnlocked ? '1' : '0.5';
         const icon = isUnlocked ? achievement.icon : '🔒';
-        const title = isUnlocked ? achievement.title : '???';
-        const description = isUnlocked ? achievement.description : 'Achievement locked';
+        // Always show real title and description, even if locked
+        const title = achievement.title;
+        const description = achievement.description;
 
         let progressBar = '';
         if (!isUnlocked && achievement.requirement) {
@@ -448,11 +523,57 @@ class AchievementSystem {
         `;
     }
 
+    // Get achievements sorted: incomplete (closest first), then completed (by date)
+    getSortedAchievements() {
+        const achievementsArr = Object.values(this.achievements);
+        const incomplete = achievementsArr.filter(a => !a.unlocked && a.requirement);
+        const completed = achievementsArr.filter(a => a.unlocked);
+        // Sort incomplete by percent complete, descending
+        incomplete.sort((a, b) => {
+            const progA = this.getProgress(a.id).percentage;
+            const progB = this.getProgress(b.id).percentage;
+            return progB - progA;
+        });
+        // Sort completed by unlock date ascending
+        completed.sort((a, b) => a.unlockedAt - b.unlockedAt);
+        return [...incomplete, ...completed];
+    }
+
+    // Render a compact row for the achievements popup
+    renderAchievementRow(achievement) {
+        const isUnlocked = achievement.unlocked;
+        const icon = isUnlocked ? achievement.icon : '🔒';
+        const title = isUnlocked ? achievement.title : '???';
+        const description = isUnlocked ? achievement.description : 'Achievement locked';
+        let progressBar = '';
+        let date = '';
+        if (!isUnlocked && achievement.requirement) {
+            const progress = this.getProgress(achievement.id);
+            progressBar = `<div style="background: #222; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px;">
+                <div style="background: #3498db; height: 100%; width: ${progress.percentage}%; transition: width 0.3s;"></div>
+            </div>
+            <small style='color:#aaa;'>${progress.percentage}% complete</small>`;
+        }
+        if (isUnlocked && achievement.unlockedAt) {
+            date = `<small style='color:#27ae60;'>Unlocked: ${new Date(achievement.unlockedAt).toLocaleDateString()}</small>`;
+        }
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;opacity:${isUnlocked?1:0.6};">
+            <div style="font-size:22px;">${icon}</div>
+            <div style="flex:1;">
+                <div style="font-weight:bold;color:${isUnlocked?'#f39c12':'#95a5a6'};">${title}</div>
+                <div style="font-size:12px;color:#bbb;">${description}</div>
+                ${progressBar}
+                ${date}
+            </div>
+        </div>`;
+    }
+
     saveToStorage() {
         try {
             const saveData = {
                 achievements: this.achievements,
-                unlockedAchievements: this.unlockedAchievements
+                unlockedAchievements: this.unlockedAchievements,
+                stats: this.stats
             };
             localStorage.setItem('achievements', JSON.stringify(saveData));
         } catch (error) {
@@ -467,6 +588,14 @@ class AchievementSystem {
                 const data = JSON.parse(saved);
                 this.achievements = data.achievements || {};
                 this.unlockedAchievements = data.unlockedAchievements || [];
+                this.stats = data.stats || { 
+                    buildings_built: 0, 
+                    battles_won: 0,
+                    houses_built: 0,
+                    farms_built: 0,
+                    barracks_built: 0,
+                    towncenters_built: 0
+                };
                 
                 // Convert unlockedAt strings back to Date objects
                 Object.values(this.achievements).forEach(achievement => {
@@ -491,5 +620,5 @@ class AchievementSystem {
 }
 
 // Create global instance
-window.AchievementSystem = AchievementSystem;
+window.achievementSystem = new AchievementSystem();
 console.log('[Achievements] Achievement system ready');

@@ -108,7 +108,7 @@ Each major system includes:
 - User notification for critical errors
 
 ### Manual Recovery Tools:
-- Debug console commands
+- Browser developer console
 - State editor interface
 - System reset buttons
 - Export/import functionality

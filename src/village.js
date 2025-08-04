@@ -36,6 +36,7 @@ class VillageManager {
             this.renderTerrain();
             
             console.log('[Village] Setting up building buttons...');
+            this.generateBuildingButtons();
             this.setupBuildingButtons();
             console.log('[Village] Rendering buildings...');
             this.renderBuildings();
@@ -53,19 +54,45 @@ class VillageManager {
         }
     }
     
+    // Generate building buttons dynamically from GameData
+    generateBuildingButtons() {
+        const buildingList = document.getElementById('building-list');
+        if (!buildingList) {
+            console.error('[Village] building-list element not found');
+            return;
+        }
+
+        // Clear existing buttons
+        buildingList.innerHTML = '';
+
+        // Get available building types (in order of progression)
+        const buildingTypes = ['townCenter', 'house', 'farm', 'barracks', 'workshop'];
+        
+        buildingTypes.forEach(buildingType => {
+            if (GameData.buildingInfo[buildingType]) {
+                const button = document.createElement('button');
+                button.id = `build-${buildingType}`;
+                button.className = 'build-btn';
+                button.dataset.building = buildingType;
+                button.textContent = GameData.formatBuildingButton(buildingType);
+                buildingList.appendChild(button);
+            }
+        });
+
+        console.log('[Village] Generated', buildingTypes.length, 'building buttons');
+    }
+    
     setupBuildingButtons() {
         document.querySelectorAll('.build-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const buildingType = btn.dataset.building;
                 console.log(`[Village] Building button clicked: ${buildingType}`);
-                
                 // Check both affordability and unlock status
                 if (!this.gameState.isBuildingUnlocked(buildingType)) {
                     console.log(`[Village] Building ${buildingType} is locked`);
                     this.showMessage('Building Locked', `Complete prerequisite buildings to unlock ${buildingType}.`);
                     return;
                 }
-                
                 if (this.gameState.canAfford(buildingType)) {
                     this.enterBuildMode(buildingType);
                 } else {
@@ -73,7 +100,83 @@ class VillageManager {
                     this.showMessage('Insufficient Resources', `You need more resources to build a ${buildingType}.`);
                 }
             });
+
+            // On hover, update button state based on current resources and unlocks
+            btn.addEventListener('mouseenter', () => {
+                const buildingType = btn.dataset.building;
+                if (!buildingType) return;
+                const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
+                const canAfford = this.gameState.canAfford(buildingType);
+                btn.disabled = !isUnlocked || !canAfford;
+                if (!isUnlocked) {
+                    btn.classList.add('locked');
+                    btn.style.opacity = '0.5';
+                    btn.title = `Locked: Complete prerequisites to unlock ${buildingType}`;
+                } else {
+                    btn.classList.remove('locked');
+                    btn.style.opacity = '1';
+                    if (!canAfford) {
+                        btn.title = `Insufficient resources for ${buildingType}`;
+                    } else {
+                        btn.title = `Build ${buildingType}`;
+                    }
+                }
+            });
         });
+    }
+
+    // Update available buildings based on unlock status
+    updateAvailableBuildings() {
+        console.log('[Village] Updating available buildings based on unlocks');
+        
+        document.querySelectorAll('.build-btn').forEach(btn => {
+            const buildingType = btn.dataset.building;
+            if (buildingType) {
+                const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
+                const canAfford = this.gameState.canAfford(buildingType);
+                
+                // Update button state
+                btn.disabled = !isUnlocked || !canAfford;
+                
+                // Visual feedback for unlock status
+                if (!isUnlocked) {
+                    btn.classList.add('locked');
+                    btn.style.opacity = '0.5';
+                    btn.title = `Locked: Complete prerequisites to unlock ${buildingType}`;
+                } else {
+                    btn.classList.remove('locked');
+                    btn.style.opacity = '1';
+                    
+                    if (!canAfford) {
+                        btn.title = `Insufficient resources for ${buildingType}`;
+                    } else {
+                        btn.title = `Build ${buildingType}`;
+                    }
+                }
+            }
+        });
+        
+        // Also update any building selection UI if it exists
+        this.updateBuildingSelectionUI();
+    }
+
+    // Update building selection UI elements
+    updateBuildingSelectionUI() {
+        // Update any building selection menus or panels
+        const buildingPanel = document.getElementById('building-panel');
+        if (buildingPanel) {
+            // Refresh the building panel content if it exists
+            const availableBuildings = this.getAvailableBuildings();
+            // Update panel display based on available buildings
+        }
+    }
+
+    // Get list of currently available (unlocked) buildings
+    getAvailableBuildings() {
+        const allBuildings = ['townCenter', 'house', 'farm', 'barracks', 'workshop'];
+        return allBuildings.filter(building => 
+            this.gameState.isBuildingUnlocked(building)
+        );
     }
     
     setupEndDayButton() {
@@ -291,6 +394,13 @@ class VillageManager {
         if (window.achievementSystem) {
             window.achievementSystem.triggerBuildingPlaced(type);
         }
+
+        // Check for new unlocks after building placement
+        if (window.unlockSystem) {
+            setTimeout(() => {
+                window.unlockSystem.checkAllUnlocks();
+            }, 100);
+        }
         
         // Toast notification is now handled by gameState.queueBuilding()
         // No need for duplicate notifications here
@@ -335,8 +445,8 @@ class VillageManager {
         const buildingName = type.charAt(0).toUpperCase() + type.slice(1);
         message.textContent = `${buildingName} construction site has been established!`;
         
-        // Show resources spent
-        const cost = this.gameState.buildingCosts[type];
+        // Show resources spent (from GameData)
+        const cost = GameData.buildingCosts[type];
         resourceList.innerHTML = '';
         Object.entries(cost).forEach(([resource, amount]) => {
             const resourceItem = document.createElement('div');
@@ -344,9 +454,9 @@ class VillageManager {
             resourceItem.textContent = `-${amount} ${resource}`;
             resourceList.appendChild(resourceItem);
         });
-        
-        // Show construction time
-        const constructionTime = this.gameState.getBuildingConstructionTime(type);
+
+        // Show construction time (from GameData)
+        const constructionTime = GameData.constructionTimes[type] || 2;
         timeText.textContent = `Construction will complete in ${constructionTime} hours during expeditions`;
         
         // Show modal
@@ -582,9 +692,9 @@ class VillageManager {
     showBuildingInfo(building) {
         if (this.gameState.buildMode) return; // Don't show info in build mode
         
-        // Get building details
-        const production = this.gameState.buildingProduction[building.type];
-        const buildingCost = this.gameState.buildingCosts[building.type];
+        // Get building details from GameData
+        const production = GameData.buildingProduction[building.type];
+        const buildingCost = GameData.buildingCosts[building.type];
         const isUnderConstruction = this.gameState.buildingQueue.some(b => b.id === building.id);
         
         let contentHTML = `

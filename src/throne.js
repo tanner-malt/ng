@@ -484,20 +484,23 @@ class ThroneManager {
     }
     
     getBonusDescription(bonusType, value) {
+        // Use GameData for resource/production names if available
+        const resourceNames = GameData && GameData.resourceNames ? GameData.resourceNames : {};
+        const pretty = (key) => resourceNames[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const percent = (v) => `+${(v * 100).toFixed(1)}%`;
         const descriptions = {
-            food_production: `+${(value * 100).toFixed(1)}% Food Production`,
-            wood_production: `+${(value * 100).toFixed(1)}% Wood Production`,
-            stone_production: `+${(value * 100).toFixed(1)}% Stone Production`,
-            all_production: `+${(value * 100).toFixed(1)}% All Production`,
+            food_production: `${percent(value)} ${pretty('food')} Production`,
+            wood_production: `${percent(value)} ${pretty('wood')} Production`,
+            stone_production: `${percent(value)} ${pretty('stone')} Production`,
+            all_production: `${percent(value)} All Production`,
             army_attack: `+${value} Army Attack`,
             army_health: `+${value} Army Health`,
             commander_experience: `+${value} Commander XP Gain`,
-            gold_generation: `+${value} Gold/minute`,
-            automation_speed: `+${(value * 100).toFixed(1)}% Automation Speed`,
-            prestige_bonus: `+${(value * 100).toFixed(1)}% Prestige Rewards`
+            gold_generation: `+${value} ${pretty('gold')}/minute`,
+            automation_speed: `${percent(value)} Automation Speed`,
+            prestige_bonus: `${percent(value)} Prestige Rewards`
         };
-        
-        return descriptions[bonusType] || `+${value} ${bonusType}`;
+        return descriptions[bonusType] || `+${value} ${pretty(bonusType)}`;
     }
     
     // Apply bonuses to game mechanics

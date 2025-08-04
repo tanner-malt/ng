@@ -7,10 +7,12 @@ Successfully cleaned and documented the Idle: Dynasty Builder codebase, removing
 ### Debug and Test Files (22 files removed):
 - Root directory: `test-restored.html`, `complete-tutorial-test.html`, `minimal-tutorial-test.html`, `tutorial-debug.html`, `simple-tutorial-test.html`, `tutorial-autostart-test.html`, `mini-modal-test.html`, `minimal.html`, `debug-full.html`, `debug-tutorial.html`, `debug.html`, `test.html`, `mini-toast-demo.html`, `tutorial-test.html`, `debug-tutorial-fixed.html`
 - Public directory: `game-debug.html`, `game-minimal-debug.html`, `dom-test.html`, `test.html`, `css-test.html`, `full-debug.html`, `debug-console.html`
+- Debug directory: Entire `debug/` directory and `debug-console.html` removed
 
-### Unused Source Files (2 files removed):
+### Unused Source Files (3 files removed):
 - `src/main.js` - Empty file, functionality moved to app.js
 - `src/eventBusIntegrations.js` - Empty file
+- `src/utils/debugTools.js` - Debug console functionality removed
 
 ### Empty Documentation Files (2 files removed):
 - `TECHNICAL.md` - Empty file
