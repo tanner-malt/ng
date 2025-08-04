@@ -68,12 +68,15 @@ class WorldManager {
     
     setupWorldUI() {
         // Create world map container structure
+        const dynastyName = (typeof this.gameState.getDynastyName === 'function')
+            ? this.gameState.getDynastyName()
+            : (this.game?.tutorialManager?.getDynastyName?.() || 'Noble');
         this.worldGrid.innerHTML = `
             <div class="world-container">
                 <div class="world-header">
                     <h2>🌍 World Map</h2>
                     <div class="world-info">
-                        <span>Dynasty: <span id="world-dynasty">House ${this.game?.tutorialManager?.getDynastyName?.() || 'Noble'}</span></span>
+                        <span>Dynasty: <span id="world-dynasty">House ${dynastyName}</span></span>
                         <span>Day: <span id="world-day">${this.gameState.currentDay}</span></span>
                         <span>Season: <span id="world-season">${this.gameState.season}</span></span>
                     </div>

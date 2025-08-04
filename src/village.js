@@ -681,8 +681,11 @@ class VillageManager {
         // Clear existing buildings (but not building sites)
         container.querySelectorAll('.building:not(.building-site)').forEach(el => el.remove());
         
+        console.log('[Village] Rendering buildings - count:', this.gameState.buildings.length);
+        
         // Render all completed buildings
         this.gameState.buildings.forEach(building => {
+            console.log('[Village] Rendering building:', building.type, 'at', building.x, building.y);
             const buildingEl = document.createElement('div');
             buildingEl.className = `building ${building.type}`;
             buildingEl.style.left = building.x + 'px';
@@ -1166,5 +1169,36 @@ class VillageManager {
         if (efficiency >= 60) return 'fair';
         if (efficiency >= 40) return 'poor';
         return 'critical';
+    }
+
+    // Resource display update method (called by eventBusIntegrations)
+    updateResourceDisplay() {
+        // This method is called when resources are updated
+        // The actual resource display is handled by updateResourcePanel() in game.html
+        // But we can update village-specific displays here if needed
+        
+        // Update production displays in the village manager
+        this.updateProductionDisplay();
+        
+        // Update efficiency displays
+        this.updateEfficiencyDisplay();
+        
+        // Update population displays
+        if (this.gameState) {
+            const populationEl = document.getElementById('manager-population');
+            const populationCapEl = document.getElementById('manager-population-cap');
+            
+            if (populationEl) {
+                populationEl.textContent = this.gameState.population || 0;
+            }
+            if (populationCapEl) {
+                const cap = window.GameData?.calculatePopulationCap ? 
+                    window.GameData.calculatePopulationCap(this.gameState.buildings) : 
+                    (this.gameState.populationCap || 0);
+                populationCapEl.textContent = cap;
+            }
+        }
+        
+        console.log('[Village] Resource display updated');
     }
 }

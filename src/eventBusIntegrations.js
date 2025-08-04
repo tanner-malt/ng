@@ -61,6 +61,11 @@ class EventBusIntegrations {
         if (window.messageHistory) {
             window.messageHistory.updateIcon();
         }
+        
+        // Save game state when resources are updated
+        if (window.gameState && typeof window.gameState.save === 'function') {
+            window.gameState.save();
+        }
     }
 
     handleBuildingPlaced(data) {
