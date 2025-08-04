@@ -1,3 +1,15 @@
+/* Dynamic viewport handling */
+:root {
+    --viewport-height: 100vh;
+}
+
+/* Support for mobile browsers with dynamic viewport */
+@supports (height: 100dvh) {
+    :root {
+        --viewport-height: 100dvh;
+    }
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -9,10 +21,11 @@ body {
     background: #2c3e50;
     color: #ecf0f1;
     overflow: hidden;
+    height: var(--viewport-height);
 }
 
 #game-container {
-    height: 100vh;
+    height: var(--viewport-height);
     display: flex;
     flex-direction: column;
 }
@@ -65,17 +78,23 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for proper flex behavior */
 }
 
 .game-view {
     display: none;
-    height: 100%;
-    padding: 1rem;
+    flex: 1;
+    padding: 0.5rem;
     animation: fadeIn 0.3s ease;
+    overflow: hidden;
+    min-height: 0; /* Important for proper flex behavior */
 }
 
 .game-view.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes fadeIn {
@@ -88,11 +107,12 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-    padding: 1rem;
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
     background: linear-gradient(135deg, #34495e, #2c3e50);
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .village-header h2 {
@@ -256,22 +276,64 @@ body {
 
 .village-content {
     display: flex;
-    height: calc(100% - 100px);
+    flex: 1;
     gap: 1rem;
+    padding: 0 1rem 1rem 1rem;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Four-column layout with ratios: 0.6:5:0.6:0.8 (Production:Grid:Manager:Buildings) */
+.production-planner {
+    flex: 0.6;
+    min-width: 150px;
 }
 
 .village-grid {
-    flex: 1;
-    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    flex: 5;
+    min-width: 600px;
+}
+
+.village-manager {
+    flex: 0.6;
+    min-width: 150px;
+}
+
+.building-menu {
+    flex: 0.8;
+    min-width: 160px;
+}
+
+.village-grid {
+    background: linear-gradient(135deg, #4a4a4a, #5a5a5a);
     border-radius: 8px;
     position: relative;
-    min-height: 500px;
+    min-height: 400px;
+    cursor: grab;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+    overflow: hidden; /* This creates the viewport effect */
+    user-select: none;
+}
+
+.village-grid:active {
+    cursor: grabbing;
+}
+
+.village-grid.dragging {
+    cursor: grabbing;
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
+}
+
+.village-grid-content {
     background-image: 
-        linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
     background-size: 50px 50px;
-    cursor: default;
-    box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: 0;
+    left: 0;
 }
 
 .village-grid.build-mode {
@@ -353,39 +415,49 @@ body {
 }
 
 .village-sidebar {
-    width: 280px;
+    width: 300px;
+    min-width: 300px;
     background: linear-gradient(135deg, #34495e, #2c3e50);
     border-radius: 8px;
-    padding: 1.5rem;
+    padding: 1rem;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+    max-height: 100%;
 }
 
 .building-menu h3,
 .village-info h3 {
-    margin-bottom: 1rem;
+    margin: 0 0 0.75rem 0;
     color: #1abc9c;
-    font-size: 1.1rem;
+    font-size: 1rem;
     border-bottom: 2px solid #1abc9c;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    text-align: center;
+    font-weight: 600;
 }
 
 .build-btn {
     display: block;
     width: 100%;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    background: #3498db;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.4rem;
+    background: linear-gradient(135deg, #3498db, #2980b9);
     color: white;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 500;
 }
 
 .build-btn:hover {
-    background: #2980b9;
-    transform: translateX(5px);
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
 .build-btn:disabled {
@@ -2273,38 +2345,95 @@ body {
     font-size: 1.2rem;
 }
 
+.building-menu {
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
+    border-radius: 6px;
+    padding: 0.6rem;
+    border: 1px solid rgba(74, 74, 74, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.building-menu h3 {
+    margin: 0 0 0.5rem 0;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    border-bottom: 2px solid rgba(224, 224, 224, 0.2);
+    padding-bottom: 0.3rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.building-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    min-height: 100px;
+}
+
+.building-list-container::-webkit-scrollbar {
+    width: 5px;
+}
+
+.building-list-container::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+}
+
+.building-list-container::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.4);
+    border-radius: 3px;
+}
+
+.building-list-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.6);
+}
+
 .building-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.3rem;
 }
 
 .building-btn {
-    padding: 0.75rem;
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
+    padding: 0.4rem 0.6rem;
+    background: linear-gradient(135deg, #555555, #666666);
+    color: #e0e0e0;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     text-align: left;
+    font-weight: 500;
 }
 
 .building-btn:hover {
-    background: linear-gradient(135deg, #2980b9, #21618c);
-    transform: translateY(-2px);
+    background: linear-gradient(135deg, #666666, #777777);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .building-btn:disabled {
-    background: #7f8c8d;
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.5;
+    color: #999999;
 }
 
 .building-btn:disabled:hover {
-    background: #7f8c8d;
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
     transform: none;
+    box-shadow: none;
+}
+
+.building-btn.selected {
+    background: linear-gradient(135deg, #888888, #999999);
+    box-shadow: 0 0 10px rgba(136, 136, 136, 0.5);
+    color: #ffffff;
 }
 
 /* End Day Button */
@@ -2324,4 +2453,311 @@ body {
 .end-day-btn:hover {
     background: linear-gradient(135deg, #d35400, #c0392b);
     transform: translateY(-2px);
+}
+
+/* Production Planner Styles */
+.production-planner {
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
+    border-radius: 6px;
+    padding: 0.6rem;
+    border: 1px solid rgba(74, 74, 74, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.production-planner h3 {
+    color: #e0e0e0;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    border-bottom: 2px solid rgba(224, 224, 224, 0.2);
+    padding-bottom: 0.3rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.planner-section {
+    background: rgba(0,0,0,0.25);
+    border-radius: 4px;
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.planner-section:last-child {
+    margin-bottom: 0;
+}
+
+.planner-section h4 {
+    color: #d0d0d0;
+    margin: 0 0 0.3rem 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.production-goals, .efficiency-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.goal-item, .efficiency-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #e0e0e0;
+    font-size: 0.75rem;
+}
+
+.goal-icon {
+    font-size: 0.9rem;
+    width: 16px;
+    text-align: center;
+}
+
+.goal-text {
+    flex: 1;
+}
+
+.efficiency-item span {
+    flex: 1;
+}
+
+/* Production Efficiency Bars */
+.goal-input {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    padding: 0.2rem 0.4rem;
+    color: white;
+    font-size: 0.75rem;
+    width: 50px;
+    text-align: center;
+}
+
+.goal-input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.efficiency-bar-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    height: 14px;
+    margin-left: 0.5rem;
+    overflow: hidden;
+    flex: 1;
+    position: relative;
+}
+
+.efficiency-bar {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.efficiency-bar.excellent {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.efficiency-bar.good {
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.efficiency-bar.fair {
+    background: linear-gradient(90deg, #f1c40f, #f39c12);
+}
+
+.efficiency-bar.poor {
+    background: linear-gradient(90deg, #e67e22, #d35400);
+}
+
+.efficiency-bar.critical {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.efficiency-text {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Village Manager Styles */
+.village-manager {
+    background: linear-gradient(135deg, #3a3a3a, #4a4a4a);
+    border-radius: 6px;
+    padding: 0.6rem;
+    border: 1px solid rgba(74, 74, 74, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.village-manager h3 {
+    color: #e0e0e0;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+    border-bottom: 2px solid rgba(224, 224, 224, 0.2);
+    padding-bottom: 0.3rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.manager-section {
+    background: rgba(0,0,0,0.25);
+    border-radius: 4px;
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.manager-section:last-child {
+    margin-bottom: 0;
+}
+
+.manager-section h4 {
+    color: #d0d0d0;
+    margin: 0 0 0.3rem 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.production-info, .population-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.production-item, .population-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #e0e0e0;
+    font-size: 0.8rem;
+}
+
+.production-icon {
+    font-size: 0.9rem;
+    width: 16px;
+    text-align: center;
+}
+
+.production-text {
+    flex: 1;
+}
+
+.time-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.current-day {
+    background: rgba(0,0,0,0.2);
+    padding: 0.4rem;
+    border-radius: 4px;
+    text-align: center;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.end-day-button, .auto-play-button {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.end-day-button:hover, .auto-play-button:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.auto-play-button.active {
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+}
+
+.auto-play-button.active:hover {
+    background: linear-gradient(135deg, #229954, #27ae60);
+}
+
+#auto-play-icon {
+    font-size: 0.7rem;
+}
+
+#auto-play-text {
+    font-size: 0.8rem;
+}
+
+/* Responsive Design */
+@media (max-height: 700px) {
+    .village-header {
+        padding: 0.5rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .village-sidebar {
+        gap: 0.5rem;
+    }
+    
+    .manager-section {
+        padding: 0.4rem;
+        margin-bottom: 0.4rem;
+    }
+    
+    .building-list-container {
+        max-height: 200px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .village-sidebar {
+        width: 280px;
+        min-width: 280px;
+    }
+}
+
+@media (max-width: 1000px) {
+    .village-content {
+        flex-direction: column;
+    }
+    
+    .village-sidebar {
+        width: 100%;
+        min-width: auto;
+        max-height: 300px;
+        flex-direction: row;
+        gap: 1rem;
+    }
+    
+    .village-manager,
+    .building-menu {
+        flex: 1;
+    }
 }

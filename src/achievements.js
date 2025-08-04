@@ -333,24 +333,34 @@ class AchievementSystem {
 
     showAchievementModal(achievement) {
         const content = `
-            <div style="text-align: center; padding: 20px;">
-                <div style="font-size: 60px; margin-bottom: 15px;">${achievement.icon}</div>
-                <h2 style="color: #f39c12; margin: 0 0 10px 0;">Achievement Unlocked!</h2>
-                <h3 style="color: #ecf0f1; margin: 0 0 15px 0;">${achievement.title}</h3>
-                <p style="color: #95a5a6; font-style: italic; margin-bottom: 20px;">${achievement.description}</p>
-                <div style="background: rgba(46, 204, 113, 0.2); padding: 15px; border-radius: 8px; border: 2px solid #2ecc71;">
-                    <strong style="color: #2ecc71;">Rewards:</strong><br>
-                    ${this.formatRewards(achievement.reward)}
+            <div style="text-align: center; padding: 12px 18px; min-width: 220px; max-width: 320px;">
+                <div style="font-size: 36px; margin-bottom: 8px;">${achievement.icon}</div>
+                <h3 style="color: #f39c12; margin: 0 0 6px 0; font-size: 1.1rem;">Achievement Unlocked!</h3>
+                <div style="color: #ecf0f1; margin: 0 0 8px 0; font-size: 1rem; font-weight: bold;">${achievement.title}</div>
+                <p style="color: #95a5a6; font-style: italic; margin-bottom: 10px; font-size: 0.95rem;">${achievement.description}</p>
+                <div style="background: rgba(46, 204, 113, 0.10); padding: 8px; border-radius: 6px; border: 1px solid #2ecc71; font-size: 0.95rem;">
+                    <strong style="color: #2ecc71;">Rewards:</strong> ${this.formatRewards(achievement.reward)}
                 </div>
+                <button id="ach-modal-close-btn" style="position: absolute; top: 8px; right: 12px; background: none; border: none; color: #aaa; font-size: 1.2rem; cursor: pointer;">&times;</button>
             </div>
         `;
 
+        // Show modal with lighter style, allow click outside to close, and a close button
         window.showModal('🏆 Achievement', content, {
             icon: '🏆',
             closable: true,
-            confirmText: 'Awesome!',
-            style: { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }
+            confirmText: 'Close',
+            style: { background: '#232946', boxShadow: '0 2px 16px rgba(0,0,0,0.18)' },
+            clickOutsideToClose: true
         });
+
+        // Attach close button handler after modal is rendered
+        setTimeout(() => {
+            const btn = document.getElementById('ach-modal-close-btn');
+            if (btn) btn.onclick = () => {
+                if (window.closeModal) window.closeModal();
+            };
+        }, 50);
     }
 
     checkRequirements() {

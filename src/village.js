@@ -44,10 +44,14 @@ class VillageManager {
             this.renderBuildingSites();
             console.log('[Village] Setting up grid click...');
             this.setupGridClick();
+            console.log('[Village] Setting up grid dragging...');
+            this.setupGridDragging();
             console.log('[Village] Setting up end day button...');
             this.setupEndDayButton();
             this.gameState.updateBuildButtons();
             this.initSupplyChains();
+            console.log('[Village] Setting up production planner...');
+            this.initProductionPlanner();
             console.log('[Village] Village initialization complete');
         } catch (error) {
             console.error('[Village] Error during initialization:', error);
@@ -65,8 +69,8 @@ class VillageManager {
         // Clear existing buttons
         buildingList.innerHTML = '';
 
-        // Get available building types (in order of progression)
-        const buildingTypes = ['townCenter', 'house', 'farm', 'barracks', 'workshop'];
+        // Get all building types from gameState instead of hardcoding
+        const buildingTypes = this.gameState.getAllBuildingTypes();
         
         buildingTypes.forEach(buildingType => {
             if (GameData.buildingInfo[buildingType]) {
@@ -79,7 +83,7 @@ class VillageManager {
             }
         });
 
-        console.log('[Village] Generated', buildingTypes.length, 'building buttons');
+        console.log('[Village] Generated', buildingTypes.length, 'building buttons from gameState');
     }
     
     setupBuildingButtons() {
@@ -173,10 +177,7 @@ class VillageManager {
 
     // Get list of currently available (unlocked) buildings
     getAvailableBuildings() {
-        const allBuildings = ['townCenter', 'house', 'farm', 'barracks', 'workshop'];
-        return allBuildings.filter(building => 
-            this.gameState.isBuildingUnlocked(building)
-        );
+        return this.gameState.getAvailableBuildingTypes();
     }
     
     setupEndDayButton() {
@@ -292,11 +293,19 @@ class VillageManager {
     
     setupGridClick() {
         this.villageGrid.addEventListener('click', (e) => {
+            // Don't allow building placement if we just finished dragging
+            if (this.villageGrid.classList.contains('dragging')) {
+                return;
+            }
+            
             if (!this.gameState.buildMode) return;
             
             const rect = this.villageGrid.getBoundingClientRect();
-            const x = Math.floor((e.clientX - rect.left) / this.gridSize) * this.gridSize;
-            const y = Math.floor((e.clientY - rect.top) / this.gridSize) * this.gridSize;
+            // Adjust coordinates for the current view offset if it exists
+            const offsetX = this.viewOffsetX || 0;
+            const offsetY = this.viewOffsetY || 0;
+            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
+            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
             
             // Check if position is free and within bounds
             if (this.isPositionFree(x, y) && this.isWithinBounds(x, y)) {
@@ -343,6 +352,91 @@ class VillageManager {
                 e.preventDefault(); // Prevent context menu
                 console.log('[Village] Right-click detected, exiting build mode');
                 this.exitBuildMode();
+            }
+        });
+    }
+    
+    setupGridDragging() {
+        let isDragging = false;
+        let lastX = 0;
+        let lastY = 0;
+        let viewOffsetX = 0;
+        let viewOffsetY = 0;
+        
+        // Create a container for all grid content that can be moved
+        const gridContent = document.createElement('div');
+        gridContent.className = 'village-grid-content';
+        gridContent.style.position = 'absolute';
+        gridContent.style.width = '200%'; // Make content area larger than viewport
+        gridContent.style.height = '200%';
+        gridContent.style.top = '0';
+        gridContent.style.left = '0';
+        gridContent.style.transition = 'none';
+        
+        // Move all existing grid children into the content container
+        while (this.villageGrid.firstChild) {
+            gridContent.appendChild(this.villageGrid.firstChild);
+        }
+        this.villageGrid.appendChild(gridContent);
+        
+        // Store reference to content container and offset for building placement
+        this.villageGridContent = gridContent;
+        this.viewOffsetX = 0;
+        this.viewOffsetY = 0;
+        
+        this.villageGrid.addEventListener('mousedown', (e) => {
+            // Start dragging on left mouse button
+            if (e.button !== 0) return;
+            
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+            this.villageGrid.classList.add('dragging');
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - lastX;
+            const deltaY = e.clientY - lastY;
+            
+            viewOffsetX += deltaX;
+            viewOffsetY += deltaY;
+            
+            // Apply bounds to prevent panning too far
+            const maxOffset = 400;
+            viewOffsetX = Math.max(-maxOffset, Math.min(maxOffset, viewOffsetX));
+            viewOffsetY = Math.max(-maxOffset, Math.min(maxOffset, viewOffsetY));
+            
+            // Update the stored offsets
+            this.viewOffsetX = viewOffsetX;
+            this.viewOffsetY = viewOffsetY;
+            
+            this.villageGridContent.style.transform = `translate(${viewOffsetX}px, ${viewOffsetY}px)`;
+            
+            lastX = e.clientX;
+            lastY = e.clientY;
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging) {
+                isDragging = false;
+                this.villageGrid.classList.remove('dragging');
+            }
+        });
+        
+        // Reset view on double-click
+        this.villageGrid.addEventListener('dblclick', (e) => {
+            if (!this.gameState.buildMode) {
+                viewOffsetX = 0;
+                viewOffsetY = 0;
+                this.viewOffsetX = 0;
+                this.viewOffsetY = 0;
+                this.villageGridContent.style.transform = 'translate(0px, 0px)';
+                e.preventDefault();
             }
         });
     }
@@ -405,8 +499,8 @@ class VillageManager {
         // Toast notification is now handled by gameState.queueBuilding()
         // No need for duplicate notifications here
         
-        // Render building sites to show construction progress
-        this.renderBuildingSites();
+        // Re-render buildings to show construction site immediately (level 0 building)
+        this.renderBuildings();
         
         // Milestone-based unlocking (for tutorial)
         if (this.game && this.game.tutorialActive && this.game.unlockView) {
@@ -471,70 +565,14 @@ class VillageManager {
     }
     
     renderBuildingSites() {
-        // Clear existing building sites
-        this.villageGrid.querySelectorAll('.building-site').forEach(el => el.remove());
+        const container = this.getGridContainer();
+        // Clear existing building sites - no longer needed since level 0 buildings
+        // are now rendered directly as regular buildings with construction icons
+        container.querySelectorAll('.building-site').forEach(el => el.remove());
         
-        // Render building sites for queued buildings
-        this.gameState.buildingQueue.forEach(buildingProject => {
-            const siteEl = document.createElement('div');
-            siteEl.className = 'building-site';
-            siteEl.style.left = buildingProject.x + 'px';
-            siteEl.style.top = buildingProject.y + 'px';
-            siteEl.dataset.buildingId = buildingProject.id;
-            siteEl.dataset.buildingType = buildingProject.type;
-            
-            // Calculate progress percentage
-            const totalTime = this.gameState.getBuildingConstructionTime(buildingProject.type);
-            const remaining = buildingProject.hoursRemaining;
-            const progress = Math.max(0, ((totalTime - remaining) / totalTime) * 100);
-            
-            // Create progress ring
-            const progressRing = document.createElement('div');
-            progressRing.className = 'progress-ring';
-            progressRing.style.setProperty('--progress', `${progress}%`);
-            
-            const progressInner = document.createElement('div');
-            progressInner.className = 'progress-inner';
-            
-            // Show different icons based on progress
-            if (progress < 25) {
-                progressInner.textContent = '🏗️'; // Early construction
-            } else if (progress < 50) {
-                progressInner.textContent = '🔨'; // Mid construction
-            } else if (progress < 75) {
-                progressInner.textContent = '⚒️'; // Late construction
-            } else {
-                progressInner.textContent = '🎯'; // Nearly complete
-            }
-            
-            progressRing.appendChild(progressInner);
-            siteEl.appendChild(progressRing);
-            
-            // Add hover tooltip
-            siteEl.title = `${buildingProject.type} - ${progress.toFixed(1)}% complete`;
-            
-            // Add click handler to show construction progress
-            siteEl.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.showConstructionProgress(buildingProject);
-            });
-            
-            this.villageGrid.appendChild(siteEl);
-        });
-        
-        console.log(`[Village] Rendered ${this.gameState.buildingQueue.length} building sites`);
-    }
-    
-    showConstructionProgress(buildingProject) {
-        const buildingName = buildingProject.type.charAt(0).toUpperCase() + buildingProject.type.slice(1);
-        const remaining = Math.ceil(buildingProject.hoursRemaining);
-        const totalTime = this.gameState.getBuildingConstructionTime(buildingProject.type);
-        const progress = Math.max(0, ((totalTime - remaining) / totalTime) * 100);
-        
-        this.showMessage(
-            `🏗️ ${buildingName} Construction`,
-            `Progress: ${progress.toFixed(1)}%\n\nTime Remaining: ${remaining} hours\n\nConstruction advances during expeditions and when ending days.`
-        );
+        // Count level 0 buildings for debugging
+        const constructionSites = this.gameState.buildings.filter(b => b.level === 0).length;
+        console.log(`[Village] ${constructionSites} buildings under construction (level 0)`);
     }
     
     showMessage(title, message) {
@@ -639,8 +677,9 @@ class VillageManager {
     }
     
     renderBuildings() {
+        const container = this.getGridContainer();
         // Clear existing buildings (but not building sites)
-        this.villageGrid.querySelectorAll('.building:not(.building-site)').forEach(el => el.remove());
+        container.querySelectorAll('.building:not(.building-site)').forEach(el => el.remove());
         
         // Render all completed buildings
         this.gameState.buildings.forEach(building => {
@@ -662,7 +701,7 @@ class VillageManager {
             buildingEl.style.position = 'absolute';
             buildingEl.style.zIndex = '10';
             
-            buildingEl.textContent = this.getBuildingSymbol(building.type);
+            buildingEl.textContent = this.getBuildingSymbol(building.type, building.level);
             buildingEl.title = `${building.type} (Level ${building.level}) - Click for info`;
             buildingEl.dataset.buildingId = building.id;
             
@@ -683,7 +722,7 @@ class VillageManager {
                 this.showBuildingInfo(building);
             });
             
-            this.villageGrid.appendChild(buildingEl);
+            container.appendChild(buildingEl);
         });
         
         console.log(`[Village] Rendered ${this.gameState.buildings.length} completed buildings`);
@@ -695,23 +734,23 @@ class VillageManager {
         // Get building details from GameData
         const production = GameData.buildingProduction[building.type];
         const buildingCost = GameData.buildingCosts[building.type];
-        const isUnderConstruction = this.gameState.buildingQueue.some(b => b.id === building.id);
+        const isUnderConstruction = building.level === 0;
         
         let contentHTML = `
             <div style="text-align: center; margin-bottom: 10px;">
-                <div style="font-size: 24px; margin-bottom: 5px;">${this.getBuildingSymbol(building.type)}</div>
+                <div style="font-size: 24px; margin-bottom: 5px;">${this.getBuildingSymbol(building.type, building.level)}</div>
                 <div style="font-weight: bold; color: #3498db;">${building.type.toUpperCase()}</div>
                 <div style="color: #bdc3c7; font-size: 12px;">Level ${building.level}</div>
             </div>
         `;
 
         if (isUnderConstruction) {
-            const constructionProject = this.gameState.buildingQueue.find(b => b.id === building.id);
-            const hoursLeft = Math.ceil(constructionProject.hoursRemaining);
+            const daysLeft = Math.max(0, GameData.buildingCosts[building.type].time - building.constructionProgress);
             contentHTML += `
                 <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
                     <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
-                    <div style="color: #ecf0f1; font-size: 11px;">${hoursLeft} hours remaining</div>
+                    <div style="color: #ecf0f1; font-size: 11px;">Progress: ${building.constructionProgress}/${GameData.buildingCosts[building.type].time} days</div>
+                    <div style="color: #ecf0f1; font-size: 11px;">${daysLeft} days remaining</div>
                 </div>
             `;
         }
@@ -800,7 +839,12 @@ class VillageManager {
         }
     }
     
-    getBuildingSymbol(type) {
+    getBuildingSymbol(type, level = 1) {
+        // Level 0 buildings show construction site icon
+        if (level === 0) {
+            return '🏗️';
+        }
+        
         const symbols = {
             house: '🏠',
             farm: '🌾',
@@ -997,9 +1041,15 @@ class VillageManager {
         return 'grass';
     }
     
+    // Helper method to get the correct container for rendering
+    getGridContainer() {
+        return this.villageGridContent || this.villageGrid;
+    }
+    
     renderTerrain() {
+        const container = this.getGridContainer();
         // Clear existing terrain
-        this.villageGrid.querySelectorAll('.terrain-tile').forEach(el => el.remove());
+        container.querySelectorAll('.terrain-tile').forEach(el => el.remove());
         
         // Render terrain tiles
         for (let y = 0; y < this.terrainHeight; y++) {
@@ -1030,7 +1080,7 @@ class VillageManager {
                 terrainEl.dataset.x = x;
                 terrainEl.dataset.y = y;
                 
-                this.villageGrid.appendChild(terrainEl);
+                container.appendChild(terrainEl);
             }
         }
     }
@@ -1053,5 +1103,68 @@ class VillageManager {
     getTerrainModifier(x, y) {
         const terrainType = this.getTerrainAt(x, y);
         return terrainType ? this.terrainTypes[terrainType].modifier : 'none';
+    }
+
+    // Production Planner functionality
+    initProductionPlanner() {
+        this.setupProductionGoals();
+        this.updateProductionEfficiency();
+    }
+
+    setupProductionGoals() {
+        const goalInputs = document.querySelectorAll('.goal-input');
+        goalInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                this.updateProductionEfficiency();
+            });
+        });
+    }
+
+    updateProductionEfficiency() {
+        const currentProduction = this.gameState.calculateDailyProduction();
+        
+        // Get goal values
+        const foodGoal = parseInt(document.getElementById('food-goal')?.value || 0);
+        const woodGoal = parseInt(document.getElementById('wood-goal')?.value || 0);
+        const stoneGoal = parseInt(document.getElementById('stone-goal')?.value || 0);
+        
+        // Calculate efficiency
+        const foodEfficiency = foodGoal > 0 ? Math.min(100, Math.round((currentProduction.food / foodGoal) * 100)) : 100;
+        const woodEfficiency = woodGoal > 0 ? Math.min(100, Math.round((currentProduction.wood / woodGoal) * 100)) : 100;
+        const stoneEfficiency = stoneGoal > 0 ? Math.min(100, Math.round((currentProduction.stone / stoneGoal) * 100)) : 100;
+        
+        // Update efficiency bars and text
+        const foodBar = document.getElementById('food-efficiency-bar');
+        const woodBar = document.getElementById('wood-efficiency-bar');
+        const stoneBar = document.getElementById('stone-efficiency-bar');
+        
+        const foodText = document.getElementById('food-efficiency-text');
+        const woodText = document.getElementById('wood-efficiency-text');
+        const stoneText = document.getElementById('stone-efficiency-text');
+        
+        if (foodBar) {
+            foodBar.style.width = `${foodEfficiency}%`;
+            foodBar.className = `efficiency-bar ${this.getEfficiencyClass(foodEfficiency)}`;
+        }
+        if (woodBar) {
+            woodBar.style.width = `${woodEfficiency}%`;
+            woodBar.className = `efficiency-bar ${this.getEfficiencyClass(woodEfficiency)}`;
+        }
+        if (stoneBar) {
+            stoneBar.style.width = `${stoneEfficiency}%`;
+            stoneBar.className = `efficiency-bar ${this.getEfficiencyClass(stoneEfficiency)}`;
+        }
+        
+        if (foodText) foodText.textContent = `${foodEfficiency}%`;
+        if (woodText) woodText.textContent = `${woodEfficiency}%`;
+        if (stoneText) stoneText.textContent = `${stoneEfficiency}%`;
+    }
+
+    getEfficiencyClass(efficiency) {
+        if (efficiency >= 100) return 'excellent';
+        if (efficiency >= 80) return 'good';
+        if (efficiency >= 60) return 'fair';
+        if (efficiency >= 40) return 'poor';
+        return 'critical';
     }
 }
