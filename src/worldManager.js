@@ -1,12 +1,30 @@
 // World map management with hexagonal grid system
 class WorldManager {
+    // Utility to brighten a hex color (hex string or named)
+    _brightenColor(color, amount) {
+        amount = amount === undefined ? 0.2 : amount;
+        let c = color;
+        if (c[0] === '#') {
+            // Convert hex to RGB
+            let num = parseInt(c.slice(1), 16);
+            let r = (num >> 16) & 0xff;
+            let g = (num >> 8) & 0xff;
+            let b = num & 0xff;
+            r = Math.min(255, Math.floor(r + (255 - r) * amount));
+            g = Math.min(255, Math.floor(g + (255 - g) * amount));
+            b = Math.min(255, Math.floor(b + (255 - b) * amount));
+            return `rgb(${r},${g},${b})`;
+        }
+        // fallback: just return color
+        return color;
+    }
     constructor(gameState, game) {
         this.gameState = gameState;
         this.game = game;
         this.worldGrid = null;
-        this.hexSize = 40; // Size of each hexagon in pixels
-        this.mapWidth = 9; // Number of hexes horizontally
-        this.mapHeight = 7; // Number of hexes vertically
+        this.hexSize = 30; // Slightly smaller hexes for a much bigger map
+        this.mapWidth = 21; // Even more hexes horizontally
+        this.mapHeight = 15; // Even more hexes vertically
         this.selectedHex = null;
         this.playerVillageHex = null;
         
@@ -37,6 +55,12 @@ class WorldManager {
             this.setupWorldUI();
             this.generateTerrain();
             this.placeTutorialElements();
+            // Reveal all hexes
+            for (let row = 0; row < this.mapHeight; row++) {
+                for (let col = 0; col < this.mapWidth; col++) {
+                    this.hexMap[row][col].discovered = true;
+                }
+            }
             this.renderHexMap();
             this.setupHexInteraction();
             
@@ -81,43 +105,36 @@ class WorldManager {
                         <span>Season: <span id="world-season">${this.gameState.season}</span></span>
                     </div>
                 </div>
-                
-                <div class="world-main">
-                    <div class="world-map-container">
-                        <canvas id="hex-canvas" width="600" height="400"></canvas>
-                        <div class="hex-overlay" id="hex-overlay"></div>
+                <div class="world-main" style="display: flex; flex-direction: row; gap: 1.5rem;">
+                    <div class="hex-info-panel" id="hex-info-panel" style="min-width:220px;max-width:320px;">
+                        <h4>📍 Select a Hex</h4>
+                        <p>Click on any hex to view its details and available actions.</p>
                     </div>
-                    
+                    <div class="world-map-container" style="flex:1;min-width:0;max-width:100vw;background:#22303a;border-radius:16px;border:2px solid #2de0c6;box-shadow:0 2px 16px #0002;position:relative;display:flex;align-items:center;justify-content:center;">
+                        <canvas id="hex-canvas" width="1200" height="900" style="display:block;margin:0 auto;border-radius:12px;"></canvas>
+                        <div class="hex-overlay" id="hex-overlay" style="pointer-events:none;position:absolute;top:0;left:0;width:1200px;height:900px;"></div>
+                    </div>
                     <div class="world-sidebar">
                         <div class="parties-management">
                             <h3>📋 Parties Management</h3>
-                            
                             <div class="party-tabs">
                                 <button class="party-tab active" data-tab="expeditions">⚔️ Expeditions</button>
                                 <button class="party-tab" data-tab="quests">📜 Quests (Locked)</button>
                                 <button class="party-tab" data-tab="battles">⚔️ Battles</button>
                             </div>
-                            
                             <div class="party-content">
                                 <div id="expeditions-tab" class="party-panel active">
                                     <div class="expedition-list" id="expedition-list">
                                         <p style="color: #bdc3c7; font-style: italic;">No expeditions active. Draft an army to begin exploring.</p>
                                     </div>
                                 </div>
-                                
                                 <div id="quests-tab" class="party-panel">
                                     <p style="color: #7f8c8d; font-style: italic;">Quest system will be unlocked as your dynasty grows in power and influence.</p>
                                 </div>
-                                
                                 <div id="battles-tab" class="party-panel">
                                     <p style="color: #bdc3c7; font-style: italic;">No active battles. Engage hostile forces to begin combat.</p>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <div class="hex-info-panel" id="hex-info-panel">
-                            <h4>📍 Select a Hex</h4>
-                            <p>Click on any hex to view its details and available actions.</p>
                         </div>
                     </div>
                 </div>
@@ -232,52 +249,54 @@ class WorldManager {
     renderHexMap() {
         const canvas = document.getElementById('hex-canvas');
         const overlay = document.getElementById('hex-overlay');
-        
         if (!canvas || !overlay) {
             console.error('[World] Canvas or overlay not found');
             return;
         }
-        
         const ctx = canvas.getContext('2d');
-        const canvasRect = canvas.getBoundingClientRect();
-        
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         // Clear overlay
         overlay.innerHTML = '';
-        
         // Calculate hex layout
-        const hexWidth = this.hexSize * 2;
-        const hexHeight = Math.sqrt(3) * this.hexSize;
+        const hexWidth = Math.sqrt(3) * this.hexSize;
+        const hexHeight = this.hexSize * 2;
+        const horizSpacing = hexWidth;
         const vertSpacing = hexHeight * 0.75;
-        const horizSpacing = hexWidth * 0.75;
-        
+        // For overlay alignment, get canvas position relative to parent
+        const canvasRect = canvas.getBoundingClientRect();
+        const parentRect = canvas.parentElement.getBoundingClientRect();
+        const offsetX = canvasRect.left - parentRect.left;
+        const offsetY = canvasRect.top - parentRect.top;
         for (let row = 0; row < this.mapHeight; row++) {
             for (let col = 0; col < this.mapWidth; col++) {
                 const hex = this.hexMap[row][col];
-                
-                // Calculate hex position
-                const x = col * horizSpacing + (row % 2) * (horizSpacing / 2) + this.hexSize;
+                // Flat-topped: x depends on col, y depends on row, with offset for odd columns
+                const x = col * horizSpacing + this.hexSize + ((row % 2) * (horizSpacing / 2));
                 const y = row * vertSpacing + this.hexSize;
-                
-                // Only render discovered hexes or adjacent to discovered
                 if (hex.discovered || this.isAdjacentToDiscovered(row, col)) {
                     this.drawHex(ctx, x, y, hex, row, col);
-                    this.createHexOverlay(overlay, x, y, row, col, hex);
+                    this.createHexOverlay(overlay, x + offsetX, y + offsetY, row, col, hex);
                 }
             }
         }
     }
     
     drawHex(ctx, x, y, hex, row, col) {
+        // Highlight selected hex by making it bigger and brighter
+        let highlight = false;
+        let drawSize = this.hexSize;
+        if (this.selectedHex && this.selectedHex.row === row && this.selectedHex.col === col) {
+            highlight = true;
+            drawSize = this.hexSize * 1.18; // Slightly bigger
+        }
         // Draw hexagon shape
+        ctx.save();
         ctx.beginPath();
         for (let i = 0; i < 6; i++) {
-            const angle = (Math.PI / 3) * i;
-            const hexX = x + this.hexSize * Math.cos(angle);
-            const hexY = y + this.hexSize * Math.sin(angle);
-            
+            const angle = Math.PI / 6 + (Math.PI / 3) * i;
+            const hexX = x + drawSize * Math.cos(angle);
+            const hexY = y + drawSize * Math.sin(angle);
             if (i === 0) {
                 ctx.moveTo(hexX, hexY);
             } else {
@@ -285,25 +304,26 @@ class WorldManager {
             }
         }
         ctx.closePath();
-        
-        // Fill with terrain color
-        ctx.fillStyle = hex.discovered ? hex.color : '#555';
+        // Fill with terrain color, brighter if selected
+        if (highlight) {
+            ctx.fillStyle = this._brightenColor(hex.color || '#888', 0.35);
+        } else {
+            ctx.fillStyle = hex.discovered ? hex.color : '#555';
+        }
         ctx.fill();
-        
         // Add border
-        ctx.strokeStyle = hex.isPlayerVillage ? '#f1c40f' : '#333';
-        ctx.lineWidth = hex.isPlayerVillage ? 3 : 1;
+        ctx.strokeStyle = hex.isPlayerVillage ? '#f1c40f' : (highlight ? '#fff' : '#333');
+        ctx.lineWidth = highlight ? 4 : (hex.isPlayerVillage ? 3 : 1);
         ctx.stroke();
-        
+        ctx.restore();
         // Add terrain symbol if discovered
         if (hex.discovered) {
             ctx.font = '20px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = highlight ? '#222' : '#000';
             ctx.fillText(hex.symbol, x, y);
         }
-        
         // Add elevation indicator
         if (hex.elevation > 0 && hex.discovered) {
             ctx.font = '10px Arial';
@@ -311,29 +331,46 @@ class WorldManager {
             ctx.fillText('⬆'.repeat(hex.elevation), x, y + 15);
         }
     }
+
+    // Utility to brighten a hex color (hex string or named)
+    _brightenColor(color, amount) {
+        amount = amount === undefined ? 0.2 : amount;
+        let c = color;
+        if (c[0] === '#') {
+            // Convert hex to RGB
+            let num = parseInt(c.slice(1), 16);
+            let r = (num >> 16) & 0xff;
+            let g = (num >> 8) & 0xff;
+            let b = num & 0xff;
+            r = Math.min(255, Math.floor(r + (255 - r) * amount));
+            g = Math.min(255, Math.floor(g + (255 - g) * amount));
+            b = Math.min(255, Math.floor(b + (255 - b) * amount));
+            return `rgb(${r},${g},${b})`;
+        }
+        // fallback: just return color
+        return color;
+    }
     
     createHexOverlay(overlay, x, y, row, col, hex) {
         const hexDiv = document.createElement('div');
         hexDiv.className = 'hex-overlay-item';
         hexDiv.style.position = 'absolute';
-        hexDiv.style.left = (x - this.hexSize) + 'px';
-        hexDiv.style.top = (y - this.hexSize) + 'px';
-        hexDiv.style.width = (this.hexSize * 2) + 'px';
-        hexDiv.style.height = (this.hexSize * 2) + 'px';
+        hexDiv.style.left = (x - this.hexSize * 1.18) + 'px';
+        hexDiv.style.top = (y - this.hexSize * 1.18) + 'px';
+        hexDiv.style.width = (this.hexSize * 2 * 1.18) + 'px';
+        hexDiv.style.height = (this.hexSize * 2 * 1.18) + 'px';
         hexDiv.style.cursor = 'pointer';
-        hexDiv.style.borderRadius = '50%';
+        // Remove border-radius, use clip-path for hexagon
+        hexDiv.style.clipPath = 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)';
         hexDiv.dataset.row = row;
         hexDiv.dataset.col = col;
-        
         // Add hover effect
         hexDiv.addEventListener('mouseenter', () => {
-            hexDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            hexDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.18)';
         });
-        
         hexDiv.addEventListener('mouseleave', () => {
             hexDiv.style.backgroundColor = 'transparent';
         });
-        
         overlay.appendChild(hexDiv);
     }
     
@@ -810,6 +847,23 @@ class WorldManager {
             timeout: 2000
         });
     }
+}
+// Inject hex-overlay-item CSS for true hexagon clickable area
+if (!document.getElementById('hex-overlay-item-style')) {
+    const style = document.createElement('style');
+    style.id = 'hex-overlay-item-style';
+    style.innerHTML = `
+    .hex-overlay-item {
+        pointer-events: auto !important;
+        background: transparent;
+        transition: background 0.15s;
+        clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    }
+    .hex-overlay-item:hover {
+        background: rgba(255,255,255,0.18);
+    }
+    `;
+    document.head.appendChild(style);
 }
 
 // Make WorldManager globally available

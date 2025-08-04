@@ -1178,10 +1178,10 @@ class VillageManager {
         // But we can update village-specific displays here if needed
         
         // Update production displays in the village manager
-        this.updateProductionDisplay();
+        // this.updateProductionDisplay(); // Removed because method does not exist
         
         // Update efficiency displays
-        this.updateEfficiencyDisplay();
+        // this.updateEfficiencyDisplay(); // Removed because method does not exist
         
         // Update population displays
         if (this.gameState) {
