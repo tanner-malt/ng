@@ -1387,35 +1387,42 @@ class VillageManager {
                 'idle': '😴', 
                 'resting': '💤'
             }[villager.status] || '❓';
-            
-            const roleIcon = {
-                'peasant': '🧑‍🌾',
-                'farmer': '👨‍🌾',
-                'woodcutter': '🪓',
-                'miner': '⛏️',
-                'builder': '🔨',
-                'guard': '⚔️',
-                'merchant': '💼'
-            }[villager.role] || '👤';
-            
+
+            let roleIcon, roleLabel;
+            if (villager.role === 'player') {
+                roleIcon = '👑';
+                roleLabel = 'Ruler';
+            } else {
+                roleIcon = {
+                    'peasant': '🧑‍🌾',
+                    'farmer': '👨‍🌾',
+                    'woodcutter': '🪓',
+                    'miner': '⛏️',
+                    'builder': '🔨',
+                    'guard': '⚔️',
+                    'merchant': '💼'
+                }[villager.role] || '👤';
+                roleLabel = villager.role.charAt(0).toUpperCase() + villager.role.slice(1);
+            }
+
             const buildingName = villager.buildingId ? 
                 this.gameState.buildings.find(b => b.id === villager.buildingId)?.type || 'Unknown Building' : 
                 'Village Square';
-            
+
             contentHTML += `
-                <div class="villager-card">
+                <div class="villager-card${villager.role === 'player' ? ' ruler-card' : ''}">
                     <div class="villager-header">
                         <span class="villager-icon">${roleIcon}</span>
                         <div class="villager-info">
                             <div class="villager-name">${villager.name}</div>
-                            <div class="villager-role">${villager.role}</div>
+                            <div class="villager-role">${roleLabel}</div>
                         </div>
                         <span class="villager-status">${statusIcon}</span>
                     </div>
                     <div class="villager-details">
                         <div class="detail-row">
                             <span class="detail-label">Age:</span>
-                            <span class="detail-value">${villager.age} years</span>
+                            <span class="detail-value">${villager.age} days</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Status:</span>

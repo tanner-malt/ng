@@ -209,18 +209,86 @@
 
                         <div class="manager-section">
                             <h4>⏰ Time Controls</h4>
-                            <div class="time-controls">
-                                <div class="current-day">
+                            <div class="time-controls" style="display: flex; flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                <div class="current-day" style="margin-right: 8px; min-width: 90px;">
                                     <span id="current-season">Spring</span>
                                     <span id="current-day-number">Day 1</span>
                                 </div>
-                                <button id="end-day-btn" class="end-day-button">End Day</button>
-                                <button id="auto-play-btn" class="auto-play-button">
+                                <button id="end-day-btn" class="end-day-button time-btn" style="min-width: 48px; padding: 6px 10px; font-size: 0.95em;">End</button>
+                                <button id="auto-play-btn" class="auto-play-button time-btn" style="min-width: 48px; padding: 6px 10px; font-size: 0.95em;">
                                     <span id="auto-play-icon">▶️</span>
                                     <span id="auto-play-text">Play</span>
                                 </button>
+                                <button id="speed-2x-btn" class="time-btn" style="min-width: 36px; padding: 6px 8px; font-size: 0.95em;">2x</button>
+                                <button id="speed-4x-btn" class="time-btn" style="min-width: 36px; padding: 6px 8px; font-size: 0.95em;">4x</button>
                             </div>
                         </div>
+    <style>
+        .time-controls .time-btn {
+            background: #222;
+            color: #e0e0e0;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-weight: 500;
+            margin: 0;
+            box-shadow: none;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border 0.15s;
+            outline: none;
+            letter-spacing: 0.2px;
+            position: relative;
+            min-width: 36px;
+            padding: 6px 8px;
+            font-size: 0.95em;
+        }
+        .time-controls .time-btn.selected, .time-controls .time-btn:active {
+            background: #292f36;
+            color: #fff;
+            border-color: #444;
+        }
+        .time-controls .time-btn:hover {
+            background: #292f36;
+            color: #fff;
+            border-color: #444;
+        }
+    </style>
+<script>
+// Time control speed buttons logic
+document.addEventListener('DOMContentLoaded', function() {
+    const autoPlayBtn = document.getElementById('auto-play-btn');
+    const speed2xBtn = document.getElementById('speed-2x-btn');
+    const speed4xBtn = document.getElementById('speed-4x-btn');
+    let lastSpeed = 20000;
+    function setSpeed(ms, btn) {
+        if (window.gameState) {
+            window.gameState.autoPlaySpeed = ms;
+            if (window.gameState.autoPlayActive) {
+                window.gameState.stopAutoPlay();
+                window.gameState.startAutoPlay();
+            }
+        }
+        // Visual feedback
+        [autoPlayBtn, speed2xBtn, speed4xBtn].forEach(b => b && b.classList.remove('selected'));
+        if (btn) btn.classList.add('selected');
+    }
+    if (speed2xBtn) {
+        speed2xBtn.addEventListener('click', function() {
+            setSpeed(10000, speed2xBtn); // 2x speed
+        });
+    }
+    if (speed4xBtn) {
+        speed4xBtn.addEventListener('click', function() {
+            setSpeed(5000, speed4xBtn); // 4x speed
+        });
+    }
+    // Default: normal speed (20s)
+    if (autoPlayBtn) {
+        autoPlayBtn.addEventListener('click', function() {
+            setSpeed(20000, autoPlayBtn);
+        });
+    }
+});
+</script>
                     </div>
 
                     <!-- Building List (Far Right) -->

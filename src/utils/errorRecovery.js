@@ -357,15 +357,8 @@ class ErrorRecovery {
      * Notify user of recovery actions
      */
     notifyUser(title, message) {
-        // Try to use the game's modal system
-        if (window.simpleModal && window.simpleModal.show) {
-            window.simpleModal.show(title, message, 'OK');
-        } else {
-            // Fallback to browser alert
-            alert(`${title}: ${message}`);
-        }
-        
-        console.log(`[ErrorRecovery] User notification: ${title} - ${message}`);
+        // Only print to console, do not show modal or alert
+        console.log(`[ErrorRecovery] ${title}: ${message}`);
     }
 
     /**
