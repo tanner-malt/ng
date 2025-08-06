@@ -22,9 +22,12 @@ class WorldManager {
         this.gameState = gameState;
         this.game = game;
         this.worldGrid = null;
-        this.hexSize = 30; // Slightly smaller hexes for a much bigger map
-        this.mapWidth = 21; // Even more hexes horizontally
-        this.mapHeight = 15; // Even more hexes vertically
+        this.hexSize = 25; // Better size for visibility and fit
+        
+        // Set global reference immediately in constructor
+        window.worldManager = this;
+        this.mapWidth = 3; // 3 columns for compact grid
+        this.mapHeight = 3; // 3 rows for compact grid (but hexagonal offset will reduce visible tiles)
         this.selectedHex = null;
         this.playerVillageHex = null;
         
@@ -41,10 +44,20 @@ class WorldManager {
         
         // Tutorial tutorial state
         this.tutorialMode = true;
+        
+        // Set global reference for onclick handlers
+        if (typeof window !== 'undefined') {
+            window.worldManager = this;
+            console.log('[World] WorldManager instance set globally');
+        }
     }
     
     init() {
         try {
+            // Set global reference immediately
+            window.worldManager = this;
+            console.log('[World] WorldManager instance set globally');
+            
             this.worldGrid = document.getElementById('world-view');
             if (!this.worldGrid) {
                 console.error('[World] world-view element not found');
@@ -55,7 +68,7 @@ class WorldManager {
             this.setupWorldUI();
             this.generateTerrain();
             this.placeTutorialElements();
-            // Reveal all hexes
+            // Reveal all tiles in the 3x3 grid
             for (let row = 0; row < this.mapHeight; row++) {
                 for (let col = 0; col < this.mapWidth; col++) {
                     this.hexMap[row][col].discovered = true;
@@ -71,7 +84,7 @@ class WorldManager {
     }
     
     initializeHexMap() {
-        // Create empty hex map
+        // Create simple 3x3 square grid with 9 tiles
         for (let row = 0; row < this.mapHeight; row++) {
             this.hexMap[row] = [];
             for (let col = 0; col < this.mapWidth; col++) {
@@ -106,15 +119,14 @@ class WorldManager {
                     </div>
                 </div>
                 <div class="world-main" style="display: flex; flex-direction: row; gap: 1.5rem;">
-                    <div class="hex-info-panel" id="hex-info-panel" style="min-width:220px;max-width:320px;">
+                    <div class="hex-info-panel" id="hex-info-panel" style="min-width:280px;max-width:280px;width:280px;flex:0 0 280px;background:#2c3e50;border-radius:12px;padding:1rem;border:1px solid #34495e;">
                         <h4>📍 Select a Hex</h4>
                         <p>Click on any hex to view its details and available actions.</p>
                     </div>
-                    <div class="world-map-container" style="flex:1;min-width:0;max-width:100vw;background:#22303a;border-radius:16px;border:2px solid #2de0c6;box-shadow:0 2px 16px #0002;position:relative;display:flex;align-items:center;justify-content:center;">
-                        <canvas id="hex-canvas" width="1200" height="900" style="display:block;margin:0 auto;border-radius:12px;"></canvas>
-                        <div class="hex-overlay" id="hex-overlay" style="pointer-events:none;position:absolute;top:0;left:0;width:1200px;height:900px;"></div>
+                    <div class="world-map-container" style="flex:1;min-width:0;background:#22303a;border-radius:16px;border:2px solid #2de0c6;box-shadow:0 2px 16px #0002;position:relative;display:flex;align-items:center;justify-content:center;height:600px;">
+                        <div class="hex-overlay" id="hex-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;border-radius:12px;pointer-events:auto;"></div>
                     </div>
-                    <div class="world-sidebar">
+                    <div class="world-sidebar" style="min-width:300px;max-width:300px;width:300px;flex:0 0 300px;">
                         <div class="parties-management">
                             <h3>📋 Parties Management</h3>
                             <div class="party-tabs">
@@ -175,32 +187,15 @@ class WorldManager {
     }
     
     generateTerrain() {
-        // Generate varied terrain for the hexagonal map
-        const terrainTypes = [
-            { type: 'grass', weight: 40, symbol: '🌱', color: '#4a7c59' },
-            { type: 'forest', weight: 25, symbol: '🌲', color: '#2d5a27' },
-            { type: 'hills', weight: 20, symbol: '⛰️', color: '#8b7355' },
-            { type: 'water', weight: 10, symbol: '💧', color: '#4a90e2' },
-            { type: 'fertile', weight: 5, symbol: '🌾', color: '#6b8e23' }
-        ];
-        
+        // Generate uniform forest terrain for testing square grid display
         for (let row = 0; row < this.mapHeight; row++) {
             for (let col = 0; col < this.mapWidth; col++) {
                 const hex = this.hexMap[row][col];
                 
-                // Use weighted random selection for terrain
-                const totalWeight = terrainTypes.reduce((sum, t) => sum + t.weight, 0);
-                let random = Math.random() * totalWeight;
-                
-                for (const terrain of terrainTypes) {
-                    random -= terrain.weight;
-                    if (random <= 0) {
-                        hex.terrain = terrain.type;
-                        hex.symbol = terrain.symbol;
-                        hex.color = terrain.color;
-                        break;
-                    }
-                }
+                // Set all terrain to forest for consistent display
+                hex.terrain = 'forest';
+                hex.symbol = '🌲';
+                hex.color = '#2d5a27';
                 
                 // Add elevation variation
                 hex.elevation = Math.floor(Math.random() * 3);
@@ -226,112 +221,271 @@ class WorldManager {
         villageHex.isPlayerVillage = true;
         this.playerVillageHex = { row: centerRow, col: centerCol };
         
-        // Place Belon War Party 2 tiles away
-        const belonRow = centerRow - 2;
-        const belonCol = centerCol + 1;
-        
-        if (belonRow >= 0 && belonCol < this.mapWidth) {
-            const belonHex = this.hexMap[belonRow][belonCol];
-            belonHex.units = [{
-                type: 'enemy',
-                name: 'Belon War Party',
-                strength: 15,
-                description: 'A hostile raiding party threatening nearby settlements'
-            }];
-            belonHex.symbol = '💀';
-            belonHex.color = '#e74c3c';
-            belonHex.discovered = true; // Make visible for tutorial
-        }
-        
-        console.log('[World] Tutorial elements placed - Village at', centerRow, centerCol, 'Belon at', belonRow, belonCol);
+        console.log('[World] Tutorial elements placed - Village at', centerRow, centerCol);
     }
     
     renderHexMap() {
-        const canvas = document.getElementById('hex-canvas');
-        const overlay = document.getElementById('hex-overlay');
-        if (!canvas || !overlay) {
-            console.error('[World] Canvas or overlay not found');
+        const container = document.getElementById('hex-overlay');
+        if (!container) {
+            console.error('[World] hex-overlay container not found');
             return;
         }
-        const ctx = canvas.getContext('2d');
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Clear overlay
-        overlay.innerHTML = '';
-        // Calculate hex layout
-        const hexWidth = Math.sqrt(3) * this.hexSize;
-        const hexHeight = this.hexSize * 2;
-        const horizSpacing = hexWidth;
-        const vertSpacing = hexHeight * 0.75;
-        // For overlay alignment, get canvas position relative to parent
-        const canvasRect = canvas.getBoundingClientRect();
-        const parentRect = canvas.parentElement.getBoundingClientRect();
-        const offsetX = canvasRect.left - parentRect.left;
-        const offsetY = canvasRect.top - parentRect.top;
-        for (let row = 0; row < this.mapHeight; row++) {
-            for (let col = 0; col < this.mapWidth; col++) {
-                const hex = this.hexMap[row][col];
-                // Flat-topped: x depends on col, y depends on row, with offset for odd columns
-                const x = col * horizSpacing + this.hexSize + ((row % 2) * (horizSpacing / 2));
-                const y = row * vertSpacing + this.hexSize;
-                if (hex.discovered || this.isAdjacentToDiscovered(row, col)) {
-                    this.drawHex(ctx, x, y, hex, row, col);
-                    this.createHexOverlay(overlay, x + offsetX, y + offsetY, row, col, hex);
-                }
-            }
+        
+        // Clear existing hexes
+        container.innerHTML = '';
+        
+        // Ensure container fills its parent properly
+        const mapContainer = container.parentElement;
+        if (mapContainer) {
+            // Remove any fixed dimensions - let flexbox handle it
+            container.style.width = '100%';
+            container.style.height = '100%';
+            // DEBUG: Add temporary border to see container bounds
+            container.style.border = '2px dashed yellow';
+            mapContainer.style.border = '2px solid lime';
+        }
+        
+        console.log('[World] Starting hex map render...', {
+            containerFound: !!container,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight
+        });
+        
+        // Wait for next frame to ensure container is sized
+        requestAnimationFrame(() => {
+            this.createSquareGrid(container);
+        });
+        
+        // Add resize handler for viewport changes
+        if (!this.resizeHandler) {
+            this.resizeHandler = () => {
+                // Debounce resize events
+                clearTimeout(this.resizeTimeout);
+                this.resizeTimeout = setTimeout(() => {
+                    this.renderHexMap();
+                }, 250);
+            };
+            window.addEventListener('resize', this.resizeHandler);
         }
     }
     
-    drawHex(ctx, x, y, hex, row, col) {
-        // Highlight selected hex by making it bigger and brighter
-        let highlight = false;
-        let drawSize = this.hexSize;
-        if (this.selectedHex && this.selectedHex.row === row && this.selectedHex.col === col) {
-            highlight = true;
-            drawSize = this.hexSize * 1.18; // Slightly bigger
+    createSquareGrid(container) {
+        // Wait for container to be properly sized
+        const containerRect = container.getBoundingClientRect();
+        if (containerRect.width === 0 || containerRect.height === 0) {
+            console.log('[World] Container not ready, retrying...');
+            setTimeout(() => this.createSquareGrid(container), 100);
+            return;
         }
-        // Draw hexagon shape
-        ctx.save();
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 6 + (Math.PI / 3) * i;
-            const hexX = x + drawSize * Math.cos(angle);
-            const hexY = y + drawSize * Math.sin(angle);
-            if (i === 0) {
-                ctx.moveTo(hexX, hexY);
-            } else {
-                ctx.lineTo(hexX, hexY);
+        
+        // Create simple square grid (3x3)
+        const baseTileSize = 60; // Base tile size
+        
+        // Square tile dimensions
+        const tileWidth = baseTileSize;
+        const tileHeight = baseTileSize;
+        
+        // Square grid spacing calculations  
+        const horizSpacing = tileWidth + 5; // Horizontal spacing between tile centers
+        const vertSpacing = tileHeight + 5; // Vertical spacing between rows
+        
+        // Calculate required grid dimensions for square grid
+        const requiredWidth = (this.mapWidth - 1) * horizSpacing + tileWidth;
+        const requiredHeight = (this.mapHeight - 1) * vertSpacing + tileHeight;
+        
+        // Use actual container dimensions
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
+        
+        // Calculate scale to fit the grid perfectly in container
+        const scaleX = (containerWidth - 40) / requiredWidth; // 40px padding
+        const scaleY = (containerHeight - 40) / requiredHeight; // 40px padding
+        const scale = Math.min(scaleX, scaleY, 1); // Never scale up
+        
+        // Apply scaling
+        const tileSize = baseTileSize * scale;
+        const scaledHorizSpacing = horizSpacing * scale;
+        const scaledVertSpacing = vertSpacing * scale;
+        const gridWidth = requiredWidth * scale;
+        const gridHeight = requiredHeight * scale;
+        
+        // Center the grid
+        const startX = (containerWidth - gridWidth) / 2;
+        const startY = (containerHeight - gridHeight) / 2;
+        
+        console.log('[World] Creating square grid:', {
+            containerWidth, containerHeight,
+            requiredWidth, requiredHeight,
+            scale, tileSize,
+            gridWidth, gridHeight,
+            startX, startY
+        });
+        
+        // Create tiles as DOM elements
+        for (let row = 0; row < this.mapHeight; row++) {
+            for (let col = 0; col < this.mapWidth; col++) {
+                const hex = this.hexMap[row][col];
+                
+                // Skip undiscovered tiles
+                if (!hex.discovered && !this.isAdjacentToDiscovered(row, col)) continue;
+                
+                // Simple square grid positioning
+                const x = startX + col * scaledHorizSpacing;
+                const y = startY + row * scaledVertSpacing;
+                
+                this.createSquareButton(container, x, y, hex, row, col, tileSize);
             }
         }
-        ctx.closePath();
-        // Fill with terrain color, brighter if selected
-        if (highlight) {
-            ctx.fillStyle = this._brightenColor(hex.color || '#888', 0.35);
-        } else {
-            ctx.fillStyle = hex.discovered ? hex.color : '#555';
+        
+        console.log('[World] Square grid creation complete - buttons added:', container.children.length);
+    }
+    
+    createSquareButton(container, x, y, hex, row, col, size) {
+        const squareButton = document.createElement('button');
+        squareButton.className = 'tile-button';
+        
+        // Position the square tile button
+        squareButton.style.position = 'absolute';
+        squareButton.style.left = x + 'px';
+        squareButton.style.top = y + 'px';
+        squareButton.style.width = size + 'px';
+        squareButton.style.height = size + 'px';
+        
+        // Create square shape with CSS
+        squareButton.style.background = hex.discovered ? hex.color : '#555';
+        squareButton.style.borderRadius = '8px'; // Rounded corners
+        squareButton.style.border = '2px solid rgba(255,255,255,0.3)';
+        squareButton.style.cursor = 'pointer';
+        squareButton.style.transition = 'all 0.2s ease';
+        squareButton.style.display = 'flex';
+        squareButton.style.alignItems = 'center';
+        squareButton.style.justifyContent = 'center';
+        squareButton.style.fontSize = Math.max(12, size * 0.4) + 'px';
+        squareButton.style.outline = 'none';
+        squareButton.style.padding = '0';
+        squareButton.style.margin = '0';
+        squareButton.style.boxSizing = 'border-box';
+        squareButton.style.zIndex = '1';
+        
+        // Add special styling for player village
+        if (hex.isPlayerVillage) {
+            squareButton.style.border = '3px solid #f1c40f';
+            squareButton.style.boxShadow = '0 0 10px rgba(241, 196, 15, 0.5)';
         }
-        ctx.fill();
-        // Add border
-        ctx.strokeStyle = hex.isPlayerVillage ? '#f1c40f' : (highlight ? '#fff' : '#333');
-        ctx.lineWidth = highlight ? 4 : (hex.isPlayerVillage ? 3 : 1);
-        ctx.stroke();
-        ctx.restore();
-        // Add terrain symbol if discovered
+        
+        // Add terrain symbol
         if (hex.discovered) {
-            ctx.font = '20px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = highlight ? '#222' : '#000';
-            ctx.fillText(hex.symbol, x, y);
+            squareButton.textContent = hex.symbol;
+            squareButton.style.color = '#fff';
+            squareButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
+            squareButton.style.fontWeight = 'bold';
         }
-        // Add elevation indicator
-        if (hex.elevation > 0 && hex.discovered) {
-            ctx.font = '10px Arial';
-            ctx.fillStyle = '#fff';
-            ctx.fillText('⬆'.repeat(hex.elevation), x, y + 15);
+        
+        // Store tile coordinates
+        squareButton.dataset.row = row;
+        squareButton.dataset.col = col;
+        
+        // Add selection state
+        if (this.selectedHex && this.selectedHex.row === row && this.selectedHex.col === col) {
+            squareButton.classList.add('selected');
+            squareButton.style.transform = 'scale(1.1)';
+            squareButton.style.background = this._brightenColor(hex.color || '#888', 0.4);
+            squareButton.style.border = hex.isPlayerVillage 
+                ? '3px solid #f1c40f' 
+                : '3px solid #fff';
+            squareButton.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
+            squareButton.style.zIndex = '10';
+        }
+        
+        // Add hover effects
+        squareButton.addEventListener('mouseenter', () => {
+            if (!squareButton.classList.contains('selected')) {
+                squareButton.style.transform = 'scale(1.05)';
+                squareButton.style.background = this._brightenColor(hex.color || '#888', 0.2);
+                squareButton.style.boxShadow = hex.isPlayerVillage 
+                    ? '0 0 12px rgba(241, 196, 15, 0.6)'
+                    : '0 0 8px rgba(255,255,255,0.3)';
+                squareButton.style.zIndex = '5';
+            }
+        });
+        
+        squareButton.addEventListener('mouseleave', () => {
+            if (!squareButton.classList.contains('selected')) {
+                squareButton.style.transform = 'scale(1)';
+                squareButton.style.background = hex.discovered ? hex.color : '#555';
+                squareButton.style.boxShadow = hex.isPlayerVillage 
+                    ? '0 0 10px rgba(241, 196, 15, 0.5)'
+                    : 'none';
+                squareButton.style.zIndex = '1';
+            }
+        });
+        
+        // Add click handler
+        squareButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.selectHex(row, col);
+        });
+        
+        // Add focus styles for accessibility
+        squareButton.addEventListener('focus', () => {
+            if (!squareButton.classList.contains('selected')) {
+                squareButton.style.boxShadow = '0 0 8px rgba(52, 152, 219, 0.6)';
+            }
+        });
+        
+        squareButton.addEventListener('blur', () => {
+            if (!squareButton.classList.contains('selected')) {
+                squareButton.style.boxShadow = hex.isPlayerVillage 
+                    ? '0 0 10px rgba(241, 196, 15, 0.5)'
+                    : 'none';
+            }
+        });
+        
+        container.appendChild(squareButton);
+    }
+    
+    
+    selectHex(row, col) {
+        const hex = this.hexMap[row][col];
+        if (!hex) return;
+        
+        // Clear previous selection
+        const previousSelected = document.querySelector('.tile-button.selected');
+        if (previousSelected) {
+            previousSelected.classList.remove('selected');
+            previousSelected.style.transform = 'scale(1)';
+            previousSelected.style.zIndex = '1';
+            
+            // Reset background and border to original state
+            const prevRow = parseInt(previousSelected.dataset.row);
+            const prevCol = parseInt(previousSelected.dataset.col);
+            const prevHex = this.hexMap[prevRow][prevCol];
+            previousSelected.style.background = prevHex.discovered ? prevHex.color : '#555';
+            previousSelected.style.border = prevHex.isPlayerVillage 
+                ? '3px solid #f1c40f'
+                : '2px solid rgba(255,255,255,0.3)';
+            previousSelected.style.boxShadow = prevHex.isPlayerVillage 
+                ? '0 0 10px rgba(241, 196, 15, 0.5)'
+                : 'none';
+        }
+        
+        this.selectedHex = { row, col };
+        this.updateHexInfoPanel(hex, row, col);
+        
+        // Highlight the new selection
+        const newSelected = document.querySelector(`button[data-row="${row}"][data-col="${col}"]`);
+        if (newSelected) {
+            newSelected.classList.add('selected');
+            newSelected.style.transform = 'scale(1.1)';
+            newSelected.style.background = this._brightenColor(hex.color || '#888', 0.4);
+            newSelected.style.border = hex.isPlayerVillage 
+                ? '3px solid #f1c40f' 
+                : '3px solid #fff';
+            newSelected.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
+            newSelected.style.zIndex = '10';
         }
     }
-
+    
     // Utility to brighten a hex color (hex string or named)
     _brightenColor(color, amount) {
         amount = amount === undefined ? 0.2 : amount;
@@ -349,29 +503,6 @@ class WorldManager {
         }
         // fallback: just return color
         return color;
-    }
-    
-    createHexOverlay(overlay, x, y, row, col, hex) {
-        const hexDiv = document.createElement('div');
-        hexDiv.className = 'hex-overlay-item';
-        hexDiv.style.position = 'absolute';
-        hexDiv.style.left = (x - this.hexSize * 1.18) + 'px';
-        hexDiv.style.top = (y - this.hexSize * 1.18) + 'px';
-        hexDiv.style.width = (this.hexSize * 2 * 1.18) + 'px';
-        hexDiv.style.height = (this.hexSize * 2 * 1.18) + 'px';
-        hexDiv.style.cursor = 'pointer';
-        // Remove border-radius, use clip-path for hexagon
-        hexDiv.style.clipPath = 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)';
-        hexDiv.dataset.row = row;
-        hexDiv.dataset.col = col;
-        // Add hover effect
-        hexDiv.addEventListener('mouseenter', () => {
-            hexDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.18)';
-        });
-        hexDiv.addEventListener('mouseleave', () => {
-            hexDiv.style.backgroundColor = 'transparent';
-        });
-        overlay.appendChild(hexDiv);
     }
     
     isAdjacentToDiscovered(row, col) {
@@ -407,31 +538,9 @@ class WorldManager {
     }
     
     setupHexInteraction() {
-        const overlay = document.getElementById('hex-overlay');
-        if (!overlay) return;
-        
-        overlay.addEventListener('click', (event) => {
-            const hexItem = event.target.closest('.hex-overlay-item');
-            if (!hexItem) return;
-            
-            const row = parseInt(hexItem.dataset.row);
-            const col = parseInt(hexItem.dataset.col);
-            
-            this.selectHex(row, col);
-        });
-    }
-    
-    selectHex(row, col) {
-        const hex = this.hexMap[row][col];
-        if (!hex) return;
-        
-        this.selectedHex = { row, col };
-        this.updateHexInfoPanel(hex, row, col);
-        
-        // Highlight selected hex
-        this.renderHexMap(); // Re-render to update selection
-        
-        console.log('[World] Selected hex:', row, col, hex);
+        // Interactions are now handled directly by individual hex elements
+        // No need for complex coordinate conversion!
+        console.log('[World] Hex interactions set up via individual CSS elements');
     }
     
     updateHexInfoPanel(hex, row, col) {
@@ -450,10 +559,10 @@ class WorldManager {
             content += `
                 <div class="village-actions">
                     <h5>🏰 Your Village</h5>
-                    <button class="action-btn" onclick="worldManager.enterVillage()">
+                    <button class="action-btn" id="enter-village-btn">
                         🏠 Enter Village
                     </button>
-                    <button class="action-btn" onclick="worldManager.draftArmy()">
+                    <button class="action-btn" id="draft-army-btn">
                         ⚔️ Draft Army
                     </button>
                 </div>
@@ -487,6 +596,14 @@ class WorldManager {
         
         content += `</div>`;
         panel.innerHTML = content;
+
+        // Attach event listeners for village actions (avoid inline onclick)
+        if (hex.isPlayerVillage) {
+            const enterBtn = panel.querySelector('#enter-village-btn');
+            if (enterBtn) enterBtn.addEventListener('click', () => this.enterVillage());
+            const draftBtn = panel.querySelector('#draft-army-btn');
+            if (draftBtn) draftBtn.addEventListener('click', () => this.draftArmy());
+        }
     }
     
     getWeatherIcon(weather) {
@@ -500,92 +617,181 @@ class WorldManager {
     }
     
     enterVillage() {
-        // Switch back to village view
-        this.game.switchView('village');
-        window.showToast('🏰 Entering your village...', {
-            icon: '🏠',
-            type: 'info',
-            timeout: 2000
-        });
+        // Switch back to village view - try multiple methods since the codebase has different systems
+        console.log('[World] Attempting to switch to village view...');
+        
+        let switchSuccessful = false;
+        
+        // Method 1: Try global switchView function (from game.html)
+        if (typeof window.switchView === 'function') {
+            console.log('[World] Using global switchView function');
+            window.switchView('village');
+            switchSuccessful = true;
+        }
+        // Method 2: Try this.game.switchView if this.game is actually a Game instance
+        else if (this.game && typeof this.game.switchView === 'function') {
+            console.log('[World] Using this.game.switchView');
+            this.game.switchView('village');
+            switchSuccessful = true;
+        }
+        // Method 3: Try window.game.switchView if there's a global game instance
+        else if (window.game && typeof window.game.switchView === 'function') {
+            console.log('[World] Using window.game.switchView');
+            window.game.switchView('village');
+            switchSuccessful = true;
+        }
+        // Method 4: Manual view switching (DOM manipulation)
+        else {
+            console.log('[World] Using manual DOM view switching');
+            // Hide all game views
+            document.querySelectorAll('.game-view').forEach(el => el.classList.remove('active'));
+            // Show village view
+            const villageView = document.getElementById('village-view');
+            if (villageView) {
+                villageView.classList.add('active');
+                switchSuccessful = true;
+                console.log('[World] Manually switched to village view');
+            }
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.view === 'village') {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        if (switchSuccessful) {
+            if (window.showToast) {
+                window.showToast('🏰 Returning to your village...', {
+                    icon: '🏠',
+                    type: 'info',
+                    timeout: 2000
+                });
+            }
+            console.log('[World] Successfully switched to village view');
+        } else {
+            console.error('[World] Failed to switch to village view. Available methods:', {
+                globalSwitchView: typeof window.switchView,
+                thisGameSwitchView: typeof this.game?.switchView,
+                windowGameSwitchView: typeof window.game?.switchView,
+                gameObject: this.game
+            });
+        }
     }
     
     draftArmy() {
-        // Tutorial army drafting
+        // Start army drafting process
+        console.log('[World] Starting army drafting process...');
+        console.log('[World] draftArmy() called on:', this);
+        console.log('[World] window.worldManager:', window.worldManager);
+        console.log('[World] Global reference check - this === window.worldManager:', this === window.worldManager);
         this.showArmyDraftingModal();
     }
     
     showArmyDraftingModal() {
-        const dynastyName = this.game?.tutorialManager?.getDynastyName?.() || 'Noble';
-        
+        const dynastyName = (typeof this.gameState.getDynastyName === 'function')
+            ? this.gameState.getDynastyName()
+            : (this.game?.tutorialManager?.getDynastyName?.() || 'Noble');
+
         const draftingContent = `
-            <div class="army-drafting">
+            <div class="army-drafting" style="padding: 20px;">
                 <h3>⚔️ Draft Army</h3>
-                <p>Select inhabitants to form your first expedition army. You'll need supplies and brave souls willing to venture beyond the village walls.</p>
-                
+                <p>Select inhabitants to form your expedition army. You'll need supplies and brave souls willing to venture beyond the village walls.</p>
                 <div class="inhabitant-selection">
-                    <h4>👥 Available Inhabitants (Population: ${this.gameState.population})</h4>
-                    
-                    <div class="draft-options">
-                        <div class="draft-role">
-                            <h5>👑 Ruler (Required)</h5>
-                            <label>
-                                <input type="radio" name="ruler" value="yourself" checked>
+                    <h4>👥 Available Inhabitants (Population: ${this.gameState.population || 25})</h4>
+                    <div class="draft-options" style="margin: 15px 0;">
+                        <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
+                            <h5>👑 Commander (Required)</h5>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="radio" name="ruler" value="yourself" checked style="margin-right: 8px;">
                                 <span>Yourself (Heir of House ${dynastyName})</span>
                             </label>
-                            <p style="font-size: 0.9em; color: #bdc3c7;">As ruler, you command the expedition but cannot manage the village while away.</p>
+                            <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">As commander, you lead the expedition but cannot manage the village while away.</p>
                         </div>
-                        
-                        <div class="draft-role">
-                            <h5>👥 Companions (Select 2)</h5>
-                            <label>
-                                <input type="checkbox" name="companion" value="peasant1" checked>
+                        <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #2ecc71; border-radius: 8px;">
+                            <h5>👥 Companions (Select up to 3)</h5>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="companion" value="peasant1" checked style="margin-right: 8px;">
                                 <span>Willem the Farmer (Hardy and reliable)</span>
                             </label>
-                            <label>
-                                <input type="checkbox" name="companion" value="peasant2" checked>
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="companion" value="peasant2" checked style="margin-right: 8px;">
                                 <span>Sarah the Woodcutter (Strong and resourceful)</span>
                             </label>
-                            <label>
-                                <input type="checkbox" name="companion" value="peasant3">
+                            <label style="display: block; margin: 5px 0;">
+                                <input type="checkbox" name="companion" value="peasant3" style="margin-right: 8px;">
                                 <span>Old Marcus the Hunter (Experienced tracker)</span>
                             </label>
-                            <p style="font-size: 0.9em; color: #bdc3c7;">Selected inhabitants will leave the village, reducing local workforce.</p>
+                            <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">Selected inhabitants will leave the village, reducing local workforce.</p>
                         </div>
                     </div>
                 </div>
-                
-                <div class="draft-warning">
-                    <p><strong>⚠️ Important:</strong> While you are away on expedition, you cannot give commands to your village. Consider unlocking governors or generals in the future to manage affairs in your absence.</p>
+                <div class="draft-warning" style="padding: 10px; background-color: rgba(230, 126, 34, 0.2); border-radius: 5px; margin-top: 15px;">
+                    <p><strong>⚠️ Important:</strong> While your army is deployed, village operations will continue automatically but you cannot give direct commands.</p>
                 </div>
             </div>
         `;
-        
-        window.showModal(
-            'Army Drafting',
-            draftingContent,
-            {
+
+        // Use the simpleModal system directly with confirm/cancel handlers
+        if (window.simpleModal) {
+            console.log('[World] Using simpleModal system');
+            window.simpleModal.show('Army Drafting', draftingContent, {
                 icon: '⚔️',
-                type: 'info',
                 showCancel: true,
-                confirmText: 'Form 1st Army',
-                cancelText: 'Cancel'
-            }
-        ).then((confirmed) => {
-            if (confirmed) {
-                this.createFirstArmy();
-            }
-        });
+                confirmText: 'Form Army',
+                cancelText: 'Cancel',
+                onConfirm: () => {
+                    this.createArmy();
+                },
+                onCancel: () => {
+                    // No action needed
+                }
+            });
+        }
+        // Fallback to showModal if available
+        else if (window.showModal) {
+            console.log('[World] Using window.showModal fallback');
+            window.showModal('Army Drafting', draftingContent);
+        } else {
+            console.error('[World] No modal system available');
+            // Final fallback - simple alert with instructions
+            alert('Army Drafting: Click on the village tile again and check the expeditions panel to see if an army was created.');
+            // Create the army anyway
+            this.createArmy();
+        }
     }
     
-    createFirstArmy() {
-        // Create the first army and add to expeditions
+    createArmy() {
+        // Get selected companions from the modal
+        const selectedCompanions = [];
+        const companionInputs = document.querySelectorAll('input[name="companion"]:checked');
+        
+        companionInputs.forEach(input => {
+            const companionNames = {
+                'peasant1': 'Willem the Farmer',
+                'peasant2': 'Sarah the Woodcutter', 
+                'peasant3': 'Old Marcus the Hunter'
+            };
+            selectedCompanions.push({
+                name: companionNames[input.value] || input.value,
+                role: 'Companion',
+                type: 'peasant'
+            });
+        });
+        
+        // Create unique army ID
+        const armyId = `army-${Date.now()}`;
+        const armyNumber = this.parties.expeditions.length + 1;
+        
+        // Create the army
         const army = {
-            id: '1st-army',
-            name: '1st Army',
+            id: armyId,
+            name: `${armyNumber}${this.getOrdinalSuffix(armyNumber)} Army`,
             members: [
-                { name: 'Yourself', role: 'Ruler', type: 'ruler' },
-                { name: 'Willem', role: 'Companion', type: 'peasant' },
-                { name: 'Sarah', role: 'Companion', type: 'peasant' }
+                { name: 'Yourself', role: 'Commander', type: 'ruler' },
+                ...selectedCompanions
             ],
             morale: 100,
             supplies: {
@@ -600,16 +806,38 @@ class WorldManager {
         this.parties.expeditions.push(army);
         this.updateExpeditionsList();
         
-        window.showToast('⚔️ 1st Army formed! Manage logistics before departure.', {
+        // Reduce village population by number of drafted members
+        if (this.gameState && this.gameState.population) {
+            this.gameState.population -= army.members.length;
+            this.gameState.updateUI?.();
+        }
+        
+        window.showToast(`⚔️ ${army.name} formed! ${army.members.length} members ready for deployment.`, {
             icon: '🎉',
             type: 'success',
             timeout: 4000
         });
         
-        // Show tutorial about logistics
+        // Show logistics tutorial after a brief delay
         setTimeout(() => {
             this.showLogisticsTutorial();
         }, 2000);
+    }
+    
+    getOrdinalSuffix(num) {
+        const lastDigit = num % 10;
+        const lastTwoDigits = num % 100;
+        
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
+            return 'th';
+        }
+        
+        switch (lastDigit) {
+            case 1: return 'st';
+            case 2: return 'nd';
+            case 3: return 'rd';
+            default: return 'th';
+        }
     }
     
     updateExpeditionsList() {
@@ -653,39 +881,54 @@ class WorldManager {
     
     manageLogistics(armyId) {
         const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) return;
+        if (!army) {
+            console.error('[World] Army not found:', armyId);
+            return;
+        }
+        
+        // Get current resources from gameState
+        const currentFood = this.gameState.food || this.gameState.resources?.food || 0;
         
         const logisticsContent = `
-            <div class="logistics-management">
+            <div class="logistics-management" style="padding: 20px;">
                 <h3>📦 Logistics Management - ${army.name}</h3>
                 <p>Manage supplies and equipment for your expedition. Proper preparation is crucial for survival in the wilderness.</p>
                 
-                <div class="supply-grid">
-                    <div class="supply-item">
-                        <h4>🍞 Food</h4>
-                        <p>Current: ${army.supplies.food} days</p>
-                        <p style="color: #e74c3c;">⚠️ Insufficient! Armies need food to maintain morale and strength.</p>
-                        <button class="action-btn small" onclick="worldManager.addSupply('${armyId}', 'food', 7)">
-                            Add 7 Days Food (-21 food)
+                <div class="current-resources" style="margin: 15px 0; padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px;">
+                    <h4>Available Resources</h4>
+                    <p>🍞 Food: ${currentFood}</p>
+                </div>
+                
+                <div class="supply-grid" style="margin: 20px 0;">
+                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e74c3c; border-radius: 8px;">
+                        <h4>🍞 Food Supplies</h4>
+                        <p>Current: ${army.supplies.food} days worth</p>
+                        <p style="color: ${army.supplies.food > 0 ? '#27ae60' : '#e74c3c'};">
+                            ${army.supplies.food > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
+                        </p>
+                        <button class="action-btn" onclick="worldManager.addSupply('${armyId}', 'food', 7)" 
+                                style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                ${currentFood < 21 ? 'disabled' : ''}>
+                            Add 7 Days Food (-21 food) ${currentFood < 21 ? '(Not enough food)' : ''}
                         </button>
                     </div>
                     
-                    <div class="supply-item">
+                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
                         <h4>💧 Water</h4>
-                        <p>Current: ${army.supplies.water} days</p>
+                        <p>Current: ${army.supplies.water} days worth</p>
                         <p style="color: #3498db;">ℹ️ Optional - Can be found along the way</p>
                     </div>
                     
-                    <div class="supply-item">
+                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #f39c12; border-radius: 8px;">
                         <h4>⚔️ Equipment</h4>
                         <p>Current: ${army.supplies.equipment}</p>
                         <p style="color: #f39c12;">Basic equipment suitable for scouting missions</p>
                     </div>
                 </div>
                 
-                <div class="logistics-tutorial">
+                <div class="logistics-tutorial" style="padding: 15px; background-color: rgba(241, 196, 15, 0.2); border-radius: 5px;">
                     <h4>💡 Tutorial: Expedition Logistics</h4>
-                    <ul style="text-align: left; padding-left: 20px;">
+                    <ul style="text-align: left; padding-left: 20px; margin: 10px 0;">
                         <li><strong>Food:</strong> Essential for maintaining army morale and preventing starvation</li>
                         <li><strong>Travel Speed:</strong> Base speed is 7 days per hex tile</li>
                         <li><strong>Events:</strong> Random encounters can affect supplies and progress</li>
@@ -695,89 +938,150 @@ class WorldManager {
             </div>
         `;
         
-        window.showModal(
-            `Logistics - ${army.name}`,
-            logisticsContent,
-            {
-                icon: '📦',
-                type: 'info',
-                confirmText: 'Done'
-            }
-        );
+        if (window.showModal) {
+            window.showModal(
+                `Logistics - ${army.name}`,
+                logisticsContent,
+                {
+                    icon: '📦',
+                    type: 'info',
+                    confirmText: 'Done'
+                }
+            );
+        } else {
+            console.error('[World] Modal system not available');
+        }
     }
     
     addSupply(armyId, supplyType, amount) {
         const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) return;
+        if (!army) {
+            console.error('[World] Army not found for supply addition:', armyId);
+            return;
+        }
         
         const costs = {
-            // Use GameData for supply costs if available
-            food: GameData.supplyCosts && GameData.supplyCosts.food ? GameData.supplyCosts.food : { amount: 3, resource: 'food' } // 3 food per day of supplies
+            food: { amount: 3, resource: 'food' } // 3 food per day of supplies
         };
         
         const cost = costs[supplyType];
-        if (!cost) return;
+        if (!cost) {
+            console.error('[World] Unknown supply type:', supplyType);
+            return;
+        }
         
         const totalCost = cost.amount * amount;
+        console.log('[World] Adding supply:', { armyId, supplyType, amount, totalCost });
         
-        if (this.gameState.resources[cost.resource] >= totalCost) {
-            this.gameState.resources[cost.resource] -= totalCost;
+        // Check available resources - try multiple possible locations
+        let currentResources = 0;
+        let resourceUpdateMethod = null;
+        
+        // Try gameState.food first (most common)
+        if (typeof this.gameState.food === 'number') {
+            currentResources = this.gameState.food;
+            resourceUpdateMethod = () => { this.gameState.food -= totalCost; };
+        }
+        // Try gameState.resources.food
+        else if (this.gameState.resources && typeof this.gameState.resources.food === 'number') {
+            currentResources = this.gameState.resources.food;
+            resourceUpdateMethod = () => { this.gameState.resources.food -= totalCost; };
+        }
+        // Try direct resource access
+        else if (this.gameState[cost.resource] !== undefined) {
+            currentResources = this.gameState[cost.resource];
+            resourceUpdateMethod = () => { this.gameState[cost.resource] -= totalCost; };
+        }
+        else {
+            console.error('[World] Could not find food resources in gameState. Available properties:', Object.keys(this.gameState));
+            if (window.showToast) {
+                window.showToast('❌ Error accessing food resources. Check console for details.', {
+                    icon: '⚠️',
+                    type: 'error',
+                    timeout: 4000
+                });
+            }
+            return;
+        }
+        
+        console.log('[World] Current resources:', currentResources, 'Required:', totalCost);
+        
+        if (currentResources >= totalCost) {
+            // Deduct resources
+            resourceUpdateMethod();
+            
+            // Add supplies to army
             army.supplies[supplyType] += amount;
-            this.gameState.updateUI();
             
-            window.showToast(`📦 Added ${amount} days of ${supplyType} to ${army.name}`, {
-                icon: '✅',
-                type: 'success',
-                timeout: 3000
-            });
+            // Update UI if available
+            if (typeof this.gameState.updateUI === 'function') {
+                this.gameState.updateUI();
+                console.log('[World] GameState UI updated');
+            } else {
+                console.log('[World] GameState updateUI not available');
+            }
             
-            // Re-open the logistics modal with updated info
-            setTimeout(() => this.manageLogistics(armyId), 500);
+            if (window.showToast) {
+                window.showToast(`📦 Added ${amount} days of ${supplyType} to ${army.name}`, {
+                    icon: '✅',
+                    type: 'success',
+                    timeout: 3000
+                });
+            }
+            
+            // Re-open the logistics modal with updated info after a brief delay
+            setTimeout(() => this.manageLogistics(armyId), 1000);
         } else {
-            window.showToast(`❌ Insufficient ${cost.resource}! Need ${totalCost} ${cost.resource}.`, {
-                icon: '⚠️',
-                type: 'error',
-                timeout: 3000
-            });
+            if (window.showToast) {
+                window.showToast(`❌ Insufficient ${cost.resource}! Need ${totalCost}, have ${currentResources}.`, {
+                    icon: '⚠️',
+                    type: 'error',
+                    timeout: 4000
+                });
+            }
         }
     }
     
     showLogisticsTutorial() {
         const tutorialContent = `
-            <div class="tutorial-panel">
+            <div class="tutorial-panel" style="padding: 20px;">
                 <h3>📚 Tutorial: Expedition Logistics</h3>
                 <p>Your army has been formed, but they need supplies before venturing into the wilderness!</p>
                 
                 <div class="tutorial-steps">
-                    <div class="tutorial-step">
+                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #e74c3c;">
                         <h4>🍞 Food is Essential</h4>
-                        <p>Armies consume food during travel. Without adequate supplies, morale will drop and your expedition may fail.</p>
+                        <p>Armies consume food during travel and combat. Without adequate supplies, morale will drop and your expedition may fail.</p>
                     </div>
                     
-                    <div class="tutorial-step">
+                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #3498db;">
                         <h4>📦 Click "Manage Logistics"</h4>
                         <p>Use this button to equip your army with the supplies they need for the journey ahead.</p>
                     </div>
                     
-                    <div class="tutorial-step">
+                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #2ecc71;">
                         <h4>🚶 Travel When Ready</h4>
-                        <p>Once supplied, use the "Travel" button to begin your expedition to the Belon War Party.</p>
+                        <p>Once supplied, use the "Travel" button to begin moving your army across the world map.</p>
                     </div>
                 </div>
                 
-                <p><em>Remember: While you're away, your village operates on its own. Plan accordingly!</em></p>
+                <p style="font-style: italic; color: #95a5a6;"><em>Remember: While your army is deployed, those members are not available for village work!</em></p>
             </div>
         `;
         
-        window.showModal(
-            'Expedition Tutorial',
-            tutorialContent,
-            {
-                icon: '📚',
-                type: 'info',
-                confirmText: 'Understood'
-            }
-        );
+        if (window.showModal) {
+            window.showModal(
+                'Expedition Tutorial',
+                tutorialContent,
+                {
+                    icon: '📚',
+                    type: 'info',
+                    confirmText: 'Understood'
+                }
+            );
+        } else {
+            console.error('[World] Modal system not available for tutorial');
+        }
     }
     
     travel(armyId) {
@@ -848,19 +1152,21 @@ class WorldManager {
         });
     }
 }
-// Inject hex-overlay-item CSS for true hexagon clickable area
-if (!document.getElementById('hex-overlay-item-style')) {
+// Inject hex-button CSS for flat-top hexagon styling
+if (!document.getElementById('hex-button-style')) {
     const style = document.createElement('style');
-    style.id = 'hex-overlay-item-style';
+    style.id = 'hex-button-style';
     style.innerHTML = `
-    .hex-overlay-item {
+    .hex-button {
         pointer-events: auto !important;
-        background: transparent;
-        transition: background 0.15s;
-        clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+        transition: all 0.2s ease;
+        transform-origin: center center;
     }
-    .hex-overlay-item:hover {
-        background: rgba(255,255,255,0.18);
+    .hex-button:hover {
+        z-index: 5 !important;
+    }
+    .hex-button.selected {
+        z-index: 10 !important;
     }
     `;
     document.head.appendChild(style);
@@ -868,3 +1174,9 @@ if (!document.getElementById('hex-overlay-item-style')) {
 
 // Make WorldManager globally available
 window.WorldManager = WorldManager;
+
+// Also expose worldManager instance globally when created
+if (typeof window !== 'undefined') {
+    // This will be set when worldManager is instantiated
+    window.worldManager = null;
+}
