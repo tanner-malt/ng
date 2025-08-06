@@ -95,6 +95,8 @@ class VillageManager {
             this.initSupplyChains();
             console.log('[Village] Setting up production planner...');
             this.initProductionPlanner();
+            console.log('[Village] Setting up population view button...');
+            this.setupPopulationViewButton();
             console.log('[Village] Village initialization complete');
         } catch (error) {
             console.error('[Village] Error during initialization:', error);
@@ -1243,5 +1245,232 @@ class VillageManager {
         }
         
         console.log('[Village] Resource display updated');
+    }
+
+    // Population View System
+    setupPopulationViewButton() {
+        const populationBtn = document.getElementById('population-view-btn');
+        if (populationBtn) {
+            populationBtn.addEventListener('click', () => {
+                this.showPopulationView();
+            });
+            console.log('[Village] Population view button set up');
+        } else {
+            console.error('[Village] population-view-btn element not found');
+        }
+    }
+
+    initializePopulationManager() {
+        // Initialize population manager if it doesn't exist
+        if (!this.gameState.populationManager && window.PopulationManager) {
+            this.gameState.populationManager = new window.PopulationManager();
+            console.log('[Village] PopulationManager initialized');
+            
+            // Generate initial population based on current population count
+            this.generateInitialPopulation();
+        }
+    }
+
+    generateInitialPopulation() {
+        if (!this.gameState.populationManager || !window.GameData) return;
+        
+        const currentPop = this.gameState.population || 0;
+        const existingPop = this.gameState.populationManager.getAll().length;
+        
+        // Generate villagers to match current population count
+        for (let i = existingPop; i < currentPop; i++) {
+            const villager = this.generateRandomVillager();
+            this.gameState.populationManager.addInhabitant(villager);
+        }
+        
+        console.log(`[Village] Generated ${currentPop - existingPop} villagers`);
+    }
+
+    generateRandomVillager() {
+        const names = [
+            'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
+            'Iris', 'Jack', 'Kate', 'Liam', 'Maya', 'Noah', 'Olivia', 'Peter',
+            'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Victor', 'Wendy', 'Xavier',
+            'Yara', 'Zoe', 'Aiden', 'Bella', 'Caleb', 'Diana', 'Ethan', 'Fiona'
+        ];
+        
+        const roles = ['peasant', 'farmer', 'woodcutter', 'miner', 'builder', 'guard', 'merchant'];
+        const statuses = ['idle', 'working', 'resting'];
+        
+        const name = names[Math.floor(Math.random() * names.length)];
+        const role = roles[Math.floor(Math.random() * roles.length)];
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const age = Math.floor(Math.random() * 50) + 15; // Age 15-65
+        
+        // Assign building locations for working villagers
+        let buildingId = null;
+        if (status === 'working' && this.gameState.buildings.length > 0) {
+            const randomBuilding = this.gameState.buildings[Math.floor(Math.random() * this.gameState.buildings.length)];
+            buildingId = randomBuilding.id;
+        }
+        
+        return {
+            name: name,
+            role: role,
+            age: age,
+            status: status,
+            location: status === 'working' ? buildingId : 'village',
+            buildingId: buildingId,
+            happiness: Math.floor(Math.random() * 41) + 60, // 60-100
+            health: Math.floor(Math.random() * 21) + 80, // 80-100
+            skills: this.generateRandomSkills(),
+            joinedDay: Math.max(1, this.gameState.currentDay - Math.floor(Math.random() * 30))
+        };
+    }
+    
+    generateRandomSkills() {
+        const allSkills = ['Farming', 'Woodcutting', 'Mining', 'Building', 'Trading', 'Crafting', 'Fighting'];
+        const numSkills = Math.floor(Math.random() * 3) + 1; // 1-3 skills
+        const skills = [];
+        
+        for (let i = 0; i < numSkills; i++) {
+            const skill = allSkills[Math.floor(Math.random() * allSkills.length)];
+            if (!skills.includes(skill)) {
+                skills.push(skill);
+            }
+        }
+        
+        return skills;
+    }
+
+    showPopulationView() {
+        // Initialize population manager if needed
+        this.initializePopulationManager();
+        
+        if (!this.gameState.populationManager) {
+            console.error('[Village] PopulationManager not available');
+            if (window.modalSystem) {
+                window.modalSystem.showMessage('Population Unavailable', 'Population management system is not initialized.');
+            }
+            return;
+        }
+        
+        const villagers = this.gameState.populationManager.getAll();
+        
+        // Generate content HTML
+        let contentHTML = `
+            <div class="population-overview">
+                <h3>👥 Population Overview</h3>
+                <div class="population-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Villagers:</span>
+                        <span class="stat-value">${villagers.length}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Working:</span>
+                        <span class="stat-value">${villagers.filter(v => v.status === 'working').length}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Idle:</span>
+                        <span class="stat-value">${villagers.filter(v => v.status === 'idle').length}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Average Age:</span>
+                        <span class="stat-value">${Math.round(villagers.reduce((sum, v) => sum + v.age, 0) / villagers.length) || 0}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="villagers-list">
+                <h4>🏘️ Villager Details</h4>
+                <div class="villagers-grid">
+        `;
+        
+        villagers.forEach(villager => {
+            const statusIcon = {
+                'working': '🔨',
+                'idle': '😴', 
+                'resting': '💤'
+            }[villager.status] || '❓';
+            
+            const roleIcon = {
+                'peasant': '🧑‍🌾',
+                'farmer': '👨‍🌾',
+                'woodcutter': '🪓',
+                'miner': '⛏️',
+                'builder': '🔨',
+                'guard': '⚔️',
+                'merchant': '💼'
+            }[villager.role] || '👤';
+            
+            const buildingName = villager.buildingId ? 
+                this.gameState.buildings.find(b => b.id === villager.buildingId)?.type || 'Unknown Building' : 
+                'Village Square';
+            
+            contentHTML += `
+                <div class="villager-card">
+                    <div class="villager-header">
+                        <span class="villager-icon">${roleIcon}</span>
+                        <div class="villager-info">
+                            <div class="villager-name">${villager.name}</div>
+                            <div class="villager-role">${villager.role}</div>
+                        </div>
+                        <span class="villager-status">${statusIcon}</span>
+                    </div>
+                    <div class="villager-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Age:</span>
+                            <span class="detail-value">${villager.age} years</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value">${villager.status}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Location:</span>
+                            <span class="detail-value">${buildingName}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Happiness:</span>
+                            <span class="detail-value">${villager.happiness || 75}%</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Health:</span>
+                            <span class="detail-value">${villager.health || 85}%</span>
+                        </div>
+                        ${villager.skills && villager.skills.length > 0 ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Skills:</span>
+                            <span class="detail-value">${villager.skills.join(', ')}</span>
+                        </div>` : ''}
+                        <div class="detail-row">
+                            <span class="detail-label">Joined:</span>
+                            <span class="detail-value">Day ${villager.joinedDay || 1}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        if (villagers.length === 0) {
+            contentHTML += `
+                <div class="no-villagers">
+                    <div class="no-villagers-icon">👻</div>
+                    <div class="no-villagers-text">No villagers yet! Build houses to attract more people to your village.</div>
+                </div>
+            `;
+        }
+        
+        contentHTML += `
+                </div>
+            </div>
+        `;
+        
+        // Show the modal
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: '👥 Village Population',
+                content: contentHTML,
+                width: '800px',
+                className: 'population-modal'
+            });
+        } else {
+            console.error('[Village] modalSystem not available');
+        }
     }
 }
