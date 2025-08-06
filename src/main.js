@@ -5,16 +5,38 @@
  * Ensures all systems are properly initialized and started.
  */
 
+// Load game version from version.json
+function loadGameVersion() {
+    // Set a fallback version immediately
+    if (!window.GAME_VERSION) {
+        window.GAME_VERSION = '0.0.1';
+    }
+    
+    // Try to load the actual version from version.json
+    fetch('/public/version.json')
+        .then(response => response.json())
+        .then(data => {
+            window.GAME_VERSION = data.version || '0.0.1';
+            console.log('[Main] Game version loaded:', window.GAME_VERSION);
+        })
+        .catch(error => {
+            console.log('[Main] Could not load version.json, using fallback version:', window.GAME_VERSION);
+        });
+}
+
 // Main game initialization function
 function initializeGame() {
     console.log('[Main] Starting game initialization...');
 
     try {
+        // Load game version information
+        loadGameVersion();
+
         // Check if essential systems are available
         const requiredSystems = [
             'eventBus',
             'gameState', 
-            'simpleModal',
+            'modalSystem',
             'showModal'
         ];
 

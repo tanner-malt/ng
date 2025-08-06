@@ -2015,6 +2015,27 @@ body {
         accent-color: #1abc9c;
     }
 
+    .setting-item.info-item {
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .setting-item.info-item:last-child {
+        border-bottom: none;
+    }
+
+    .info-label {
+        color: #bdc3c7;
+        font-weight: 500;
+    }
+
+    .info-value {
+        color: #1abc9c;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+    }
+
     .settings-actions {
         text-align: center;
         margin-top: 1rem;

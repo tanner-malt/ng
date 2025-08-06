@@ -53,38 +53,113 @@ Open `http://localhost:8000/public/game.html` in your browser.
 
 ## Core Systems
 
-### 1. Tutorial System (`tutorial.js`)
-The tutorial guides new players through:
-1. **Dynasty Naming**: Player names their royal house
-2. **Village Building**: Learn construction mechanics
-3. **Resource Management**: Understanding resources and grants
-4. **World Exploration**: Unlock world map and expeditions
-5. **Military Preparation**: Build barracks and prepare for battle
 
-**Key Features:**
+### 1. Tutorial System (`tutorial.js`)
+Guides new players through a step-based onboarding:
+1. **Dynasty Naming**: Name your royal house
+2. **Village Building**: Learn construction and placement
+3. **Resource Management**: Understand food, wood, stone, gold
+4. **World Exploration**: Unlock world map and expeditions
+5. **Military Preparation**: Build barracks, unlock battle mode
+
+**Features:**
 - Auto-starts for new players
-- Modal-based guided experience
-- Progressive unlocking of game features
+- Modal-based, story-driven steps
+- Progressive feature unlocking
 - Dynasty-specific storytelling
+- Integrates with achievements and message history
 
 ### 2. Village Management (`village.js`)
-- **Building System**: Place and upgrade structures
-- **Resource Generation**: Buildings produce resources over time
-- **Construction Time**: Realistic building completion times
-- **Grid-based Layout**: Strategic placement on village map
+- **Building System**: Place, upgrade, and manage structures
+- **Resource Generation**: Buildings produce resources per cycle
+- **Construction Time**: Realistic, multi-day building times
+- **Grid & Terrain**: Strategic placement, terrain types (grass, forest, hills, water, fertile, rocky)
+- **Supply Chains**: Visualized resource flow from production to town center
+- **Automation**: Production planning and auto-assignment (based on prestige)
 
 **Available Buildings:**
-- Town Center (central building, boosts productivity)
-- Houses (population capacity)
-- Farms (food production)
-- Sawmills (wood production)
-- Quarries (stone production)
-- Markets (gold generation)
-- Barracks (military training)
-- Churches (gold generation)
-- Workshops (building enchantments)
-- Fortress (Fallback point and knights)
-- Blacksmiths (metal production)
+- Town Center (central hub, boosts all production)
+- House (population capacity)
+- Farm (food)
+- Sawmill (wood)
+- Quarry (stone)
+- Market (gold, trade efficiency)
+- Barracks (soldiers, defense)
+- Workshop (production boost)
+- Temple (influence, happiness)
+- Academy (research, efficiency)
+- Castle (defense, influence)
+- University (advanced research)
+
+### 3. Achievement System (`achievements.js`)
+- **Progress Tracking**: Unlock achievements for milestones (buildings, resources, combat, tutorial)
+- **Rewards**: Achievements grant resources, prestige, influence, and more
+- **Integration**: Tied to tutorial, village, and battle systems
+- **UI**: Modal popups and achievement history
+- **Persistence**: Progress saved in localStorage
+
+### 4. Message History (`messageHistory.js`)
+- **Notifications**: Persistent log of achievements, events, and royal messages
+- **UI**: Modal-based message history with unread/new indicators
+- **Types**: Info, achievement, warning, royal, tutorial, grant
+- **Persistence**: Messages saved in localStorage
+
+### 5. Game State Management (`gameState.js`)
+- **Save/Load**: Persistent state using localStorage
+- **Resource Tracking**: Real-time management of all resources
+- **Time Progression**: Day/night cycle, seasons
+- **Auto-save**: Automatic state preservation
+
+### 6. Modal System (`modalSystem.js`)
+- **Tutorial Modals**: Story-driven dialogs
+- **Confirmation/Info**: User prompts and help
+- **Promise-based**: Async modal handling
+- **Mini-modals**: Contextual building/info popups
+
+### 7. Event System (`eventBus.js`)
+- **Component Communication**: Decoupled event-driven architecture
+- **Event Broadcasting**: Game-wide notifications
+- **State Sync**: UI and game state updates
+
+### 8. World & Quest Systems
+- **World Map (`worldManager.js`)**: Hex grid, exploration, weather, terrain
+- **Quest System (`quest.js`, `quests.js`)**: Expeditions, Oregon Trail-style travel, modal-based quest UI
+
+### 9. Battle System (`battle.js`)
+- **Combat**: Automated battles, AI personalities, weather/terrain effects
+- **Preparation**: Barracks, army management, battle phases
+
+### 10. Unlock System (`unlockSystem.js`)
+- **Feature Gating**: Achievements unlock new buildings, views, and features
+- **Progression**: Dynamic content unlocking as player advances
+
+### 11. Debug & Error Recovery (`debugTools.js`, `errorRecovery.js`)
+- **Debug Tools**: Console commands, test hooks
+- **Error Handling**: Recovery from common issues
+
+### 12. Backup & Recovery (`app_backup.js`)
+- **Backup**: Fallback app logic and error recovery
+
+---
+
+## Building Types & Effects
+
+| Building      | Effect(s)                                 |
+|-------------- |-------------------------------------------|
+| Town Center   | Boosts all production, pop. capacity      |
+| House         | Increases population cap                  |
+| Farm          | Produces food                             |
+| Sawmill       | Produces wood                             |
+| Quarry        | Produces stone                            |
+| Market        | Generates gold, boosts trade              |
+| Barracks      | Trains soldiers, provides defense         |
+| Workshop      | Boosts production efficiency              |
+| Temple        | Grants influence, happiness               |
+| Academy       | Research, boosts efficiency               |
+| Castle        | Defense, influence                        |
+| University    | Advanced research, efficiency             |
+
+---
 
 ### 3. Game State Management (`gameState.js`)
 - **Save/Load System**: Persistent game state using localStorage

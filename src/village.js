@@ -1,5 +1,48 @@
+
 // Village management system
 class VillageManager {
+    // Duplicate constructor removed
+
+    // Returns the number of worker slots for a building (equal to its level)
+    getWorkerSlotsForBuilding(building) {
+        return building.level || 0;
+    }
+
+    // Returns the population assigned to a building
+    getAssignedWorkers(building) {
+        if (!this.gameState.populationManager) return [];
+        return this.gameState.populationManager.population.filter(p => p.buildingId === building.id && p.status === 'working');
+    }
+
+    // Returns eligible population for a building type (young adults/adults, correct role)
+    getEligibleWorkers(building) {
+        if (!this.gameState.populationManager) return [];
+        const role = window.GameData.getDefaultRoleForBuilding(building.type);
+        return this.gameState.populationManager.population.filter(p => {
+            // Only young adults/adults, not already assigned
+            return (p.age >= 10 && p.age <= 30) && p.status !== 'working' && (p.role === role || p.role === 'peasant');
+        });
+    }
+
+    // Assigns workers to all buildings up to their slot limit
+    autoAssignCitizens() {
+        if (!this.gameState.populationManager) return;
+        // For each building that can have workers
+        this.gameState.buildings.forEach(building => {
+            const role = window.GameData.getDefaultRoleForBuilding(building.type);
+            if (!role || role === 'peasant') return; // skip non-work buildings
+            const slots = this.getWorkerSlotsForBuilding(building);
+            let assigned = this.getAssignedWorkers(building);
+            if (assigned.length >= slots) return; // already full
+            const needed = slots - assigned.length;
+            const eligible = this.getEligibleWorkers(building).slice(0, needed);
+            eligible.forEach(worker => {
+                this.gameState.populationManager.assignRole(worker.id, role);
+                this.gameState.populationManager.updateStatus(worker.id, 'working');
+                this.gameState.populationManager.moveInhabitant(worker.id, building.id);
+            });
+        });
+    }
     constructor(gameState, game) {
         this.gameState = gameState;
         this.game = game;

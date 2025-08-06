@@ -83,138 +83,9 @@ function getTypeColor(type) {
     return colors[type] || colors.info;
 }
 
-// ===== MODAL DIALOGS =====
-// Important information that requires user attention and dominates the screen
-// Usage: window.showModal('Important!', 'This requires your attention', {type: 'warning'})
-function showModal(title, message, opts = {}) {
-    // Create modal overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2000;
-        backdrop-filter: blur(2px);
-    `;
-    
-    // Create modal content
-    const modal = document.createElement('div');
-    modal.className = 'modal-content';
-    const type = opts.type || 'info';
-    
-    modal.style.cssText = `
-        background: linear-gradient(145deg, #2c3e50, #34495e);
-        border-radius: 12px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-        border: 2px solid ${getTypeColor(type)};
-        max-width: 500px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
-        transform: scale(0.7);
-        opacity: 0;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    `;
-    
-    const iconMap = {
-        success: '✅',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️',
-        question: '❓'
-    };
-    
-    modal.innerHTML = `
-        <div style="padding: 24px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                <span style="font-size: 24px;">${opts.icon || iconMap[type] || iconMap.info}</span>
-                <h3 style="color: #ecf0f1; margin: 0; font-size: 20px;">${title}</h3>
-            </div>
-            <div style="color: #bdc3c7; line-height: 1.5; margin-bottom: 24px;">
-                ${message}
-            </div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                ${opts.showCancel ? '<button class="modal-cancel-btn" style="padding: 10px 20px; background: #7f8c8d; border: none; border-radius: 6px; color: white; cursor: pointer;">Cancel</button>' : ''}
-                <button class="modal-ok-btn" style="padding: 10px 20px; background: ${getTypeColor(type)}; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: 600;">OK</button>
-            </div>
-        </div>
-    `;
-    
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-    
-    // Animate in
-    requestAnimationFrame(() => {
-        modal.style.transform = 'scale(1)';
-        modal.style.opacity = '1';
-    });
-    
-    // Return a promise for user interaction
-    return new Promise((resolve) => {
-        const cleanup = () => {
-            modal.style.transform = 'scale(0.7)';
-            modal.style.opacity = '0';
-            setTimeout(() => {
-                if (overlay.parentNode) {
-                    document.body.removeChild(overlay);
-                }
-            }, 300);
-        };
-        
-        modal.querySelector('.modal-ok-btn').onclick = () => {
-            cleanup();
-            resolve(true);
-        };
-        
-        const cancelBtn = modal.querySelector('.modal-cancel-btn');
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                cleanup();
-                resolve(false);
-            };
-        }
-        
-        // Close on overlay click
-        overlay.onclick = (e) => {
-            if (e.target === overlay) {
-                cleanup();
-                resolve(false);
-            }
-        };
-        
-        // Close on escape key
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape') {
-                document.removeEventListener('keydown', escapeHandler);
-                cleanup();
-                resolve(false);
-            }
-        };
-        document.addEventListener('keydown', escapeHandler);
-    });
-}
-
-// Legacy compatibility - showNotification now defaults to toast behavior
-function showNotification(message, opts = {}) {
-    // If it's a brief message, use toast
-    if (!opts.modal && (!opts.timeout || opts.timeout <= 5000)) {
-        return showToast(message, opts);
-    }
-    // Otherwise use modal
-    return showModal('Notification', message, opts);
-}
-
-// Export toast and notification functions (showModal comes from modalSystem.js)
+// Export toast functions
 window.showToast = showToast;
-// window.showModal = showModal;  // REMOVED - use modalSystem.js version instead
-window.showNotification = showNotification;
+
 // Popup/modal UI logic for top-right icons (progression, settings, quit)
 // All DOM event binding and popup show/hide logic is here
 
@@ -226,27 +97,13 @@ function bindTopRightPopups(game) {
     console.log('[UI] settings-btn:', document.getElementById('settings-btn'));
     console.log('[UI] settings-popup:', document.getElementById('settings-popup'));
     console.log('[UI] quit-btn:', document.getElementById('quit-btn'));
+    
     // Progression popup
     const progressBtn = document.getElementById('progress-btn');
-    if (progressBtn && window.simpleModal) {
+    if (progressBtn && window.modalSystem) {
         progressBtn.onclick = () => {
             console.log('[UI] Progression modal triggered');
-            window.simpleModal.show('🏆 Progression', `
-                <div class="progression-content">
-                    <div class="progress-item">
-                        <span>🏘️ Village:</span> <span style="color: #27ae60;">✓ Established</span>
-                    </div>
-                    <div class="progress-item">
-                        <span>⚔️ Battle:</span> <span style="color: #e74c3c;">🔒 Locked</span>
-                    </div>
-                    <div class="progress-item">
-                        <span>👑 Monarch:</span> <span style="color: #e74c3c;">🔒 Locked</span>
-                    </div>
-                    <div class="progress-item">
-                        <span>🏰 Throne:</span> <span style="color: #e74c3c;">🔒 Locked</span>
-                    </div>
-                </div>
-            `, { icon: '🏆' });
+            window.modalSystem.showProgressionModal();
         };
         progressBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -256,7 +113,7 @@ function bindTopRightPopups(game) {
         });
     } else {
         if (!progressBtn) console.log('[UI] progress-btn not found');
-        if (!window.simpleModal) console.log('[UI] modalSystem not available');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
     // Message History button
@@ -293,52 +150,31 @@ function bindTopRightPopups(game) {
     } else {
         if (!questBtn) console.log('[UI] quest-btn not found');
         if (!game.questManager) console.log('[UI] questManager not available');
-        if (!window.simpleModal) console.log('[UI] modalSystem not available');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
     // Settings/menu popup
     const settingsBtn = document.getElementById('settings-btn');
+    console.log('[UI] Settings button found:', !!settingsBtn);
+    console.log('[UI] modalSystem available:', !!window.modalSystem);
+    
     // Define game version globally if not already
     if (!window.GAME_VERSION) window.GAME_VERSION = '0.0.1';
-    if (settingsBtn && window.simpleModal) {
+    
+    if (settingsBtn && window.modalSystem) {
+        console.log('[UI] Setting up settings button click handler...');
         settingsBtn.onclick = () => {
             console.log('[UI] Settings modal triggered');
-            window.simpleModal.show('⚙️ Settings', `
-                <div class="settings-content">
-                    <div class="setting-item">
-                        <label>🔊 Sound:</label>
-                        <button id="sound-toggle-modal" onclick="toggleSound()" style="
-                            background: #27ae60;
-                            color: white;
-                            border: none;
-                            padding: 8px 16px;
-                            border-radius: 5px;
-                            cursor: pointer;
-                        ">ON</button>
-                    </div>
-                    <div class="setting-item">
-                        <label>� Restart:</label>
-                        <button id="restart-game-modal" style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">Restart Game</button>
-                    </div>
-                    <div class="setting-item">
-                        <label>�🎮 Game Version:</label>
-                        <span>Dynasty Builder v${window.GAME_VERSION}</span>
-                    </div>
-                </div>
-            `, { icon: '⚙️' });
-            // Add event listener for restart button after modal is shown
-            setTimeout(() => {
-                const restartBtn = document.getElementById('restart-game-modal');
-                if (restartBtn) {
-                    restartBtn.onclick = () => {
-                        if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
-                            localStorage.clear();
-                            location.reload();
-                        }
-                    };
-                }
-            }, 100);
+            window.modalSystem.showSettingsModal();
         };
+        
+        // Also add event listener as a backup
+        settingsBtn.addEventListener('click', () => {
+            console.log('[UI] Settings button clicked via addEventListener');
+        });
+        
+        console.log('[UI] Settings button click handler attached successfully');
+        
         settingsBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
@@ -347,7 +183,7 @@ function bindTopRightPopups(game) {
         });
     } else {
         if (!settingsBtn) console.log('[UI] settings-btn not found');
-        if (!window.simpleModal) console.log('[UI] modalSystem not available');
+        if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
     // Sound button
@@ -382,8 +218,65 @@ function bindTopRightPopups(game) {
     }
 }
 
+// Simplified unified restart function - uses only modalSystem
+function performGameReset() {
+    console.log('[UI] performGameReset called');
+    
+    // Don't show our own confirmation - let modalSystem handle it
+    console.log('[UI] Delegating reset to modalSystem');
+    
+    // Use modalSystem for reset
+    if (window.modalSystem && typeof window.modalSystem.resetGame === 'function') {
+        console.log('[UI] Using modalSystem reset');
+        window.modalSystem.resetGame();
+    } else if (window.app && typeof window.app.resetGame === 'function') {
+        console.log('[UI] Using app.resetGame with confirmation');
+        // Fallback - use modalSystem for confirmation if available
+        if (window.modalSystem && window.modalSystem.showConfirmation) {
+            window.modalSystem.showConfirmation(
+                'Are you sure you want to restart the game? This will erase your progress.',
+                {
+                    title: 'Restart Game',
+                    type: 'danger',
+                    onConfirm: () => window.app.resetGame()
+                }
+            );
+        } else {
+            // Last resort - native confirm
+            if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
+                window.app.resetGame();
+            }
+        }
+    } else {
+        console.log('[UI] Using fallback reset - clearing localStorage and reloading');
+        // Fallback - use modalSystem for confirmation if available
+        if (window.modalSystem && window.modalSystem.showConfirmation) {
+            window.modalSystem.showConfirmation(
+                'Are you sure you want to restart the game? This will erase your progress.',
+                {
+                    title: 'Restart Game',
+                    type: 'danger',
+                    onConfirm: () => {
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        location.reload();
+                    }
+                }
+            );
+        } else {
+            // Last resort - native confirm
+            if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                location.reload();
+            }
+        }
+    }
+}
+
 // Attach to window for browser compatibility
 window.bindTopRightPopups = bindTopRightPopups;
+window.performGameReset = performGameReset;
 
 // ===== MINI TOAST NOTIFICATIONS =====
 // Ultra-lightweight notifications for small changes (resource updates, building completion)

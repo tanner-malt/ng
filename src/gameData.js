@@ -236,6 +236,124 @@ const GameData = {
             }
         });
         return Math.max(totalCap, 1); // Minimum cap of 1 for starting population
+    },
+
+    // ===== POPULATION SYSTEM =====
+    // ===== POPULATION SYSTEM DEFAULTS =====
+    // Age is stored in days. Age brackets:
+    //   - Baby: 1–3 days
+    //   - Child: 4–9 days
+    //   - Young Adult: 10–15 days (can start working)
+    //   - Adult: 16–24 days (can be a soldier)
+    //   - Middle Age: 25–30 days
+    //   - Elder: 31–34 days
+    //   - Death: 35+ days
+    // Population growth: Offspring can be born if there are at least one male and one female in the Young Adult bracket (10–15 days).
+    // Base birth rate: 1 child per eligible couple per year (365 days). 1% chance for twins per birth.
+    // Growth bonuses: +50% if food is abundant, -50% if food is scarce, 0 if sick or traveling.
+    // Default roles: farmer, woodcutter, hunter, peasant. Children and elders are unassigned (peasant) by default.
+    // Status: 'idle' for babies/children/elders, 'working' for assigned young adults/adults, else 'idle'.
+    // Gender: 50% male, 50% female for new births (randomized), 1–2% nonbinary optional.
+    // Skills: Children [], Young Adults/Adults 1–2 skills by role, Elders retain skills, may mentor.
+    // Only young adults and adults can be assigned to buildings. Only adults (16–24) can be soldiers.
+
+    // Default population templates for new games
+    startingPopulation: [],
+
+    // Role definitions (where they work, what they do)
+    populationRoles: {
+        farmer: {
+            label: 'Farmer',
+            buildingType: 'farm',
+            description: 'Produces food at farms.'
+        },
+        woodcutter: {
+            label: 'Woodcutter',
+            buildingType: 'sawmill',
+            description: 'Produces wood at sawmills.'
+        },
+        quarryWorker: {
+            label: 'Quarry Worker',
+            buildingType: 'quarry',
+            description: 'Extracts stone at quarries.'
+        },
+        marketTrader: {
+            label: 'Market Trader',
+            buildingType: 'market',
+            description: 'Generates gold at markets.'
+        },
+        priest: {
+            label: 'Priest',
+            buildingType: 'temple',
+            description: 'Provides influence and happiness at temples.'
+        },
+        scholar: {
+            label: 'Scholar',
+            buildingType: 'academy',
+            description: 'Researches new technologies at academies.'
+        },
+        soldier: {
+            label: 'Soldier',
+            buildingType: 'barracks',
+            description: 'Trains and defends at barracks.'
+        },
+        blacksmith: {
+            label: 'Blacksmith',
+            buildingType: 'workshop',
+            description: 'Improves production at workshops.'
+        },
+        noble: {
+            label: 'Noble',
+            buildingType: 'townCenter',
+            description: 'Manages the town center.'
+        },
+        peasant: {
+            label: 'Peasant',
+            buildingType: null,
+            description: 'Unassigned, can be given any job.'
+        }
+    },
+
+    // Status types for population
+    populationStatuses: ['idle', 'working', 'traveling', 'sick', 'dead'],
+
+    // Demographic options (for extensibility)
+    populationGenders: ['male', 'female'],
+
+    // Utility: get default role for a building type
+    getDefaultRoleForBuilding: function(buildingType) {
+        for (const [role, def] of Object.entries(this.populationRoles)) {
+            if (def.buildingType === buildingType) return role;
+        }
+        return 'peasant';
+    }
+
+    /**
+     * Generate a new population member from a list of names and random gender.
+     * @param {string[]} names - List of possible names.
+     * @param {object} [options] - Optional overrides (age, role, etc.)
+     * @returns {object} New population member object.
+     */
+    ,generatePopulationMember: function(names, options = {}) {
+        // Only 'male' or 'female' genders
+        const gender = Math.random() < 0.5 ? 'male' : 'female';
+        const name = names[Math.floor(Math.random() * names.length)];
+        // Default to young adult (10–15 days)
+        const age = options.age !== undefined ? options.age : 10 + Math.floor(Math.random() * 6);
+        const role = options.role || 'peasant';
+        const status = options.status || 'idle';
+        const buildingId = options.buildingId || null;
+        const skills = options.skills || [];
+        return {
+            id: options.id || Date.now() + Math.floor(Math.random() * 10000),
+            name,
+            role,
+            age,
+            gender,
+            status,
+            buildingId,
+            skills
+        };
     }
 };
 

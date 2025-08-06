@@ -12,7 +12,7 @@
     <script src="../src/systems/core/eventBus.js"></script>
     <script src="../src/gameState.js"></script>
     <script src="../src/utils/errorRecovery.js"></script>
-    <script src="../src/simpleModal.js"></script>
+    <script src="../src/modalSystem.js"></script>
     <script src="../src/messageHistory.js"></script>
     <script src="../src/achievements.js"></script>
     <script src="../src/unlockSystem.js"></script>
@@ -497,21 +497,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         // Fallback: poll every 2s if eventBus is not available
         setInterval(updateNavButtonLocks, 2000);
-    }
-});
-</script>
-<script>
-// Add event listener for Restart Game button
-document.addEventListener('DOMContentLoaded', function() {
-    const restartBtn = document.getElementById('restart-game-btn');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', function() {
-            if (confirm('Are you sure you want to restart the game? This will erase your progress.')) {
-                // Clear localStorage and reload
-                localStorage.clear();
-                location.reload();
-            }
-        });
     }
 });
 </script>

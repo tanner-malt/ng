@@ -734,20 +734,28 @@ class WorldManager {
             </div>
         `;
 
-        // Use the simpleModal system directly with confirm/cancel handlers
-        if (window.simpleModal) {
-            console.log('[World] Using simpleModal system');
-            window.simpleModal.show('Army Drafting', draftingContent, {
-                icon: '⚔️',
-                showCancel: true,
-                confirmText: 'Form Army',
-                cancelText: 'Cancel',
-                onConfirm: () => {
-                    this.createArmy();
-                },
-                onCancel: () => {
-                    // No action needed
-                }
+        // Use the modalSystem
+        if (window.modalSystem) {
+            console.log('[World] Using modalSystem');
+            window.modalSystem.showModal({
+                title: 'Army Drafting',
+                content: draftingContent,
+                width: '500px',
+                className: 'army-drafting-modal',
+                modalType: 'army-drafting'
+            }).then(() => {
+                // Add confirm/cancel buttons manually or use showConfirmation
+                window.modalSystem.showConfirmation(
+                    'Form this army with the current population?',
+                    {
+                        title: 'Confirm Army Formation',
+                        confirmText: 'Form Army',
+                        cancelText: 'Cancel',
+                        onConfirm: () => {
+                            this.createArmy();
+                        }
+                    }
+                );
             });
         }
         // Fallback to showModal if available

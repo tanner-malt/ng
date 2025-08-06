@@ -5,6 +5,10 @@
  * Integrates with tutorial system and message history.
  */
 
+// Import PopulationManager and GameData
+// Assumes PopulationManager is available globally or via window.PopulationManager
+// and GameData is available as window.GameData
+
 class AchievementSystem {
     constructor() {
         this.achievements = {};
@@ -51,7 +55,7 @@ class AchievementSystem {
             type: 'building',
             hidden: false,
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { population: 2, wood: 500 }
+            reward: { population: 10, wood: 500 }
         });
 
         this.defineAchievement('feeding_people', {
@@ -170,7 +174,7 @@ class AchievementSystem {
     triggerBuildingPlaced(buildingType) {
         // Track total buildings built
         this.stats.buildings_built++;
-        
+
         // Track specific building types
         switch (buildingType) {
             case 'house':
@@ -186,7 +190,7 @@ class AchievementSystem {
                 this.stats.towncenters_built++;
                 break;
         }
-        
+
         const achievementMap = {
             'townCenter': 'first_settlement',
             'farm': 'feeding_people',
@@ -206,6 +210,11 @@ class AchievementSystem {
         // Check houses requirement for sheltering_citizens
         if (this.stats.houses_built >= 3) {
             this.unlock('sheltering_citizens');
+        }
+
+        // Emit event for building completed
+        if (window.eventBus) {
+            window.eventBus.emit('building_completed', { buildingType });
         }
 
         this.saveToStorage();
@@ -284,12 +293,30 @@ class AchievementSystem {
     }
 
     applyRewards(rewards) {
-
         if (!window.gameState) return;
-
+        let populationGained = 0;
+        // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
-            // Use GameData.resourceCaps to check if resource is valid and cap it if needed
-            if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
+            if (resource === 'population' && amount > 0) {
+                // Use GameData.generatePopulationMember to create new pops
+                const names = window.GameData && window.GameData.populationNames ? window.GameData.populationNames : ["Alex", "Sam", "Jamie", "Taylor", "Jordan", "Morgan", "Casey", "Riley", "Drew", "Cameron"];
+                if (window.gameState.populationManager && window.GameData && typeof window.GameData.generatePopulationMember === 'function') {
+                    for (let i = 0; i < amount; i++) {
+                        const pop = window.GameData.generatePopulationMember(names);
+                        window.gameState.populationManager.addInhabitant(pop);
+                    }
+                    // Update population count if tracked separately
+                    if (typeof window.gameState.population === 'number') {
+                        window.gameState.population += amount;
+                    } else {
+                        window.gameState.population = window.gameState.populationManager.getAll().length;
+                    }
+                } else {
+                    // Fallback: just increment population number
+                    window.gameState.population = (window.gameState.population || 0) + amount;
+                }
+                populationGained += amount;
+            } else if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
                 window.gameState.resources[resource] += amount;
                 // Cap resource if defined in GameData
                 if (GameData.resourceCaps && GameData.resourceCaps[resource]) {
@@ -301,10 +328,27 @@ class AchievementSystem {
                 window.gameState.militaryExperience = (window.gameState.militaryExperience || 0) + amount;
             }
         });
-
+        // Emit event for population gained if any
+        if (populationGained > 0 && window.eventBus) {
+            window.eventBus.emit('population_gained', { amount: populationGained });
+        }
         // Trigger UI update
         if (window.eventBus) {
             window.eventBus.emit('resources-updated');
+        }
+    }
+
+    // Stub: Call this when population is drafted (implement actual logic where drafting occurs)
+    emitPopulationDrafted(amount = 1, data = {}) {
+        if (window.eventBus) {
+            window.eventBus.emit('population_drafted', { amount, ...data });
+        }
+    }
+
+    // Stub: Call this when population dies (implement actual logic where deaths occur)
+    emitPopulationDied(amount = 1, data = {}) {
+        if (window.eventBus) {
+            window.eventBus.emit('population_died', { amount, ...data });
         }
     }
 
@@ -629,6 +673,27 @@ class AchievementSystem {
     }
 }
 
+
 // Create global instance
 window.achievementSystem = new AchievementSystem();
 console.log('[Achievements] Achievement system ready');
+
+// --- Auto-assign workers on key population/building events ---
+if (window.eventBus && window.villageManager) {
+    // 1. After build completes
+    window.eventBus.on('building_completed', () => {
+        window.villageManager.autoAssignCitizens();
+    });
+    // 2. After population gain
+    window.eventBus.on('population_gained', () => {
+        window.villageManager.autoAssignCitizens();
+    });
+    // 3. After population drafted
+    window.eventBus.on('population_drafted', () => {
+        window.villageManager.autoAssignCitizens();
+    });
+    // 4. When population dies
+    window.eventBus.on('population_died', () => {
+        window.villageManager.autoAssignCitizens();
+    });
+}

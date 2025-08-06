@@ -171,7 +171,8 @@ class ModalSystem {
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
 
-        return modalId;
+        // Resolve the Promise with the modalId
+        resolve(modalId);
     }
 
     _setupModalEventListeners(modal, closable) {
@@ -353,50 +354,114 @@ class ModalSystem {
 
     // Show confirmation dialog
     showConfirmation(message, options = {}) {
-        const {
-            title = 'Confirm',
-            confirmText = 'Yes',
-            cancelText = 'No',
-            onConfirm = null,
-            onCancel = null,
-            type = 'warning'
-        } = options;
+        return new Promise((resolve, reject) => {
+            const {
+                title = 'Confirm',
+                confirmText = 'Yes',
+                cancelText = 'No',
+                onConfirm = null,
+                onCancel = null,
+                type = 'warning',
+                exclusive = false  // New option to close other modals first
+            } = options;
 
-        const content = `
-            <div class="confirmation-dialog">
-                <div class="confirmation-message">${message}</div>
-                <div class="confirmation-buttons">
-                    <button class="btn btn-primary confirm-btn">${confirmText}</button>
-                    <button class="btn btn-secondary cancel-btn">${cancelText}</button>
-                </div>
-            </div>
-        `;
+            // If exclusive, close all other modals first
+            if (exclusive && this.modalStack.length > 0) {
+                console.log('[ModalSystem] Closing all modals for exclusive confirmation');
+                this.closeAllModals();
+                // Wait a moment for modals to close
+                setTimeout(() => this.createConfirmationModal(), 100);
+            } else {
+                this.createConfirmationModal();
+            }
 
-        const modalId = this.showModal({
-            title,
-            content,
-            width: '400px',
-            className: `confirmation-modal confirmation-${type}`,
-            closable: false,
-            showCloseButton: false
+            const createConfirmationModal = () => {
+                const modalType = `confirmation-${type}-${title.toLowerCase().replace(/\s+/g, '-')}`;
+                
+                // Check if this type of confirmation is already active
+                if (this.activeModals.has(modalType)) {
+                    console.log(`[ModalSystem] Confirmation of type '${modalType}' already active`);
+                    resolve(null);
+                    return;
+                }
+
+                const content = `
+                    <div class="confirmation-dialog">
+                        <div class="confirmation-message">${message}</div>
+                        <div class="confirmation-buttons">
+                            <button class="btn btn-primary confirm-btn">${confirmText}</button>
+                            <button class="btn btn-secondary cancel-btn">${cancelText}</button>
+                        </div>
+                    </div>
+                `;
+
+                this.showModal({
+                    title,
+                    content,
+                    width: '400px',
+                    className: `confirmation-modal confirmation-${type}`,
+                    closable: false,
+                    showCloseButton: false,
+                    modalType: modalType
+                }).then(modalId => {
+                    if (!modalId) {
+                        console.error('[ModalSystem] Failed to create confirmation modal');
+                        resolve(null);
+                        return;
+                    }
+
+                    console.log('[ModalSystem] Confirmation modal created with ID:', modalId);
+
+                    // Use setTimeout to ensure modal is fully rendered
+                    setTimeout(() => {
+                        const modal = document.getElementById(modalId);
+                        if (!modal) {
+                            console.error('[ModalSystem] Could not find modal element with ID:', modalId);
+                            resolve(null);
+                            return;
+                        }
+                        
+                        const confirmBtn = modal.querySelector('.confirm-btn');
+                        const cancelBtn = modal.querySelector('.cancel-btn');
+
+                        if (!confirmBtn || !cancelBtn) {
+                            console.error('[ModalSystem] Could not find confirm/cancel buttons in modal');
+                            resolve(null);
+                            return;
+                        }
+
+                        console.log('[ModalSystem] Setting up button event handlers');
+
+                        confirmBtn.addEventListener('click', () => {
+                            console.log('[ModalSystem] Confirm button clicked');
+                            this.closeModal(modalId);
+                            if (onConfirm) {
+                                console.log('[ModalSystem] Calling onConfirm callback');
+                                onConfirm();
+                            }
+                            resolve(true);
+                        });
+
+                        cancelBtn.addEventListener('click', () => {
+                            console.log('[ModalSystem] Cancel button clicked');
+                            this.closeModal(modalId);
+                            if (onCancel) {
+                                console.log('[ModalSystem] Calling onCancel callback');
+                                onCancel();
+                            }
+                            resolve(false);
+                        });
+
+                        console.log('[ModalSystem] Button handlers attached successfully');
+                    }, 200);
+                }).catch(error => {
+                    console.error('[ModalSystem] Error creating confirmation modal:', error);
+                    reject(error);
+                });
+            };
+
+            createConfirmationModal();
         });
-
-        // Setup button handlers
-        const modal = document.getElementById(modalId);
-        const confirmBtn = modal.querySelector('.confirm-btn');
-        const cancelBtn = modal.querySelector('.cancel-btn');
-
-        confirmBtn.addEventListener('click', () => {
-            this.closeModal(modalId);
-            if (onConfirm) onConfirm();
-        });
-
-        cancelBtn.addEventListener('click', () => {
-            this.closeModal(modalId);
-            if (onCancel) onCancel();
-        });
-
-        return modalId;
     }
 
     // Show quest menu (replacing the quest view)
@@ -528,6 +593,10 @@ class ModalSystem {
 
     setupQuestMenuHandlers(modalId, questManager) {
         const modal = document.getElementById(modalId);
+        if (!modal) {
+            console.log('[ModalSystem] Modal not found for quest menu handlers:', modalId);
+            return;
+        }
         
         // Handle expedition start buttons
         modal.querySelectorAll('.expedition-start-btn').forEach(btn => {
@@ -651,6 +720,33 @@ class ModalSystem {
     generateSettingsContent() {
         const settings = this.loadSettings();
         
+        // Load current version
+        let currentVersion = '0.0.1'; // fallback
+        try {
+            // Try to get version from window global (set by version.json)
+            if (window.GAME_VERSION) {
+                currentVersion = window.GAME_VERSION;
+            } else {
+                // Try to fetch from version.json if not already loaded
+                fetch('/public/version.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        currentVersion = data.version || '0.0.1';
+                        window.GAME_VERSION = currentVersion;
+                        // Update the version display if modal is still open
+                        const versionElement = document.getElementById('current-version');
+                        if (versionElement) {
+                            versionElement.textContent = `v${currentVersion}`;
+                        }
+                    })
+                    .catch(() => {
+                        console.log('[Settings] Could not load version.json, using fallback');
+                    });
+            }
+        } catch (error) {
+            console.log('[Settings] Error loading version:', error);
+        }
+        
         return `
             <div class="settings-content">
                 <div class="setting-group">
@@ -692,7 +788,19 @@ class ModalSystem {
                         <button class="btn btn-secondary" onclick="window.modalSystem.importSave()">Import Save</button>
                     </div>
                     <div class="setting-item">
-                        <button class="btn btn-danger" onclick="window.modalSystem.resetGame()">Reset Game</button>
+                        <button class="btn btn-danger" onclick="window.modalSystem.resetGame()">🔄 Restart Game</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h5>ℹ️ Game Information</h5>
+                    <div class="setting-item info-item">
+                        <span class="info-label">Version:</span>
+                        <span id="current-version" class="info-value">v${currentVersion}</span>
+                    </div>
+                    <div class="setting-item info-item">
+                        <span class="info-label">Build:</span>
+                        <span class="info-value">Idle Dynasty Builder</span>
                     </div>
                 </div>
 
@@ -867,17 +975,85 @@ class ModalSystem {
     }
 
     resetGame() {
-        this.showConfirmation(
-            'Are you sure you want to reset your game? This action cannot be undone!',
-            {
-                title: 'Reset Game',
-                type: 'danger',
-                onConfirm: () => {
-                    localStorage.clear();
-                    this.showNotification('Game reset! Reload the page to start fresh.', { type: 'success' });
+        // Check if a reset confirmation is already active
+        const resetModalType = 'confirmation-danger-reset-game';
+        if (this.activeModals.has(resetModalType)) {
+            console.log('[ModalSystem] Reset confirmation already active, ignoring duplicate request');
+            return;
+        }
+
+        try {
+            this.showConfirmation(
+                'Are you sure you want to reset your game? This action cannot be undone!',
+                {
+                    title: 'Reset Game',
+                    type: 'danger',
+                    exclusive: true,  // Close any other modals first
+                    onConfirm: () => {
+                        console.log('[ModalSystem] Reset game confirmed - starting reset process...');
+                        console.log('[ModalSystem] LocalStorage before reset:', Object.keys(localStorage));
+                        console.log('[ModalSystem] Save data exists:', !!localStorage.getItem('idleDynastyBuilder'));
+                        
+                        // Call the main app's resetGame for a full reset (in-memory and storage)
+                        if (window.app && typeof window.app.resetGame === 'function') {
+                            console.log('[ModalSystem] Calling window.app.resetGame()');
+                            window.app.resetGame();
+                        } else if (window.game && typeof window.game.resetGame === 'function') {
+                            console.log('[ModalSystem] Calling window.game.resetGame()');
+                            window.game.resetGame();
+                        } else {
+                            console.log('[ModalSystem] No app.resetGame found, using fallback reset');
+                            // Fallback: Stop any running processes and clear everything
+                            try {
+                                // Stop any auto-play or game loops
+                                if (window.gameState && window.gameState.stopAutoPlay) {
+                                    console.log('[ModalSystem] Stopping auto-play...');
+                                    window.gameState.stopAutoPlay();
+                                }
+                                if (window.game && window.game.stopGameLoop) {
+                                    console.log('[ModalSystem] Stopping game loop...');
+                                    window.game.stopGameLoop();
+                                }
+                                
+                                console.log('[ModalSystem] Clearing localStorage...');
+                                // Clear all storage
+                                localStorage.clear();
+                                sessionStorage.clear();
+                                
+                                console.log('[ModalSystem] LocalStorage after clear:', Object.keys(localStorage));
+                                console.log('[ModalSystem] Reloading page...');
+                                
+                                // Force full page reload to start completely fresh
+                                location.href = location.href.split('?')[0]; // Remove any query params
+                            } catch (error) {
+                                console.error('[ModalSystem] Error during fallback reset:', error);
+                                location.reload(); // Last resort
+                            }
+                        }
+                    }
                 }
-            }
-        );
+            ).then(result => {
+                if (result === null) {
+                    console.log('[ModalSystem] Confirmation dialog failed to show properly');
+                }
+                // If result is the modal ID or true/false, the confirmation was shown successfully
+                console.log('[ModalSystem] Confirmation dialog shown successfully');
+            }).catch(error => {
+                console.error('[ModalSystem] Failed to show confirmation dialog:', error);
+                // Fallback to direct reset if modal system fails
+                console.log('[ModalSystem] Using direct reset fallback');
+                localStorage.clear();
+                sessionStorage.clear();
+                location.reload();
+            });
+        } catch (error) {
+            console.error('[ModalSystem] Error in resetGame:', error);
+            // Emergency fallback - just do the reset without confirmation
+            console.log('[ModalSystem] Modal system failed, performing emergency reset');
+            localStorage.clear();
+            sessionStorage.clear();
+            location.reload();
+        }
     }
 
     // Show unlock requirement modal
