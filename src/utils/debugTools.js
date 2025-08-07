@@ -284,16 +284,117 @@ class DebugTools {
                 }
             },
             
+            generatePop: (count = 20) => {
+                if (window.gameState && window.gameState.generateMassPopulation) {
+                    const generated = window.gameState.generateMassPopulation(count);
+                    console.log(`[DebugTools] Generated ${count} villagers. Total population: ${window.gameState.population}`);
+                    return generated;
+                } else {
+                    console.error('[DebugTools] GameState or generateMassPopulation not available');
+                    return null;
+                }
+            },
+
+            agePopulation: (days = 1) => {
+                if (window.gameState && window.gameState.populationManager) {
+                    const before = window.gameState.populationManager.getAll().length;
+                    let totalDeaths = 0;
+                    
+                    for (let i = 0; i < days; i++) {
+                        const result = window.gameState.populationManager.processAging();
+                        totalDeaths += result.deaths;
+                    }
+                    
+                    const after = window.gameState.populationManager.getAll().length;
+                    window.gameState.population = after; // Update game state
+                    
+                    console.log(`[DebugTools] Aged population by ${days} day(s). Deaths: ${totalDeaths}, Population: ${before} -> ${after}`);
+                    
+                    if (window.gameState.updateResourceDisplay) {
+                        window.gameState.updateResourceDisplay();
+                    }
+                    
+                    return { daysPassed: days, deaths: totalDeaths, beforePop: before, afterPop: after };
+                } else {
+                    console.error('[DebugTools] PopulationManager not available');
+                    return null;
+                }
+            },
+
+            ageVillager: (villagerId, newAge) => {
+                if (window.gameState && window.gameState.populationManager) {
+                    const villager = window.gameState.populationManager.getInhabitant(villagerId);
+                    if (villager) {
+                        const oldAge = villager.age;
+                        villager.age = newAge;
+                        console.log(`[DebugTools] ${villager.name} aged from ${oldAge} to ${newAge} days`);
+                        return villager;
+                    } else {
+                        console.error(`[DebugTools] Villager with ID ${villagerId} not found`);
+                        return null;
+                    }
+                } else {
+                    console.error('[DebugTools] PopulationManager not available');
+                    return null;
+                }
+            },
+
+            showPopGroups: () => {
+                if (window.gameState && window.gameState.populationManager) {
+                    const groups = window.gameState.populationManager.getPopulationGroups();
+                    console.log('[DebugTools] Population Groups:');
+                    console.log('Age Groups:', groups.ageGroups);
+                    console.log('Job Groups:', groups.jobGroups);
+                    console.log('Demographics:', groups.demographics);
+                    return groups;
+                } else {
+                    console.error('[DebugTools] PopulationManager not available');
+                    return null;
+                }
+            },
+
+            createElders: (count = 5) => {
+                if (window.gameState && window.gameState.populationManager) {
+                    const before = window.gameState.populationManager.getAll().length;
+                    
+                    for (let i = 0; i < count; i++) {
+                        window.gameState.populationManager.addInhabitant({ 
+                            age: 180 + Math.floor(Math.random() * 15), // Age 180-194, close to death
+                            status: 'idle' 
+                        });
+                    }
+                    
+                    const after = window.gameState.populationManager.getAll().length;
+                    window.gameState.population = after;
+                    
+                    console.log(`[DebugTools] Created ${count} elderly villagers (age 180-194). Population: ${before} -> ${after}`);
+                    
+                    if (window.gameState.updateResourceDisplay) {
+                        window.gameState.updateResourceDisplay();
+                    }
+                    
+                    return { created: count, beforePop: before, afterPop: after };
+                } else {
+                    console.error('[DebugTools] PopulationManager not available');
+                    return null;
+                }
+            },
+            
             help: () => {
                 console.log(`
 🔧 Dynasty Builder Debug Commands:
-  debugCommands.health()           - Check system health
-  debugCommands.snapshot(name)     - Create state snapshot
-  debugCommands.restore(index)     - Restore from snapshot
-  debugCommands.listSnapshots()    - List all snapshots
-  debugCommands.errors()           - Show recent errors
-  debugCommands.reset(systemName)  - Reset specific system
-  debugCommands.help()             - Show this help
+  debugCommands.health()             - Check system health
+  debugCommands.snapshot(name)       - Create state snapshot
+  debugCommands.restore(index)       - Restore from snapshot
+  debugCommands.listSnapshots()      - List all snapshots
+  debugCommands.errors()             - Show recent errors
+  debugCommands.reset(systemName)    - Reset specific system
+  debugCommands.generatePop(count)   - Generate population (default: 20)
+  debugCommands.agePopulation(days)  - Age all villagers by X days
+  debugCommands.ageVillager(id, age) - Set specific villager's age
+  debugCommands.showPopGroups()      - Show population groups breakdown
+  debugCommands.createElders(count)  - Create elderly villagers (default: 5)
+  debugCommands.help()               - Show this help
                 `);
             }
         };

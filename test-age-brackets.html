@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Age Bracket Test</title>
+</head>
+<body>
+    <h1>Age Bracket Testing</h1>
+    <div id="output"></div>
+
+    <script src="src/populationManager.js"></script>
+    <script>
+        // Test the tripled age brackets
+        const pm = new PopulationManager();
+        
+        // Add test villagers at key ages
+        const testAges = [0, 10, 27, 28, 35, 45, 46, 60, 75, 76, 100, 150, 151, 180, 197, 198, 200];
+        
+        testAges.forEach((age, index) => {
+            pm.addInhabitant({
+                name: `Test${index}`,
+                age: age,
+                gender: index % 2 === 0 ? 'male' : 'female'
+            });
+        });
+        
+        // Test population groups
+        const groups = pm.getPopulationGroups();
+        
+        let output = '<h2>Age Bracket Distribution:</h2>';
+        Object.entries(groups.ageGroups).forEach(([key, group]) => {
+            output += `<p><strong>${group.name}</strong> (${group.age}): ${group.count} villagers</p>`;
+            group.villagers.forEach(v => {
+                output += `&nbsp;&nbsp;- ${v.name} (age ${v.age})<br>`;
+            });
+        });
+        
+        output += '<h2>Demographics:</h2>';
+        output += `<p>Working Age (28-180): ${groups.demographics.workingAge}</p>`;
+        output += `<p>Average Age: ${groups.demographics.averageAge}</p>`;
+        
+        // Test breeding population
+        output += '<h2>Breeding Population (Adults + Middle-Aged):</h2>';
+        const breedingPop = pm.population.filter(p => p.age >= 46 && p.age <= 150);
+        output += `<p>Breeding Age Population (46-150): ${breedingPop.length}</p>`;
+        breedingPop.forEach(v => {
+            output += `&nbsp;&nbsp;- ${v.name} (age ${v.age})<br>`;
+        });
+        
+        // Test aging and death
+        output += '<h2>Death Testing:</h2>';
+        const deathResult = pm.processAging();
+        output += `<p>Deaths from aging: ${deathResult.deaths}</p>`;
+        if (deathResult.diedVillagers.length > 0) {
+            deathResult.diedVillagers.forEach(v => {
+                output += `&nbsp;&nbsp;- ${v.name} died at age ${v.age}<br>`;
+            });
+        }
+        
+        document.getElementById('output').innerHTML = output;
+    </script>
+</body>
+</html>

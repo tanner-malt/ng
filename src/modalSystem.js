@@ -89,6 +89,19 @@ class ModalSystem {
                     this.closeTopModal();
                 }
             }
+            
+            // Handle Enter key for modals with OK buttons
+            if (e.key === 'Enter' && this.modalStack.length > 0) {
+                const topModal = this.modalStack[this.modalStack.length - 1];
+                const modalElement = topModal.element;
+                
+                // Look for OK button, confirm button, or close button
+                const okButton = modalElement.querySelector('.btn-primary, .message-confirm, .modal-close-btn');
+                if (okButton && topModal.closable !== false) {
+                    e.preventDefault();
+                    okButton.click();
+                }
+            }
         });
     }
 
@@ -122,9 +135,22 @@ class ModalSystem {
 
         // Prevent multiple instances of the same modal type
         if (modalType && this.activeModals.has(modalType)) {
-            console.log(`[ModalSystem] Modal type '${modalType}' already active`);
+            console.log(`[ModalSystem] Modal type '${modalType}' already active, rejecting duplicate`);
             resolve(null);
             return;
+        }
+        
+        // Special handling for tutorial modals - only allow one tutorial modal at a time
+        if (modalType && modalType.includes('tutorial') || className.includes('tutorial')) {
+            const existingTutorial = Array.from(this.activeModals).find(id => 
+                id.includes('tutorial') || 
+                (this.modalStack.find(m => m.id === id)?.element?.classList?.contains('tutorial-modal'))
+            );
+            if (existingTutorial) {
+                console.log(`[ModalSystem] Tutorial modal already active (${existingTutorial}), rejecting duplicate`);
+                resolve(null);
+                return;
+            }
         }
 
         const modalId = modalType || id;

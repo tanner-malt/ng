@@ -30,6 +30,7 @@ class WorldManager {
         this.mapHeight = 3; // 3 rows for compact grid (but hexagonal offset will reduce visible tiles)
         this.selectedHex = null;
         this.playerVillageHex = null;
+        this.selectedArmy = null;
         
         // Hex map data structure
         this.hexMap = [];
@@ -49,6 +50,32 @@ class WorldManager {
         if (typeof window !== 'undefined') {
             window.worldManager = this;
             console.log('[World] WorldManager instance set globally');
+            
+            // Add safe world manager call function
+            window.safeWorldManagerCall = (methodName, ...args) => {
+                try {
+                    console.log(`[World] safeWorldManagerCall: ${methodName}`, args);
+                    console.log(`[World] window.worldManager exists:`, !!window.worldManager);
+                    console.log(`[World] method exists:`, !!window.worldManager?.[methodName]);
+                    
+                    if (window.worldManager && typeof window.worldManager[methodName] === 'function') {
+                        console.log(`[World] Safely calling ${methodName} with args:`, args);
+                        return window.worldManager[methodName](...args);
+                    } else {
+                        console.error(`[World] WorldManager method ${methodName} not available`, {
+                            worldManagerExists: !!window.worldManager,
+                            methodExists: !!window.worldManager?.[methodName],
+                            methodType: typeof window.worldManager?.[methodName]
+                        });
+                        window.showToast(`⚠️ Feature temporarily unavailable: ${methodName}`, { type: 'warning' });
+                        return false;
+                    }
+                } catch (error) {
+                    console.error(`[World] Error calling ${methodName}:`, error);
+                    window.showToast(`❌ Error: ${error.message}`, { type: 'error' });
+                    return false;
+                }
+            };
         }
     }
     
@@ -268,6 +295,27 @@ class WorldManager {
             window.addEventListener('resize', this.resizeHandler);
         }
     }
+
+    // Method to refresh army positions without full re-render
+    refreshArmyPositions() {
+        const container = document.getElementById('hex-overlay');
+        if (!container) return;
+        
+        // Re-render the entire map to update army positions
+        this.renderHexMap();
+    }
+
+    // Method to update army displays and info panels
+    updateArmyDisplays() {
+        // Refresh the map to show updated army positions
+        this.refreshArmyPositions();
+        
+        // Update the info panel if a hex is currently selected
+        if (this.selectedHex) {
+            const hex = this.hexMap[this.selectedHex.row][this.selectedHex.col];
+            this.updateHexInfoPanel(hex, this.selectedHex.row, this.selectedHex.col);
+        }
+    }
     
     createSquareGrid(container) {
         // Wait for container to be properly sized
@@ -373,8 +421,17 @@ class WorldManager {
             squareButton.style.boxShadow = '0 0 10px rgba(241, 196, 15, 0.5)';
         }
         
-        // Add terrain symbol
-        if (hex.discovered) {
+        // Check if there's an army at this position
+        const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
+        
+        // Add terrain symbol or army indicator
+        if (armyAtPosition) {
+            // Show army with different styling
+            squareButton.innerHTML = `<div style="position: relative;">
+                <div style="position: absolute; top: -2px; left: -2px; background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚔</div>
+                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '?'}</span>
+            </div>`;
+        } else if (hex.discovered) {
             squareButton.textContent = hex.symbol;
             squareButton.style.color = '#fff';
             squareButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
@@ -390,10 +447,17 @@ class WorldManager {
             squareButton.classList.add('selected');
             squareButton.style.transform = 'scale(1.1)';
             squareButton.style.background = this._brightenColor(hex.color || '#888', 0.4);
-            squareButton.style.border = hex.isPlayerVillage 
-                ? '3px solid #f1c40f' 
-                : '3px solid #fff';
-            squareButton.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
+            
+            // Different border for army selection vs hex selection
+            if (this.selectedArmy) {
+                squareButton.style.border = '3px solid #e74c3c'; // Red for army
+                squareButton.style.boxShadow = '0 0 15px rgba(231, 76, 60, 0.8)';
+            } else {
+                squareButton.style.border = hex.isPlayerVillage 
+                    ? '3px solid #f1c40f' 
+                    : '3px solid #fff';
+                squareButton.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
+            }
             squareButton.style.zIndex = '10';
         }
         
@@ -449,6 +513,17 @@ class WorldManager {
         const hex = this.hexMap[row][col];
         if (!hex) return;
         
+        // Check if we're trying to move an army
+        if (this.selectedArmy && this.selectedArmy.position.x !== col && this.selectedArmy.position.y !== row) {
+            // Attempt to move the selected army to this hex
+            const success = this.gameState.moveArmy(this.selectedArmy.id, { x: col, y: row });
+            if (success) {
+                this.selectedArmy = null; // Clear army selection after successful move
+                this.updateArmyDisplays();
+                return;
+            }
+        }
+        
         // Clear previous selection
         const previousSelected = document.querySelector('.tile-button.selected');
         if (previousSelected) {
@@ -472,6 +547,21 @@ class WorldManager {
         this.selectedHex = { row, col };
         this.updateHexInfoPanel(hex, row, col);
         
+        // Check if there's an army at this location
+        const armyAtLocation = this.gameState.getArmyAt({ x: col, y: row });
+        if (armyAtLocation) {
+            this.selectedArmy = armyAtLocation;
+            if (window.showToast) {
+                window.showToast(`⚔️ Army "${armyAtLocation.name}" selected. Click another tile to move.`, {
+                    icon: '👆',
+                    type: 'info',
+                    timeout: 3000
+                });
+            }
+        } else {
+            this.selectedArmy = null;
+        }
+        
         // Highlight the new selection
         const newSelected = document.querySelector(`button[data-row="${row}"][data-col="${col}"]`);
         if (newSelected) {
@@ -480,8 +570,10 @@ class WorldManager {
             newSelected.style.background = this._brightenColor(hex.color || '#888', 0.4);
             newSelected.style.border = hex.isPlayerVillage 
                 ? '3px solid #f1c40f' 
-                : '3px solid #fff';
-            newSelected.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
+                : armyAtLocation ? '3px solid #ff6b6b' : '3px solid #fff';
+            newSelected.style.boxShadow = armyAtLocation 
+                ? '0 0 15px rgba(255,107,107,0.8)'
+                : '0 0 15px rgba(255,255,255,0.8)';
             newSelected.style.zIndex = '10';
         }
     }
@@ -547,6 +639,9 @@ class WorldManager {
         const panel = document.getElementById('hex-info-panel');
         if (!panel) return;
         
+        // Check for armies at this position
+        const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
+        
         let content = `
             <h4>📍 Hex (${row}, ${col})</h4>
             <div class="hex-details">
@@ -554,6 +649,27 @@ class WorldManager {
                 <p><strong>Weather:</strong> ${this.getWeatherIcon(hex.weather)} ${hex.weather}</p>
                 <p><strong>Elevation:</strong> ${'⬆'.repeat(hex.elevation) || 'Sea level'}</p>
         `;
+
+        // Show army information if present
+        if (armyAtPosition) {
+            const foodUpkeep = armyAtPosition.units.length * 2; // 2 food per unit per day
+            content += `
+                <div class="army-info" style="border: 2px solid #e74c3c; border-radius: 8px; padding: 10px; margin: 10px 0; background: rgba(231, 76, 60, 0.1);">
+                    <h5>⚔️ Army: ${armyAtPosition.name}</h5>
+                    <p><strong>Units:</strong> ${armyAtPosition.units.length}</p>
+                    <p><strong>Food Upkeep:</strong> ${foodUpkeep}/day</p>
+                    ${armyAtPosition.isMoving ? 
+                        `<p><strong>Status:</strong> 🚶 Moving to (${armyAtPosition.movementTarget.x}, ${armyAtPosition.movementTarget.y})</p>
+                         <p><strong>Progress:</strong> ${Math.round(armyAtPosition.movementProgress * 100)}%</p>` :
+                        `<p><strong>Status:</strong> 🛡️ Stationed</p>`
+                    }
+                    ${this.selectedArmy && this.selectedArmy.id === armyAtPosition.id ? 
+                        `<p style="color: #e74c3c; font-weight: bold;">📍 SELECTED - Click another tile to move</p>` : 
+                        ''
+                    }
+                </div>
+            `;
+        }
         
         if (hex.isPlayerVillage) {
             content += `
@@ -587,7 +703,7 @@ class WorldManager {
         if (hex.discovered) {
             content += `
                 <div class="hex-actions">
-                    <button class="action-btn secondary" onclick="worldManager.exploreHex(${row}, ${col})">
+                    <button class="action-btn secondary" onclick="window.safeWorldManagerCall?.('exploreHex', ${row}, ${col}) || (window.worldManager && window.worldManager.exploreHex?.(${row}, ${col}))">
                         🔍 Explore Further
                     </button>
                 </div>
@@ -695,12 +811,48 @@ class WorldManager {
             ? this.gameState.getDynastyName()
             : (this.game?.tutorialManager?.getDynastyName?.() || 'Noble');
 
+        // Get available villagers for drafting
+        let availableVillagers = [];
+        let totalPopulation = this.gameState.population || 0;
+        
+        if (this.gameState.populationManager) {
+            const allVillagers = this.gameState.populationManager.getAll();
+            availableVillagers = allVillagers.filter(villager => 
+                villager.age >= 16 && // Only adults
+                villager.status !== 'drafted' && 
+                villager.status !== 'sick' &&
+                villager.canWork // Only those able to work
+            );
+            totalPopulation = allVillagers.filter(v => v.status !== 'drafted').length;
+        }
+
+        // Generate companion options from actual villagers
+        let companionOptions = '';
+        if (availableVillagers.length > 0) {
+            // Take up to 10 available villagers for selection
+            const selectableVillagers = availableVillagers.slice(0, 10);
+            
+            selectableVillagers.forEach((villager, index) => {
+                const roleDescription = this.getVillagerDescription(villager);
+                const isPreSelected = index < 3; // Pre-select first 3
+                
+                companionOptions += `
+                    <label style="display: block; margin: 5px 0;">
+                        <input type="checkbox" name="companion" value="${villager.id}" ${isPreSelected ? 'checked' : ''} style="margin-right: 8px;">
+                        <span>${villager.name} (${roleDescription})</span>
+                    </label>
+                `;
+            });
+        } else {
+            companionOptions = '<p style="color: #e74c3c;">⚠️ No eligible villagers available for drafting. You need adults (16+) who are not sick or already drafted.</p>';
+        }
+
         const draftingContent = `
             <div class="army-drafting" style="padding: 20px;">
                 <h3>⚔️ Draft Army</h3>
                 <p>Select inhabitants to form your expedition army. You'll need supplies and brave souls willing to venture beyond the village walls.</p>
                 <div class="inhabitant-selection">
-                    <h4>👥 Available Inhabitants (Population: ${this.gameState.population || 25})</h4>
+                    <h4>👥 Available Inhabitants (Population: ${totalPopulation})</h4>
                     <div class="draft-options" style="margin: 15px 0;">
                         <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
                             <h5>👑 Commander (Required)</h5>
@@ -711,25 +863,22 @@ class WorldManager {
                             <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">As commander, you lead the expedition but cannot manage the village while away.</p>
                         </div>
                         <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #2ecc71; border-radius: 8px;">
-                            <h5>👥 Companions (Select up to 3)</h5>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="companion" value="peasant1" checked style="margin-right: 8px;">
-                                <span>Willem the Farmer (Hardy and reliable)</span>
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="companion" value="peasant2" checked style="margin-right: 8px;">
-                                <span>Sarah the Woodcutter (Strong and resourceful)</span>
-                            </label>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="checkbox" name="companion" value="peasant3" style="margin-right: 8px;">
-                                <span>Old Marcus the Hunter (Experienced tracker)</span>
-                            </label>
+                            <h5>👥 Companions (Select up to ${Math.min(availableVillagers.length, 10)})</h5>
+                            ${companionOptions}
                             <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">Selected inhabitants will leave the village, reducing local workforce.</p>
                         </div>
                     </div>
                 </div>
                 <div class="draft-warning" style="padding: 10px; background-color: rgba(230, 126, 34, 0.2); border-radius: 5px; margin-top: 15px;">
                     <p><strong>⚠️ Important:</strong> While your army is deployed, village operations will continue automatically but you cannot give direct commands.</p>
+                </div>
+                <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <button id="cancel-draft-btn" class="btn btn-secondary" style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button id="confirm-draft-btn" class="btn btn-primary" style="padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        ⚔️ Form Army
+                    </button>
                 </div>
             </div>
         `;
@@ -744,24 +893,35 @@ class WorldManager {
                 className: 'army-drafting-modal',
                 modalType: 'army-drafting'
             }).then(() => {
-                // Add confirm/cancel buttons manually or use showConfirmation
-                window.modalSystem.showConfirmation(
-                    'Form this army with the current population?',
-                    {
-                        title: 'Confirm Army Formation',
-                        confirmText: 'Form Army',
-                        cancelText: 'Cancel',
-                        onConfirm: () => {
-                            this.createArmy();
-                        }
-                    }
-                );
+                // Add event listeners to the buttons after modal is shown
+                const confirmBtn = document.getElementById('confirm-draft-btn');
+                const cancelBtn = document.getElementById('cancel-draft-btn');
+                
+                if (confirmBtn) {
+                    confirmBtn.addEventListener('click', () => {
+                        this.createArmy();
+                        window.modalSystem.closeTopModal();
+                    });
+                }
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => {
+                        window.modalSystem.closeTopModal();
+                    });
+                }
             });
         }
         // Fallback to showModal if available
         else if (window.showModal) {
             console.log('[World] Using window.showModal fallback');
-            window.showModal('Army Drafting', draftingContent);
+            window.showModal('Army Drafting', draftingContent, {
+                icon: '⚔️',
+                confirmText: 'Form Army',
+                cancelText: 'Cancel',
+                onConfirm: () => {
+                    this.createArmy();
+                }
+            });
         } else {
             console.error('[World] No modal system available');
             // Final fallback - simple alert with instructions
@@ -776,31 +936,66 @@ class WorldManager {
         const selectedCompanions = [];
         const companionInputs = document.querySelectorAll('input[name="companion"]:checked');
         
+        // Store villager IDs for actual drafting
+        const selectedVillagerIds = [];
         companionInputs.forEach(input => {
-            const companionNames = {
-                'peasant1': 'Willem the Farmer',
-                'peasant2': 'Sarah the Woodcutter', 
-                'peasant3': 'Old Marcus the Hunter'
-            };
-            selectedCompanions.push({
-                name: companionNames[input.value] || input.value,
-                role: 'Companion',
-                type: 'peasant'
-            });
+            selectedVillagerIds.push(input.value);
         });
         
         // Create unique army ID
         const armyId = `army-${Date.now()}`;
         const armyNumber = this.parties.expeditions.length + 1;
+        const armyName = `${armyNumber}${this.getOrdinalSuffix(armyNumber)} Army`;
         
-        // Create the army
-        const army = {
+        // Create army units array for the new system
+        const armyUnits = [
+            { id: 'commander', name: 'Yourself', role: 'Commander', type: 'ruler', health: 100, attack: 20, experience: 0 }
+        ];
+        
+        // Draft villagers from the population manager
+        if (this.gameState.populationManager && selectedVillagerIds.length > 0) {
+            selectedVillagerIds.forEach(villagerId => {
+                const villager = this.gameState.populationManager.getInhabitant(parseInt(villagerId));
+                if (villager && villager.status !== 'drafted') {
+                    // Mark villager as drafted
+                    this.gameState.populationManager.updateStatus(villager.id, 'drafted');
+                    
+                    // Add to army units
+                    armyUnits.push({
+                        id: `unit_${villager.id}`,
+                        name: villager.name,
+                        role: 'Soldier',
+                        type: 'villager',
+                        villagerId: villager.id,
+                        health: 80,
+                        attack: 10 + Math.floor(villager.age / 10), // Age affects combat ability
+                        experience: 0,
+                        age: villager.age
+                    });
+                }
+            });
+            
+            // Update population count to reflect drafted villagers
+            this.gameState.population = this.gameState.populationManager.getAll()
+                .filter(v => v.status !== 'drafted').length;
+                
+            console.log(`[WorldManager] Drafted ${armyUnits.length - 1} villagers for army. Remaining population: ${this.gameState.population}`);
+        }
+        
+        // Create army using new system (starts at village location)
+        const newArmy = this.gameState.createArmy(armyName, armyUnits, this.playerVillageHex);
+        
+        // Legacy expedition tracking (for UI compatibility)
+        const legacyArmy = {
             id: armyId,
-            name: `${armyNumber}${this.getOrdinalSuffix(armyNumber)} Army`,
-            members: [
-                { name: 'Yourself', role: 'Commander', type: 'ruler' },
-                ...selectedCompanions
-            ],
+            name: armyName,
+            members: armyUnits.map(unit => ({
+                name: unit.name,
+                role: unit.role,
+                type: unit.type,
+                villagerId: unit.villagerId,
+                age: unit.age
+            })),
             morale: 100,
             supplies: {
                 food: 0,
@@ -808,23 +1003,47 @@ class WorldManager {
                 equipment: 'basic'
             },
             location: this.playerVillageHex,
-            status: 'ready'
+            status: 'ready',
+            draftedVillagers: armyUnits.filter(u => u.type === 'villager').map(u => ({
+                id: u.villagerId,
+                name: u.name,
+                originalRole: 'Companion',
+                age: u.age
+            })),
+            armyId: newArmy.id // Link to new army system
         };
         
-        this.parties.expeditions.push(army);
+        this.parties.expeditions.push(legacyArmy);
         this.updateExpeditionsList();
         
-        // Reduce village population by number of drafted members
-        if (this.gameState && this.gameState.population) {
-            this.gameState.population -= army.members.length;
-            this.gameState.updateUI?.();
+        // Update UI
+        if (this.gameState.updateResourceDisplay) {
+            this.gameState.updateResourceDisplay();
+        } else if (this.gameState.updateUI) {
+            this.gameState.updateUI();
         }
         
-        window.showToast(`⚔️ ${army.name} formed! ${army.members.length} members ready for deployment.`, {
-            icon: '🎉',
-            type: 'success',
-            timeout: 4000
-        });
+        // Show army created notification
+        if (window.showToast) {
+            window.showToast(`⚔️ Army "${armyName}" has been formed with ${armyUnits.length} members at village!`, {
+                icon: '🏗️',
+                type: 'success',
+                timeout: 5000
+            });
+        }
+        
+        // Emit population drafted event for achievements
+        if (window.eventBus) {
+            window.eventBus.emit('population_drafted', { amount: armyUnits.length - 1 }); // -1 for commander
+        }
+        
+        // Achievement system notification
+        if (window.achievementSystem) {
+            window.achievementSystem.emitPopulationDrafted(armyUnits.length - 1, { armyId: armyId });
+        }
+        
+        // Update army displays to show the new army on the map
+        this.updateArmyDisplays();
         
         // Show logistics tutorial after a brief delay
         setTimeout(() => {
@@ -832,6 +1051,32 @@ class WorldManager {
         }, 2000);
     }
     
+    getVillagerDescription(villager) {
+        const age = villager.age;
+        const role = villager.role || 'peasant';
+        
+        // Age categories
+        let ageDesc = '';
+        if (age < 20) ageDesc = 'Young';
+        else if (age < 30) ageDesc = 'Adult';
+        else if (age < 40) ageDesc = 'Experienced';
+        else ageDesc = 'Veteran';
+        
+        // Role descriptions
+        const roleDescs = {
+            'peasant': 'Hardy worker',
+            'farmer': 'Experienced with crops',
+            'builder': 'Skilled in construction',
+            'guard': 'Trained in combat',
+            'scout': 'Quick and observant',
+            'crafter': 'Skilled artisan'
+        };
+        
+        const roleDesc = roleDescs[role] || 'Willing worker';
+        
+        return `${ageDesc} ${roleDesc}, age ${age}`;
+    }
+
     getOrdinalSuffix(num) {
         const lastDigit = num % 10;
         const lastTwoDigits = num % 100;
@@ -849,6 +1094,9 @@ class WorldManager {
     }
     
     updateExpeditionsList() {
+        // Ensure global reference is maintained when updating UI
+        window.worldManager = this;
+        
         const list = document.getElementById('expedition-list');
         if (!list) return;
         
@@ -867,17 +1115,20 @@ class WorldManager {
                     <p><strong>Status:</strong> ${army.status}</p>
                     
                     <div class="expedition-actions">
-                        <button class="action-btn small" onclick="worldManager.manageLogistics('${army.id}')">
+                        <button class="action-btn small" onclick="window.safeWorldManagerCall?.('manageLogistics', '${army.id}') || (window.worldManager && window.worldManager.manageLogistics?.('${army.id}'))">
                             📦 Manage Logistics
                         </button>
-                        <button class="action-btn small secondary" onclick="worldManager.renameArmy('${army.id}')">
+                        <button class="action-btn small secondary" onclick="window.safeWorldManagerCall?.('renameArmy', '${army.id}') || (window.worldManager && window.worldManager.renameArmy?.('${army.id}'))">
                             ✏️ Rename
                         </button>
-                        <button class="action-btn small" onclick="worldManager.viewComposition('${army.id}')">
+                        <button class="action-btn small" onclick="window.safeWorldManagerCall?.('viewComposition', '${army.id}') || (window.worldManager && window.worldManager.viewComposition?.('${army.id}'))">
                             👥 View Composition
                         </button>
-                        <button class="action-btn small primary" onclick="worldManager.travel('${army.id}')">
+                        <button class="action-btn small primary" onclick="window.safeWorldManagerCall?.('travel', '${army.id}') || (window.worldManager && window.worldManager.travel?.('${army.id}'))">
                             🚶 Travel
+                        </button>
+                        <button class="action-btn small danger" onclick="window.safeWorldManagerCall?.('disbandArmy', '${army.id}') || (window.worldManager && window.worldManager.disbandArmy?.('${army.id}'))">
+                            ❌ Disband
                         </button>
                     </div>
                 </div>
@@ -887,10 +1138,94 @@ class WorldManager {
         list.innerHTML = content;
     }
     
-    manageLogistics(armyId) {
+    disbandArmy(armyId) {
         const army = this.parties.expeditions.find(a => a.id === armyId);
         if (!army) {
-            console.error('[World] Army not found:', armyId);
+            console.error('[WorldManager] Army not found:', armyId);
+            return;
+        }
+        
+        // Confirm disbanding
+        if (window.modalSystem) {
+            window.modalSystem.showConfirmation(
+                `Are you sure you want to disband ${army.name}? All members will return to the village.`,
+                {
+                    title: 'Disband Army',
+                    confirmText: 'Disband',
+                    cancelText: 'Cancel',
+                    onConfirm: () => {
+                        this.performDisbandArmy(armyId);
+                    }
+                }
+            );
+        } else if (confirm(`Disband ${army.name}? All members will return to the village.`)) {
+            this.performDisbandArmy(armyId);
+        }
+    }
+    
+    performDisbandArmy(armyId) {
+        const armyIndex = this.parties.expeditions.findIndex(a => a.id === armyId);
+        if (armyIndex === -1) return;
+        
+        const army = this.parties.expeditions[armyIndex];
+        
+        // Return drafted villagers to the population
+        if (this.gameState.populationManager && army.draftedVillagers) {
+            army.draftedVillagers.forEach(draftedVillager => {
+                const villager = this.gameState.populationManager.getInhabitant(draftedVillager.id);
+                if (villager) {
+                    // Restore original status
+                    this.gameState.populationManager.updateStatus(villager.id, 'idle');
+                    // Restore original role if it was changed
+                    if (draftedVillager.originalRole && villager.role !== draftedVillager.originalRole) {
+                        this.gameState.populationManager.assignRole(villager.id, draftedVillager.originalRole);
+                    }
+                }
+            });
+            
+            // Update population count
+            this.gameState.population = this.gameState.populationManager.getAll()
+                .filter(v => v.status !== 'drafted').length;
+        } else {
+            // Fallback: simple population addition
+            const returningMembers = army.members.length - 1; // -1 for commander (yourself)
+            if (this.gameState && typeof this.gameState.population === 'number') {
+                this.gameState.population += returningMembers;
+            }
+        }
+        
+        // Remove army from expeditions
+        this.parties.expeditions.splice(armyIndex, 1);
+        
+        // Update UI
+        this.updateExpeditionsList();
+        if (this.gameState.updateResourceDisplay) {
+            this.gameState.updateResourceDisplay();
+        } else if (this.gameState.updateUI) {
+            this.gameState.updateUI();
+        }
+        
+        // Emit population returned event
+        if (window.eventBus) {
+            window.eventBus.emit('population_returned', { 
+                amount: army.draftedVillagers ? army.draftedVillagers.length : army.members.length - 1,
+                armyName: army.name
+            });
+        }
+        
+        window.showToast(`🏠 ${army.name} disbanded! Members have returned to the village.`, {
+            icon: '✅',
+            type: 'success',
+            timeout: 3000
+        });
+    }
+    
+    manageLogistics(armyId) {
+        console.log('[World] manageLogistics called with armyId:', armyId);
+        console.log('[World] this.parties.expeditions:', this.parties.expeditions);
+        const army = this.parties.expeditions.find(a => a.id === armyId);
+        if (!army) {
+            console.error('[World] Army not found:', armyId, 'Available armies:', this.parties.expeditions.map(a => a.id));
             return;
         }
         
@@ -914,7 +1249,7 @@ class WorldManager {
                         <p style="color: ${army.supplies.food > 0 ? '#27ae60' : '#e74c3c'};">
                             ${army.supplies.food > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
                         </p>
-                        <button class="action-btn" onclick="worldManager.addSupply('${armyId}', 'food', 7)" 
+                        <button class="action-btn" onclick="window.safeWorldManagerCall?.('addSupply', '${armyId}', 'food', 7) || (window.worldManager && window.worldManager.addSupply?.('${armyId}', 'food', 7))" 
                                 style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
                                 ${currentFood < 21 ? 'disabled' : ''}>
                             Add 7 Days Food (-21 food) ${currentFood < 21 ? '(Not enough food)' : ''}
@@ -1093,6 +1428,7 @@ class WorldManager {
     }
     
     travel(armyId) {
+        console.log('[World] travel called with armyId:', armyId);
         // Start travel mechanics - this will be enhanced in later phases
         window.showToast('🚶 Travel system coming in next tutorial phase!', {
             icon: '🗺️',
@@ -1111,8 +1447,12 @@ class WorldManager {
     }
     
     viewComposition(armyId) {
+        console.log('[World] viewComposition called with armyId:', armyId);
         const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) return;
+        if (!army) {
+            console.error('[World] Army not found for viewComposition:', armyId, 'Available armies:', this.parties.expeditions.map(a => a.id));
+            return;
+        }
         
         let compositionContent = `
             <div class="army-composition">

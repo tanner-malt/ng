@@ -168,7 +168,7 @@ const GameData = {
         stone: 0,
         metal: 0,
         gold: 0,
-        population: 0
+        population: 1  // Start with 1 population (the player)
     },
 
     // Resource caps (population cap is calculated dynamically based on houses)
@@ -240,22 +240,21 @@ const GameData = {
 
     // ===== POPULATION SYSTEM =====
     // ===== POPULATION SYSTEM DEFAULTS =====
-    // Age is stored in days. Age brackets:
-    //   - Baby: 1–3 days
-    //   - Child: 4–9 days
-    //   - Young Adult: 10–15 days (can start working)
-    //   - Adult: 16–24 days (can be a soldier)
-    //   - Middle Age: 25–30 days
-    //   - Elder: 31–34 days
-    //   - Death: 35+ days
-    // Population growth: Offspring can be born if there are at least one male and one female in the Young Adult bracket (10–15 days).
+    // Age is stored in days. Age brackets (tripled):
+    //   - Children: 0–27 days
+    //   - Young Adult: 28–45 days (can start working)
+    //   - Adult: 46–75 days (can be a soldier, breeding population)
+    //   - Middle Age: 76–150 days (breeding population)
+    //   - Elder: 151–197 days
+    //   - Death: 198+ days
+    // Population growth: Offspring can be born if there are at least one male and one female in the Adult or Middle-Aged brackets (46–150 days).
     // Base birth rate: 1 child per eligible couple per year (365 days). 1% chance for twins per birth.
     // Growth bonuses: +50% if food is abundant, -50% if food is scarce, 0 if sick or traveling.
     // Default roles: farmer, woodcutter, hunter, peasant. Children and elders are unassigned (peasant) by default.
     // Status: 'idle' for babies/children/elders, 'working' for assigned young adults/adults, else 'idle'.
     // Gender: 50% male, 50% female for new births (randomized), 1–2% nonbinary optional.
     // Skills: Children [], Young Adults/Adults 1–2 skills by role, Elders retain skills, may mentor.
-    // Only young adults and adults can be assigned to buildings. Only adults (16–24) can be soldiers.
+    // Only young adults and adults can be assigned to buildings. Only adults (46–75) can be soldiers.
 
     // Default population templates for new games
     startingPopulation: [],
@@ -338,7 +337,7 @@ const GameData = {
         // Only 'male' or 'female' genders
         const gender = Math.random() < 0.5 ? 'male' : 'female';
         const name = names[Math.floor(Math.random() * names.length)];
-        // Default to young adult (10–15 days)
+        // Default to young adult (28–45 days)
         const age = options.age !== undefined ? options.age : 10 + Math.floor(Math.random() * 6);
         const role = options.role || 'peasant';
         const status = options.status || 'idle';

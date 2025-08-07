@@ -1350,12 +1350,210 @@ class VillageManager {
             return;
         }
         
-        const villagers = this.gameState.populationManager.getAll();
+        const populationData = this.gameState.populationManager.getPopulationGroups();
         
-        // Generate content HTML
+        // Generate enhanced content HTML with modern design
         let contentHTML = `
             <div class="population-overview">
-                <h3>👥 Population Overview</h3>
+                <div class="overview-header">
+                    <h3><span class="header-icon">👥</span> Population Management</h3>
+                    <div class="overview-subtitle">Manage your village demographics and workforce</div>
+                </div>
+                
+                <div class="population-stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">🏘️</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${populationData.total}</div>
+                            <div class="stat-label">Total Population</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${populationData.demographics.averageAge}</div>
+                            <div class="stat-label">Average Age (days)</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💪</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${populationData.demographics.workingAge}</div>
+                            <div class="stat-label">Working Age</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">💼</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${populationData.demographics.employed}</div>
+                            <div class="stat-label">Employed</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🍞</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${populationData.total}</div>
+                            <div class="stat-label">Daily Food Need</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚖️</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${Math.round((populationData.demographics.maleCount / (populationData.demographics.maleCount + populationData.demographics.femaleCount) * 100) || 0)}% / ${Math.round((populationData.demographics.femaleCount / (populationData.demographics.maleCount + populationData.demographics.femaleCount) * 100) || 0)}%</div>
+                            <div class="stat-label">Male / Female</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="population-sections">
+                <div class="population-section">
+                    <div class="section-header">
+                        <h4><span class="section-icon">📊</span> Age Demographics</h4>
+                        <div class="section-subtitle">Population distribution by age groups</div>
+                    </div>
+                    <div class="groups-container">
+        `;
+        
+        // Enhanced age groups
+        Object.entries(populationData.ageGroups).forEach(([key, group]) => {
+            if (group.count > 0) {
+                const percentage = Math.round((group.count / populationData.total * 100));
+                contentHTML += `
+                    <div class="population-group modern-group">
+                        <div class="group-header">
+                            <div class="group-left">
+                                <span class="group-icon">${group.name.split(' ')[0]}</span>
+                                <div class="group-info">
+                                    <div class="group-name">${group.name}</div>
+                                    <div class="group-description">${group.age}</div>
+                                </div>
+                            </div>
+                            <div class="group-stats">
+                                <div class="group-count">${group.count}</div>
+                                <div class="group-percentage">${percentage}%</div>
+                            </div>
+                        </div>
+                        <div class="group-progress">
+                            <div class="progress-bg">
+                                <div class="progress-fill age-${key}" style="width: ${percentage}%"></div>
+                                <div class="progress-label">${group.count} villagers</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        contentHTML += `
+                    </div>
+                </div>
+                
+                <div class="population-section">
+                    <div class="section-header">
+                        <h4><span class="section-icon">💼</span> Employment Overview</h4>
+                        <div class="section-subtitle">Workforce allocation and job distribution</div>
+                    </div>
+                    <div class="groups-container">
+        `;
+        
+        // Enhanced job groups
+        Object.entries(populationData.jobGroups).forEach(([key, group]) => {
+            if (group.count > 0) {
+                const percentage = Math.round((group.count / populationData.total * 100));
+                contentHTML += `
+                    <div class="population-group modern-group">
+                        <div class="group-header">
+                            <div class="group-left">
+                                <span class="group-icon">${group.name.split(' ')[0]}</span>
+                                <div class="group-info">
+                                    <div class="group-name">${group.name}</div>
+                                    <div class="group-description">${group.description}</div>
+                                </div>
+                            </div>
+                            <div class="group-stats">
+                                <div class="group-count">${group.count}</div>
+                                <div class="group-percentage">${percentage}%</div>
+                            </div>
+                        </div>
+                        <div class="group-progress">
+                            <div class="progress-bg">
+                                <div class="progress-fill job-${key}" style="width: ${percentage}%"></div>
+                                <div class="progress-label">${group.count} workers</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        contentHTML += `
+                    </div>
+                </div>
+            </div>
+            
+            <div class="population-actions">
+                <button class="action-btn primary" onclick="document.getElementById('village-manager').villageManager.showDetailedPopulationView();">
+                    <span class="btn-icon">📋</span>
+                    <span class="btn-text">View Individual Villagers</span>
+                </button>
+                <button class="action-btn secondary" onclick="window.modalSystem.closeModal();">
+                    <span class="btn-icon">📊</span>
+                    <span class="btn-text">Close Overview</span>
+                </button>
+            </div>
+        `;
+        
+        if (populationData.total === 0) {
+            contentHTML = `
+                <div class="no-villagers">
+                    <div class="no-villagers-content">
+                        <div class="no-villagers-icon">🏘️</div>
+                        <h3>No Population Yet</h3>
+                        <p>Your village is waiting for its first inhabitants! Build houses to attract people and provide food to sustain them.</p>
+                        <div class="empty-state-tips">
+                            <div class="tip">
+                                <span class="tip-icon">🏠</span>
+                                <span class="tip-text">Build houses to increase population capacity</span>
+                            </div>
+                            <div class="tip">
+                                <span class="tip-icon">🌾</span>
+                                <span class="tip-text">Farms provide food for population growth</span>
+                            </div>
+                            <div class="tip">
+                                <span class="tip-icon">👥</span>
+                                <span class="tip-text">Population grows naturally with adequate resources</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.showModal('Population Overview', contentHTML, {
+            maxWidth: '800px',
+            customClass: 'population-modal modern-modal'
+        });
+    }
+
+    showDetailedPopulationView() {
+        // Initialize population manager if needed
+        this.initializePopulationManager();
+        
+        if (!this.gameState.populationManager) {
+            console.error('[Village] PopulationManager not available');
+            if (window.modalSystem) {
+                window.modalSystem.showMessage('Population Unavailable', 'Population management system is not initialized.');
+            }
+            return;
+        }
+        
+        const villagers = this.gameState.populationManager.getAll();
+        
+        // Generate content HTML for individual villagers (original detailed view)
+        let contentHTML = `
+            <div class="population-overview">
+                <h3>👥 Individual Villagers</h3>
                 <div class="population-stats">
                     <div class="stat-item">
                         <span class="stat-label">Total Villagers:</span>

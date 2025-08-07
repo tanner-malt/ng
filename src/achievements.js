@@ -45,7 +45,7 @@ class AchievementSystem {
             icon: '🏛️',
             type: 'building',
             hidden: false,
-            reward: { wood: 75}
+            reward: { wood: 75, stone: 500}
         });
 
         this.defineAchievement('sheltering_citizens', {
@@ -139,6 +139,26 @@ class AchievementSystem {
             hidden: false,
             requirement: { population: 100 },
             reward: { influence: 50 }
+        });
+
+        this.defineAchievement('thriving_dynasty', {
+            title: 'Thriving Dynasty',
+            description: 'Reached 50 population',
+            icon: '🏘️',
+            type: 'resource',
+            hidden: false,
+            requirement: { population: 50 },
+            reward: { population: 15, gold: 300 }
+        });
+
+        this.defineAchievement('migration_wave', {
+            title: 'Migration Wave',
+            description: 'Your dynasty attracts settlers from afar',
+            icon: '🚶‍♂️🚶‍♀️',
+            type: 'special',
+            hidden: false,
+            requirement: { population: 25 },
+            reward: { population: 25, food: 200 }
         });
 
         // Combat achievements
@@ -295,12 +315,18 @@ class AchievementSystem {
     applyRewards(rewards) {
         if (!window.gameState) return;
         let populationGained = 0;
+        
         // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
             if (resource === 'population' && amount > 0) {
-                // Use GameData.generatePopulationMember to create new pops
-                const names = window.GameData && window.GameData.populationNames ? window.GameData.populationNames : ["Alex", "Sam", "Jamie", "Taylor", "Jordan", "Morgan", "Casey", "Riley", "Drew", "Cameron"];
-                if (window.gameState.populationManager && window.GameData && typeof window.GameData.generatePopulationMember === 'function') {
+                // Use the new generateMassPopulation method for better distribution
+                if (window.gameState.generateMassPopulation) {
+                    const generated = window.gameState.generateMassPopulation(amount);
+                    populationGained += generated.length;
+                    console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
+                } else if (window.gameState.populationManager && window.GameData && typeof window.GameData.generatePopulationMember === 'function') {
+                    // Fallback to old method if new one isn't available
+                    const names = window.GameData && window.GameData.populationNames ? window.GameData.populationNames : ["Alex", "Sam", "Jamie", "Taylor", "Jordan", "Morgan", "Casey", "Riley", "Drew", "Cameron"];
                     for (let i = 0; i < amount; i++) {
                         const pop = window.GameData.generatePopulationMember(names);
                         window.gameState.populationManager.addInhabitant(pop);
@@ -311,11 +337,12 @@ class AchievementSystem {
                     } else {
                         window.gameState.population = window.gameState.populationManager.getAll().length;
                     }
+                    populationGained += amount;
                 } else {
-                    // Fallback: just increment population number
+                    // Last resort: just increment population number
                     window.gameState.population = (window.gameState.population || 0) + amount;
+                    populationGained += amount;
                 }
-                populationGained += amount;
             } else if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
                 window.gameState.resources[resource] += amount;
                 // Cap resource if defined in GameData
@@ -328,10 +355,16 @@ class AchievementSystem {
                 window.gameState.militaryExperience = (window.gameState.militaryExperience || 0) + amount;
             }
         });
+        
         // Emit event for population gained if any
         if (populationGained > 0 && window.eventBus) {
             window.eventBus.emit('population_gained', { amount: populationGained });
+            // Show additional notification for population gains
+            if (window.showNotification) {
+                window.showNotification(`🎉 ${populationGained} new villagers joined your dynasty!`, 'success');
+            }
         }
+        
         // Trigger UI update
         if (window.eventBus) {
             window.eventBus.emit('resources-updated');
@@ -377,26 +410,47 @@ class AchievementSystem {
 
     showAchievementModal(achievement) {
         const content = `
-            <div style="text-align: center; padding: 12px 18px; min-width: 220px; max-width: 320px;">
-                <div style="font-size: 36px; margin-bottom: 8px;">${achievement.icon}</div>
-                <h3 style="color: #f39c12; margin: 0 0 6px 0; font-size: 1.1rem;">Achievement Unlocked!</h3>
-                <div style="color: #ecf0f1; margin: 0 0 8px 0; font-size: 1rem; font-weight: bold;">${achievement.title}</div>
-                <p style="color: #95a5a6; font-style: italic; margin-bottom: 10px; font-size: 0.95rem;">${achievement.description}</p>
-                <div style="background: rgba(46, 204, 113, 0.10); padding: 8px; border-radius: 6px; border: 1px solid #2ecc71; font-size: 0.95rem;">
-                    <strong style="color: #2ecc71;">Rewards:</strong> ${this.formatRewards(achievement.reward)}
+            <div class="achievement-toast-content">
+                <div class="achievement-icon">${achievement.icon}</div>
+                <div class="achievement-text">
+                    <h3>Achievement Unlocked!</h3>
+                    <div class="achievement-title">${achievement.title}</div>
+                    <p class="achievement-description">${achievement.description}</p>
+                    <div class="achievement-rewards">
+                        <strong>Rewards:</strong> ${this.formatRewards(achievement.reward)}
+                    </div>
                 </div>
-                <button id="ach-modal-close-btn" style="position: absolute; top: 8px; right: 12px; background: none; border: none; color: #aaa; font-size: 1.2rem; cursor: pointer;">&times;</button>
+                <button class="achievement-ok-btn" onclick="window.modalSystem?.closeTopModal() || (document.querySelector('.modal-overlay') && (document.querySelector('.modal-overlay').style.display = 'none'))">
+                    OK
+                </button>
             </div>
         `;
 
-        // Show modal with lighter style, allow click outside to close, and a close button
-        window.showModal('🏆 Achievement', content, {
-            icon: '🏆',
-            closable: true,
-            confirmText: 'Close',
-            style: { background: '#232946', boxShadow: '0 2px 16px rgba(0,0,0,0.18)' },
-            clickOutsideToClose: true
-        });
+        // Show modal with toast-like style positioned in center
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: '',
+                content: content,
+                width: '400px',
+                className: 'achievement-toast-modal',
+                closable: true,
+                showCloseButton: true,
+                modalType: 'achievement-notification'
+            });
+        } else if (window.showModal) {
+            window.showModal('', content, {
+                icon: '🏆',
+                closable: true,
+                confirmText: 'OK',
+                style: { 
+                    background: '#232946', 
+                    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
+                    width: '320px',
+                    maxWidth: '90vw'
+                },
+                clickOutsideToClose: true
+            });
+        }
 
         // Attach close button handler after modal is rendered
         setTimeout(() => {

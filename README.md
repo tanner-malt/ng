@@ -1,99 +1,98 @@
 # Idle: Dynasty Builder
 
 ## Overview
-Idle: Dynasty Builder is a browser-based idle strategy game where players build and manage a village, explore a hexagonal world map, and defend against threats. The game features a comprehensive tutorial system and progressive gameplay mechanics.
+Idle: Dynasty Builder is a browser-based idle/strategy game. The codebase is organized by system, with each major mechanic in its own file. This README is for internal reference and logic mapping.
 
-## Features
-- **Village Management**: Build and upgrade structures (houses, farms, barracks, etc.)
-- **Resource Management**: Manage food, wood, stone, and gold
-- **World Exploration**: Navigate a hexagonal world map with expeditions
-- **Tutorial System**: Guided experience for new players including dynasty naming
-- **Auto-play System**: Automated progression for idle gameplay
-- **Battle System**: Defend against waves of enemies
-- **Quest System**: Complete expeditions and challenges
+## Main Systems & File Roles
+- `app.js`: Main game initialization and system coordination
+- `eventBus.js`: Event system for decoupled component communication
+- `gameState.js`: Game state management and persistence (localStorage)
+- `modalSystem.js`: Modal/dialog logic (tutorial, info, confirmation)
+- `tutorial.js`: Tutorial system and onboarding logic
+- `village.js`: Village building, placement, upgrades, resource generation
+- `worldManager.js`: World map, hex grid, exploration
+- `battle.js`: Combat, battle phases, AI, weather/terrain effects
+- `throne.js`: Dynasty management, royal features
+- `monarch.js`: Monarch system (NOT military management)
+- `quest.js`: Individual quest logic
+- `quests.js`: Quest system management
+- `uiPopups.js`: UI popups and notifications
+- `achievements.js`: Achievement tracking, rewards, integration
+- `messageHistory.js`: Persistent message log (achievements, events, royal messages)
+- `unlockSystem.js`: Feature gating and progression
+- `app_backup.js`: Backup logic and error recovery
+- `style.less`: LESS source for game styling
+- `debugTools.js`: UNKNOWN
+- `errorRecovery.js`: UNKNOWN
 
-## Getting Started
+## Project Structure
 
-### Installation
-```bash
-npm install
-npm run dev
-```
-
-### Game Access
-Open `http://localhost:8000/public/game.html` in your browser.
 
 ## Project Structure
 
 ```
 /workspaces/ng/
 ├── src/                    # Core game logic
-│   ├── app.js             # Main game initialization and coordination
-│   ├── eventBus.js        # Event system for component communication
-│   ├── gameState.js       # Game state management and persistence
-│   ├── modalSystem.js     # Modal/dialog system
-│   ├── tutorial.js        # Tutorial system and guidance
-│   ├── village.js         # Village building and management
-│   ├── worldManager.js    # World map and exploration
-│   ├── battle.js          # Combat and defense systems
-│   ├── throne.js          # Dynasty management and royal features
-│   ├── monarch.js         # Military and army management
-│   ├── quest.js           # Individual quest logic
-│   ├── quests.js          # Quest system management
-│   ├── uiPopups.js        # UI popups and notifications
-│   └── style.less         # Game styling (LESS)
-├── public/                # Public web assets
-│   ├── game.html          # Main game interface
-│   ├── game.css           # Compiled game styles
-│   ├── progress-icons.css # UI icon styles
-│   └── version.json       # Version tracking
-├── scripts/               # Build and utility scripts
-└── package.json           # Project configuration
+│   ├── app.js               # Main game initialization and coordination
+│   ├── eventBus.js          # Event system for component communication
+│   ├── gameState.js         # Game state management and persistence
+│   ├── modalSystem.js       # Modal/dialog system
+│   ├── tutorial.js          # Tutorial system and guidance
+│   ├── village.js           # Village building and management
+│   ├── worldManager.js      # World map and exploration
+│   ├── battle.js            # Combat and defense systems
+│   ├── throne.js            # Dynasty management and royal features
+│   ├── monarch.js           # Military and army management
+│   ├── quest.js             # Individual quest logic
+│   ├── quests.js            # Quest system management
+│   ├── uiPopups.js          # UI popups and notifications
+│   ├── achievements.js      # Achievement system
+│   ├── messageHistory.js    # Persistent message log
+│   ├── unlockSystem.js      # Feature unlocking system
+│   ├── app_backup.js        # Backup logic and error recovery
+│   └── style.less           # Game styling (LESS)
+├── public/                  # Public web assets
+│   ├── game.html            # Main game interface
+│   ├── game.css             # Compiled game styles
+│   ├── progress-icons.css   # UI icon styles
+│   └── version.json         # Version tracking
+├── scripts/                 # Build and utility scripts
+│   └── update-version-json.js # Version update utility
+├── docs/                    # Design and system documentation
+│   ├── GAME_BALANCE.md
+│   ├── GAMEPLAY_GUIDE.md
+│   ├── REFACTORING_GUIDE.md
+│   ├── SYSTEM_MAPPING.md
+├── package.json             # Project configuration
+├── README.md                # Main documentation
+└── TODO.md                  # Development tasks
 ```
 
 ## Core Systems
 
 
-### 1. Tutorial System (`tutorial.js`)
-Guides new players through a step-based onboarding:
-1. **Dynasty Naming**: Name your royal house
-2. **Village Building**: Learn construction and placement
-3. **Resource Management**: Understand food, wood, stone, gold
-4. **World Exploration**: Unlock world map and expeditions
-5. **Military Preparation**: Build barracks, unlock battle mode
+### 1. Tutorial System
+When you start a new game, the tutorial guides you step-by-step. You'll name your dynasty, learn how to build your village, manage resources, explore the world, and prepare for battles. The tutorial is interactive and story-driven, helping you unlock new features as you progress. It also connects with the achievement and message systems, so you always know what you've accomplished.
 
-**Features:**
-- Auto-starts for new players
-- Modal-based, story-driven steps
-- Progressive feature unlocking
-- Dynasty-specific storytelling
-- Integrates with achievements and message history
+### 2. Village Management
+Your village is the heart of your dynasty. You can place and upgrade buildings, each with its own purpose—houses for population, farms for food, sawmills for wood, and so on. Building takes time, and where you place things matters: terrain types like forest, hills, and water affect your strategy. As your village grows, supply chains become visible, showing how resources flow. Automation features help you manage production as your prestige increases.
 
-### 2. Village Management (`village.js`)
-- **Building System**: Place, upgrade, and manage structures
-- **Resource Generation**: Buildings produce resources per cycle
-- **Construction Time**: Realistic, multi-day building times
-- **Grid & Terrain**: Strategic placement, terrain types (grass, forest, hills, water, fertile, rocky)
-- **Supply Chains**: Visualized resource flow from production to town center
-- **Automation**: Production planning and auto-assignment (based on prestige)
+**Buildings you can construct:**
+- Town Center: Boosts all production, increases population capacity
+- House: Lets you support more villagers
+- Farm: Produces food
+- Sawmill: Produces wood
+- Quarry: Produces stone
+- Market: Generates gold, improves trade
+- Barracks: Trains soldiers, improves defense
+- Workshop: Boosts production efficiency
+- Temple: Increases influence and happiness
+- Academy: Improves research and efficiency
+- Castle: Adds defense and influence
+- University: Unlocks advanced research
 
-**Available Buildings:**
-- Town Center (central hub, boosts all production)
-- House (population capacity)
-- Farm (food)
-- Sawmill (wood)
-- Quarry (stone)
-- Market (gold, trade efficiency)
-- Barracks (soldiers, defense)
-- Workshop (production boost)
-- Temple (influence, happiness)
-- Academy (research, efficiency)
-- Castle (defense, influence)
-- University (advanced research)
-
-### 3. Achievement System (`achievements.js`)
-- **Progress Tracking**: Unlock achievements for milestones (buildings, resources, combat, tutorial)
-- **Rewards**: Achievements grant resources, prestige, influence, and more
+### 3. Achievement System
+As you play, you'll unlock achievements for reaching milestones—like building certain structures, gathering resources, winning battles, or completing tutorial steps. Achievements reward you with resources, prestige, influence, and more, and are tracked in your history so you can see your progress at any time.
 - **Integration**: Tied to tutorial, village, and battle systems
 - **UI**: Modal popups and achievement history
 - **Persistence**: Progress saved in localStorage
