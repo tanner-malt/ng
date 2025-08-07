@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Functionality Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #2c3e50; 
+            color: white; 
+            line-height: 1.6;
+        }
+        .test-section { 
+            background: #34495e; 
+            padding: 20px; 
+            margin: 15px 0; 
+            border-radius: 8px; 
+            border-left: 4px solid #3498db;
+        }
+        .success { border-left-color: #27ae60; }
+        .error { border-left-color: #e74c3c; }
+        .warning { border-left-color: #f39c12; }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-size: 14px;
+        }
+        button:hover { background: #2980b9; }
+        .death-report-button { background: #e74c3c; }
+        .death-report-button:hover { background: #c0392b; }
+        code { 
+            background: #2c3e50; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Complete Functionality Test</h1>
+    <p>Testing the new Death Report system and Blacksmith building integration.</p>
+
+    <div class="test-section">
+        <h2>🏗️ Blacksmith Building Tests</h2>
+        <button onclick="testBlacksmithData()">Test Blacksmith Data</button>
+        <button onclick="testBuildingUnlocks()">Test Building Unlocks</button>
+        <div id="blacksmith-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>💀 Death Report System Tests</h2>
+        <button onclick="setupTestPopulation()">Setup Test Population</button>
+        <button onclick="testDeathCalculations()">Test Death Calculations</button>
+        <button class="death-report-button" onclick="showDeathReportModal()">Show Death Report Modal</button>
+        <div id="death-report-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎮 Game Integration Tests</h2>
+        <button onclick="testGameStateIntegration()">Test GameState Integration</button>
+        <button onclick="testVillageManagerIntegration()">Test Village Manager</button>
+        <div id="integration-results"></div>
+    </div>
+
+    <!-- Load all game scripts -->
+    <script src="src/systems/core/eventBus.js"></script>
+    <script src="src/gameData.js"></script>
+    <script src="src/populationManager.js"></script>
+    <script src="src/gameState.js"></script>
+    <script src="src/modalSystem.js"></script>
+    <script src="src/village.js"></script>
+
+    <script>
+        let testGameState = null;
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                console.log('🧪 Starting comprehensive tests...');
+                
+                // Initialize test game state
+                testGameState = new GameState();
+                console.log('Test GameState initialized:', testGameState);
+                
+                // Set global reference for modal system
+                window.gameState = testGameState;
+                
+            }, 1000);
+        });
+
+        function testBlacksmithData() {
+            const results = document.getElementById('blacksmith-results');
+            let output = '<h3>Blacksmith Data Test Results:</h3>';
+            
+            try {
+                // Test all blacksmith data
+                const tests = [
+                    {
+                        name: 'Building Costs',
+                        test: () => GameData.buildingCosts.blacksmith,
+                        expected: 'object with wood, stone, metal'
+                    },
+                    {
+                        name: 'Building Production',
+                        test: () => GameData.buildingProduction.blacksmith,
+                        expected: 'object with metal and efficiency'
+                    },
+                    {
+                        name: 'Construction Time',
+                        test: () => GameData.constructionTimes.blacksmith,
+                        expected: 'number of days'
+                    },
+                    {
+                        name: 'Building Info',
+                        test: () => GameData.buildingInfo.blacksmith,
+                        expected: 'object with icon, name, description'
+                    },
+                    {
+                        name: 'Button Formatting',
+                        test: () => GameData.formatBuildingButton('blacksmith'),
+                        expected: 'formatted button text'
+                    }
+                ];
+                
+                tests.forEach(test => {
+                    const result = test.test();
+                    if (result) {
+                        output += `<div class="success">✅ ${test.name}: ${JSON.stringify(result)}</div>`;
+                    } else {
+                        output += `<div class="error">❌ ${test.name}: Failed (expected ${test.expected})</div>`;
+                    }
+                });
+                
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+
+        function testBuildingUnlocks() {
+            const results = document.getElementById('blacksmith-results');
+            let output = results.innerHTML + '<h3>Building Unlock Test Results:</h3>';
+            
+            try {
+                if (testGameState) {
+                    // Test that blacksmith is in unlock progression
+                    const unlocks = testGameState.buildingUnlocks;
+                    if (unlocks.blacksmith) {
+                        output += `<div class="success">✅ Blacksmith unlock defined: requires ${unlocks.blacksmith.required.join(', ')}</div>`;
+                        
+                        // Test unlock checking
+                        const isUnlocked = testGameState.isBuildingUnlocked('blacksmith');
+                        output += `<div class="warning">⚠️ Blacksmith currently unlocked: ${isUnlocked}</div>`;
+                        
+                        // Test all building types include blacksmith
+                        const allTypes = testGameState.getAllBuildingTypes();
+                        if (allTypes.includes('blacksmith')) {
+                            output += `<div class="success">✅ Blacksmith included in all building types</div>`;
+                        } else {
+                            output += `<div class="error">❌ Blacksmith not found in building types list</div>`;
+                        }
+                    } else {
+                        output += `<div class="error">❌ Blacksmith unlock not defined</div>`;
+                    }
+                } else {
+                    output += `<div class="error">❌ GameState not available</div>`;
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+
+        function setupTestPopulation() {
+            const results = document.getElementById('death-report-results');
+            let output = '<h3>Test Population Setup:</h3>';
+            
+            try {
+                if (testGameState && testGameState.populationManager) {
+                    // Clear existing population
+                    testGameState.populationManager.population = [];
+                    
+                    // Add test villagers with specific ages for testing
+                    const testData = [
+                        { age: 197, name: 'Elder Doomed', count: 2 },  // Imminent death
+                        { age: 195, name: 'Elder Critical', count: 3 }, // Very high risk
+                        { age: 185, name: 'Elder High', count: 4 },     // High risk
+                        { age: 175, name: 'Elder Moderate', count: 5 }, // Moderate risk
+                        { age: 165, name: 'Elder Low', count: 3 },      // Low risk
+                        { age: 45, name: 'Adult Safe', count: 10 },     // Safe
+                        { age: 20, name: 'Young Safe', count: 8 }       // Very safe
+                    ];
+                    
+                    let totalAdded = 0;
+                    testData.forEach(group => {
+                        for (let i = 0; i < group.count; i++) {
+                            testGameState.populationManager.addInhabitant({
+                                name: `${group.name} ${i + 1}`,
+                                age: group.age + (Math.random() * 2 - 1), // Small variation
+                                gender: Math.random() < 0.5 ? 'male' : 'female',
+                                role: 'peasant',
+                                status: 'idle'
+                            });
+                            totalAdded++;
+                        }
+                    });
+                    
+                    output += `<div class="success">✅ Added ${totalAdded} test villagers</div>`;
+                    output += `<div class="success">✅ Total population: ${testGameState.populationManager.getAll().length}</div>`;
+                    
+                    // Show age distribution
+                    const ageGroups = testGameState.populationManager.getPopulationGroups().ageGroups;
+                    Object.values(ageGroups).forEach(group => {
+                        output += `<div>📊 ${group.name}: ${group.count} villagers</div>`;
+                    });
+                    
+                } else {
+                    output += `<div class="error">❌ GameState or PopulationManager not available</div>`;
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+
+        function testDeathCalculations() {
+            const results = document.getElementById('death-report-results');
+            let output = results.innerHTML + '<h3>Death Calculation Test Results:</h3>';
+            
+            try {
+                if (testGameState) {
+                    // Test daily death report
+                    const dailyReport = testGameState.getDeathReportData('daily');
+                    output += `<div class="success">✅ Daily Report: ${dailyReport.expectedDeaths} deaths expected</div>`;
+                    output += `<div>📊 Imminent (197+): ${dailyReport.imminentDeaths} villagers</div>`;
+                    output += `<div>📊 Total at Risk (160+): ${dailyReport.totalAtRisk} villagers</div>`;
+                    
+                    // Test monthly death report
+                    const monthlyReport = testGameState.getDeathReportData('monthly');
+                    output += `<div class="success">✅ Monthly Report: ${monthlyReport.expectedDeaths} deaths expected</div>`;
+                    
+                    // Test age group breakdown
+                    Object.values(dailyReport.ageGroups).forEach(group => {
+                        if (group.count > 0) {
+                            output += `<div>🔴 ${group.name}: ${group.count} villagers</div>`;
+                        }
+                    });
+                    
+                } else {
+                    output += `<div class="error">❌ GameState not available</div>`;
+                }
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+
+        function showDeathReportModal() {
+            console.log('Testing death report modal...');
+            try {
+                if (window.modalSystem && testGameState) {
+                    window.modalSystem.showDeathReportModal(testGameState, 'daily');
+                } else {
+                    alert('Modal system or game state not available');
+                }
+            } catch (error) {
+                alert('Error showing death report: ' + error.message);
+                console.error('Death report modal error:', error);
+            }
+        }
+
+        function testGameStateIntegration() {
+            const results = document.getElementById('integration-results');
+            let output = '<h3>GameState Integration Test Results:</h3>';
+            
+            try {
+                // Test if GameState has all required methods
+                const requiredMethods = [
+                    'getDeathReportData',
+                    'getAllBuildingTypes',
+                    'isBuildingUnlocked',
+                    'canAfford'
+                ];
+                
+                requiredMethods.forEach(method => {
+                    if (typeof testGameState[method] === 'function') {
+                        output += `<div class="success">✅ Method ${method} exists</div>`;
+                    } else {
+                        output += `<div class="error">❌ Method ${method} missing</div>`;
+                    }
+                });
+                
+                // Test affordability of blacksmith
+                const canAffordBlacksmith = testGameState.canAfford('blacksmith');
+                output += `<div class="warning">⚠️ Can afford Blacksmith: ${canAffordBlacksmith}</div>`;
+                
+                // Show current resources
+                output += `<div>💰 Resources: ${JSON.stringify(testGameState.resources)}</div>`;
+                
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+
+        function testVillageManagerIntegration() {
+            const results = document.getElementById('integration-results');
+            let output = results.innerHTML + '<h3>Village Manager Integration Test Results:</h3>';
+            
+            try {
+                // Test VillageManager class exists
+                if (typeof VillageManager === 'function') {
+                    output += `<div class="success">✅ VillageManager class available</div>`;
+                    
+                    // Test if we can create a VillageManager instance
+                    const testVillage = new VillageManager(testGameState, null);
+                    if (testVillage) {
+                        output += `<div class="success">✅ VillageManager instance created</div>`;
+                        
+                        // Test if required methods exist
+                        const requiredMethods = ['setupDeathReportButton', 'showDeathReport', 'getBuildingSymbol'];
+                        requiredMethods.forEach(method => {
+                            if (typeof testVillage[method] === 'function') {
+                                output += `<div class="success">✅ VillageManager.${method} exists</div>`;
+                            } else {
+                                output += `<div class="error">❌ VillageManager.${method} missing</div>`;
+                            }
+                        });
+                        
+                        // Test building symbol for blacksmith
+                        const blacksmithSymbol = testVillage.getBuildingSymbol('blacksmith');
+                        output += `<div class="success">✅ Blacksmith symbol: ${blacksmithSymbol}</div>`;
+                        
+                    } else {
+                        output += `<div class="error">❌ Failed to create VillageManager instance</div>`;
+                    }
+                } else {
+                    output += `<div class="error">❌ VillageManager class not available</div>`;
+                }
+                
+            } catch (error) {
+                output += `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+            
+            results.innerHTML = output;
+        }
+    </script>
+</body>
+</html>

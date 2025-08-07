@@ -1,7 +1,17 @@
 // populationManager.js - Manages population details, roles, and assignments
 // Used by both VillageManager and WorldManager
 
+console.log('[PopulationManager] Script starting to load...');
+
 class PopulationManager {
+    constructor(initialPopulation = []) {
+        console.log('[PopulationManager] Constructor called with:', initialPopulation);
+        // Each inhabitant: { id, name, role, age, status, location, skills, ... }
+        this.population = initialPopulation;
+        this.nextId = initialPopulation.length > 0 ? Math.max(...initialPopulation.map(p => p.id)) + 1 : 1;
+        console.log('[PopulationManager] Constructor completed, nextId:', this.nextId);
+    }
+
     /**
      * Process aging and death for the population
      * @returns {object} - { deaths: number, diedVillagers: array }
@@ -133,6 +143,68 @@ class PopulationManager {
     }
 
     /**
+     * Calculate expected deaths for the population
+     * @param {string} timeframe - 'daily' or 'monthly'
+     * @returns {object} - { expectedDeaths, imminentDeaths, ageGroups }
+     */
+    calculateExpectedDeaths(timeframe = 'daily') {
+        const daysToDeath = 198; // Death age
+        const multiplier = timeframe === 'monthly' ? 30 : 1;
+        
+        // Group villagers by age proximity to death
+        const ageGroups = {
+            imminent: { name: 'Imminent (197+ days)', count: 0, villagers: [] }, // 1 day or less
+            veryHigh: { name: 'Very High Risk (190-196 days)', count: 0, villagers: [] }, // 2-8 days
+            high: { name: 'High Risk (180-189 days)', count: 0, villagers: [] }, // 9-18 days
+            moderate: { name: 'Moderate Risk (170-179 days)', count: 0, villagers: [] }, // 19-28 days
+            low: { name: 'Low Risk (160-169 days)', count: 0, villagers: [] } // 29-38 days
+        };
+        
+        this.population.forEach(villager => {
+            if (villager.age >= 197) {
+                ageGroups.imminent.villagers.push(villager);
+                ageGroups.imminent.count++;
+            } else if (villager.age >= 190) {
+                ageGroups.veryHigh.villagers.push(villager);
+                ageGroups.veryHigh.count++;
+            } else if (villager.age >= 180) {
+                ageGroups.high.villagers.push(villager);
+                ageGroups.high.count++;
+            } else if (villager.age >= 170) {
+                ageGroups.moderate.villagers.push(villager);
+                ageGroups.moderate.count++;
+            } else if (villager.age >= 160) {
+                ageGroups.low.villagers.push(villager);
+                ageGroups.low.count++;
+            }
+        });
+        
+        // Calculate expected deaths based on timeframe
+        let expectedDeaths = 0;
+        let imminentDeaths = ageGroups.imminent.count;
+        
+        if (timeframe === 'daily') {
+            // Daily: count those who will die in the next day
+            expectedDeaths = ageGroups.imminent.count;
+        } else if (timeframe === 'monthly') {
+            // Monthly: estimate deaths over 30 days
+            expectedDeaths = ageGroups.imminent.count + 
+                            Math.ceil(ageGroups.veryHigh.count * 0.9) + // 90% of very high risk
+                            Math.ceil(ageGroups.high.count * 0.6) + // 60% of high risk
+                            Math.ceil(ageGroups.moderate.count * 0.3) + // 30% of moderate risk
+                            Math.ceil(ageGroups.low.count * 0.1); // 10% of low risk
+        }
+        
+        return {
+            expectedDeaths,
+            imminentDeaths,
+            ageGroups,
+            timeframe,
+            totalAtRisk: Object.values(ageGroups).reduce((sum, group) => sum + group.count, 0)
+        };
+    }
+
+    /**
      * Calculate daily population growth based on eligible couples and food status.
      * - Each eligible couple (adults and middle-aged 46–150 days) tries for a child every day
      * - Base chance: 1/7 per couple per day (so +1 per week per couple, before modifiers)
@@ -170,11 +242,6 @@ class PopulationManager {
         births += twins; // Each twin birth adds one more child
 
         return { births, twins, bonus, eligibleCouples };
-    }
-    constructor(initialPopulation = []) {
-        // Each inhabitant: { id, name, role, age, status, location, skills, ... }
-        this.population = initialPopulation;
-        this.nextId = initialPopulation.length > 0 ? Math.max(...initialPopulation.map(p => p.id)) + 1 : 1;
     }
 
     addInhabitant(details) {
@@ -242,6 +309,8 @@ class PopulationManager {
         const inhabitant = this.getInhabitant(id);
         if (inhabitant) {
             inhabitant.location = newLocation;
+            // Also set buildingId for production tracking
+            inhabitant.buildingId = newLocation;
             return true;
         }
         return false;
@@ -331,9 +400,26 @@ class PopulationManager {
     }
 }
 
+console.log('[PopulationManager] Class definition completed');
+
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
+    console.log('[PopulationManager] Exporting for Node.js');
     module.exports = PopulationManager;
 } else if (typeof window !== 'undefined') {
+    console.log('[PopulationManager] Exporting to window object');
     window.PopulationManager = PopulationManager;
+    console.log('[PopulationManager] window.PopulationManager set to:', window.PopulationManager);
+    
+    // Signal that PopulationManager is ready
+    window.populationManagerReady = true;
+    
+    // Trigger event if event bus is available
+    if (window.eventBus && typeof window.eventBus.emit === 'function') {
+        window.eventBus.emit('populationManagerReady');
+    }
+} else {
+    console.error('[PopulationManager] Unknown environment - cannot export');
 }
+
+console.log('[PopulationManager] Script fully loaded and exported');

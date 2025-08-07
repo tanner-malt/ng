@@ -119,7 +119,8 @@ class WorldManager {
                     row,
                     col,
                     terrain: 'grass',
-                    discovered: false,
+                    discovered: row === 1 && col === 1, // Center hex (player village) starts discovered
+                    fogOfWar: !(row === 1 && col === 1), // All hexes except center start with fog of war
                     units: [],
                     resources: null,
                     buildings: [],
@@ -128,6 +129,9 @@ class WorldManager {
                 };
             }
         }
+        
+        // Initialize expeditions array
+        this.expeditions = [];
     }
     
     setupWorldUI() {
@@ -374,10 +378,7 @@ class WorldManager {
             for (let col = 0; col < this.mapWidth; col++) {
                 const hex = this.hexMap[row][col];
                 
-                // Skip undiscovered tiles
-                if (!hex.discovered && !this.isAdjacentToDiscovered(row, col)) continue;
-                
-                // Simple square grid positioning
+                // Always show tiles, but with different styling for fog of war
                 const x = startX + col * scaledHorizSpacing;
                 const y = startY + row * scaledVertSpacing;
                 
@@ -399,10 +400,23 @@ class WorldManager {
         squareButton.style.width = size + 'px';
         squareButton.style.height = size + 'px';
         
-        // Create square shape with CSS
-        squareButton.style.background = hex.discovered ? hex.color : '#555';
-        squareButton.style.borderRadius = '8px'; // Rounded corners
-        squareButton.style.border = '2px solid rgba(255,255,255,0.3)';
+        // Create square shape with CSS - apply fog of war styling
+        if (hex.fogOfWar) {
+            // Fog of war tiles
+            squareButton.style.background = 'linear-gradient(45deg, #2c3e50, #34495e)';
+            squareButton.style.borderRadius = '8px';
+            squareButton.style.border = '2px solid #7f8c8d';
+            squareButton.style.opacity = '0.6';
+            squareButton.textContent = '🌫️';
+            squareButton.style.color = '#95a5a6';
+        } else {
+            // Discovered tiles
+            squareButton.style.background = hex.color || '#4a90a4';
+            squareButton.style.borderRadius = '8px';
+            squareButton.style.border = '2px solid rgba(255,255,255,0.3)';
+            squareButton.style.opacity = '1';
+        }
+        
         squareButton.style.cursor = 'pointer';
         squareButton.style.transition = 'all 0.2s ease';
         squareButton.style.display = 'flex';
@@ -424,15 +438,39 @@ class WorldManager {
         // Check if there's an army at this position
         const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
         
-        // Add terrain symbol or army indicator
-        if (armyAtPosition) {
+        // Check if there are scouts stationed at this position
+        const scoutsAtPosition = this.expeditions.find(exp => 
+            exp.status === 'stationed' && 
+            exp.targetHex.row === row && 
+            exp.targetHex.col === col
+        );
+        
+        // Add terrain symbol or unit indicators
+        if (hex.fogOfWar) {
+            // Don't show details for fog of war tiles - just show fog icon
+            squareButton.textContent = '🌫️';
+            squareButton.style.color = '#95a5a6';
+        } else if (armyAtPosition && scoutsAtPosition) {
+            // Show both army and scouts
+            squareButton.innerHTML = `<div style="position: relative;">
+                <div style="position: absolute; top: -2px; left: -2px; background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚔</div>
+                <div style="position: absolute; top: -2px; right: -2px; background: #3498db; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">👁</div>
+                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
+            </div>`;
+        } else if (armyAtPosition) {
             // Show army with different styling
             squareButton.innerHTML = `<div style="position: relative;">
                 <div style="position: absolute; top: -2px; left: -2px; background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚔</div>
-                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '?'}</span>
+                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
             </div>`;
-        } else if (hex.discovered) {
-            squareButton.textContent = hex.symbol;
+        } else if (scoutsAtPosition) {
+            // Show scouts stationed here
+            squareButton.innerHTML = `<div style="position: relative;">
+                <div style="position: absolute; top: -2px; right: -2px; background: #3498db; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">👁</div>
+                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
+            </div>`;
+        } else {
+            squareButton.textContent = hex.symbol || '🌱';
             squareButton.style.color = '#fff';
             squareButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
             squareButton.style.fontWeight = 'bold';
@@ -642,6 +680,13 @@ class WorldManager {
         // Check for armies at this position
         const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
         
+        // Check for scouts at this position
+        const scoutsAtPosition = this.expeditions.find(exp => 
+            exp.status === 'stationed' && 
+            exp.targetHex.row === row && 
+            exp.targetHex.col === col
+        );
+        
         let content = `
             <h4>📍 Hex (${row}, ${col})</h4>
             <div class="hex-details">
@@ -667,6 +712,21 @@ class WorldManager {
                         `<p style="color: #e74c3c; font-weight: bold;">📍 SELECTED - Click another tile to move</p>` : 
                         ''
                     }
+                </div>
+            `;
+        }
+        
+        // Show scout information if present
+        if (scoutsAtPosition) {
+            content += `
+                <div class="scout-info" style="border: 2px solid #3498db; border-radius: 8px; padding: 10px; margin: 10px 0; background: rgba(52, 152, 219, 0.1);">
+                    <h5>👁️ Scouts Stationed</h5>
+                    <p><strong>Scouts:</strong> ${scoutsAtPosition.scouts.map(s => s.name).join(', ')}</p>
+                    <p><strong>Count:</strong> ${scoutsAtPosition.scouts.length} scout${scoutsAtPosition.scouts.length !== 1 ? 's' : ''}</p>
+                    <p><strong>Status:</strong> 🔍 Gathering intelligence</p>
+                    <button class="action-btn secondary" onclick="window.worldManager.orderScoutsHome('${scoutsAtPosition.id}')" style="margin-top: 8px;">
+                        🏠 Order Return Home
+                    </button>
                 </div>
             `;
         }
@@ -1100,40 +1160,126 @@ class WorldManager {
         const list = document.getElementById('expedition-list');
         if (!list) return;
         
-        if (this.parties.expeditions.length === 0) {
-            list.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No expeditions active. Draft an army to begin exploring.</p>';
+        // Check for both armies and scout expeditions
+        const hasArmies = this.parties.expeditions.length > 0;
+        const hasScoutTrips = this.expeditions && this.expeditions.length > 0;
+        
+        if (!hasArmies && !hasScoutTrips) {
+            list.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No expeditions active. Draft an army or send scouts to begin exploring.</p>';
             return;
         }
         
         let content = '';
-        this.parties.expeditions.forEach(army => {
-            content += `
-                <div class="expedition-item">
-                    <h4>⚔️ ${army.name}</h4>
-                    <p><strong>Members:</strong> ${army.members.length} (${army.members.map(m => m.name).join(', ')})</p>
-                    <p><strong>Morale:</strong> ${army.morale}%</p>
-                    <p><strong>Status:</strong> ${army.status}</p>
-                    
-                    <div class="expedition-actions">
-                        <button class="action-btn small" onclick="window.safeWorldManagerCall?.('manageLogistics', '${army.id}') || (window.worldManager && window.worldManager.manageLogistics?.('${army.id}'))">
-                            📦 Manage Logistics
-                        </button>
-                        <button class="action-btn small secondary" onclick="window.safeWorldManagerCall?.('renameArmy', '${army.id}') || (window.worldManager && window.worldManager.renameArmy?.('${army.id}'))">
-                            ✏️ Rename
-                        </button>
-                        <button class="action-btn small" onclick="window.safeWorldManagerCall?.('viewComposition', '${army.id}') || (window.worldManager && window.worldManager.viewComposition?.('${army.id}'))">
-                            👥 View Composition
-                        </button>
-                        <button class="action-btn small primary" onclick="window.safeWorldManagerCall?.('travel', '${army.id}') || (window.worldManager && window.worldManager.travel?.('${army.id}'))">
-                            🚶 Travel
-                        </button>
-                        <button class="action-btn small danger" onclick="window.safeWorldManagerCall?.('disbandArmy', '${army.id}') || (window.worldManager && window.worldManager.disbandArmy?.('${army.id}'))">
-                            ❌ Disband
-                        </button>
+        
+        // Display army expeditions
+        if (hasArmies) {
+            content += '<h4 style="color: #e74c3c; margin-bottom: 10px;">⚔️ Army Expeditions</h4>';
+            this.parties.expeditions.forEach(army => {
+                content += `
+                    <div class="expedition-item army-expedition">
+                        <h4>⚔️ ${army.name}</h4>
+                        <p><strong>Members:</strong> ${army.members.length} (${army.members.map(m => m.name).join(', ')})</p>
+                        <p><strong>Morale:</strong> ${army.morale}%</p>
+                        <p><strong>Status:</strong> ${army.status}</p>
+                        
+                        <div class="expedition-actions">
+                            <button class="action-btn small" onclick="window.safeWorldManagerCall?.('manageLogistics', '${army.id}') || (window.worldManager && window.worldManager.manageLogistics?.('${army.id}'))">
+                                📦 Manage Logistics
+                            </button>
+                            <button class="action-btn small secondary" onclick="window.safeWorldManagerCall?.('renameArmy', '${army.id}') || (window.worldManager && window.worldManager.renameArmy?.('${army.id}'))">
+                                ✏️ Rename
+                            </button>
+                            <button class="action-btn small" onclick="window.safeWorldManagerCall?.('viewComposition', '${army.id}') || (window.worldManager && window.worldManager.viewComposition?.('${army.id}'))">
+                                👥 View Composition
+                            </button>
+                            <button class="action-btn small primary" onclick="window.safeWorldManagerCall?.('travel', '${army.id}') || (window.worldManager && window.worldManager.travel?.('${army.id}'))">
+                                🚶 Travel
+                            </button>
+                            <button class="action-btn small danger" onclick="window.safeWorldManagerCall?.('disbandArmy', '${army.id}') || (window.worldManager && window.worldManager.disbandArmy?.('${army.id}'))">
+                                ❌ Disband
+                            </button>
+                        </div>
                     </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
+        
+        // Display scout expeditions
+        if (hasScoutTrips) {
+            if (hasArmies) {
+                content += '<hr style="margin: 15px 0; border: 1px solid #34495e;">';
+            }
+            content += '<h4 style="color: #3498db; margin-bottom: 10px;">🔍 Scout Expeditions</h4>';
+            
+            this.expeditions.forEach(expedition => {
+                const daysPassed = window.gameState.currentDay - expedition.startDay;
+                let currentStatus = '';
+                let actionButton = '';
+                
+                if (expedition.returningHome) {
+                    const returnDistance = Math.abs(expedition.currentHex.row - this.playerVillageHex.row) + 
+                                         Math.abs(expedition.currentHex.col - this.playerVillageHex.col);
+                    const returnProgress = Math.max(0, expedition.travelDistance - expedition.daysRemaining);
+                    const returnDaysLeft = Math.max(0, expedition.daysRemaining);
+                    
+                    currentStatus = `🏠 Returning home (${returnDaysLeft} day${returnDaysLeft !== 1 ? 's' : ''} remaining)`;
+                    
+                    if (returnDaysLeft === 0) {
+                        actionButton = `<button class="action-btn small primary" onclick="window.worldManager.completeExpedition('${expedition.id}')" style="margin-top: 8px;">
+                            ✅ Scouts Returned
+                        </button>`;
+                    }
+                } else if (expedition.status === 'traveling') {
+                    const travelProgress = Math.min(expedition.travelDistance, daysPassed);
+                    const daysLeft = Math.max(0, expedition.travelDistance - daysPassed);
+                    
+                    if (daysLeft === 0) {
+                        currentStatus = '� Arrived at destination - Scouting area';
+                        actionButton = `<button class="action-btn small secondary" onclick="window.worldManager.orderScoutsHome('${expedition.id}')" style="margin-top: 8px;">
+                            🏠 Order Return Home
+                        </button>`;
+                        // Update expedition status to stationed
+                        expedition.status = 'stationed';
+                        expedition.isStationed = true;
+                        // Reveal the hex now that scouts have arrived
+                        this.revealHex(expedition.targetHex.row, expedition.targetHex.col);
+                        this.revealSurroundingHexes(expedition.targetHex.row, expedition.targetHex.col);
+                    } else {
+                        currentStatus = `🚶 Traveling to destination (${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining)`;
+                    }
+                } else if (expedition.status === 'stationed') {
+                    currentStatus = '🔍 Stationed at destination - Gathering intelligence';
+                    actionButton = `<button class="action-btn small secondary" onclick="window.worldManager.orderScoutsHome('${expedition.id}')" style="margin-top: 8px;">
+                        🏠 Order Return Home
+                    </button>`;
+                }
+                
+                const totalProgress = expedition.returningHome ? 
+                    (expedition.isStationed ? 50 + ((expedition.travelDistance - expedition.daysRemaining) / expedition.travelDistance) * 50 : 0) :
+                    (Math.min(daysPassed, expedition.travelDistance) / expedition.travelDistance) * 100;
+                
+                content += `
+                    <div class="expedition-item scout-expedition ${expedition.isStationed && !expedition.returningHome ? 'stationed' : ''}">
+                        <div class="expedition-header">
+                            <h5>🎯 Scout Mission to (${expedition.targetHex.row}, ${expedition.targetHex.col})</h5>
+                            <span class="expedition-scouts">${expedition.scouts.length} scouts</span>
+                        </div>
+                        <div class="expedition-details">
+                            <p><strong>Scouts:</strong> ${expedition.scouts.map(s => s.name).join(', ')}</p>
+                            <p><strong>Distance:</strong> ${expedition.travelDistance} hex${expedition.travelDistance !== 1 ? 'es' : ''}</p>
+                            <p><strong>Status:</strong> ${currentStatus}</p>
+                        </div>
+                        <div class="expedition-progress">
+                            <div class="progress-bar" style="background: #34495e; border-radius: 4px; height: 8px; margin: 8px 0;">
+                                <div class="progress-fill" style="width: ${totalProgress}%; background: ${expedition.isStationed ? '#f39c12' : '#3498db'}; height: 100%; border-radius: 4px; transition: width 0.3s;"></div>
+                            </div>
+                            <span class="progress-text" style="font-size: 0.8em; color: #bdc3c7;">${Math.floor(totalProgress)}% journey complete</span>
+                        </div>
+                        ${actionButton}
+                    </div>
+                `;
+            });
+        }
         
         list.innerHTML = content;
     }
@@ -1147,6 +1293,7 @@ class WorldManager {
         
         // Confirm disbanding
         if (window.modalSystem) {
+            console.log('[World] Showing confirmation modal for army disbanding');
             window.modalSystem.showConfirmation(
                 `Are you sure you want to disband ${army.name}? All members will return to the village.`,
                 {
@@ -1154,10 +1301,22 @@ class WorldManager {
                     confirmText: 'Disband',
                     cancelText: 'Cancel',
                     onConfirm: () => {
+                        console.log('[World] Confirmation onConfirm callback triggered');
                         this.performDisbandArmy(armyId);
+                    },
+                    onCancel: () => {
+                        console.log('[World] Confirmation onCancel callback triggered');
                     }
                 }
-            );
+            ).then((result) => {
+                console.log('[World] Confirmation dialog result:', result);
+            }).catch((error) => {
+                console.error('[World] Confirmation dialog error:', error);
+                // Fallback to browser confirm
+                if (confirm(`Disband ${army.name}? All members will return to the village.`)) {
+                    this.performDisbandArmy(armyId);
+                }
+            });
         } else if (confirm(`Disband ${army.name}? All members will return to the village.`)) {
             this.performDisbandArmy(armyId);
         }
@@ -1296,6 +1455,92 @@ class WorldManager {
         }
     }
     
+    updateLogisticsModal(armyId) {
+        console.log('[World] Updating logistics modal for armyId:', armyId);
+        const army = this.parties.expeditions.find(a => a.id === armyId);
+        if (!army) {
+            console.error('[World] Army not found for modal update:', armyId);
+            return;
+        }
+        
+        // Try to find and update the existing modal
+        const modalTitle = `Logistics - ${army.name}`;
+        const existingModal = Array.from(document.querySelectorAll('.modal')).find(modal => {
+            const titleElement = modal.querySelector('.modal-title, h3');
+            return titleElement && titleElement.textContent.includes(`Logistics - ${army.name}`);
+        });
+        
+        if (existingModal) {
+            console.log('[World] Found existing logistics modal, updating content...');
+            
+            // Get current resources from gameState
+            const currentFood = this.gameState.food || this.gameState.resources?.food || 0;
+            
+            // Generate updated content
+            const logisticsContent = `
+                <div class="logistics-management" style="padding: 20px;">
+                    <h3>📦 Logistics Management - ${army.name}</h3>
+                    <p>Manage supplies and equipment for your expedition. Proper preparation is crucial for survival in the wilderness.</p>
+                    
+                    <div class="current-resources" style="margin: 15px 0; padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px;">
+                        <h4>Available Resources</h4>
+                        <p>🍞 Food: ${currentFood}</p>
+                    </div>
+                    
+                    <div class="supply-grid" style="margin: 20px 0;">
+                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e74c3c; border-radius: 8px;">
+                            <h4>🍞 Food Supplies</h4>
+                            <p>Current: ${army.supplies.food} days worth</p>
+                            <p style="color: ${army.supplies.food > 0 ? '#27ae60' : '#e74c3c'};">
+                                ${army.supplies.food > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
+                            </p>
+                            <button class="action-btn" onclick="window.safeWorldManagerCall?.('addSupply', '${armyId}', 'food', 7) || (window.worldManager && window.worldManager.addSupply?.('${armyId}', 'food', 7))" 
+                                    style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                    ${currentFood < 21 ? 'disabled' : ''}>
+                                Add 7 Days Food (-21 food) ${currentFood < 21 ? '(Not enough food)' : ''}
+                            </button>
+                        </div>
+                        
+                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
+                            <h4>💧 Water</h4>
+                            <p>Current: ${army.supplies.water} days worth</p>
+                            <p style="color: #3498db;">ℹ️ Optional - Can be found along the way</p>
+                        </div>
+                        
+                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #f39c12; border-radius: 8px;">
+                            <h4>⚔️ Equipment</h4>
+                            <p>Current: ${army.supplies.equipment}</p>
+                            <p style="color: #f39c12;">Basic equipment suitable for scouting missions</p>
+                        </div>
+                    </div>
+                    
+                    <div class="logistics-tutorial" style="padding: 15px; background-color: rgba(241, 196, 15, 0.2); border-radius: 5px;">
+                        <h4>💡 Tutorial: Expedition Logistics</h4>
+                        <ul style="text-align: left; padding-left: 20px; margin: 10px 0;">
+                            <li><strong>Food:</strong> Essential for maintaining army morale and preventing starvation</li>
+                            <li><strong>Travel Speed:</strong> Base speed is 7 days per hex tile</li>
+                            <li><strong>Events:</strong> Random encounters can affect supplies and progress</li>
+                            <li><strong>Planning:</strong> Consider round-trip supplies for safe return</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            // Update the modal body content
+            const modalBody = existingModal.querySelector('.modal-body');
+            if (modalBody) {
+                modalBody.innerHTML = logisticsContent;
+                console.log('[World] Logistics modal content updated successfully');
+            } else {
+                console.warn('[World] Could not find modal body to update');
+            }
+        } else {
+            console.log('[World] No existing logistics modal found, reopening...');
+            // Fallback: re-open the modal
+            setTimeout(() => this.manageLogistics(armyId), 300);
+        }
+    }
+    
     addSupply(armyId, supplyType, amount) {
         const army = this.parties.expeditions.find(a => a.id === armyId);
         if (!army) {
@@ -1372,8 +1617,8 @@ class WorldManager {
                 });
             }
             
-            // Re-open the logistics modal with updated info after a brief delay
-            setTimeout(() => this.manageLogistics(armyId), 1000);
+            // Try to update the existing modal content in place
+            this.updateLogisticsModal(armyId);
         } else {
             if (window.showToast) {
                 window.showToast(`❌ Insufficient ${cost.resource}! Need ${totalCost}, have ${currentResources}.`, {
@@ -1492,12 +1737,352 @@ class WorldManager {
     }
     
     exploreHex(row, col) {
-        // Basic exploration mechanic
-        window.showToast('🔍 Detailed exploration coming soon!', {
-            icon: '🗺️',
-            type: 'info',
-            timeout: 2000
+        // Prevent multiple modals from being created
+        if (document.querySelector('.scout-modal-overlay')) {
+            console.log('[WorldManager] Scout modal already open, ignoring duplicate request');
+            return;
+        }
+        
+        // Trigger exploration achievement
+        if (window.gameState && window.gameState.achievements) {
+            window.gameState.achievements.triggerTileExplored();
+        }
+        
+        // Start scout selection process
+        this.showScoutSelectionModal(row, col);
+    }
+
+    showScoutSelectionModal(targetRow, targetCol) {
+        // Check if a scout modal is already open
+        if (document.querySelector('.scout-modal-overlay')) {
+            console.log('[WorldManager] Scout modal already open, ignoring request');
+            return;
+        }
+        
+        // Get available villagers for scouting (working age, not already working)
+        const availableScouts = [];
+        if (window.gameState && window.gameState.populationManager) {
+            const population = window.gameState.populationManager.getAll();
+            population.forEach(villager => {
+                const isRightAge = villager.age >= 16 && villager.age <= 65;
+                const isAvailable = villager.status !== 'working' && villager.status !== 'scouting';
+                if (isRightAge && isAvailable) {
+                    availableScouts.push(villager);
+                }
+            });
+        }
+
+        if (availableScouts.length === 0) {
+            window.showToast('❌ No available scouts! Need unemployed villagers aged 16-65.', {
+                icon: '�',
+                type: 'error',
+                timeout: 3000
+            });
+            return;
+        }
+
+        // Create scout selection modal
+        const modal = document.createElement('div');
+        modal.className = 'scout-modal-overlay';
+        modal.innerHTML = `
+            <div class="scout-modal">
+                <div class="scout-modal-header">
+                    <h3>�🔍 Select Scouts for Expedition</h3>
+                    <p>Choose up to 3 villagers to scout hex (${targetRow}, ${targetCol})</p>
+                </div>
+                <div class="scout-selection">
+                    <div class="scout-list">
+                        ${availableScouts.map(scout => `
+                            <div class="scout-option" data-scout-id="${scout.id}">
+                                <input type="checkbox" id="scout-${scout.id}" class="scout-checkbox">
+                                <label for="scout-${scout.id}" class="scout-label">
+                                    <span class="scout-name">${scout.name}</span>
+                                    <span class="scout-details">Age: ${scout.age}, ${scout.gender}</span>
+                                    <span class="scout-role">${scout.role || 'villager'}</span>
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="scout-modal-actions">
+                    <button class="scout-btn cancel" onclick="this.parentElement.parentElement.parentElement.remove()">Cancel</button>
+                    <button class="scout-btn confirm" onclick="this.disabled=true; window.worldManager.confirmScoutExpedition(${targetRow}, ${targetCol})">Send Scouts</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Add event listeners for checkbox limitation (max 3)
+        const checkboxes = modal.querySelectorAll('.scout-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const checked = modal.querySelectorAll('.scout-checkbox:checked');
+                if (checked.length > 3) {
+                    checkbox.checked = false;
+                    window.showToast('⚠️ Maximum 3 scouts per expedition!', {
+                        icon: '👥',
+                        type: 'warning',
+                        timeout: 2000
+                    });
+                }
+            });
         });
+    }
+
+    confirmScoutExpedition(targetRow, targetCol) {
+        const modal = document.querySelector('.scout-modal-overlay');
+        if (!modal) {
+            console.error('[WorldManager] Scout modal not found');
+            return;
+        }
+        
+        // Disable the confirm button to prevent double-clicking
+        const confirmButton = modal.querySelector('.scout-btn.confirm');
+        if (confirmButton) {
+            confirmButton.disabled = true;
+            confirmButton.textContent = 'Sending...';
+        }
+        
+        const selectedScouts = [];
+        const checkedBoxes = modal.querySelectorAll('.scout-checkbox:checked');
+        
+        if (checkedBoxes.length === 0) {
+            window.showToast('❌ Please select at least one scout!', {
+                icon: '👥',
+                type: 'error',
+                timeout: 2000
+            });
+            return;
+        }
+
+        // Get scout data
+        checkedBoxes.forEach(checkbox => {
+            const scoutId = parseInt(checkbox.id.replace('scout-', '')); // Convert to number
+            const scout = window.gameState.populationManager.getAll().find(v => v.id === scoutId);
+            if (scout) {
+                selectedScouts.push(scout);
+            } else {
+                console.warn('[WorldManager] Could not find scout with ID:', scoutId);
+            }
+        });
+
+        if (selectedScouts.length === 0) {
+            window.showToast('❌ No valid scouts found!', {
+                icon: '👥',
+                type: 'error',
+                timeout: 2000
+            });
+            // Re-enable the button
+            if (confirmButton) {
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Send Scouts';
+            }
+            return;
+        }
+
+        // Check if any selected scouts are already on expeditions
+        const busyScouts = selectedScouts.filter(scout => scout.status === 'scouting');
+        if (busyScouts.length > 0) {
+            window.showToast(`❌ Some scouts are already on expeditions: ${busyScouts.map(s => s.name).join(', ')}`, {
+                icon: '👥',
+                type: 'error',
+                timeout: 3000
+            });
+            // Re-enable the button
+            if (confirmButton) {
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Send Scouts';
+            }
+            return;
+        }
+
+        // Calculate travel distance (Manhattan distance for simplicity)
+        const playerPos = this.playerVillageHex;
+        const distance = Math.abs(targetRow - playerPos.row) + Math.abs(targetCol - playerPos.col);
+        
+        // Create expedition (allowing multiple expeditions to the same location for stationing)
+        const expedition = {
+            id: `expedition_${Date.now()}`,
+            scouts: selectedScouts,
+            targetHex: { row: targetRow, col: targetCol },
+            currentHex: { row: playerPos.row, col: playerPos.col },
+            status: 'traveling',
+            progress: 0,
+            travelDistance: distance,
+            daysRemaining: distance,
+            startDay: window.gameState.currentDay,
+            isStationed: false, // Will be true when scouts reach destination and stay there
+            returningHome: false
+        };
+
+        // Initialize expeditions array if it doesn't exist
+        if (!this.expeditions) {
+            this.expeditions = [];
+        }
+        this.expeditions.push(expedition);
+
+        // Mark scouts as busy
+        selectedScouts.forEach(scout => {
+            // Double-check scout isn't already on an expedition
+            if (scout.status === 'scouting') {
+                console.warn('[WorldManager] Scout', scout.name, 'already on expedition, skipping');
+                return;
+            }
+            scout.status = 'scouting';
+            scout.expeditionId = expedition.id;
+        });
+
+        // Remove modal FIRST to prevent double-clicking
+        modal.remove();
+
+        // Show confirmation
+        window.showToast(`🔍 ${selectedScouts.length} scouts sent to explore hex (${targetRow}, ${targetCol})! ${distance} day${distance > 1 ? 's' : ''} travel time.`, {
+            icon: '🗺️',
+            type: 'success',
+            timeout: 4000
+        });
+
+        // Update expedition display
+        this.updateExpeditionsList(); // Use main expeditions list instead of separate display
+    }
+
+    orderScoutsHome(expeditionId) {
+        const expedition = this.expeditions.find(e => e.id === expeditionId);
+        if (!expedition) {
+            console.error('[WorldManager] Expedition not found:', expeditionId);
+            return;
+        }
+
+        if (expedition.returningHome) {
+            window.showToast('⚠️ Scouts are already returning home!', {
+                icon: '🏠',
+                type: 'warning',
+                timeout: 2000
+            });
+            return;
+        }
+
+        // Calculate return distance
+        const returnDistance = Math.abs(expedition.targetHex.row - this.playerVillageHex.row) + 
+                              Math.abs(expedition.targetHex.col - this.playerVillageHex.col);
+
+        // Update expedition status
+        expedition.returningHome = true;
+        expedition.status = 'returning';
+        expedition.daysRemaining = returnDistance;
+        expedition.returnStartDay = window.gameState.currentDay;
+
+        window.showToast(`🏠 Ordered ${expedition.scouts.length} scouts to return home. ${returnDistance} day${returnDistance !== 1 ? 's' : ''} travel time.`, {
+            icon: '📋',
+            type: 'success',
+            timeout: 3000
+        });
+
+        // Update expedition display
+        this.updateExpeditionsList();
+    }
+
+    completeExpedition(expeditionId) {
+        const expedition = this.expeditions.find(e => e.id === expeditionId);
+        if (!expedition) return;
+
+        // Return scouts to available status
+        expedition.scouts.forEach(scout => {
+            scout.status = 'idle';
+            delete scout.expeditionId;
+        });
+
+        // Remove expedition
+        this.expeditions = this.expeditions.filter(e => e.id !== expeditionId);
+
+        // Show results
+        if (expedition.returningHome) {
+            window.showToast(`� ${expedition.scouts.length} scouts have returned home safely!`, {
+                icon: '✅',
+                type: 'success',
+                timeout: 4000
+            });
+        } else {
+            // This shouldn't normally happen, but handle legacy cases
+            const { row, col } = expedition.targetHex;
+            
+            // Reveal the target hex and surrounding hexes (fog of war)
+            this.revealHex(row, col);
+            this.revealSurroundingHexes(row, col);
+
+            window.showToast(`�🎉 Expedition complete! Discovered hex (${row}, ${col}) and surrounding area.`, {
+                icon: '🗺️',
+                type: 'success',
+                timeout: 4000
+            });
+        }
+
+        // Update displays
+        this.updateExpeditionsList(); // Use main expeditions list
+        this.renderHexMap();
+    }
+
+    revealHex(row, col) {
+        if (this.hexMap[row] && this.hexMap[row][col]) {
+            this.hexMap[row][col].discovered = true;
+            this.hexMap[row][col].fogOfWar = false;
+        }
+    }
+
+    revealSurroundingHexes(centerRow, centerCol) {
+        // Reveal adjacent hexes (6 directions in hex grid)
+        const directions = [
+            [-1, -1], [-1, 0], [0, -1], [0, 1], [1, 0], [1, 1]
+        ];
+
+        directions.forEach(([dRow, dCol]) => {
+            const newRow = centerRow + dRow;
+            const newCol = centerCol + dCol;
+            if (newRow >= 0 && newRow < this.mapHeight && newCol >= 0 && newCol < this.mapWidth) {
+                this.revealHex(newRow, newCol);
+            }
+        });
+    }
+
+    updateExpeditions() {
+        // Called each day to update expedition progress
+        if (!this.expeditions || this.expeditions.length === 0) return;
+
+        this.expeditions.forEach(expedition => {
+            if (expedition.returningHome) {
+                // Update return journey progress
+                expedition.daysRemaining = Math.max(0, expedition.daysRemaining - 1);
+                
+                if (expedition.daysRemaining === 0) {
+                    // Scouts have returned home - they'll be processed by completeExpedition
+                    expedition.status = 'complete';
+                }
+            } else if (expedition.status === 'traveling') {
+                // Update travel progress
+                const daysPassed = window.gameState.currentDay - expedition.startDay;
+                
+                if (daysPassed >= expedition.travelDistance) {
+                    // Scouts have arrived at destination
+                    expedition.status = 'stationed';
+                    expedition.isStationed = true;
+                    
+                    // Reveal the target hex and surrounding area
+                    this.revealHex(expedition.targetHex.row, expedition.targetHex.col);
+                    this.revealSurroundingHexes(expedition.targetHex.row, expedition.targetHex.col);
+                    
+                    // Show arrival notification
+                    window.showToast(`🔍 Scouts have arrived at hex (${expedition.targetHex.row}, ${expedition.targetHex.col}) and are scouting the area!`, {
+                        icon: '🗺️',
+                        type: 'success',
+                        timeout: 4000
+                    });
+                }
+            }
+        });
+
+        // Update expedition display in the expeditions list
+        this.updateExpeditionsList();
     }
 }
 // Inject hex-button CSS for flat-top hexagon styling

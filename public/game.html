@@ -68,10 +68,24 @@
     <div id="game-container">
         <!-- Navigation -->
         <nav id="view-navigation">
-            <button class="nav-btn active" data-view="village">Village</button>
-            <button class="nav-btn locked" data-view="world">World</button>
-            <button class="nav-btn locked" data-view="monarch">Monarch</button>
-            <button class="nav-btn locked" data-view="throne">Throne</button>
+        <button class="nav-btn active" data-view="village">Village</button>
+        <button class="nav-btn locked" data-view="world">World</button>
+        <button class="nav-btn locked" data-view="monarch">Monarch</button>
+        <button class="nav-btn locked" data-view="throne">Throne</button>
+        <!-- Time Controls: now in top nav -->
+        <div id="global-time-controls" class="time-controls-nav">
+            <div class="current-day-nav">
+                <span id="current-season-nav">Spring</span>
+                <span id="current-day-number-nav">Day 1</span>
+            </div>
+            <button id="end-day-btn-nav" class="end-day-button time-btn">End Day</button>
+            <button id="auto-play-btn-nav" class="auto-play-button time-btn">
+                <span id="auto-play-icon-nav">▶️</span>
+                <span id="auto-play-text-nav">Play</span>
+            </button>
+            <button id="speed-2x-btn-nav" class="time-btn">2x</button>
+            <button id="speed-4x-btn-nav" class="time-btn">4x</button>
+        </div>
         </nav>
 
         <!-- Game Content -->
@@ -87,6 +101,7 @@
                         <span>🌲 Wood: <span id="wood-count"></span></span>
                         <span>🪨 Stone: <span id="stone-count"></span></span>
                         <span>🪙 Metal: <span id="metal-count"></span></span>
+                        <span>⚙️ Production: <span id="production-count"></span></span>
                         <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
@@ -110,55 +125,28 @@
                 <div class="village-content">
                     <!-- Production Planner (Left) -->
                     <div class="production-planner">
-                        <h3>📈 Production Planner</h3>
+                        <h3>🏭 Production Planner</h3>
                         
                         <div class="planner-section">
-                            <h4>🎯 Goals</h4>
-                            <div class="production-goals">
-                                <div class="goal-item">
-                                    <span class="goal-icon">🌾</span>
-                                    <span class="goal-text">Target: </span>
-                                    <input type="number" id="food-goal" class="goal-input" value="100" min="0">
-                                    <span>/day</span>
+                            <h4>⚔️ Crafting Queue</h4>
+                            <div class="crafting-options">
+                                <div class="craft-item">
+                                    <span class="craft-icon">⚔️</span>
+                                    <span class="craft-name">Weapon</span>
+                                    <span class="craft-cost">5⚙️ 2🪙</span>
+                                    <button class="craft-btn" onclick="craftItem('weapon')">Craft</button>
                                 </div>
-                                <div class="goal-item">
-                                    <span class="goal-icon">🪵</span>
-                                    <span class="goal-text">Target: </span>
-                                    <input type="number" id="wood-goal" class="goal-input" value="50" min="0">
-                                    <span>/day</span>
+                                <div class="craft-item">
+                                    <span class="craft-icon">🔨</span>
+                                    <span class="craft-name">Tool</span>
+                                    <span class="craft-cost">3⚙️ 1🪙</span>
+                                    <button class="craft-btn" onclick="craftItem('tool')">Craft</button>
                                 </div>
-                                <div class="goal-item">
-                                    <span class="goal-icon">🗿</span>
-                                    <span class="goal-text">Target: </span>
-                                    <input type="number" id="stone-goal" class="goal-input" value="25" min="0">
-                                    <span>/day</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="planner-section">
-                            <h4>📊 Efficiency</h4>
-                            <div class="efficiency-stats">
-                                <div class="efficiency-item">
-                                    <span class="goal-icon">🌾</span>
-                                    <div class="efficiency-bar-container">
-                                        <div id="food-efficiency-bar" class="efficiency-bar excellent" style="width: 0%"></div>
-                                        <span id="food-efficiency-text" class="efficiency-text">0%</span>
-                                    </div>
-                                </div>
-                                <div class="efficiency-item">
-                                    <span class="goal-icon">🪵</span>
-                                    <div class="efficiency-bar-container">
-                                        <div id="wood-efficiency-bar" class="efficiency-bar excellent" style="width: 0%"></div>
-                                        <span id="wood-efficiency-text" class="efficiency-text">0%</span>
-                                    </div>
-                                </div>
-                                <div class="efficiency-item">
-                                    <span class="goal-icon">🗿</span>
-                                    <div class="efficiency-bar-container">
-                                        <div id="stone-efficiency-bar" class="efficiency-bar excellent" style="width: 0%"></div>
-                                        <span id="stone-efficiency-text" class="efficiency-text">0%</span>
-                                    </div>
+                                <div class="craft-item">
+                                    <span class="craft-icon">🛡️</span>
+                                    <span class="craft-name">Armor</span>
+                                    <span class="craft-cost">8⚙️ 3🪙</span>
+                                    <button class="craft-btn" onclick="craftItem('armor')">Craft</button>
                                 </div>
                             </div>
                         </div>
@@ -175,18 +163,57 @@
                         
                         <div class="manager-section">
                             <h4>📊 Production</h4>
-                            <div class="production-info">
-                                <div class="production-item">
-                                    <span class="production-icon">🌾</span>
-                                    <span class="production-text">Food: <span id="daily-food-production">0</span>/day</span>
+                            <div class="production-table">
+                                <div class="production-header">
+                                    <div class="column-header">Resource</div>
+                                    <div class="column-header">Gain</div>
+                                    <div class="column-header">Loss</div>
+                                    <div class="column-header">Net</div>
                                 </div>
-                                <div class="production-item">
-                                    <span class="production-icon">🪵</span>
-                                    <span class="production-text">Wood: <span id="daily-wood-production">0</span>/day</span>
+                                <div class="production-row">
+                                    <div class="resource-cell">
+                                        <span class="production-icon">🌾</span>
+                                        <span class="resource-name">Food</span>
+                                    </div>
+                                    <div class="gain-cell">+<span id="daily-food-production">0</span></div>
+                                    <div class="loss-cell">-<span id="daily-food-consumption">0</span></div>
+                                    <div class="net-cell"><span id="daily-food-net">0</span></div>
                                 </div>
-                                <div class="production-item">
-                                    <span class="production-icon">🗿</span>
-                                    <span class="production-text">Stone: <span id="daily-stone-production">0</span>/day</span>
+                                <div class="production-row">
+                                    <div class="resource-cell">
+                                        <span class="production-icon">🪵</span>
+                                        <span class="resource-name">Wood</span>
+                                    </div>
+                                    <div class="gain-cell">+<span id="daily-wood-production">0</span></div>
+                                    <div class="loss-cell">-<span id="daily-wood-consumption">0</span></div>
+                                    <div class="net-cell"><span id="daily-wood-net">0</span></div>
+                                </div>
+                                <div class="production-row">
+                                    <div class="resource-cell">
+                                        <span class="production-icon">🗿</span>
+                                        <span class="resource-name">Stone</span>
+                                    </div>
+                                    <div class="gain-cell">+<span id="daily-stone-production">0</span></div>
+                                    <div class="loss-cell">-<span id="daily-stone-consumption">0</span></div>
+                                    <div class="net-cell"><span id="daily-stone-net">0</span></div>
+                                </div>
+                                <div class="production-row">
+                                    <div class="resource-cell">
+                                        <span class="production-icon">⚒️</span>
+                                        <span class="resource-name">Metal</span>
+                                    </div>
+                                    <div class="gain-cell">+<span id="daily-metal-production">0</span></div>
+                                    <div class="loss-cell">-<span id="daily-metal-consumption">0</span></div>
+                                    <div class="net-cell"><span id="daily-metal-net">0</span></div>
+                                </div>
+                                <div class="production-row">
+                                    <div class="resource-cell">
+                                        <span class="production-icon">⚙️</span>
+                                        <span class="resource-name">Production</span>
+                                    </div>
+                                    <div class="gain-cell">+<span id="daily-production-gain">0</span></div>
+                                    <div class="loss-cell">-<span id="daily-production-consumption">0</span></div>
+                                    <div class="net-cell"><span id="daily-production-net">0</span></div>
                                 </div>
                             </div>
                         </div>
@@ -201,29 +228,22 @@
                                     <span>Capacity: <span id="manager-population-cap">0</span></span>
                                 </div>
                                 <div class="population-stat">
-                                    <span>Growth: <span id="population-growth-rate">+0</span>/day</span>
+                                    <span>Weekly Growth: <span id="population-growth-rate">+0</span></span>
+                                </div>
+                                <div class="population-stat">
+                                    <span>Expected Deaths: <span id="population-death-rate">0</span>/week</span>
+                                </div>
+                                <div class="population-stat">
+                                    <span>Net Change: <span id="population-net-change">+0</span>/week</span>
                                 </div>
                             </div>
                             <div class="population-actions" style="display: flex; gap: 8px; margin-top: 8px;">
-                                <button id="population-view-btn" class="population-view-button">👥 View Population</button>
+                                <button id="population-view-btn" class="population-view-button">� View Population</button>
                             </div>
                         </div>
 
                         <div class="manager-section">
-                            <h4>⏰ Time Controls</h4>
-                            <div class="time-controls" style="display: flex; flex-direction: row; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                <div class="current-day" style="margin-right: 8px; min-width: 90px;">
-                                    <span id="current-season">Spring</span>
-                                    <span id="current-day-number">Day 1</span>
-                                </div>
-                                <button id="end-day-btn" class="end-day-button time-btn" style="min-width: 48px; padding: 6px 10px; font-size: 0.95em;">End</button>
-                                <button id="auto-play-btn" class="auto-play-button time-btn" style="min-width: 48px; padding: 6px 10px; font-size: 0.95em;">
-                                    <span id="auto-play-icon">▶️</span>
-                                    <span id="auto-play-text">Play</span>
-                                </button>
-                                <button id="speed-2x-btn" class="time-btn" style="min-width: 36px; padding: 6px 8px; font-size: 0.95em;">2x</button>
-                                <button id="speed-4x-btn" class="time-btn" style="min-width: 36px; padding: 6px 8px; font-size: 0.95em;">4x</button>
-                            </div>
+                            <!-- Time Controls moved to nav -->
                         </div>
     <style>
         .time-controls .time-btn {
@@ -253,13 +273,92 @@
             color: #fff;
             border-color: #444;
         }
+
+        /* Navigation Time Controls Styling */
+        .time-controls-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            padding: 0 1rem;
+        }
+
+        .current-day-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.85em;
+            color: #ecf0f1;
+            margin-right: 8px;
+            min-width: 80px;
+        }
+
+        .current-day-nav span {
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .time-controls-nav .time-btn {
+            background: #34495e;
+            color: #ecf0f1;
+            border: 1px solid #2c3e50;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+            font-size: 0.85em;
+            padding: 4px 8px;
+            min-width: 40px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-controls-nav .time-btn:hover {
+            background: #1abc9c;
+            color: #fff;
+            border-color: #16a085;
+            transform: translateY(-1px);
+        }
+
+        .time-controls-nav .time-btn.selected,
+        .time-controls-nav .time-btn:active {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #c0392b;
+        }
+
+        .time-controls-nav .auto-play-button {
+            min-width: 60px;
+            gap: 4px;
+        }
+
+        .time-controls-nav .end-day-button {
+            background: #f39c12;
+            border-color: #e67e22;
+        }
+
+        .time-controls-nav .end-day-button:hover {
+            background: #e67e22;
+            border-color: #d35400;
+        }
     </style>
 <script>
 // Time control speed buttons logic
 document.addEventListener('DOMContentLoaded', function() {
-    const autoPlayBtn = document.getElementById('auto-play-btn');
-    const speed2xBtn = document.getElementById('speed-2x-btn');
-    const speed4xBtn = document.getElementById('speed-4x-btn');
+    // Navigation time controls (new location)
+    const autoPlayBtnNav = document.getElementById('auto-play-btn-nav');
+    const speed2xBtnNav = document.getElementById('speed-2x-btn-nav');
+    const speed4xBtnNav = document.getElementById('speed-4x-btn-nav');
+    const endDayBtnNav = document.getElementById('end-day-btn-nav');
+    
+    // Initialize autoPlaySpeed if not set
+    if (window.gameState && !window.gameState.autoPlaySpeed) {
+        window.gameState.autoPlaySpeed = 20000; // Default 20 seconds
+    }
+    
     let lastSpeed = 20000;
     function setSpeed(ms, btn) {
         if (window.gameState) {
@@ -270,25 +369,71 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         // Visual feedback
-        [autoPlayBtn, speed2xBtn, speed4xBtn].forEach(b => b && b.classList.remove('selected'));
+        [autoPlayBtnNav, speed2xBtnNav, speed4xBtnNav].forEach(b => b && b.classList.remove('selected'));
         if (btn) btn.classList.add('selected');
     }
-    if (speed2xBtn) {
-        speed2xBtn.addEventListener('click', function() {
-            setSpeed(10000, speed2xBtn); // 2x speed
+    
+    // End day button
+    if (endDayBtnNav) {
+        endDayBtnNav.addEventListener('click', function() {
+            if (window.gameState) {
+                window.gameState.endDay();
+            }
+            // Button animation
+            endDayBtnNav.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                endDayBtnNav.style.transform = '';
+            }, 100);
         });
     }
-    if (speed4xBtn) {
-        speed4xBtn.addEventListener('click', function() {
-            setSpeed(5000, speed4xBtn); // 4x speed
+    
+    // Auto-play toggle button
+    if (autoPlayBtnNav) {
+        autoPlayBtnNav.addEventListener('click', function() {
+            if (window.gameState) {
+                window.gameState.toggleAutoPlay();
+            }
         });
     }
-    // Default: normal speed (20s)
-    if (autoPlayBtn) {
-        autoPlayBtn.addEventListener('click', function() {
-            setSpeed(20000, autoPlayBtn);
+    
+    // Speed buttons
+    if (speed2xBtnNav) {
+        speed2xBtnNav.addEventListener('click', function() {
+            setSpeed(10000, speed2xBtnNav); // 2x speed
         });
     }
+    if (speed4xBtnNav) {
+        speed4xBtnNav.addEventListener('click', function() {
+            setSpeed(5000, speed4xBtnNav); // 4x speed
+        });
+    }
+    
+    // Update navigation time controls when gameState is ready
+    function updateNavigationTimeControls() {
+        if (window.gameState) {
+            // Update day/season display
+            const seasonNavElement = document.getElementById('current-season-nav');
+            const dayNavElement = document.getElementById('current-day-number-nav');
+            
+            if (seasonNavElement && window.gameState.season) {
+                seasonNavElement.textContent = window.gameState.season;
+            }
+            if (dayNavElement && window.gameState.currentDay) {
+                dayNavElement.textContent = `Day ${window.gameState.currentDay}`;
+            }
+            
+            // Update auto-play button state
+            if (window.gameState.updateAutoPlayUI) {
+                window.gameState.updateAutoPlayUI();
+            }
+        } else {
+            // Retry if gameState not ready yet
+            setTimeout(updateNavigationTimeControls, 200);
+        }
+    }
+    
+    // Call update function after a short delay to ensure gameState is loaded
+    setTimeout(updateNavigationTimeControls, 500);
 });
 </script>
                     </div>
@@ -571,4 +716,13 @@ document.addEventListener('DOMContentLoaded', function() {
         setInterval(updateNavButtonLocks, 2000);
     }
 });
+
+// Global crafting function
+function craftItem(itemType) {
+    if (window.gameState) {
+        return window.gameState.craftItem(itemType);
+    }
+    console.log('GameState not available for crafting');
+    return false;
+}
 </script>

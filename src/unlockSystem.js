@@ -243,7 +243,7 @@ class UnlockSystem {
                     const hasAchievement = window.achievementSystem && 
                                          typeof window.achievementSystem.isUnlocked === 'function' &&
                                          window.achievementSystem.isUnlocked(condition.achievement);
-                    console.log(`[UnlockSystem] Checking achievement ${condition.achievement}: ${hasAchievement}`);
+                    // console.log(`[UnlockSystem] Checking achievement ${condition.achievement}: ${hasAchievement}`);
                     return hasAchievement;
 
                 case 'building_count':
@@ -251,12 +251,12 @@ class UnlockSystem {
                         b => b.type === condition.building
                     ).length;
                     const hasEnoughBuildings = buildingCount >= condition.count;
-                    console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
+                    // console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
                     return hasEnoughBuildings;
 
                 case 'resource':
                     const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
-                    console.log(`[UnlockSystem] Checking resource ${condition.resource}: ${this.gameState[condition.resource]}/${condition.amount} = ${hasEnoughResource}`);
+                    // console.log(`[UnlockSystem] Checking resource ${condition.resource}: ${this.gameState[condition.resource]}/${condition.amount} = ${hasEnoughResource}`);
                     return hasEnoughResource;
 
                 case 'tutorial_step':

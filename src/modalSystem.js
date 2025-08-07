@@ -119,19 +119,23 @@ class ModalSystem {
         });
     }
 
-    _showModalInternal(options, resolve, reject) {
+        _showModalInternal(options, resolve, reject) {
         const {
-            id = `modal-${Date.now()}`,
+            id = 'modal-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
             title = 'Modal',
             content = '',
-            width = '500px',
+            width = '600px',
             height = 'auto',
-            closable = true,
             className = '',
             onClose = null,
+            closable = true,
             showCloseButton = true,
-            modalType = null
+            modalType = 'general',
+            priority = 0  // Add priority support: 0 = normal, 1 = high (settings), 2 = critical
         } = options;
+
+        console.log(`[ModalSystem] Creating modal: "${title}" (type: ${modalType}, id: ${id})`);
+        console.log(`[ModalSystem] Modal options:`, options);
 
         // Prevent multiple instances of the same modal type
         if (modalType && this.activeModals.has(modalType)) {
@@ -185,14 +189,24 @@ class ModalSystem {
             modalType, 
             closable,
             resolve,
-            reject
+            reject,
+            priority  // Store priority for z-index calculations
         });
         this.activeModals.add(modalId);
+
+        // Calculate z-index based on priority and stack position
+        // Base z-index: 10000, Priority bonus: +1000 per level, Stack position: +10 per modal
+        const baseZIndex = 10000;
+        const priorityBonus = priority * 1000;
+        const stackPosition = this.modalStack.length * 10;
+        const finalZIndex = baseZIndex + priorityBonus + stackPosition;
 
         // Show overlay and modal
         const overlay = document.getElementById('modal-overlay');
         overlay.appendChild(modal);
         overlay.style.display = 'flex';
+        overlay.style.zIndex = finalZIndex;  // Set calculated z-index
+        overlay.classList.add('show'); // Add show class for animations and selectors
 
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
@@ -249,7 +263,19 @@ class ModalSystem {
 
             // Hide overlay if no more modals
             if (this.modalStack.length === 0) {
-                document.getElementById('modal-overlay').style.display = 'none';
+                const overlay = document.getElementById('modal-overlay');
+                overlay.style.display = 'none';
+                overlay.classList.remove('show'); // Remove show class when hiding
+            } else {
+                // Recalculate z-index for remaining top modal
+                const topModal = this.modalStack[this.modalStack.length - 1];
+                const baseZIndex = 10000;
+                const priorityBonus = (topModal.priority || 0) * 1000;
+                const stackPosition = this.modalStack.length * 10;
+                const finalZIndex = baseZIndex + priorityBonus + stackPosition;
+                
+                const overlay = document.getElementById('modal-overlay');
+                overlay.style.zIndex = finalZIndex;
             }
         }, 200);
     }
@@ -391,16 +417,6 @@ class ModalSystem {
                 exclusive = false  // New option to close other modals first
             } = options;
 
-            // If exclusive, close all other modals first
-            if (exclusive && this.modalStack.length > 0) {
-                console.log('[ModalSystem] Closing all modals for exclusive confirmation');
-                this.closeAllModals();
-                // Wait a moment for modals to close
-                setTimeout(() => this.createConfirmationModal(), 100);
-            } else {
-                this.createConfirmationModal();
-            }
-
             const createConfirmationModal = () => {
                 const modalType = `confirmation-${type}-${title.toLowerCase().replace(/\s+/g, '-')}`;
                 
@@ -457,25 +473,45 @@ class ModalSystem {
                         }
 
                         console.log('[ModalSystem] Setting up button event handlers');
+                        console.log('[ModalSystem] Confirm button:', confirmBtn);
+                        console.log('[ModalSystem] Cancel button:', cancelBtn);
 
-                        confirmBtn.addEventListener('click', () => {
-                            console.log('[ModalSystem] Confirm button clicked');
+                        // Use direct event listeners instead of delegation
+                        const handleConfirm = (e) => {
+                            console.log('[ModalSystem] Confirm button clicked directly');
+                            e.preventDefault();
+                            e.stopPropagation();
                             this.closeModal(modalId);
                             if (onConfirm) {
                                 console.log('[ModalSystem] Calling onConfirm callback');
                                 onConfirm();
                             }
                             resolve(true);
-                        });
+                        };
 
-                        cancelBtn.addEventListener('click', () => {
-                            console.log('[ModalSystem] Cancel button clicked');
+                        const handleCancel = (e) => {
+                            console.log('[ModalSystem] Cancel button clicked directly');
+                            e.preventDefault();
+                            e.stopPropagation();
                             this.closeModal(modalId);
                             if (onCancel) {
                                 console.log('[ModalSystem] Calling onCancel callback');
                                 onCancel();
                             }
                             resolve(false);
+                        };
+
+                        // Add event listeners directly to buttons
+                        confirmBtn.addEventListener('click', handleConfirm);
+                        cancelBtn.addEventListener('click', handleCancel);
+
+                        // Also add mousedown as fallback
+                        confirmBtn.addEventListener('mousedown', (e) => {
+                            console.log('[ModalSystem] Confirm mousedown detected');
+                        });
+
+                        cancelBtn.addEventListener('mousedown', (e) => {
+                            console.log('[ModalSystem] Cancel mousedown detected');
                         });
 
                         console.log('[ModalSystem] Button handlers attached successfully');
@@ -486,7 +522,15 @@ class ModalSystem {
                 });
             };
 
-            createConfirmationModal();
+            // If exclusive, close all other modals first
+            if (exclusive && this.modalStack.length > 0) {
+                console.log('[ModalSystem] Closing all modals for exclusive confirmation');
+                this.closeAllModals();
+                // Wait a moment for modals to close
+                setTimeout(() => createConfirmationModal(), 100);
+            } else {
+                createConfirmationModal();
+            }
         });
     }
 
@@ -736,6 +780,7 @@ class ModalSystem {
             height: '400px',
             className: 'settings-modal',
             modalType: 'settings',
+            priority: 1,  // High priority - always appears above other modals
             onClose: () => {
                 // Save settings
                 this.saveSettings();
@@ -1192,6 +1237,126 @@ class ModalSystem {
                 // Clean up any construction-specific listeners
             }
         });
+    }
+
+    // Show death report modal
+    showDeathReportModal(gameState, timeframe = 'daily') {
+        const deathReportContent = this.generateDeathReportContent(gameState, timeframe);
+        
+        return this.showModal({
+            id: 'death-report-modal',
+            title: '💀 Death Report',
+            content: deathReportContent,
+            width: '700px',
+            height: '600px',
+            className: 'death-report-modal',
+            modalType: 'death-report',
+            onClose: () => {
+                // Clean up death report listeners
+            }
+        });
+    }
+
+    generateDeathReportContent(gameState, timeframe) {
+        const deathData = gameState.getDeathReportData(timeframe);
+        const { expectedDeaths, imminentDeaths, ageGroups, totalAtRisk, totalPopulation } = deathData;
+        
+        // Calculate percentages
+        const deathPercentage = totalPopulation > 0 ? ((expectedDeaths / totalPopulation) * 100).toFixed(1) : '0.0';
+        const riskPercentage = totalPopulation > 0 ? ((totalAtRisk / totalPopulation) * 100).toFixed(1) : '0.0';
+        
+        return `
+            <div class="death-report-content">
+                <div class="death-report-header">
+                    <div class="report-summary">
+                        <div class="summary-stat">
+                            <span class="stat-number">${expectedDeaths}</span>
+                            <span class="stat-label">Expected Deaths (${timeframe})</span>
+                        </div>
+                        <div class="summary-stat">
+                            <span class="stat-number">${deathPercentage}%</span>
+                            <span class="stat-label">of Population</span>
+                        </div>
+                        <div class="summary-stat">
+                            <span class="stat-number">${totalAtRisk}</span>
+                            <span class="stat-label">At Risk</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timeframe-controls">
+                        <button class="timeframe-btn ${timeframe === 'daily' ? 'active' : ''}" 
+                                onclick="window.modalSystem.switchDeathReportTimeframe('daily')">
+                            📅 Daily View
+                        </button>
+                        <button class="timeframe-btn ${timeframe === 'monthly' ? 'active' : ''}" 
+                                onclick="window.modalSystem.switchDeathReportTimeframe('monthly')">
+                            📊 Monthly View
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="death-risk-groups">
+                    <h4>Death Risk by Age Group</h4>
+                    <div class="risk-groups-list">
+                        ${Object.values(ageGroups).map(group => `
+                            <div class="risk-group ${group.count > 0 ? 'has-villagers' : 'empty'}">
+                                <div class="risk-group-header">
+                                    <span class="risk-group-name">${group.name}</span>
+                                    <span class="risk-group-count">${group.count} villagers</span>
+                                </div>
+                                ${group.count > 0 ? `
+                                    <div class="risk-group-villagers">
+                                        ${group.villagers.slice(0, 10).map(villager => `
+                                            <span class="villager-name" title="Age: ${villager.age} days">${villager.name}</span>
+                                        `).join('')}
+                                        ${group.villagers.length > 10 ? `<span class="more-villagers">+${group.villagers.length - 10} more</span>` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="death-report-info">
+                    <div class="info-section">
+                        <h5>📋 Report Information</h5>
+                        <ul>
+                            <li>Villagers die of old age at 198 days</li>
+                            <li>Daily view shows expected deaths in the next day</li>
+                            <li>Monthly view estimates deaths over the next 30 days</li>
+                            <li>Risk calculations are based on age proximity to death</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="population-overview">
+                        <h5>👥 Population Overview</h5>
+                        <div class="overview-stats">
+                            <div class="overview-stat">Total Population: <strong>${totalPopulation}</strong></div>
+                            <div class="overview-stat">At Risk (160+ days): <strong>${totalAtRisk}</strong></div>
+                            <div class="overview-stat">Risk Percentage: <strong>${riskPercentage}%</strong></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="death-report-actions">
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('death-report-modal')">Close Report</button>
+                </div>
+            </div>
+        `;
+    }
+
+    // Switch death report timeframe
+    switchDeathReportTimeframe(timeframe) {
+        if (!window.gameState) return;
+        
+        // Update the modal content
+        const modal = document.getElementById('death-report-modal');
+        if (modal) {
+            const modalBody = modal.querySelector('.modal-body');
+            if (modalBody) {
+                modalBody.innerHTML = this.generateDeathReportContent(window.gameState, timeframe);
+            }
+        }
     }
 
     // Get current modal count

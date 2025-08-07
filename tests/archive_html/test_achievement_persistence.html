@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Achievement Persistence Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .test-section { background: #f0f8ff; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .test-results { background: #e8f5e8; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffe8e8; color: #d00; }
+        .success { background: #e8f5e8; color: #080; }
+        button { padding: 8px 16px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .console-output { background: #f5f5f5; padding: 10px; border-left: 3px solid #007cba; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>🏆 Achievement Persistence Test</h1>
+    
+    <div class="test-section">
+        <h2>Problem Description</h2>
+        <p>The issue was that achievements could be obtained again after refreshing the page. This was caused by the <code>defineAchievement()</code> method always setting <code>unlocked: false</code> when initializing achievements, overwriting the saved progress from localStorage.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Fix Applied</h2>
+        <ul>
+            <li>Modified <code>defineAchievement()</code> to preserve existing unlock status from saved data</li>
+            <li>Added <code>verifyUnlockedAchievements()</code> to ensure consistency between achievement objects and the unlocked array</li>
+            <li>Enhanced logging to help debug future issues</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Instructions</h2>
+        <ol>
+            <li><button onclick="openGame()">Open the Game</button></li>
+            <li>Play until you unlock some achievements (build buildings, complete tutorial, etc.)</li>
+            <li><button onclick="checkAchievements()">Check Current Achievements</button></li>
+            <li><button onclick="refreshPage()">Refresh This Page</button></li>
+            <li><button onclick="checkAchievements()">Check Achievements Again</button></li>
+            <li>The unlocked achievements should remain unlocked after refresh</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Manual Testing</h2>
+        <button onclick="testLocalStorage()">Test localStorage</button>
+        <button onclick="clearAchievements()">Clear Achievements (Reset)</button>
+        <button onclick="addTestAchievement()">Add Test Achievement</button>
+        <div id="test-results" class="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <div id="console-output" class="console-output">Console logs will appear here...</div>
+    </div>
+
+    <script>
+        function openGame() {
+            window.open('game.html', '_blank');
+        }
+        
+        function refreshPage() {
+            location.reload();
+        }
+        
+        function checkAchievements() {
+            const saved = localStorage.getItem('achievements');
+            const results = document.getElementById('test-results');
+            
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    const unlockedCount = data.unlockedAchievements ? data.unlockedAchievements.length : 0;
+                    const achievementCount = data.achievements ? Object.keys(data.achievements).length : 0;
+                    
+                    results.innerHTML = `
+                        <h3 class="success">✅ Achievement data found in localStorage</h3>
+                        <p><strong>Total Achievements:</strong> ${achievementCount}</p>
+                        <p><strong>Unlocked Achievements:</strong> ${unlockedCount}</p>
+                        <p><strong>Unlocked IDs:</strong> ${JSON.stringify(data.unlockedAchievements)}</p>
+                        <details>
+                            <summary>Full Achievement Data</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `;
+                } catch (e) {
+                    results.innerHTML = `<h3 class="error">❌ Error parsing achievement data: ${e.message}</h3>`;
+                }
+            } else {
+                results.innerHTML = `<h3 class="error">❌ No achievement data found in localStorage</h3>`;
+            }
+        }
+        
+        function testLocalStorage() {
+            const results = document.getElementById('test-results');
+            
+            try {
+                // Test if localStorage is available
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                
+                // Check for game-related data
+                const gameData = localStorage.getItem('idleDynastyBuilder');
+                const achievementData = localStorage.getItem('achievements');
+                const tutorialComplete = localStorage.getItem('tutorialComplete');
+                
+                results.innerHTML = `
+                    <h3 class="success">✅ localStorage is working</h3>
+                    <p><strong>Game Data:</strong> ${gameData ? 'Found' : 'Not found'}</p>
+                    <p><strong>Achievement Data:</strong> ${achievementData ? 'Found' : 'Not found'}</p>
+                    <p><strong>Tutorial Complete:</strong> ${tutorialComplete ? 'Found' : 'Not found'}</p>
+                    <p><strong>All localStorage keys:</strong> ${Object.keys(localStorage).join(', ')}</p>
+                `;
+            } catch (e) {
+                results.innerHTML = `<h3 class="error">❌ localStorage error: ${e.message}</h3>`;
+            }
+        }
+        
+        function clearAchievements() {
+            if (confirm('This will clear all achievement progress. Are you sure?')) {
+                localStorage.removeItem('achievements');
+                const results = document.getElementById('test-results');
+                results.innerHTML = `<h3 class="success">✅ Achievement data cleared</h3>`;
+            }
+        }
+        
+        function addTestAchievement() {
+            const testData = {
+                achievements: {
+                    'test_achievement': {
+                        id: 'test_achievement',
+                        title: 'Test Achievement',
+                        description: 'This is a test achievement for persistence testing',
+                        icon: '🧪',
+                        unlocked: true,
+                        unlockedAt: new Date().toISOString()
+                    }
+                },
+                unlockedAchievements: ['test_achievement'],
+                stats: { buildings_built: 1 }
+            };
+            
+            localStorage.setItem('achievements', JSON.stringify(testData));
+            const results = document.getElementById('test-results');
+            results.innerHTML = `<h3 class="success">✅ Test achievement added</h3>`;
+        }
+        
+        // Intercept console logs
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        const consoleOutput = document.getElementById('console-output');
+        
+        function addToConsoleOutput(level, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            consoleOutput.textContent += `[${timestamp}] ${level}: ${message}\n`;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsoleOutput('LOG', args);
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsoleOutput('WARN', args);
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsoleOutput('ERROR', args);
+        };
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Achievement persistence test page loaded');
+            checkAchievements();
+        });
+    </script>
+</body>
+</html>

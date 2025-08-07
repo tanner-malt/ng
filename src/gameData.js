@@ -9,6 +9,7 @@ const GameData = {
         wood: '🌲', 
         stone: 'S',
         metal: 'M',
+        production: '⚙️',
         gold: '💰',
         population: '👥'
     },
@@ -24,6 +25,7 @@ const GameData = {
         sawmill: { wood: 80, stone: 30 },
         quarry: { wood: 40, stone: 60 },
         market: { wood: 100, stone: 50, metal: 25 },
+        blacksmith: { wood: 80, stone: 40, metal: 30 },
         temple: { wood: 120, stone: 80, metal: 40 },
         academy: { wood: 150, stone: 100, metal: 50 },
         castle: { wood: 200, stone: 150, metal: 75 },
@@ -49,17 +51,25 @@ const GameData = {
         },
         workshop: { 
             efficiency: 1.1, // 10% boost to production
-            production: 2 
+            production: 3 
         },
         sawmill: {
-            wood: 15
+            wood: 15,
+            production: 1  // Sawmill produces basic production materials
         },
         quarry: {
-            stone: 12
+            stone: 12,
+            metal: 2,
+            production: 1  // Quarry produces basic production materials
         },
         market: {
             gold: 8,
             efficiency: 1.15 // 15% boost to resource trading
+        },
+        blacksmith: {
+            metal: 6,
+            production: 4, // Blacksmith produces advanced production materials
+            efficiency: 1.2 // 20% boost to all production
         },
         temple: {
             influence: 10,
@@ -91,6 +101,7 @@ const GameData = {
         sawmill: 3,
         quarry: 4,
         market: 5,
+        blacksmith: 4,
         temple: 6,
         academy: 7,
         castle: 10,
@@ -139,6 +150,11 @@ const GameData = {
             name: 'Market',
             description: 'Generates gold and improves trade efficiency'
         },
+        blacksmith: {
+            icon: '⚒️',
+            name: 'Blacksmith',
+            description: 'Produces metal tools and weapons, boosts production efficiency'
+        },
         temple: {
             icon: '⛪',
             name: 'Temple',
@@ -166,7 +182,8 @@ const GameData = {
         food: 0,
         wood: 50,
         stone: 0,
-        metal: 0,
+        metal: 0,  // Metal will be given through tutorial achievement
+        production: 0,
         gold: 0,
         population: 1  // Start with 1 population (the player)
     },
@@ -177,6 +194,7 @@ const GameData = {
         wood: 999,
         stone: 999,
         metal: 999,
+        production: 999,
         gold: 9999
     },
 

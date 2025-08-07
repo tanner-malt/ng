@@ -52,20 +52,15 @@ class EventBusIntegrations {
             window.villageManager.updateResourceDisplay();
         }
 
-        // Check achievement requirements
-        if (window.achievementSystem) {
-            window.achievementSystem.checkRequirements();
-        }
+        // Note: Achievement checking is now handled by specific event listeners in app.js
+        // to avoid circular loops when achievements grant resources
 
         // Update message history icon (in case of unread messages)
         if (window.messageHistory) {
             window.messageHistory.updateIcon();
         }
         
-        // Save game state when resources are updated
-        if (window.gameState && typeof window.gameState.save === 'function') {
-            window.gameState.save();
-        }
+        // Note: Autosave handles periodic saving, no need to save on every resource update
     }
 
     handleBuildingPlaced(data) {
@@ -107,10 +102,8 @@ class EventBusIntegrations {
             );
         }
 
-        // Trigger achievement check
-        if (window.achievementSystem) {
-            window.achievementSystem.checkRequirements();
-        }
+        // Note: Achievement checking is now handled by specific event listeners in app.js
+        // to avoid circular loops when achievements grant resources
     }
 
     handleAchievementUnlocked(data) {

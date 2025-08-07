@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Building Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-instructions { background: #e8f4f8; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .test-steps { background: #f0f8ff; padding: 15px; border-radius: 5px; }
+        .test-steps ol { margin: 0; }
+        .test-steps li { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <h1>🏗️ Multi-Building Placement Test</h1>
+    
+    <div class="test-instructions">
+        <h2>Feature Description</h2>
+        <p>This test validates the new multi-building placement functionality where players can place multiple buildings of the same type without having to reselect from the build menu, as long as they have sufficient resources.</p>
+    </div>
+
+    <div class="test-steps">
+        <h2>Test Steps</h2>
+        <ol>
+            <li><a href="game.html" target="_blank">Open the game</a></li>
+            <li>Complete the tutorial or skip to get to the main village view</li>
+            <li>Ensure you have enough resources for multiple buildings (you can use developer tools to add resources if needed)</li>
+            <li>Click on a building type in the build menu (e.g., House)</li>
+            <li>Place the building on the village grid</li>
+            <li><strong>Expected Result:</strong> If you still have enough resources, you should:
+                <ul>
+                    <li>Stay in build mode (crosshair cursor remains)</li>
+                    <li>See the building button still highlighted</li>
+                    <li>Get a toast notification saying you can build another</li>
+                    <li>Be able to immediately place another building</li>
+                </ul>
+            </li>
+            <li>Continue placing buildings until you run out of resources</li>
+            <li><strong>Expected Result:</strong> When you can't afford another building:
+                <ul>
+                    <li>Build mode automatically exits</li>
+                    <li>Cursor returns to normal</li>
+                    <li>Building button becomes disabled/unaffordable</li>
+                </ul>
+            </li>
+            <li>Test the Escape key to manually exit build mode while still having resources</li>
+            <li>Test right-clicking to exit build mode</li>
+        </ol>
+    </div>
+
+    <div class="test-instructions">
+        <h2>Developer Testing Commands</h2>
+        <p>If you need to add resources for testing, open the browser console and use:</p>
+        <pre>
+// Add resources for testing
+window.gameState.resources.gold += 1000;
+window.gameState.resources.wood += 1000;
+window.gameState.resources.stone += 1000;
+window.gameState.resources.food += 1000;
+
+// Refresh the UI
+window.villageManager.updateBuildingButtonStates();
+        </pre>
+    </div>
+</body>
+</html>

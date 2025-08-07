@@ -21,9 +21,29 @@ class AchievementSystem {
             barracks_built: 0,
             towncenters_built: 0
         };
+        this.isCheckingRequirements = false; // Prevent recursive checking
         this.loadFromStorage();
         this.initializeAchievements();
+        
+        // After initializing, verify the unlocked achievements array is consistent
+        this.verifyUnlockedAchievements();
+        
         console.log('[Achievements] Achievement system initialized');
+    }
+
+    // Verify that the unlocked achievements array matches the actual achievement states
+    verifyUnlockedAchievements() {
+        const actualUnlocked = [];
+        Object.values(this.achievements).forEach(achievement => {
+            if (achievement.unlocked) {
+                actualUnlocked.push(achievement.id);
+            }
+        });
+        
+        // Update the unlocked array to match reality
+        this.unlockedAchievements = actualUnlocked;
+        
+        console.log('[Achievements] Verified unlocked achievements:', this.unlockedAchievements.length);
     }
 
     initializeAchievements() {
@@ -182,6 +202,16 @@ class AchievementSystem {
             reward: { prestige: 200, influence: 100 }
         });
 
+        // Exploration achievement
+        this.defineAchievement('first_exploration', {
+            title: 'First Explorer',
+            description: 'Explored a tile in the world view',
+            icon: '🗺️',
+            type: 'exploration',
+            hidden: false,
+            reward: { metal: 15, influence: 10 }
+        });
+
         console.log('[Achievements] Initialized', Object.keys(this.achievements).length, 'achievements');
     }
 
@@ -223,12 +253,12 @@ class AchievementSystem {
         }
 
         // Check master builder achievement
-        if (this.stats.buildings_built >= 10) {
+        if (this.stats.buildings_built >= 10 && !this.isUnlocked('master_builder')) {
             this.unlock('master_builder');
         }
 
         // Check houses requirement for sheltering_citizens
-        if (this.stats.houses_built >= 3) {
+        if (this.stats.houses_built >= 3 && !this.isUnlocked('sheltering_citizens')) {
             this.unlock('sheltering_citizens');
         }
 
@@ -245,6 +275,11 @@ class AchievementSystem {
         this.unlock('tutorial_complete');
     }
 
+    // Trigger achievement for exploring a tile
+    triggerTileExplored() {
+        this.unlock('first_exploration');
+    }
+
     // Check if an achievement is unlocked
     isUnlocked(achievementId) {
         const achievement = this.achievements[achievementId];
@@ -252,6 +287,9 @@ class AchievementSystem {
     }
 
     defineAchievement(id, config) {
+        // Check if this achievement already exists (from loaded save data)
+        const existing = this.achievements[id];
+        
         this.achievements[id] = {
             id: id,
             title: config.title,
@@ -261,8 +299,9 @@ class AchievementSystem {
             hidden: false, // Always visible
             requirement: config.requirement || null,
             reward: config.reward || {},
-            unlocked: false,
-            unlockedAt: null
+            // Preserve existing unlock status if it exists, otherwise use config or default to false
+            unlocked: existing ? existing.unlocked : (config.unlocked || false),
+            unlockedAt: existing ? existing.unlockedAt : (config.unlockedAt || null)
         };
     }
 
@@ -274,12 +313,15 @@ class AchievementSystem {
         }
 
         if (achievement.unlocked) {
+            console.log('[Achievements] Already unlocked:', achievementId);
             return false; // Already unlocked
         }
 
         achievement.unlocked = true;
         achievement.unlockedAt = new Date();
         this.unlockedAchievements.push(achievementId);
+
+        console.log('[Achievements] Unlocking:', achievement.title);
 
         // Apply rewards
         if (achievement.reward && window.gameState) {
@@ -300,7 +342,7 @@ class AchievementSystem {
             this.showAchievementModal(achievement);
         }
 
-        // Trigger unlock system check
+        // Trigger unlock system check (delayed to avoid recursive calls)
         if (window.unlockSystem) {
             setTimeout(() => {
                 window.unlockSystem.checkAllUnlocks();
@@ -308,7 +350,6 @@ class AchievementSystem {
         }
 
         this.saveToStorage();
-        console.log('[Achievements] Unlocked:', achievement.title);
         return true;
     }
 
@@ -316,14 +357,22 @@ class AchievementSystem {
         if (!window.gameState) return;
         let populationGained = 0;
         
+        // Temporarily disable requirement checking while applying rewards
+        const wasChecking = this.isCheckingRequirements;
+        this.isCheckingRequirements = true;
+        
         // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
             if (resource === 'population' && amount > 0) {
                 // Use the new generateMassPopulation method for better distribution
                 if (window.gameState.generateMassPopulation) {
                     const generated = window.gameState.generateMassPopulation(amount);
-                    populationGained += generated.length;
-                    console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
+                    if (generated && generated.length) {
+                        populationGained += generated.length;
+                        console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
+                    } else {
+                        console.warn(`[Achievements] generateMassPopulation returned no results for ${amount} villagers`);
+                    }
                 } else if (window.gameState.populationManager && window.GameData && typeof window.GameData.generatePopulationMember === 'function') {
                     // Fallback to old method if new one isn't available
                     const names = window.GameData && window.GameData.populationNames ? window.GameData.populationNames : ["Alex", "Sam", "Jamie", "Taylor", "Jordan", "Morgan", "Casey", "Riley", "Drew", "Cameron"];
@@ -356,12 +405,21 @@ class AchievementSystem {
             }
         });
         
-        // Emit event for population gained if any
-        if (populationGained > 0 && window.eventBus) {
-            window.eventBus.emit('population_gained', { amount: populationGained });
-            // Show additional notification for population gains
+        // Restore checking state
+        this.isCheckingRequirements = wasChecking;
+        
+        // Emit events for population gains, but avoid immediate requirement checking
+        if (populationGained > 0) {
+            // Show notification for population gains
             if (window.showNotification) {
                 window.showNotification(`🎉 ${populationGained} new villagers joined your dynasty!`, 'success');
+            }
+            
+            // Emit event for other systems, but delay it to avoid immediate recursive checking
+            if (window.eventBus) {
+                setTimeout(() => {
+                    window.eventBus.emit('population_gained', { amount: populationGained, source: 'achievement' });
+                }, 200);
             }
         }
         
@@ -462,7 +520,15 @@ class AchievementSystem {
     }
 
     checkRequirements() {
-        if (!window.gameState) return;
+        if (!window.gameState || this.isCheckingRequirements) return;
+        
+        // Don't check requirements if we're still initializing the game
+        if (!window.gameState.buildings || window.gameState.buildings.length === 0) {
+            console.log('[Achievements] Skipping requirement check - game still initializing');
+            return;
+        }
+        
+        this.isCheckingRequirements = true;
 
         Object.values(this.achievements).forEach(achievement => {
             if (!achievement.unlocked && achievement.requirement) {
@@ -508,6 +574,8 @@ class AchievementSystem {
                 }
             }
         });
+        
+        this.isCheckingRequirements = false;
     }
 
     getProgress(achievementId) {
@@ -684,6 +752,11 @@ class AchievementSystem {
                 stats: this.stats
             };
             localStorage.setItem('achievements', JSON.stringify(saveData));
+            console.log('[Achievements] Saved to storage:', {
+                achievementsCount: Object.keys(this.achievements).length,
+                unlockedCount: this.unlockedAchievements.length,
+                stats: this.stats
+            });
         } catch (error) {
             console.warn('[Achievements] Could not save to localStorage:', error);
         }
@@ -711,6 +784,14 @@ class AchievementSystem {
                         achievement.unlockedAt = new Date(achievement.unlockedAt);
                     }
                 });
+                
+                console.log('[Achievements] Loaded from storage:', {
+                    achievementsCount: Object.keys(this.achievements).length,
+                    unlockedCount: this.unlockedAchievements.length,
+                    stats: this.stats
+                });
+            } else {
+                console.log('[Achievements] No saved data found, starting fresh');
             }
         } catch (error) {
             console.warn('[Achievements] Could not load from localStorage:', error);
@@ -725,29 +806,146 @@ class AchievementSystem {
             this.checkRequirements();
         }, 5000); // Check every 5 seconds
     }
+    
+    // Debug function to see current achievement states
+    debugAchievements() {
+        console.log('=== ACHIEVEMENT DEBUG ===');
+        console.log('Total achievements:', Object.keys(this.achievements).length);
+        console.log('Unlocked count:', this.unlockedAchievements.length);
+        console.log('Currently checking:', this.isCheckingRequirements);
+        console.log('Unlocked array contents:', this.unlockedAchievements);
+        
+        Object.values(this.achievements).forEach(achievement => {
+            if (achievement.unlocked) {
+                console.log(`✅ ${achievement.id}: ${achievement.title} (unlocked at ${achievement.unlockedAt})`);
+            } else {
+                console.log(`❌ ${achievement.id}: ${achievement.title} (locked)`);
+                if (achievement.requirement) {
+                    const progress = this.getProgress(achievement.id);
+                    console.log(`   Progress: ${progress.percentage}%`);
+                }
+            }
+        });
+    }
+
+    // Fix achievement data corruption
+    fixAchievementData() {
+        console.log('[Achievements] Fixing data corruption...');
+        
+        // Clear corrupted unlocked array
+        this.unlockedAchievements = [];
+        
+        // Rebuild unlocked array from achievement objects
+        Object.values(this.achievements).forEach(achievement => {
+            if (achievement.unlocked) {
+                this.unlockedAchievements.push(achievement.id);
+            }
+        });
+        
+        // Force check all requirements and unlock eligible achievements
+        this.forceCheckAllRequirements();
+        
+        this.saveToStorage();
+        console.log('[Achievements] Data corruption fixed');
+    }
+    
+    // Force check all requirements ignoring flags
+    forceCheckAllRequirements() {
+        console.log('[Achievements] Force checking all achievement requirements...');
+        
+        Object.values(this.achievements).forEach(achievement => {
+            if (!achievement.unlocked && achievement.requirement) {
+                let meetsRequirement = true;
+
+                Object.entries(achievement.requirement).forEach(([resource, required]) => {
+                    let current = 0;
+                    switch (resource) {
+                        case 'gold':
+                        case 'food':
+                        case 'stone':
+                        case 'wood':
+                            current = window.gameState.resources[resource] || 0;
+                            break;
+                        case 'population':
+                            current = window.gameState.population || 0;
+                            break;
+                        case 'battles_won':
+                            current = window.gameState.battlesWon || 0;
+                            break;
+                        case 'influence':
+                            current = window.gameState.influence || 0;
+                            break;
+                        case 'prestige':
+                            current = window.gameState.prestige || 0;
+                            break;
+                        case 'buildings_built':
+                        case 'houses_built':
+                        case 'farms_built':
+                        case 'barracks_built':
+                        case 'towncenters_built':
+                            current = this.stats[resource] || 0;
+                            break;
+                    }
+
+                    if (current < required) {
+                        meetsRequirement = false;
+                    }
+                });
+
+                if (meetsRequirement) {
+                    console.log(`[Achievements] Force unlocking eligible: ${achievement.id}`);
+                    this.unlock(achievement.id);
+                }
+            }
+        });
+    }
 }
 
 
-// Create global instance
-window.achievementSystem = new AchievementSystem();
-console.log('[Achievements] Achievement system ready');
-
-// --- Auto-assign workers on key population/building events ---
-if (window.eventBus && window.villageManager) {
-    // 1. After build completes
-    window.eventBus.on('building_completed', () => {
-        window.villageManager.autoAssignCitizens();
-    });
-    // 2. After population gain
-    window.eventBus.on('population_gained', () => {
-        window.villageManager.autoAssignCitizens();
-    });
-    // 3. After population drafted
-    window.eventBus.on('population_drafted', () => {
-        window.villageManager.autoAssignCitizens();
-    });
-    // 4. When population dies
-    window.eventBus.on('population_died', () => {
-        window.villageManager.autoAssignCitizens();
-    });
+    // Create global instance
+if (!window.achievementSystem) {
+    window.achievementSystem = new AchievementSystem();
+    console.log('[Achievements] Achievement system ready');
+    
+    // Add debug function globally
+    window.debugAchievements = () => {
+        if (window.achievementSystem) {
+            window.achievementSystem.debugAchievements();
+        } else {
+            console.log('Achievement system not available');
+        }
+    };
+    
+    // Add fix function globally
+    window.fixAchievements = () => {
+        if (window.achievementSystem) {
+            window.achievementSystem.fixAchievementData();
+        } else {
+            console.log('Achievement system not available');
+        }
+    };
+    
+    // Add building stats sync function
+    window.syncAchievementStats = () => {
+        if (window.achievementSystem && window.gameState && window.gameState.buildings) {
+            const stats = window.achievementSystem.stats;
+            
+            // Count buildings from gameState
+            stats.buildings_built = window.gameState.buildings.length;
+            stats.houses_built = window.gameState.buildings.filter(b => b.type === 'house').length;
+            stats.farms_built = window.gameState.buildings.filter(b => b.type === 'farm').length;
+            stats.barracks_built = window.gameState.buildings.filter(b => b.type === 'barracks').length;
+            stats.towncenters_built = window.gameState.buildings.filter(b => b.type === 'townCenter').length;
+            
+            console.log('[Achievements] Stats synced:', stats);
+            window.achievementSystem.saveToStorage();
+            return stats;
+        } else {
+            console.log('Achievement system or game state not available');
+        }
+    };
+    
+    console.log('[Achievements] Debug commands available: debugAchievements(), fixAchievements(), syncAchievementStats()');
+} else {
+    console.log('[Achievements] Achievement system already exists');
 }

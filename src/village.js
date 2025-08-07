@@ -16,32 +16,167 @@ class VillageManager {
 
     // Returns eligible population for a building type (young adults/adults, correct role)
     getEligibleWorkers(building) {
-        if (!this.gameState.populationManager) return [];
+        if (!this.gameState.populationManager) {
+            console.log('[Village] No population manager for eligible workers');
+            return [];
+        }
+        
         const role = window.GameData.getDefaultRoleForBuilding(building.type);
-        return this.gameState.populationManager.population.filter(p => {
-            // Only young adults/adults, not already assigned
-            return (p.age >= 10 && p.age <= 30) && p.status !== 'working' && (p.role === role || p.role === 'peasant');
+        console.log(`[Village] Looking for eligible workers for ${building.type} (role: ${role})`);
+        
+        const allPop = this.gameState.populationManager.population || [];
+        console.log(`[Village] Total population: ${allPop.length}`);
+        
+        const eligible = allPop.filter(p => {
+            // Only working age adults (28+), not already assigned
+            const ageOk = (p.age >= 28 && p.age <= 180); // Expanded age range for all working adults
+            const statusOk = p.status !== 'working';
+            const roleOk = (p.role === role || p.role === 'peasant');
+            
+            return ageOk && statusOk && roleOk;
         });
+        
+        console.log(`[Village] Found ${eligible.length} eligible workers (${allPop.filter(p => p.age >= 28 && p.age <= 180).length} working age, ${allPop.filter(p => p.status !== 'working').length} not working)`);
+        
+        if (eligible.length === 0) {
+            // Detailed breakdown when no workers found
+            const workingAge = allPop.filter(p => p.age >= 28 && p.age <= 180);
+            const notWorking = allPop.filter(p => p.status !== 'working');
+            const rightRole = allPop.filter(p => p.role === role || p.role === 'peasant');
+            console.log(`[Village] No eligible workers: ${workingAge.length} working age, ${notWorking.length} not working, ${rightRole.length} right role`);
+        }
+        
+        return eligible;
     }
 
     // Assigns workers to all buildings up to their slot limit
     autoAssignCitizens() {
-        if (!this.gameState.populationManager) return;
+        console.log('[Village] Starting auto-assign citizens...');
+        
+        // Enhanced error checking
+        if (!this.gameState) {
+            console.error('[Village] No gameState available!');
+            return;
+        }
+        
+        // Ensure PopulationManager is available
+        if (!this.gameState.populationManager && this.gameState.ensurePopulationManager) {
+            console.log('[Village] Attempting to initialize PopulationManager...');
+            this.gameState.ensurePopulationManager();
+        }
+        
+        if (!this.gameState.populationManager) {
+            console.error('[Village] No population manager available!');
+            return;
+        }
+        
+        if (!window.GameData) {
+            console.error('[Village] GameData not available!');
+            return;
+        }
+        
+        const totalPop = this.gameState.populationManager.population.length;
+        const workingAgePop = this.gameState.populationManager.population.filter(p => p.age >= 28 && p.age <= 180).length;
+        const currentlyWorking = this.gameState.populationManager.population.filter(p => p.status === 'working').length;
+        
+        console.log(`[Village] Population: ${totalPop} total, ${workingAgePop} working age, ${currentlyWorking} currently working`);
+        console.log('[Village] Total buildings:', this.gameState.buildings.length);
+        
+        let totalAssignments = 0;
+        
         // For each building that can have workers
         this.gameState.buildings.forEach(building => {
-            const role = window.GameData.getDefaultRoleForBuilding(building.type);
-            if (!role || role === 'peasant') return; // skip non-work buildings
-            const slots = this.getWorkerSlotsForBuilding(building);
-            let assigned = this.getAssignedWorkers(building);
-            if (assigned.length >= slots) return; // already full
-            const needed = slots - assigned.length;
-            const eligible = this.getEligibleWorkers(building).slice(0, needed);
-            eligible.forEach(worker => {
-                this.gameState.populationManager.assignRole(worker.id, role);
-                this.gameState.populationManager.updateStatus(worker.id, 'working');
-                this.gameState.populationManager.moveInhabitant(worker.id, building.id);
-            });
+            try {
+                const role = window.GameData.getDefaultRoleForBuilding(building.type);
+                console.log(`[Village] Building ${building.type} (ID: ${building.id}) -> role: ${role}`);
+                
+                if (!role || role === 'peasant') {
+                    console.log(`[Village] Skipping ${building.type} - no specific role needed (role: ${role})`);
+                    return; // skip non-work buildings
+                }
+                
+                const slots = this.getWorkerSlotsForBuilding(building);
+                let assigned = this.getAssignedWorkers(building);
+                console.log(`[Village] ${building.type} has ${assigned.length}/${slots} workers assigned`);
+                
+                if (assigned.length >= slots) {
+                    console.log(`[Village] ${building.type} is already full`);
+                    return; // already full
+                }
+                
+                const needed = slots - assigned.length;
+                const eligible = this.getEligibleWorkers(building);
+                console.log(`[Village] Found ${eligible.length} eligible workers for ${building.type}, need ${needed}`);
+                
+                const toAssign = eligible.slice(0, needed);
+                console.log(`[Village] Assigning ${toAssign.length} workers to ${building.type}`);
+                
+                toAssign.forEach(worker => {
+                    console.log(`[Village] Assigning ${worker.name} (age: ${worker.age}, role: ${worker.role}) to ${building.type} as ${role}`);
+                    
+                    // Update worker properties
+                    this.gameState.populationManager.assignRole(worker.id, role);
+                    this.gameState.populationManager.updateStatus(worker.id, 'working');
+                    this.gameState.populationManager.moveInhabitant(worker.id, building.id);
+                    
+                    // Also set buildingId directly to ensure production counting works
+                    worker.buildingId = building.id;
+                    totalAssignments++;
+                    
+                    console.log(`[Village] ✅ ${worker.name} now working at ${building.type} (buildingId: ${worker.buildingId}, status: ${worker.status})`);
+                });
+            } catch (error) {
+                console.error(`[Village] Error processing building ${building.type}:`, error);
+            }
         });
+        
+        console.log(`[Village] Auto-assign citizens completed. Total new assignments: ${totalAssignments}`);
+        
+        // Summary report
+        const finalWorkingCount = this.gameState.populationManager.population.filter(p => p.status === 'working').length;
+        console.log(`[Village] Employment Summary: ${finalWorkingCount}/${workingAgePop} working age citizens employed`);
+    }
+
+    // Manual employment check - can be called on game load or manually
+    runEmploymentCheck() {
+        console.log('[Village] Running manual employment check...');
+        
+        // First, ensure population manager exists and has initial population
+        if (!this.gameState.populationManager) {
+            console.error('[Village] PopulationManager not available for employment check');
+            return;
+        }
+        
+        // Show current employment status
+        const population = this.gameState.populationManager.population;
+        const workingAge = population.filter(p => p.age >= 28 && p.age <= 180);
+        const currentlyWorking = population.filter(p => p.status === 'working');
+        const unemployed = workingAge.filter(p => p.status !== 'working');
+        
+        console.log(`[Village] Current Employment Status:`);
+        console.log(`[Village] - Total Population: ${population.length}`);
+        console.log(`[Village] - Working Age (28-180): ${workingAge.length}`);
+        console.log(`[Village] - Currently Employed: ${currentlyWorking.length}`);
+        console.log(`[Village] - Unemployed Working Age: ${unemployed.length}`);
+        
+        // Show buildings that need workers
+        const buildings = this.gameState.buildings.filter(b => b.level > 0);
+        console.log(`[Village] Buildings Available for Work: ${buildings.length}`);
+        
+        buildings.forEach(building => {
+            const role = window.GameData.getDefaultRoleForBuilding(building.type);
+            const slots = this.getWorkerSlotsForBuilding(building);
+            const assigned = this.getAssignedWorkers(building);
+            
+            if (role && role !== 'peasant') {
+                console.log(`[Village] - ${building.type}: ${assigned.length}/${slots} workers (needs ${role})`);
+            }
+        });
+        
+        // Then run auto-assignment
+        this.autoAssignCitizens();
+        
+        console.log('[Village] Manual employment check completed');
     }
     constructor(gameState, game) {
         this.gameState = gameState;
@@ -89,8 +224,8 @@ class VillageManager {
             this.setupGridClick();
             console.log('[Village] Setting up grid dragging...');
             this.setupGridDragging();
-            console.log('[Village] Setting up end day button...');
-            this.setupEndDayButton();
+            // End day button now handled in navigation - see game.html
+            // this.setupEndDayButton();
             this.gameState.updateBuildButtons();
             this.initSupplyChains();
             console.log('[Village] Setting up production planner...');
@@ -209,6 +344,33 @@ class VillageManager {
         this.updateBuildingSelectionUI();
     }
 
+    // Update building button states based on current resources and unlocks
+    updateBuildingButtonStates() {
+        document.querySelectorAll('.build-btn').forEach(btn => {
+            const buildingType = btn.dataset.building;
+            if (!buildingType) return;
+            
+            const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
+            const canAfford = this.gameState.canAfford(buildingType);
+            
+            btn.disabled = !isUnlocked || !canAfford;
+            
+            if (!isUnlocked) {
+                btn.classList.add('locked');
+                btn.style.opacity = '0.5';
+                btn.title = `Locked: Complete prerequisites to unlock ${buildingType}`;
+            } else {
+                btn.classList.remove('locked');
+                btn.style.opacity = '1';
+                if (!canAfford) {
+                    btn.title = `Insufficient resources for ${buildingType}`;
+                } else {
+                    btn.title = `Build ${buildingType}`;
+                }
+            }
+        });
+    }
+
     // Update building selection UI elements
     updateBuildingSelectionUI() {
         // Update any building selection menus or panels
@@ -297,8 +459,11 @@ class VillageManager {
             if (!this.gameState.buildMode) return;
             
             const rect = this.villageGrid.getBoundingClientRect();
-            const x = Math.floor((e.clientX - rect.left) / this.gridSize) * this.gridSize;
-            const y = Math.floor((e.clientY - rect.top) / this.gridSize) * this.gridSize;
+            // Adjust coordinates for the current view offset
+            const offsetX = this.viewOffsetX || 0;
+            const offsetY = this.viewOffsetY || 0;
+            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
+            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
             
             // Remove existing ghost
             if (ghostBuilding) {
@@ -313,7 +478,8 @@ class VillageManager {
                 ghostBuilding.style.top = y + 'px';
                 ghostBuilding.style.opacity = '0.5';
                 ghostBuilding.textContent = this.getBuildingSymbol(this.gameState.buildMode);
-                this.villageGrid.appendChild(ghostBuilding);
+                // Add ghost building to the grid content instead of grid itself
+                this.villageGridContent.appendChild(ghostBuilding);
             }
         };
         
@@ -382,9 +548,42 @@ class VillageManager {
                     return;
                 }
                 
+                // Store the building type before placing (since placeBuilding might modify state)
+                const currentBuildingType = this.gameState.buildMode;
+                
                 // Place the building (this handles spending resources internally)
-                this.placeBuilding(this.gameState.buildMode, x, y);
-                this.exitBuildMode();
+                this.placeBuilding(currentBuildingType, x, y);
+                
+                // Check if we can still afford another building of the same type
+                // If yes, stay in build mode; if no, exit build mode
+                // During tutorial, always exit build mode to avoid confusion
+                if (!this.gameState.tutorialActive && this.gameState.canAfford(currentBuildingType)) {
+                    console.log(`[Village] Can still afford ${currentBuildingType}, staying in build mode`);
+                    // Stay in build mode by maintaining the buildMode state
+                    // The button should already be highlighted and cursor should be crosshair
+                    
+                    // Update building button states since resources have changed
+                    this.updateBuildingButtonStates();
+                    
+                    // Show helpful toast notification
+                    if (window.showToast) {
+                        const buildingName = currentBuildingType.charAt(0).toUpperCase() + currentBuildingType.slice(1);
+                        window.showToast(`You can build another ${buildingName}! Click to place or press Escape to exit.`, {
+                            icon: '🏗️',
+                            type: 'info',
+                            timeout: 3000
+                        });
+                    }
+                } else {
+                    if (this.gameState.tutorialActive) {
+                        console.log(`[Village] Tutorial active, exiting build mode after placement`);
+                    } else {
+                        console.log(`[Village] Cannot afford another ${currentBuildingType}, exiting build mode`);
+                    }
+                    this.exitBuildMode();
+                    // Update building button states since resources have changed
+                    this.updateBuildingButtonStates();
+                }
                 
                 // Start supply chain if applicable
                 this.updateSupplyChains();
@@ -493,8 +692,11 @@ class VillageManager {
     }
     
     isWithinBounds(x, y) {
-        const rect = this.villageGrid.getBoundingClientRect();
-        return x >= 0 && y >= 0 && x < rect.width - this.gridSize && y < rect.height - this.gridSize;
+        // Allow building in a large area since we have a 200% content area
+        // Use grid coordinates instead of pixel coordinates for bounds
+        const maxX = 1600; // Allow building up to 1600px x coordinate
+        const maxY = 1200; // Allow building up to 1200px y coordinate
+        return x >= 0 && y >= 0 && x < maxX && y < maxY;
     }
     
     placeBuilding(type, x, y) {
@@ -560,7 +762,7 @@ class VillageManager {
             }
         }
         
-        this.exitBuildMode();
+        // Note: exitBuildMode() is now handled by the caller to support multi-building placement
     }
     
     startBuildingProduction(buildingId) {
@@ -897,7 +1099,16 @@ class VillageManager {
             house: '🏠',
             farm: '🌾',
             townCenter: '🏛️',
-            barracks: '⚔️'
+            barracks: '⚔️',
+            workshop: '🔧',
+            sawmill: '🪚',
+            quarry: '⛏️',
+            market: '🏪',
+            blacksmith: '⚒️',
+            temple: '⛪',
+            academy: '📚',
+            castle: '🏰',
+            university: '🎓'
         };
         return symbols[type] || '?';
     }
@@ -914,109 +1125,29 @@ class VillageManager {
     }
     
     updateSupplyChains() {
-        // Clear existing supply routes
-        this.villageGrid.querySelectorAll('.supply-route, .carriage').forEach(el => el.remove());
-        
-        // Find town center
-        const townCenter = this.gameState.buildings.find(b => b.type === 'townCenter');
-        if (!townCenter) return;
-        
-        // Create supply routes from production buildings to town center
-        this.gameState.buildings.forEach(building => {
-            if (building.type === 'farm' || building.type === 'barracks') {
-                this.createSupplyRoute(building, townCenter);
-            }
-        });
+        // Visual supply lines removed
+        // No longer clear or create supply-route/carriage elements
+        // Function now does nothing
     }
     
     createSupplyRoute(fromBuilding, toBuilding) {
-        // Calculate route path
-        const startX = fromBuilding.x + 22; // Center of building
-        const startY = fromBuilding.y + 22;
-        const endX = toBuilding.x + 22;
-        const endY = toBuilding.y + 22;
-        
-        // Create route line
-        const route = document.createElement('div');
-        route.className = 'supply-route';
-        route.style.position = 'absolute';
-        route.style.left = Math.min(startX, endX) + 'px';
-        route.style.top = Math.min(startY, endY) + 'px';
-        route.style.width = Math.abs(endX - startX) + 'px';
-        route.style.height = Math.abs(endY - startY) + 'px';
-        route.style.border = '2px dashed rgba(255, 255, 255, 0.3)';
-        route.style.pointerEvents = 'none';
-        
-        this.villageGrid.appendChild(route);
-        
-        // Create moving carriage
-        this.createCarriage(startX, startY, endX, endY, fromBuilding.type);
+        // Visual supply lines removed
+        // Function now does nothing
     }
     
     createCarriage(startX, startY, endX, endY, sourceType) {
-        const carriage = document.createElement('div');
-        carriage.className = 'carriage';
-        carriage.style.position = 'absolute';
-        carriage.style.left = startX + 'px';
-        carriage.style.top = startY + 'px';
-        carriage.style.width = '20px';
-        carriage.style.height = '20px';
-        carriage.style.background = '#f39c12';
-        carriage.style.borderRadius = '50%';
-        carriage.style.transition = 'all 2s linear';
-        carriage.style.zIndex = '10';
-        carriage.textContent = sourceType === 'farm' ? '🚛' : '⚔️';
-        carriage.style.fontSize = '12px';
-        carriage.style.display = 'flex';
-        carriage.style.alignItems = 'center';
-        carriage.style.justifyContent = 'center';
-        
-        this.villageGrid.appendChild(carriage);
-        
-        // Animate movement
-        setTimeout(() => {
-            carriage.style.left = endX + 'px';
-            carriage.style.top = endY + 'px';
-        }, 100);
-        
-        // Remove after animation
-        setTimeout(() => {
-            if (carriage.parentNode) {
-                carriage.remove();
-            }
-        }, 2500);
+        // Visual supply lines removed
+        // Function now does nothing
     }
     
     animateSupplyMovement() {
-        // This will be called periodically to show ongoing supply movement
-        const townCenter = this.gameState.buildings.find(b => b.type === 'townCenter');
-        if (!townCenter) return;
-        
-        // Animate supply movement from production buildings
-        this.gameState.buildings.forEach(building => {
-            if ((building.type === 'farm' || building.type === 'barracks') && Math.random() > 0.5) {
-                const startX = building.x + 22;
-                const startY = building.y + 22;
-                const endX = townCenter.x + 22;
-                const endY = townCenter.y + 22;
-                
-                this.createCarriage(startX, startY, endX, endY, building.type);
-            }
-        });
+        // Visual supply lines removed
+        // Function now does nothing
     }
     
     // Automation features based on prestige level
     getAutomationLevel() {
         return this.gameState.automationLevel;
-    }
-    
-    autoAssignCitizens() {
-        // This would automatically assign villagers to optimal jobs
-        // Implementation depends on automation level from prestige
-        if (this.getAutomationLevel() !== 'manual') {
-            // Auto-assign logic here
-            // ...
-        }
     }
 
     // Terrain Generation System - Realistic Layout
@@ -1252,6 +1383,7 @@ class VillageManager {
         const populationBtn = document.getElementById('population-view-btn');
         if (populationBtn) {
             populationBtn.addEventListener('click', () => {
+                console.log('[Village] Population view button clicked');
                 this.showPopulationView();
             });
             console.log('[Village] Population view button set up');
@@ -1339,17 +1471,20 @@ class VillageManager {
     }
 
     showPopulationView() {
+        console.log('[Village] showPopulationView called');
+        
         // Initialize population manager if needed
         this.initializePopulationManager();
         
         if (!this.gameState.populationManager) {
-            console.error('[Village] PopulationManager not available');
+            console.error('[Village] PopulationManager not available for population view');
             if (window.modalSystem) {
                 window.modalSystem.showMessage('Population Unavailable', 'Population management system is not initialized.');
             }
             return;
         }
         
+        console.log('[Village] PopulationManager available, getting population data');
         const populationData = this.gameState.populationManager.getPopulationGroups();
         
         // Generate enhanced content HTML with modern design
@@ -1493,11 +1628,11 @@ class VillageManager {
             </div>
             
             <div class="population-actions">
-                <button class="action-btn primary" onclick="document.getElementById('village-manager').villageManager.showDetailedPopulationView();">
+                <button class="action-btn primary" onclick="window.villageManager.showDetailedPopulationView();">
                     <span class="btn-icon">📋</span>
                     <span class="btn-text">View Individual Villagers</span>
                 </button>
-                <button class="action-btn secondary" onclick="window.modalSystem.closeModal();">
+                <button class="action-btn secondary" onclick="window.modalSystem.closeTopModal();">
                     <span class="btn-icon">📊</span>
                     <span class="btn-text">Close Overview</span>
                 </button>
