@@ -561,29 +561,10 @@
         .time-controls-nav .auto-play-button {
             min-width: 80px;
             gap: 6px;
-            font-weight: 800;
         }
 
         .time-controls-nav .end-day-button {
-            background: linear-gradient(145deg, #ed8936 0%, #dd6b20 50%, #c05621 100%);
-            border-color: #ed8936;
-            font-weight: 800;
             min-width: 85px;
-            box-shadow: 
-                0 4px 6px rgba(0,0,0,0.3),
-                0 0 15px rgba(237, 137, 54, 0.2),
-                inset 0 1px 0 rgba(255,255,255,0.2),
-                inset 0 -1px 0 rgba(0,0,0,0.2);
-        }
-
-        .time-controls-nav .end-day-button:hover {
-            background: linear-gradient(145deg, #f6ad55 0%, #ed8936 50%, #dd6b20 100%);
-            border-color: #f6ad55;
-            box-shadow: 
-                0 8px 15px rgba(0,0,0,0.4),
-                0 0 25px rgba(246, 173, 85, 0.4),
-                inset 0 1px 0 rgba(255,255,255,0.3),
-                inset 0 -1px 0 rgba(0,0,0,0.1);
         }
 
         /* Add pulsing animation for active auto-play */
@@ -606,32 +587,6 @@
                     inset 0 1px 0 rgba(255,255,255,0.2),
                     inset 0 -1px 0 rgba(0,0,0,0.1);
             }
-        }
-
-        /* Speed button special effects */
-        .time-controls-nav .time-btn[id*="speed"] {
-            background: linear-gradient(145deg, #805ad5 0%, #6b46c1 50%, #553c9a 100%);
-            border-color: #805ad5;
-        }
-
-        .time-controls-nav .time-btn[id*="speed"]:hover {
-            background: linear-gradient(145deg, #9f7aea 0%, #805ad5 50%, #6b46c1 100%);
-            border-color: #9f7aea;
-            box-shadow: 
-                0 8px 15px rgba(0,0,0,0.4),
-                0 0 20px rgba(159, 122, 234, 0.4),
-                inset 0 1px 0 rgba(255,255,255,0.2),
-                inset 0 -1px 0 rgba(0,0,0,0.1);
-        }
-
-        .time-controls-nav .time-btn[id*="speed"].selected {
-            background: linear-gradient(145deg, #9f7aea 0%, #805ad5 50%, #6b46c1 100%);
-            border-color: #9f7aea;
-            box-shadow: 
-                0 2px 4px rgba(0,0,0,0.4),
-                0 0 20px rgba(159, 122, 234, 0.6),
-                inset 0 1px 0 rgba(255,255,255,0.1),
-                inset 0 -1px 0 rgba(0,0,0,0.3);
         }
     </style>
 <script>
@@ -703,12 +658,20 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update day/season display
             const seasonNavElement = document.getElementById('current-season-nav');
             const dayNavElement = document.getElementById('current-day-number-nav');
+            const seasonDayElement = document.getElementById('current-season-day');
             
             if (seasonNavElement && window.gameState.season) {
                 seasonNavElement.textContent = window.gameState.season;
             }
             if (dayNavElement && window.gameState.currentDay) {
                 dayNavElement.textContent = `Day ${window.gameState.currentDay}`;
+            }
+            
+            // Calculate days within current season (assuming 30 days per season)
+            if (seasonDayElement && window.gameState.currentDay) {
+                const daysPerSeason = 30; // This should match your game's season length
+                const seasonDay = ((window.gameState.currentDay - 1) % daysPerSeason) + 1;
+                seasonDayElement.textContent = `Day ${seasonDay}`;
             }
             
             // Update auto-play button state
