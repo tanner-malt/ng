@@ -31,25 +31,6 @@
     <script src="../src/main.js"></script>
 </head>
 <body>
-    <!-- Top Right Icons -->
-    <div id="top-right-icons">
-        <button id="sound-btn" class="icon-btn" title="Sound">
-            <span>🔊</span>
-        </button>
-        <button id="message-history-btn" class="icon-btn" title="Message History">
-            <span>📜</span>
-        </button>
-        <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
-            <span>🗺️</span>
-        </button>
-        <button id="settings-btn" class="icon-btn" title="Settings">
-            <span>⚙️</span>
-        </button>
-        <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
-            <span id="achievements-icon">🏆</span>
-        </button>
-    </div>
-
     <!-- Popup panels for top-right buttons -->
 
 
@@ -68,24 +49,59 @@
     <div id="game-container">
         <!-- Navigation -->
         <nav id="view-navigation">
-        <button class="nav-btn active" data-view="village">Village</button>
-        <button class="nav-btn locked" data-view="world">World</button>
-        <button class="nav-btn locked" data-view="monarch">Monarch</button>
-        <button class="nav-btn locked" data-view="throne">Throne</button>
-        <!-- Time Controls: now in top nav -->
-        <div id="global-time-controls" class="time-controls-nav">
-            <div class="current-day-nav">
-                <span id="current-season-nav">Spring</span>
-                <span id="current-day-number-nav">Day 1</span>
+            <!-- All navigation elements in one flexible container -->
+            <div class="nav-container">
+                <!-- View buttons -->
+                <div class="nav-section nav-left">
+                    <button class="nav-btn active" data-view="village">Village</button>
+                    <button class="nav-btn locked" data-view="world">World</button>
+                    <button class="nav-btn locked" data-view="monarch">Monarch</button>
+                    <button class="nav-btn locked" data-view="throne">Throne</button>
+                </div>
+                
+                <!-- Time controls -->
+                <div class="nav-section nav-center" id="global-time-controls">
+                    <div class="current-day-nav">
+                        <div class="season-info">
+                            <span id="current-season-nav">Spring</span>
+                            <span id="current-season-day">Day 1</span>
+                        </div>
+                        <div class="total-day-info">
+                            <span>Total:</span>
+                            <span id="current-day-number-nav">Day 1</span>
+                        </div>
+                    </div>
+                    <button id="end-day-btn-nav" class="end-day-button time-btn">End Day</button>
+                    <button id="auto-play-btn-nav" class="auto-play-button time-btn">
+                        <span id="auto-play-icon-nav">▶️</span>
+                        <span id="auto-play-text-nav">Play</span>
+                    </button>
+                    <button id="speed-2x-btn-nav" class="time-btn">2x</button>
+                    <button id="speed-4x-btn-nav" class="time-btn">4x</button>
+                </div>
+                
+                <!-- Icon buttons -->
+                <div class="nav-section nav-right" id="top-right-icons">
+                    <button id="sound-btn" class="icon-btn" title="Sound">
+                        <span>🔊</span>
+                    </button>
+                    <button id="message-history-btn" class="icon-btn" title="Message History" style="position: relative;">
+                        <span>📜<span style="position: absolute; top: -5px; right: -5px; 
+                            background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; 
+                            font-size: 10px; display: flex; align-items: center; justify-content: center;">
+                            9+</span></span>
+                    </button>
+                    <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
+                        <span>🗺️</span>
+                    </button>
+                    <button id="settings-btn" class="icon-btn" title="Settings">
+                        <span>⚙️</span>
+                    </button>
+                    <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
+                        <span id="achievements-icon">🏆</span>
+                    </button>
+                </div>
             </div>
-            <button id="end-day-btn-nav" class="end-day-button time-btn">End Day</button>
-            <button id="auto-play-btn-nav" class="auto-play-button time-btn">
-                <span id="auto-play-icon-nav">▶️</span>
-                <span id="auto-play-text-nav">Play</span>
-            </button>
-            <button id="speed-2x-btn-nav" class="time-btn">2x</button>
-            <button id="speed-4x-btn-nav" class="time-btn">4x</button>
-        </div>
         </nav>
 
         <!-- Game Content -->
@@ -274,75 +290,348 @@
             border-color: #444;
         }
 
+        /* Navigation Layout */
+        #view-navigation {
+            width: 100%;
+            padding: 0 1rem 1rem 1rem;
+        }
+
+        .nav-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            min-height: 40px;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .nav-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-left {
+            /* View buttons stay on left */
+            flex: 0 0 auto;
+            order: 1;
+        }
+
+        .nav-center {
+            /* Time controls absolutely centered */
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1;
+        }
+
+        .nav-right {
+            /* Icons on right */
+            flex: 0 0 auto;
+            order: 3;
+            margin-left: auto;
+        }
+
+        /* Responsive behavior to prevent overlaps */
+        @media (max-width: 1200px) {
+            .nav-container {
+                gap: 0.5rem;
+            }
+            .nav-section {
+                gap: 4px;
+            }
+            
+            /* On smaller screens, fall back to flex layout */
+            .nav-center {
+                position: static;
+                transform: none;
+                flex: 1 1 auto;
+                justify-content: center;
+                order: 2;
+            }
+            
+            .nav-container {
+                justify-content: space-between;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .nav-container {
+                gap: 0.25rem;
+            }
+            .nav-section {
+                gap: 2px;
+            }
+            
+            /* Even smaller buttons on very small screens */
+            .time-controls-nav .time-btn {
+                padding: 4px 8px;
+                min-width: 35px;
+                height: 28px;
+                font-size: 0.8em;
+            }
+            
+            #view-navigation .icon-btn {
+                width: 32px;
+                height: 28px;
+                padding: 4px 6px;
+            }
+        }
+
         /* Navigation Time Controls Styling */
         .time-controls-nav {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin-left: auto;
-            padding: 0 1rem;
         }
 
-        .current-day-nav {
+        /* Top Right Icons in Navigation */
+        #view-navigation #top-right-icons {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            font-size: 0.85em;
-            color: #ecf0f1;
-            margin-right: 8px;
-            min-width: 80px;
+            gap: 8px;
         }
 
-        .current-day-nav span {
-            font-weight: 600;
-            line-height: 1.2;
-        }
-
-        .time-controls-nav .time-btn {
+        #view-navigation .icon-btn {
             background: #34495e;
             color: #ecf0f1;
             border: 1px solid #2c3e50;
             border-radius: 4px;
-            font-weight: 500;
+            padding: 6px 8px;
             cursor: pointer;
             transition: all 0.2s ease;
-            outline: none;
-            font-size: 0.85em;
-            padding: 4px 8px;
-            min-width: 40px;
-            height: 28px;
+            font-size: 16px;
+            width: 36px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .time-controls-nav .time-btn:hover {
+        #view-navigation .icon-btn:hover {
             background: #1abc9c;
             color: #fff;
             border-color: #16a085;
             transform: translateY(-1px);
         }
 
-        .time-controls-nav .time-btn.selected,
-        .time-controls-nav .time-btn:active {
+        #view-navigation .icon-btn.achievements-incomplete {
             background: #e74c3c;
-            color: #fff;
             border-color: #c0392b;
         }
 
-        .time-controls-nav .auto-play-button {
-            min-width: 60px;
+        #view-navigation .icon-btn.achievements-incomplete:hover {
+            background: #c0392b;
+            border-color: #a93226;
+        }
+
+        .current-day-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.8em;
+            color: #e2e8f0;
+            margin-right: 12px;
+            min-width: 110px;
+            background: linear-gradient(145deg, #2d3748 0%, #1a202c 100%);
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            padding: 8px 12px;
+            box-shadow: 
+                0 3px 6px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
             gap: 4px;
         }
 
+        .current-day-nav::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        }
+
+        .season-info, .total-day-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.1;
+        }
+
+        .season-info span:first-child {
+            color: #f7fafc;
+            font-weight: 700;
+            font-size: 1em;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .season-info span:last-child {
+            color: #38b2ac;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-shadow: 0 0 6px rgba(56, 178, 172, 0.4);
+        }
+
+        .total-day-info span:first-child {
+            color: #a0aec0;
+            font-weight: 600;
+            font-size: 0.8em;
+        }
+
+        .total-day-info span:last-child {
+            color: #edf2f7;
+            font-weight: 700;
+            font-size: 0.9em;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .time-controls-nav .time-btn {
+            background: linear-gradient(145deg, #4a5568 0%, #2d3748 50%, #1a202c 100%);
+            color: #e2e8f0;
+            border: 2px solid #4a5568;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+            font-size: 0.85em;
+            padding: 8px 14px;
+            min-width: 50px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 4px 6px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.2);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .time-controls-nav .time-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .time-controls-nav .time-btn:hover {
+            background: linear-gradient(145deg, #38b2ac 0%, #319795 50%, #2c7a7b 100%);
+            color: #fff;
+            border-color: #38b2ac;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 
+                0 8px 15px rgba(0,0,0,0.4),
+                0 0 20px rgba(56, 178, 172, 0.3),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                inset 0 -1px 0 rgba(0,0,0,0.1);
+        }
+
+        .time-controls-nav .time-btn:hover::before {
+            left: 100%;
+        }
+
+        .time-controls-nav .time-btn.selected,
+        .time-controls-nav .time-btn:active {
+            background: linear-gradient(145deg, #e53e3e 0%, #c53030 50%, #9c2626 100%);
+            color: #fff;
+            border-color: #e53e3e;
+            transform: translateY(-1px) scale(0.98);
+            box-shadow: 
+                0 2px 4px rgba(0,0,0,0.4),
+                0 0 15px rgba(229, 62, 62, 0.4),
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.3);
+        }
+
+        .time-controls-nav .auto-play-button {
+            min-width: 80px;
+            gap: 6px;
+            font-weight: 800;
+        }
+
         .time-controls-nav .end-day-button {
-            background: #f39c12;
-            border-color: #e67e22;
+            background: linear-gradient(145deg, #ed8936 0%, #dd6b20 50%, #c05621 100%);
+            border-color: #ed8936;
+            font-weight: 800;
+            min-width: 85px;
+            box-shadow: 
+                0 4px 6px rgba(0,0,0,0.3),
+                0 0 15px rgba(237, 137, 54, 0.2),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                inset 0 -1px 0 rgba(0,0,0,0.2);
         }
 
         .time-controls-nav .end-day-button:hover {
-            background: #e67e22;
-            border-color: #d35400;
+            background: linear-gradient(145deg, #f6ad55 0%, #ed8936 50%, #dd6b20 100%);
+            border-color: #f6ad55;
+            box-shadow: 
+                0 8px 15px rgba(0,0,0,0.4),
+                0 0 25px rgba(246, 173, 85, 0.4),
+                inset 0 1px 0 rgba(255,255,255,0.3),
+                inset 0 -1px 0 rgba(0,0,0,0.1);
+        }
+
+        /* Add pulsing animation for active auto-play */
+        .time-controls-nav .auto-play-button.auto-play-active {
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 
+                    0 4px 6px rgba(0,0,0,0.3),
+                    0 0 15px rgba(56, 178, 172, 0.3),
+                    inset 0 1px 0 rgba(255,255,255,0.1),
+                    inset 0 -1px 0 rgba(0,0,0,0.2);
+            }
+            50% {
+                box-shadow: 
+                    0 6px 12px rgba(0,0,0,0.4),
+                    0 0 25px rgba(56, 178, 172, 0.6),
+                    inset 0 1px 0 rgba(255,255,255,0.2),
+                    inset 0 -1px 0 rgba(0,0,0,0.1);
+            }
+        }
+
+        /* Speed button special effects */
+        .time-controls-nav .time-btn[id*="speed"] {
+            background: linear-gradient(145deg, #805ad5 0%, #6b46c1 50%, #553c9a 100%);
+            border-color: #805ad5;
+        }
+
+        .time-controls-nav .time-btn[id*="speed"]:hover {
+            background: linear-gradient(145deg, #9f7aea 0%, #805ad5 50%, #6b46c1 100%);
+            border-color: #9f7aea;
+            box-shadow: 
+                0 8px 15px rgba(0,0,0,0.4),
+                0 0 20px rgba(159, 122, 234, 0.4),
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                inset 0 -1px 0 rgba(0,0,0,0.1);
+        }
+
+        .time-controls-nav .time-btn[id*="speed"].selected {
+            background: linear-gradient(145deg, #9f7aea 0%, #805ad5 50%, #6b46c1 100%);
+            border-color: #9f7aea;
+            box-shadow: 
+                0 2px 4px rgba(0,0,0,0.4),
+                0 0 20px rgba(159, 122, 234, 0.6),
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.3);
         }
     </style>
 <script>
