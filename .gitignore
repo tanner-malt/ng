@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Auto-generated files
+src/wikiData.js
+
+# Development files
+.vscode/
+*.log
+temp_cleanup/
+
+# Debug and test files
+debug_*.js
+test_*.html
+test_*.js
+emergency_*.js
+fix_*.js
+
+# Documentation (keep in repo but exclude from build)
+docs/archive/
+*_ANALYSIS.md
+*_IMPLEMENTATION.md
+*_SUMMARY.md
+*_FIXES.md
+*_OVERVIEW.md
+*_MANAGEMENT.md

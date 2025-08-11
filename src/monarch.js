@@ -101,6 +101,7 @@ class MonarchManager {
     
     init() {
         this.setupInvestmentButtons();
+        this.setupDynastyButtons();
         this.generateAdvisorAdvice();
         this.updateInvestmentDisplay();
         this.calculateInheritance();
@@ -110,53 +111,121 @@ class MonarchManager {
         document.querySelectorAll('.investment-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const cost = parseInt(btn.dataset.cost);
-                const investmentName = btn.textContent.split('(')[0].trim();
+                const investmentType = btn.dataset.type;
                 
                 if (this.gameState.canAffordGold(cost)) {
-                    this.makeInvestment(investmentName, cost);
+                    this.makeInvestment(investmentType, cost);
                 }
             });
         });
     }
     
-    makeInvestment(investmentName, cost) {
+    setupDynastyButtons() {
+        const calculateBtn = document.getElementById('calculate-inheritance-btn');
+        const prestigeBtn = document.getElementById('prestige-reset-btn');
+        
+        if (calculateBtn) {
+            calculateBtn.addEventListener('click', () => {
+                const inheritance = this.calculateInheritance();
+                if (window.showModal) {
+                    window.showModal(
+                        'Dynasty Inheritance Calculation',
+                        `<div class="dynasty-calculation">
+                            <h3>💰 Current Dynasty Value</h3>
+                            <p>If your dynasty ended today, your heir would inherit:</p>
+                            <div class="inheritance-breakdown">
+                                <div class="inheritance-item">
+                                    <span class="inheritance-label">Base Inheritance:</span>
+                                    <span class="inheritance-value">500 💰</span>
+                                </div>
+                                <div class="inheritance-item">
+                                    <span class="inheritance-label">Wave Bonus:</span>
+                                    <span class="inheritance-value">${this.gameState.wave * 50} 💰</span>
+                                </div>
+                                <div class="inheritance-item">
+                                    <span class="inheritance-label">Building Bonus:</span>
+                                    <span class="inheritance-value">${this.gameState.buildings.length * 25} 💰</span>
+                                </div>
+                                <div class="inheritance-item">
+                                    <span class="inheritance-label">Population Bonus:</span>
+                                    <span class="inheritance-value">${Math.floor(this.gameState.population / 5) * 10} 💰</span>
+                                </div>
+                                <hr style="margin: 1rem 0; border-color: #444;">
+                                <div class="inheritance-total">
+                                    <span class="inheritance-label"><strong>Total Inheritance:</strong></span>
+                                    <span class="inheritance-value"><strong>${inheritance} 💰</strong></span>
+                                </div>
+                            </div>
+                        </div>`,
+                        { icon: '💰', type: 'info' }
+                    );
+                }
+            });
+        }
+        
+        if (prestigeBtn) {
+            prestigeBtn.addEventListener('click', () => {
+                if (window.modalSystem && window.modalSystem.showConfirmation) {
+                    window.modalSystem.showConfirmation(
+                        'Are you sure you want to end your dynasty? This will reset your progress but grant legacy bonuses for your next dynasty.',
+                        {
+                            title: 'End Dynasty (Prestige Reset)',
+                            confirmText: 'End Dynasty',
+                            cancelText: 'Keep Ruling',
+                            onConfirm: () => {
+                                this.triggerPrestige();
+                            }
+                        }
+                    );
+                }
+            });
+        }
+    }
+    
+    makeInvestment(investmentType, cost) {
         this.gameState.spendGold(cost);
         
-        // Apply investment effects
-        switch (investmentName) {
-            case 'Production Boost':
+        // Trigger first investment achievement (only once)
+        if (window.achievementSystem && !window.achievementSystem.isUnlocked('royal_investor')) {
+            window.achievementSystem.triggerFirstInvestment();
+            console.log('[Monarch] First investment achievement triggered');
+        }
+        
+        // Apply investment effects based on type
+        switch (investmentType) {
+            case 'productionBoost':
                 this.gameState.investments.productionBoost++;
                 this.gameState.logBattleEvent(`💰 Invested in production boost (Level ${this.gameState.investments.productionBoost})`);
                 break;
-            case 'New Building Types':
+            case 'buildingTypes':
                 this.gameState.investments.buildingTypes++;
                 this.gameState.logBattleEvent('🏗️ Unlocked new building types');
                 break;
-            case 'Automation Level Up':
+            case 'automationLevel':
                 this.gameState.investments.automationLevel++;
                 this.updateAutomationLevel();
                 break;
-            case 'Army Scouts':
+            case 'armyScouts':
                 this.gameState.investments.armyScouts = true;
                 this.gameState.logBattleEvent('🔍 Army scouts improve battle intelligence');
                 break;
-            case 'Elite Generals':
+            case 'eliteGenerals':
                 this.gameState.investments.eliteGenerals = true;
                 this.gameState.logBattleEvent('⭐ Elite generals joined your forces');
                 break;
-            case 'Tactical Academy':
+            case 'tacticalAcademy':
                 this.gameState.investments.tacticalAcademy = true;
                 this.gameState.logBattleEvent('🎓 Tactical academy built - commanders learn faster');
                 break;
-            case 'Parallel Villages':
+            case 'parallelVillages':
                 this.gameState.investments.parallelVillages = true;
                 this.gameState.logBattleEvent('🏘️ Parallel village system activated');
                 break;
-            case 'Prestige Automation':
+            case 'prestigeAutomation':
                 this.gameState.investments.prestigeAutomation = true;
                 this.gameState.logBattleEvent('🤖 Prestige automation system online');
                 break;
-            case 'Dynasty Progression':
+            case 'dynastyProgression':
                 this.gameState.investments.dynastyProgression = true;
                 this.gameState.logBattleEvent('👑 Dynasty progression unlocked');
                 break;
@@ -198,30 +267,38 @@ class MonarchManager {
     }
     
     displayInvestmentStatus() {
-        // Create or update investment status display
-        let statusDiv = document.getElementById('investment-status');
-        if (!statusDiv) {
-            statusDiv = document.createElement('div');
-            statusDiv.id = 'investment-status';
-            statusDiv.style.marginTop = '20px';
-            statusDiv.style.padding = '15px';
-            statusDiv.style.background = 'rgba(0,0,0,0.3)';
-            statusDiv.style.borderRadius = '5px';
-            
-            const monarchContent = document.querySelector('.monarch-content');
-            if (monarchContent) {
-                monarchContent.appendChild(statusDiv);
-            }
-        }
+        // Update the investment status display
+        const statusDiv = document.getElementById('investment-status');
+        if (!statusDiv) return;
         
         statusDiv.innerHTML = `
-            <h3 style="color: #1abc9c; margin-bottom: 10px;">Current Investments</h3>
-            <p>Production Boost: Level ${this.gameState.investments.productionBoost}</p>
-            <p>Automation: ${this.gameState.automationLevel}</p>
-            <p>Army Scouts: ${this.gameState.investments.armyScouts ? 'Active' : 'Not purchased'}</p>
-            <p>Elite Generals: ${this.gameState.investments.eliteGenerals ? 'Active' : 'Not purchased'}</p>
-            <p>Parallel Villages: ${this.gameState.investments.parallelVillages ? 'Unlocked' : 'Locked'}</p>
-            <p>Prestige Automation: ${this.gameState.investments.prestigeAutomation ? 'Active' : 'Not purchased'}</p>
+            <h4 style="color: #1abc9c; margin-bottom: 1rem;">Current Investment Levels</h4>
+            <div class="dynasty-stats">
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Production Boost</div>
+                    <div class="dynasty-stat-value">Level ${this.gameState.investments.productionBoost}</div>
+                </div>
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Automation Level</div>
+                    <div class="dynasty-stat-value">${this.gameState.automationLevel}</div>
+                </div>
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Army Scouts</div>
+                    <div class="dynasty-stat-value">${this.gameState.investments.armyScouts ? 'Active' : 'Inactive'}</div>
+                </div>
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Elite Generals</div>
+                    <div class="dynasty-stat-value">${this.gameState.investments.eliteGenerals ? 'Active' : 'Inactive'}</div>
+                </div>
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Parallel Villages</div>
+                    <div class="dynasty-stat-value">${this.gameState.investments.parallelVillages ? 'Unlocked' : 'Locked'}</div>
+                </div>
+                <div class="dynasty-stat">
+                    <div class="dynasty-stat-label">Prestige Automation</div>
+                    <div class="dynasty-stat-value">${this.gameState.investments.prestigeAutomation ? 'Active' : 'Inactive'}</div>
+                </div>
+            </div>
         `;
     }
     
@@ -287,44 +364,34 @@ class MonarchManager {
     }
     
     displayAdvisorAdvice() {
-        // Create or update advisor panel
-        let advisorDiv = document.getElementById('advisor-panel');
-        if (!advisorDiv) {
-            advisorDiv = document.createElement('div');
-            advisorDiv.id = 'advisor-panel';
-            advisorDiv.style.marginTop = '20px';
-            advisorDiv.style.padding = '15px';
-            advisorDiv.style.background = 'linear-gradient(135deg, #9b59b6, #8e44ad)';
-            advisorDiv.style.borderRadius = '8px';
-            advisorDiv.style.border = '2px solid #1abc9c';
-            
-            const monarchContent = document.querySelector('.monarch-content');
-            if (monarchContent) {
-                monarchContent.appendChild(advisorDiv);
-            }
-        }
+        // Update the existing advisor panel
+        const advisorDiv = document.getElementById('advisor-panel');
+        if (!advisorDiv) return;
         
         let adviceHtml = `
-            <h3 style="color: #f1c40f; margin-bottom: 10px;">
+            <h4 style="color: #f1c40f; margin-bottom: 1rem;">
                 👑 ${this.currentAdvisor.name} advises:
-            </h3>
+            </h4>
         `;
         
         if (this.currentAdvisor.advice.length > 0) {
             this.currentAdvisor.advice.forEach(advice => {
-                adviceHtml += `<p style="margin-bottom: 8px; font-style: italic;">• ${advice}</p>`;
+                adviceHtml += `<p style="margin-bottom: 0.75rem; font-style: italic; color: #ecf0f1;">• ${advice}</p>`;
             });
         } else {
-            adviceHtml += `<p style="font-style: italic;">Your kingdom prospers under your wise rule, Your Majesty.</p>`;
+            adviceHtml += `<p style="font-style: italic; color: #bdc3c7;">Your kingdom prospers under your wise rule, Your Majesty.</p>`;
         }
         
         // Add advisor switching buttons
         adviceHtml += `
-            <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
                 ${this.advisors.map(advisor => `
                     <button class="advisor-btn" data-advisor="${advisor.name}" 
-                            style="padding: 5px 10px; background: ${advisor === this.currentAdvisor ? '#1abc9c' : '#34495e'}; 
-                                   color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">
+                            style="padding: 0.5rem 1rem; 
+                                   background: ${advisor === this.currentAdvisor ? '#1abc9c' : '#34495e'}; 
+                                   color: white; border: none; border-radius: 4px; cursor: pointer; 
+                                   font-size: 0.9rem; transition: all 0.3s ease;
+                                   border: 2px solid ${advisor === this.currentAdvisor ? '#16a085' : '#2c3e50'};">
                         ${advisor.specialty}
                     </button>
                 `).join('')}
@@ -340,6 +407,21 @@ class MonarchManager {
                 this.currentAdvisor = this.advisors.find(a => a.name === advisorName);
                 this.displayAdvisorAdvice();
             });
+            
+            // Add hover effects
+            btn.addEventListener('mouseenter', () => {
+                if (!btn.style.background.includes('#1abc9c')) {
+                    btn.style.background = '#3498db';
+                    btn.style.borderColor = '#2980b9';
+                }
+            });
+            
+            btn.addEventListener('mouseleave', () => {
+                if (!btn.style.background.includes('#1abc9c')) {
+                    btn.style.background = '#34495e';
+                    btn.style.borderColor = '#2c3e50';
+                }
+            });
         });
     }
     
@@ -354,12 +436,66 @@ class MonarchManager {
         
         this.gameState.logBattleEvent(`💰 Inheritance calculated: ${totalInheritance} gold (Base: ${baseInheritance}, Wave: ${waveBonus}, Buildings: ${buildingBonus}, Population: ${populationBonus})`);
         
+        // Update dynasty stats display
+        this.updateDynastyStats(totalInheritance);
+        
         return totalInheritance;
+    }
+    
+    updateDynastyStats(inheritance) {
+        const dynastyStatsDiv = document.getElementById('dynasty-stats');
+        if (!dynastyStatsDiv) return;
+        
+        dynastyStatsDiv.innerHTML = `
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Current Wave</div>
+                <div class="dynasty-stat-value">${this.gameState.wave}</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Total Buildings</div>
+                <div class="dynasty-stat-value">${this.gameState.buildings.length}</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Population</div>
+                <div class="dynasty-stat-value">${this.gameState.population}</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Current Gold</div>
+                <div class="dynasty-stat-value">${this.gameState.gold} 💰</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Potential Inheritance</div>
+                <div class="dynasty-stat-value">${inheritance} 💰</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-label">Dynasty Age</div>
+                <div class="dynasty-stat-value">${this.gameState.currentDay || 1} days</div>
+            </div>
+        `;
     }
     
     triggerPrestige() {
         // Save current progress
         const inheritance = this.calculateInheritance();
+        
+        // Show confirmation of the reset
+        if (window.showModal) {
+            window.showModal(
+                'Dynasty Reset Complete',
+                `<div class="dynasty-calculation">
+                    <h3>👑 Your Dynasty Has Ended</h3>
+                    <p>Your rule has come to an end, but your legacy lives on...</p>
+                    <div class="inheritance-breakdown">
+                        <div class="inheritance-total">
+                            <span class="inheritance-label">Legacy Gold Inherited:</span>
+                            <span class="inheritance-value">${inheritance} 💰</span>
+                        </div>
+                    </div>
+                    <p><em>Your successor will begin their reign with the benefits of your accumulated wisdom and resources.</em></p>
+                </div>`,
+                { icon: '⚰️', type: 'info' }
+            );
+        }
         
         // Reset some values but keep investments
         this.gameState.wave = 1;

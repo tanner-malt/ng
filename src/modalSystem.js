@@ -134,37 +134,60 @@ class ModalSystem {
             priority = 0  // Add priority support: 0 = normal, 1 = high (settings), 2 = critical
         } = options;
 
+        console.log(`🔥 [MODAL TRACKER] _showModalInternal called`);
+        console.log(`🔥 [MODAL TRACKER] Modal ID: ${id}`);
+        console.log(`🔥 [MODAL TRACKER] Modal type: ${modalType}`);
+        console.log(`🔥 [MODAL TRACKER] Title: ${title}`);
+        console.log(`🔥 [MODAL TRACKER] Content length: ${content.length}`);
+        console.log(`🔥 [MODAL TRACKER] Active modals count: ${this.activeModals.size}`);
+        console.log(`🔥 [MODAL TRACKER] Modal stack length: ${this.modalStack.length}`);
+
         console.log(`[ModalSystem] Creating modal: "${title}" (type: ${modalType}, id: ${id})`);
         console.log(`[ModalSystem] Modal options:`, options);
 
         // Prevent multiple instances of the same modal type
         if (modalType && this.activeModals.has(modalType)) {
+            console.log(`🔥 [MODAL TRACKER] DUPLICATE MODAL REJECTED: ${modalType}`);
             console.log(`[ModalSystem] Modal type '${modalType}' already active, rejecting duplicate`);
             resolve(null);
             return;
         }
         
-        // Special handling for tutorial modals - only allow one tutorial modal at a time
+        // Special handling for tutorial modals - only prevent exact same modal type duplicates
         if (modalType && modalType.includes('tutorial') || className.includes('tutorial')) {
-            const existingTutorial = Array.from(this.activeModals).find(id => 
-                id.includes('tutorial') || 
-                (this.modalStack.find(m => m.id === id)?.element?.classList?.contains('tutorial-modal'))
+            console.log(`🔥 [MODAL TRACKER] Checking for existing tutorial modals...`);
+            console.log(`🔥 [MODAL TRACKER] Current activeModals:`, Array.from(this.activeModals));
+            console.log(`🔥 [MODAL TRACKER] Looking for modalType: ${modalType}`);
+            
+            // Only block if the EXACT same tutorial modal type is already active
+            const existingTutorial = Array.from(this.activeModals).find(activeId => 
+                activeId === modalType
             );
             if (existingTutorial) {
-                console.log(`[ModalSystem] Tutorial modal already active (${existingTutorial}), rejecting duplicate`);
+                console.log(`[ModalSystem] Same tutorial modal type already active (${existingTutorial}), rejecting duplicate`);
                 resolve(null);
                 return;
             }
+            console.log(`🔥 [MODAL TRACKER] No exact duplicate found, proceeding...`);
         }
 
-        const modalId = modalType || id;
+        // Use the provided ID, fallback to modalType for activeModals tracking
+        const actualModalId = id;  // Use the actual provided ID for the DOM element
+        const trackingId = modalType || id;  // Use modalType for duplicate prevention
+
+        console.log(`🔥 [MODAL TRACKER] Using actual modal ID: ${actualModalId}`);
+        console.log(`🔥 [MODAL TRACKER] Using tracking ID: ${trackingId}`);
+        console.log(`🔥 [MODAL TRACKER] Original id parameter: ${id}`);
+        console.log(`🔥 [MODAL TRACKER] Modal type: ${modalType}`);
 
         // Create modal element
         const modal = document.createElement('div');
-        modal.id = modalId;
+        modal.id = actualModalId;  // Use the actual ID for the DOM element
         modal.className = `modal-content ${className}`;
         modal.style.width = width;
         modal.style.height = height;
+
+        console.log(`🔥 [MODAL TRACKER] Modal element created with ID: ${modal.id}`);
 
         // Store resolve/reject for this modal
         modal._resolve = resolve;
@@ -183,7 +206,7 @@ class ModalSystem {
 
         // Add to modal stack
         this.modalStack.push({ 
-            id: modalId, 
+            id: actualModalId,  // Use actual ID for stack tracking
             element: modal, 
             onClose, 
             modalType, 
@@ -192,7 +215,7 @@ class ModalSystem {
             reject,
             priority  // Store priority for z-index calculations
         });
-        this.activeModals.add(modalId);
+        this.activeModals.add(trackingId);  // Use tracking ID for duplicate prevention
 
         // Calculate z-index based on priority and stack position
         // Base z-index: 10000, Priority bonus: +1000 per level, Stack position: +10 per modal
@@ -203,16 +226,35 @@ class ModalSystem {
 
         // Show overlay and modal
         const overlay = document.getElementById('modal-overlay');
+        console.log(`🔥 [MODAL TRACKER] Overlay element found:`, !!overlay);
+        console.log(`🔥 [MODAL TRACKER] Overlay current display:`, overlay ? overlay.style.display : 'N/A');
+        console.log(`🔥 [MODAL TRACKER] Overlay children count before:`, overlay ? overlay.children.length : 'N/A');
+        
         overlay.appendChild(modal);
+        console.log(`🔥 [MODAL TRACKER] Modal appended to overlay`);
+        console.log(`🔥 [MODAL TRACKER] Overlay children count after:`, overlay.children.length);
+        
         overlay.style.display = 'flex';
         overlay.style.zIndex = finalZIndex;  // Set calculated z-index
         overlay.classList.add('show'); // Add show class for animations and selectors
+        
+        console.log(`🔥 [MODAL TRACKER] Overlay display set to: ${overlay.style.display}`);
+        console.log(`🔥 [MODAL TRACKER] Overlay z-index set to: ${finalZIndex}`);
+        console.log(`🔥 [MODAL TRACKER] Overlay classes:`, overlay.className);
+        
+        // Check if modal is actually visible
+        setTimeout(() => {
+            const rect = overlay.getBoundingClientRect();
+            console.log(`🔥 [MODAL TRACKER] Overlay computed display:`, window.getComputedStyle(overlay).display);
+            console.log(`🔥 [MODAL TRACKER] Overlay position:`, rect);
+            console.log(`🔥 [MODAL TRACKER] Modal in DOM:`, !!document.getElementById(actualModalId));
+        }, 50);
 
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
 
-        // Resolve the Promise with the modalId
-        resolve(modalId);
+        // Resolve the Promise with the actual modal ID
+        resolve(actualModalId);
     }
 
     _setupModalEventListeners(modal, closable) {
@@ -252,7 +294,13 @@ class ModalSystem {
 
         // Remove from stack and active set
         this.modalStack.splice(modalIndex, 1);
-        this.activeModals.delete(modalId);
+        
+        // Remove the correct tracking ID from activeModals
+        const trackingId = modalData.modalType || modalId;
+        this.activeModals.delete(trackingId);
+        
+        console.log(`[ModalSystem] Removed modal from tracking: ${trackingId}`);
+        console.log(`[ModalSystem] Active modals remaining:`, Array.from(this.activeModals));
 
         // Animate out
         modal.classList.add('modal-exit');
@@ -278,6 +326,41 @@ class ModalSystem {
                 overlay.style.zIndex = finalZIndex;
             }
         }, 200);
+    }
+
+    // Close all modals (emergency cleanup)
+    closeAllModals() {
+        console.log('[ModalSystem] Closing all modals (emergency cleanup)');
+        
+        // Clear all tracking
+        this.activeModals.clear();
+        this.modalStack = [];
+        
+        // Remove all modal elements from DOM
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) {
+            overlay.innerHTML = '';
+            overlay.style.display = 'none';
+            overlay.classList.remove('show');
+        }
+        
+        console.log('[ModalSystem] All modals cleared');
+    }
+
+    // Debug method to show current modal state
+    debugModalState() {
+        console.log('=== Modal System Debug ===');
+        console.log('Active modals:', Array.from(this.activeModals));
+        console.log('Modal stack length:', this.modalStack.length);
+        console.log('Modal stack:', this.modalStack.map(m => ({
+            id: m.id,
+            modalType: m.modalType,
+            element: !!m.element
+        })));
+        
+        const overlay = document.getElementById('modal-overlay');
+        console.log('Overlay display:', overlay ? overlay.style.display : 'N/A');
+        console.log('Overlay children:', overlay ? overlay.children.length : 'N/A');
     }
 
     // Close the top modal in the stack
@@ -559,14 +642,34 @@ class ModalSystem {
 
     generateQuestMenuContent(questManager) {
         if (!questManager.currentExpedition) {
+            // Check if expeditions are unlocked
+            if (!questManager.areExpeditionsUnlocked()) {
+                return `
+                    <div class="expedition-locked">
+                        <h3>🏰 Expeditions Locked</h3>
+                        <p>To unlock expeditions, you need:</p>
+                        <ul>
+                            <li>✅ Build a Barracks</li>
+                            <li>✅ Complete the "Military Establishment" achievement</li>
+                        </ul>
+                        <p>Expeditions allow you to send royal-led armies to explore, conquer, and gather resources from distant lands.</p>
+                    </div>
+                `;
+            }
+
             // Show available expeditions
             let expeditionsHTML = '<div class="expedition-grid">';
             
             questManager.availableLocations.forEach(location => {
                 if (!location.unlocked) return;
 
+                const requiredSupplies = questManager.calculateRequiredSupplies(location);
+                const availableSupplies = questManager.getAvailableSupplies();
+                const canAfford = questManager.canStartExpedition(location, availableSupplies, requiredSupplies);
+                const availableRoyals = questManager.getAvailableRoyalLeaders();
+
                 expeditionsHTML += `
-                    <div class="expedition-card" data-location="${location.id}">
+                    <div class="expedition-card ${!canAfford || availableRoyals.length === 0 ? 'insufficient' : ''}" data-location="${location.id}">
                         <h4>${location.name}</h4>
                         <p class="expedition-description">${location.description}</p>
                         <div class="expedition-details">
@@ -576,23 +679,44 @@ class ModalSystem {
                             </div>
                             <div class="expedition-stat">
                                 <span class="stat-icon">⚔️</span>
-                                <span>Battle: ~${location.estimatedBattleMinutes} minutes</span>
+                                <span>Difficulty: ${location.difficulty}</span>
                             </div>
                             <div class="expedition-stat">
-                                <span class="stat-icon">💀</span>
-                                <span>Risk: ${location.difficulty}</span>
+                                <span class="stat-icon">🌍</span>
+                                <span>Terrain: ${location.terrain}</span>
+                            </div>
+                            <div class="expedition-stat">
+                                <span class="stat-icon">🎯</span>
+                                <span>Type: ${location.type}</span>
+                            </div>
+                            <div class="expedition-stat">
+                                <span class="stat-icon">👑</span>
+                                <span>Leaders: ${availableRoyals.length} available</span>
+                            </div>
+                        </div>
+                        <div class="expedition-requirements">
+                            <strong>Required Supplies:</strong>
+                            <div class="requirements-list">
+                                ${Object.keys(requiredSupplies).map(supply => `
+                                    <span class="requirement-item ${availableSupplies[supply] >= requiredSupplies[supply] ? 'sufficient' : 'insufficient'}">
+                                        ${questManager.getSupplyIcon(supply)} ${requiredSupplies[supply]}
+                                    </span>
+                                `).join('')}
                             </div>
                         </div>
                         <div class="expedition-rewards">
                             <strong>Potential Rewards:</strong>
                             <div class="rewards-list">
-                                <span>🪙 ${location.rewards.gold.min}-${location.rewards.gold.max} gold</span>
-                                ${location.rewards.wood ? `<span>🪵 ${location.rewards.wood.min}-${location.rewards.wood.max} wood</span>` : ''}
-                                ${location.rewards.stone ? `<span>🪨 ${location.rewards.stone.min}-${location.rewards.stone.max} stone</span>` : ''}
+                                ${Object.keys(location.rewards).map(resource => {
+                                    if (resource === 'special') return `<span>✨ ${location.rewards[resource]}</span>`;
+                                    return `<span>${questManager.getSupplyIcon(resource)} ${location.rewards[resource].min}-${location.rewards[resource].max}</span>`;
+                                }).join('')}
                             </div>
                         </div>
-                        <button class="expedition-start-btn" data-location="${location.id}">
-                            Start Expedition
+                        <button class="expedition-start-btn ${!canAfford || availableRoyals.length === 0 ? 'disabled' : ''}" 
+                                data-location="${location.id}"
+                                ${!canAfford || availableRoyals.length === 0 ? 'disabled' : ''}>
+                            ${availableRoyals.length === 0 ? 'No Royal Leaders' : !canAfford ? 'Insufficient Supplies' : 'Plan Expedition'}
                         </button>
                     </div>
                 `;
@@ -602,28 +726,40 @@ class ModalSystem {
             return expeditionsHTML;
             
         } else {
-            // Show active expedition status
+            // Show active expedition status with enhanced details
             const expedition = questManager.currentExpedition;
             const location = expedition.location;
             const progressPercent = questManager.calculateExpeditionProgress();
+            const leader = expedition.leader;
             
             return `
                 <div class="active-expedition">
                     <h4>🚶 Active Expedition: ${location.name}</h4>
+                    <div class="expedition-leader">
+                        <span class="leader-icon">👑</span>
+                        <span>Led by: ${leader ? leader.name : 'Unknown Commander'}</span>
+                        ${leader ? `<span class="leader-experience">(${leader.experience} exp)</span>` : ''}
+                    </div>
+                    
                     <div class="expedition-progress">
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${progressPercent}%"></div>
                         </div>
                         <p>Progress: ${Math.floor(progressPercent)}% - Phase: ${questManager.expeditionState}</p>
+                        <p class="progress-details">
+                            ${questManager.expeditionState === 'traveling_out' ? `Traveling to ${location.name}` :
+                              questManager.expeditionState === 'battling' ? 'Engaged in battle' :
+                              questManager.expeditionState === 'traveling_back' ? 'Returning home' : 'Preparing'}
+                        </p>
                     </div>
-                    
+
                     <div class="expedition-status">
-                        <div class="army-status">
-                            <h5>Army Status</h5>
+                        <div class="status-overview">
+                            <h5>📊 Expedition Status</h5>
                             <div class="status-grid">
                                 <div class="status-item">
                                     <span class="status-icon">🥖</span>
-                                    <span>Supplies: ${expedition.supplies.food}</span>
+                                    <span>Food: ${expedition.supplies.food}</span>
                                 </div>
                                 <div class="status-item">
                                     <span class="status-icon">💊</span>
@@ -633,13 +769,43 @@ class ModalSystem {
                                     <span class="status-icon">😊</span>
                                     <span>Morale: ${expedition.armyMorale}%</span>
                                 </div>
+                                <div class="status-item">
+                                    <span class="status-icon">🌤️</span>
+                                    <span>Weather: ${expedition.weather.name}</span>
+                                </div>
+                                <div class="status-item">
+                                    <span class="status-icon">⚰️</span>
+                                    <span>Casualties: ${expedition.casualties}</span>
+                                </div>
+                                <div class="status-item">
+                                    <span class="status-icon">🏃</span>
+                                    <span>Desertions: ${expedition.desertions}</span>
+                                </div>
                             </div>
                         </div>
+
+                        ${expedition.pursuitRisk > 0 ? `
+                            <div class="pursuit-warning">
+                                <span class="warning-icon">⚠️</span>
+                                <span>Pursuit Risk: ${Math.floor(expedition.pursuitRisk * 100)}%</span>
+                            </div>
+                        ` : ''}
+
+                        ${expedition.inventoryItems && expedition.inventoryItems.length > 0 ? `
+                            <div class="expedition-inventory">
+                                <h5>📦 Special Equipment</h5>
+                                <div class="inventory-items">
+                                    ${expedition.inventoryItems.map(item => 
+                                        `<span class="inventory-item">${item.name}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                         
                         <div class="recent-events">
-                            <h5>Recent Events</h5>
+                            <h5>📰 Recent Events</h5>
                             <div class="events-list">
-                                ${expedition.events.slice(-3).map(event => 
+                                ${expedition.events.slice(-4).map(event => 
                                     `<div class="event-item ${event.type}">
                                         <span class="event-time">${event.time}</span>
                                         <span class="event-text">${event.text}</span>
@@ -668,12 +834,17 @@ class ModalSystem {
             return;
         }
         
-        // Handle expedition start buttons
+        // Handle expedition planning buttons (new system)
         modal.querySelectorAll('.expedition-start-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const locationId = e.target.dataset.location;
-                questManager.startExpedition(locationId);
-                this.closeModal(modalId);
+                if (!e.target.disabled) {
+                    // Use new planning system instead of direct start
+                    if (questManager.planExpedition(locationId)) {
+                        // Planning modal will handle the actual expedition start
+                        this.closeModal(modalId);
+                    }
+                }
             });
         });
 
@@ -703,6 +874,164 @@ class ModalSystem {
         const modalBody = modal.querySelector('.modal-body');
         modalBody.innerHTML = this.generateQuestMenuContent(questManager);
         this.setupQuestMenuHandlers(modalId, questManager);
+    }
+
+    // Show wiki menu
+    showWikiMenu() {
+        console.log('🔥 [MODAL TRACKER] showWikiMenu() called');
+        console.log('🔥 [MODAL TRACKER] Generating wiki content...');
+        
+        const wikiContent = this.generateWikiContent();
+        console.log('🔥 [MODAL TRACKER] Wiki content generated, length:', wikiContent.length);
+        
+        console.log('🔥 [MODAL TRACKER] Calling showModal with wiki parameters...');
+        const modalPromise = this.showModal({
+            id: 'wiki-modal',
+            title: '📖 Game Wiki & Documentation',
+            content: wikiContent,
+            width: '900px',
+            height: '700px',
+            className: 'wiki-modal',
+            modalType: 'wiki',
+            onClose: () => {
+                console.log('🔥 [MODAL TRACKER] Wiki modal onClose callback triggered');
+                // Clean up any wiki-specific listeners
+            }
+        });
+
+        console.log('🔥 [MODAL TRACKER] showModal returned:', modalPromise);
+        
+        // Setup wiki interactions after modal is created
+        modalPromise.then(actualModalId => {
+            console.log('🔥 [MODAL TRACKER] Modal promise resolved with ID:', actualModalId);
+            console.log('🔥 [MODAL TRACKER] Setting up wiki handlers...');
+            this.setupWikiHandlers(actualModalId);
+        });
+        
+        console.log('🔥 [MODAL TRACKER] showWikiMenu complete, returning promise');
+        return modalPromise;
+    }
+
+    generateWikiContent() {
+        const navigation = window.WikiData ? window.WikiData.getNavigation() : this.getDefaultNavigation();
+        
+        let navigationHTML = '';
+        navigation.forEach(category => {
+            navigationHTML += `
+                <div class="wiki-nav-section">
+                    <h4>${category.title}</h4>
+                    ${category.sections.map((section, index) => `
+                        <button class="wiki-nav-btn ${index === 0 && category === navigation[0] ? 'active' : ''}" 
+                                data-section="${section.id}">
+                            ${section.label}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        });
+        
+        const initialSection = window.WikiData ? window.WikiData.getSection('getting-started') : this.getDefaultSection();
+        
+        return `
+            <div class="wiki-container">
+                <!-- Wiki Navigation -->
+                <div class="wiki-nav">
+                    ${navigationHTML}
+                </div>
+                
+                <!-- Wiki Content Area -->
+                <div class="wiki-content">
+                    <div id="wiki-content-area">
+                        ${initialSection.content}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    getWikiSection(section) {
+        if (window.WikiData) {
+            return window.WikiData.getSection(section).content;
+        }
+        
+        // Fallback content if WikiData not available
+        return this.getDefaultSection().content;
+    }
+    
+    getDefaultNavigation() {
+        return [
+            {
+                title: '📋 Game Basics',
+                sections: [
+                    { id: 'getting-started', label: 'Getting Started' },
+                    { id: 'buildings', label: 'Buildings Guide' },
+                    { id: 'development', label: 'Development Notes' }
+                ]
+            }
+        ];
+    }
+    
+    getDefaultSection() {
+        return {
+            content: `
+                <div class="wiki-section">
+                    <h3>📖 Game Wiki</h3>
+                    <p>Welcome to the game wiki! This system is loading...</p>
+                    <div class="wiki-note">
+                        <strong>Loading:</strong> Wiki data is being initialized. Please try again in a moment.
+                    </div>
+                </div>
+            `
+        };
+    }
+
+    setupWikiHandlers(modalId) {
+        console.log('🔥 [WIKI TRACKER] setupWikiHandlers called with modalId:', modalId);
+        
+        // Wait for the modal to be fully rendered
+        setTimeout(() => {
+            const modal = document.getElementById('wiki-modal') || document.getElementById('wiki') || document.querySelector('.wiki-modal');
+            console.log('🔥 [WIKI TRACKER] Found modal element:', !!modal);
+            console.log('🔥 [WIKI TRACKER] Modal ID in DOM:', modal ? modal.id : 'N/A');
+            
+            if (!modal) {
+                console.error('🔥 [WIKI TRACKER] No modal found for wiki handlers setup');
+                return;
+            }
+            
+            // Setup navigation button handlers
+            const navButtons = modal.querySelectorAll('.wiki-nav-btn');
+            console.log('🔥 [WIKI TRACKER] Found navigation buttons:', navButtons.length);
+            
+            navButtons.forEach((btn, index) => {
+                console.log('🔥 [WIKI TRACKER] Setting up button', index, 'with section:', btn.dataset.section);
+                
+                btn.addEventListener('click', (e) => {
+                    console.log('🔥 [WIKI TRACKER] Navigation button clicked:', e.target.dataset.section);
+                    
+                    // Remove active class from all buttons
+                    navButtons.forEach(b => b.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    e.target.classList.add('active');
+                    
+                    // Update content area
+                    const section = e.target.dataset.section;
+                    const contentArea = modal.querySelector('#wiki-content-area');
+                    console.log('🔥 [WIKI TRACKER] Content area found:', !!contentArea);
+                    
+                    if (contentArea) {
+                        const newContent = this.getWikiSection(section);
+                        console.log('🔥 [WIKI TRACKER] New content length:', newContent.length);
+                        contentArea.innerHTML = newContent;
+                    } else {
+                        console.error('🔥 [WIKI TRACKER] Content area not found');
+                    }
+                });
+            });
+            
+            console.log('🔥 [WIKI TRACKER] Wiki handlers setup complete');
+        }, 200);
     }
 
     // Check if any modal is currently open
@@ -773,7 +1102,7 @@ class ModalSystem {
     showSettingsModal() {
         const settingsContent = this.generateSettingsContent();
         
-        return this.showModal({
+        const modalPromise = this.showModal({
             title: '⚙️ Game Settings',
             content: settingsContent,
             width: '500px',
@@ -786,6 +1115,15 @@ class ModalSystem {
                 this.saveSettings();
             }
         });
+
+        // Update stats after modal is shown
+        setTimeout(() => {
+            if (window.statsIntegration) {
+                window.statsIntegration.updateQuickStats();
+            }
+        }, 100);
+
+        return modalPromise;
     }
 
     generateSettingsContent() {
@@ -860,6 +1198,36 @@ class ModalSystem {
                     </div>
                     <div class="setting-item">
                         <button class="btn btn-danger" onclick="window.modalSystem.resetGame()">🔄 Restart Game</button>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h5>📊 Stats</h5>
+                    <div class="stats-grid-modal">
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Total Days:</span>
+                            <span class="stat-value-modal" id="modal-stat-total-days">1</span>
+                        </div>
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Peak Population:</span>
+                            <span class="stat-value-modal" id="modal-stat-peak-population">1</span>
+                        </div>
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Buildings Built:</span>
+                            <span class="stat-value-modal" id="modal-stat-buildings-built">0</span>
+                        </div>
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Seasons Passed:</span>
+                            <span class="stat-value-modal" id="modal-stat-seasons-passed">0</span>
+                        </div>
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Resources Generated:</span>
+                            <span class="stat-value-modal" id="modal-stat-resources-generated">0</span>
+                        </div>
+                        <div class="stat-item-modal">
+                            <span class="stat-label-modal">Resources Spent:</span>
+                            <span class="stat-value-modal" id="modal-stat-resources-spent">0</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1522,10 +1890,27 @@ class ModalSystem {
             });
         }
     }
+    
+    // Test function to verify modal system works
+    testModalSystem() {
+        console.log('🔥 [TEST] Testing modal system...');
+        const testModal = this.showModal({
+            title: 'Test Modal',
+            content: '<p>This is a test modal to verify the system works.</p>',
+            width: '400px',
+            height: '300px',
+            modalType: 'test'
+        });
+        console.log('🔥 [TEST] Test modal result:', testModal);
+        return testModal;
+    }
 }
 
 // Create global modal system instance
 window.modalSystem = new ModalSystem();
+
+// Add test function globally
+window.testModal = () => window.modalSystem.testModalSystem();
 
 // Global showModal function for backwards compatibility
 window.showModal = (title, content, options = {}) => {

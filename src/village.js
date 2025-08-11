@@ -187,6 +187,10 @@ class VillageManager {
         // Tutorial tracking
         this.tutorialBuildings = new Set();
         
+        // Building effects system
+        this.buildingEffectsManager = null; // Will be initialized after DOM loads
+        this.buildingTutorial = null; // Will be initialized after DOM loads
+        
         // Terrain system
         this.terrain = [];
         this.terrainWidth = 16; // Number of terrain tiles horizontally
@@ -207,6 +211,24 @@ class VillageManager {
             if (!this.villageGrid) {
                 console.error('[Village] village-grid element not found');
                 return;
+            }
+            
+            // Initialize building effects manager
+            console.log('[Village] Initializing building effects manager...');
+            if (typeof BuildingEffectsManager !== 'undefined') {
+                this.buildingEffectsManager = new BuildingEffectsManager(this.gameState, this);
+                console.log('[Village] Building effects manager initialized');
+            } else {
+                console.warn('[Village] BuildingEffectsManager not available');
+            }
+
+            // Initialize building tutorial
+            console.log('[Village] Initializing building tutorial...');
+            if (typeof BuildingTutorial !== 'undefined') {
+                this.buildingTutorial = new BuildingTutorial(this.gameState, this);
+                console.log('[Village] Building tutorial initialized');
+            } else {
+                console.warn('[Village] BuildingTutorial not available');
             }
             
             console.log('[Village] Generating realistic terrain...');
@@ -238,32 +260,77 @@ class VillageManager {
         }
     }
     
-    // Generate building buttons dynamically from GameData
+    // Generate building buttons dynamically organized by category
     generateBuildingButtons() {
-        const buildingList = document.getElementById('building-list');
-        if (!buildingList) {
-            console.error('[Village] building-list element not found');
-            return;
-        }
+        console.log('[Village] Generating organized building buttons');
 
-        // Clear existing buttons
-        buildingList.innerHTML = '';
-
-        // Get all building types from gameState instead of hardcoding
-        const buildingTypes = this.gameState.getAllBuildingTypes();
-        
-        buildingTypes.forEach(buildingType => {
-            if (GameData.buildingInfo[buildingType]) {
-                const button = document.createElement('button');
-                button.id = `build-${buildingType}`;
-                button.className = 'build-btn';
-                button.dataset.building = buildingType;
-                button.textContent = GameData.formatBuildingButton(buildingType);
-                buildingList.appendChild(button);
+        // Clear all category containers and track which have buildings
+        const categories = ['essential', 'production', 'craft', 'military', 'royal', 'knowledge', 'advanced'];
+        categories.forEach(category => {
+            const container = document.getElementById(`${category}-buildings`);
+            if (container) {
+                container.innerHTML = '';
+            } else {
+                console.warn(`[Village] Category container ${category}-buildings not found`);
             }
         });
 
-        console.log('[Village] Generated', buildingTypes.length, 'building buttons from gameState');
+        // Get all available building types
+        const availableBuildingTypes = this.gameState.getAllBuildingTypes();
+        console.log('[Village] Available building types:', availableBuildingTypes);
+
+        // Organize buildings by category
+        Object.keys(GameData.buildingCategories).forEach(categoryKey => {
+            const categoryBuildings = GameData.buildingCategories[categoryKey];
+            const container = document.getElementById(`${categoryKey}-buildings`);
+            
+            if (!container) {
+                console.warn(`[Village] No container found for category: ${categoryKey}`);
+                return;
+            }
+
+            let buildingsAddedToCategory = 0;
+
+            categoryBuildings.forEach(buildingType => {
+                // Only create button if building is defined in GameData and available
+                if (GameData.buildingInfo[buildingType] && availableBuildingTypes.includes(buildingType)) {
+                    const button = document.createElement('button');
+                    button.id = `build-${buildingType}`;
+                    button.className = 'build-btn';
+                    button.dataset.building = buildingType;
+                    button.textContent = GameData.formatBuildingButton(buildingType);
+                    
+                    // Add tooltip with building description
+                    button.title = GameData.getBuildingDescription(buildingType);
+                    
+                    container.appendChild(button);
+                    buildingsAddedToCategory++;
+                    
+                    console.log(`[Village] Added ${buildingType} to ${categoryKey} category`);
+                } else {
+                    console.log(`[Village] Skipping ${buildingType} - not available or missing info`);
+                }
+            });
+
+            // Hide category if no buildings were added
+            const categoryElement = container.closest('.building-category');
+            if (categoryElement) {
+                if (buildingsAddedToCategory === 0) {
+                    categoryElement.style.display = 'none';
+                    console.log(`[Village] Hiding empty category: ${categoryKey}`);
+                } else {
+                    categoryElement.style.display = 'block';
+                    
+                    // Add category description as subtitle
+                    const categoryHeader = categoryElement.querySelector('h4');
+                    if (categoryHeader && GameData.categoryDescriptions[categoryKey]) {
+                        categoryHeader.title = GameData.categoryDescriptions[categoryKey];
+                    }
+                }
+            }
+        });
+
+        console.log('[Village] Finished generating organized building buttons');
     }
     
     setupBuildingButtons() {
@@ -313,6 +380,11 @@ class VillageManager {
     updateAvailableBuildings() {
         console.log('[Village] Updating available buildings based on unlocks');
         
+        // Regenerate building buttons to handle new unlocks
+        this.generateBuildingButtons();
+        this.setupBuildingButtons();
+        
+        // Update button states for affordability
         document.querySelectorAll('.build-btn').forEach(btn => {
             const buildingType = btn.dataset.building;
             if (buildingType) {
@@ -421,6 +493,16 @@ class VillageManager {
             console.log(`[Village] Button highlighted for ${buildingType}`);
         } else {
             console.warn(`[Village] Could not find button for ${buildingType}`);
+        }
+        
+        // Show helpful instruction about shift-click (but not during tutorial to avoid confusion)
+        if (!this.gameState.tutorialActive && window.showToast) {
+            const buildingName = buildingType.charAt(0).toUpperCase() + buildingType.slice(1);
+            window.showToast(`💡 Click to place ${buildingName}. Hold Shift+Click to place multiple!`, {
+                icon: '🏗️',
+                type: 'info',
+                timeout: 4000
+            });
         }
         
         // Show ghost building preview on hover
@@ -554,13 +636,18 @@ class VillageManager {
                 // Place the building (this handles spending resources internally)
                 this.placeBuilding(currentBuildingType, x, y);
                 
-                // Check if we can still afford another building of the same type
-                // If yes, stay in build mode; if no, exit build mode
-                // During tutorial, always exit build mode to avoid confusion
-                if (!this.gameState.tutorialActive && this.gameState.canAfford(currentBuildingType)) {
-                    console.log(`[Village] Can still afford ${currentBuildingType}, staying in build mode`);
-                    // Stay in build mode by maintaining the buildMode state
-                    // The button should already be highlighted and cursor should be crosshair
+                // Check if shift was held during click for multi-build mode
+                const shiftHeld = e.shiftKey;
+                
+                // Determine whether to stay in build mode:
+                // 1. If shift was held AND we can afford another building -> stay in build mode
+                // 2. If tutorial is active -> always exit (to avoid confusion)
+                // 3. Otherwise -> exit build mode (normal single-building behavior)
+                const canAffordAnother = this.gameState.canAfford(currentBuildingType);
+                const shouldStayInBuildMode = !this.gameState.tutorialActive && shiftHeld && canAffordAnother;
+                
+                if (shouldStayInBuildMode) {
+                    console.log(`[Village] Shift held and can afford ${currentBuildingType}, staying in build mode`);
                     
                     // Update building button states since resources have changed
                     this.updateBuildingButtonStates();
@@ -568,19 +655,26 @@ class VillageManager {
                     // Show helpful toast notification
                     if (window.showToast) {
                         const buildingName = currentBuildingType.charAt(0).toUpperCase() + currentBuildingType.slice(1);
-                        window.showToast(`You can build another ${buildingName}! Click to place or press Escape to exit.`, {
+                        window.showToast(`Hold Shift and click to place another ${buildingName}! Press Escape to exit.`, {
                             icon: '🏗️',
                             type: 'info',
                             timeout: 3000
                         });
                     }
                 } else {
+                    // Exit build mode
+                    let exitReason = 'Normal placement complete';
                     if (this.gameState.tutorialActive) {
-                        console.log(`[Village] Tutorial active, exiting build mode after placement`);
-                    } else {
-                        console.log(`[Village] Cannot afford another ${currentBuildingType}, exiting build mode`);
+                        exitReason = 'Tutorial active, exiting build mode after placement';
+                    } else if (!canAffordAnother) {
+                        exitReason = `Cannot afford another ${currentBuildingType}`;
+                    } else if (!shiftHeld) {
+                        exitReason = 'Shift not held, single building placement';
                     }
+                    
+                    console.log(`[Village] ${exitReason}, exiting build mode`);
                     this.exitBuildMode();
+                    
                     // Update building button states since resources have changed
                     this.updateBuildingButtonStates();
                 }
@@ -749,18 +843,8 @@ class VillageManager {
         // Re-render buildings to show construction site immediately (level 0 building)
         this.renderBuildings();
         
-        // Milestone-based unlocking (for tutorial)
-        if (this.game && this.game.tutorialActive && this.game.unlockView) {
-            if (type === 'townCenter') {
-                this.game.unlockView('battle');
-            }
-            if (type === 'farm') {
-                this.game.unlockView('monarch');
-            }
-            if (type === 'house') {
-                this.game.unlockView('throne');
-            }
-        }
+        // Milestone-based unlocking handled by achievement system
+        // Building types trigger achievements which unlock views automatically
         
         // Note: exitBuildMode() is now handled by the caller to support multi-building placement
     }
@@ -969,7 +1053,14 @@ class VillageManager {
             // Add click handler for building info/upgrade
             buildingEl.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.showBuildingInfo(building);
+                
+                // Use new building management modal for completed buildings
+                if (building.level > 0) {
+                    this.showBuildingManagement(building.id);
+                } else {
+                    // Keep old info modal for construction sites
+                    this.showBuildingInfo(building);
+                }
             });
             
             container.appendChild(buildingEl);
@@ -1108,7 +1199,15 @@ class VillageManager {
             temple: '⛪',
             academy: '📚',
             castle: '🏰',
-            university: '🎓'
+            university: '🎓',
+            keep: '🏰',
+            monument: '🗿',
+            fortifications: '🛡️',
+            militaryAcademy: '🎓',
+            mine: '⛏️',
+            lumberMill: '🪓',
+            magicalTower: '🔮',
+            grandLibrary: '🏛️'
         };
         return symbols[type] || '?';
     }
@@ -1485,14 +1584,14 @@ class VillageManager {
         }
         
         console.log('[Village] PopulationManager available, getting population data');
-        const populationData = this.gameState.populationManager.getPopulationGroups();
+        const populationData = this.gameState.populationManager.getDetailedStatistics();
         
-        // Generate enhanced content HTML with modern design
+        // Generate enhanced content HTML with modern design and skill system
         let contentHTML = `
             <div class="population-overview">
                 <div class="overview-header">
                     <h3><span class="header-icon">👥</span> Population Management</h3>
-                    <div class="overview-subtitle">Manage your village demographics and workforce</div>
+                    <div class="overview-subtitle">Manage your village demographics, workforce, and skills</div>
                 </div>
                 
                 <div class="population-stats-grid">
@@ -1525,17 +1624,17 @@ class VillageManager {
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">🍞</div>
+                        <div class="stat-icon">😊</div>
                         <div class="stat-content">
-                            <div class="stat-value">${populationData.total}</div>
-                            <div class="stat-label">Daily Food Need</div>
+                            <div class="stat-value">${Math.round(populationData.happiness.average)}%</div>
+                            <div class="stat-label">Avg Happiness</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">⚖️</div>
+                        <div class="stat-icon">⚡</div>
                         <div class="stat-content">
-                            <div class="stat-value">${Math.round((populationData.demographics.maleCount / (populationData.demographics.maleCount + populationData.demographics.femaleCount) * 100) || 0)}% / ${Math.round((populationData.demographics.femaleCount / (populationData.demographics.maleCount + populationData.demographics.femaleCount) * 100) || 0)}%</div>
-                            <div class="stat-label">Male / Female</div>
+                            <div class="stat-value">${Math.round(populationData.productivity.average * 100)}%</div>
+                            <div class="stat-label">Avg Productivity</div>
                         </div>
                     </div>
                 </div>
@@ -1625,6 +1724,125 @@ class VillageManager {
         contentHTML += `
                     </div>
                 </div>
+        `;
+        
+        // Add skills section if skill system is available
+        if (populationData.skills && populationData.skills.available) {
+            contentHTML += `
+                <div class="population-section">
+                    <div class="section-header">
+                        <h4><span class="section-icon">🎯</span> Skills & Training</h4>
+                        <div class="section-subtitle">Population expertise and development</div>
+                    </div>
+                    <div class="skills-overview">
+                        <div class="skills-stats">
+                            <div class="skill-stat">
+                                <span class="skill-stat-icon">📚</span>
+                                <span class="skill-stat-value">${populationData.skills.totalSkills}</span>
+                                <span class="skill-stat-label">Total Skills</span>
+                            </div>
+                            <div class="skill-stat">
+                                <span class="skill-stat-icon">👨‍🏫</span>
+                                <span class="skill-stat-value">${populationData.training.mentors}</span>
+                                <span class="skill-stat-label">Mentors</span>
+                            </div>
+                            <div class="skill-stat">
+                                <span class="skill-stat-icon">📖</span>
+                                <span class="skill-stat-value">${populationData.training.total}</span>
+                                <span class="skill-stat-label">In Training</span>
+                            </div>
+                            <div class="skill-stat">
+                                <span class="skill-stat-icon">⚡</span>
+                                <span class="skill-stat-value">${Math.round(populationData.skills.averageSkillsPerVillager * 10) / 10}</span>
+                                <span class="skill-stat-label">Avg Skills/Person</span>
+                            </div>
+                        </div>
+                        
+                        <div class="skill-levels">
+                            <h5>Skill Level Distribution</h5>
+                            <div class="skill-level-bars">
+            `;
+            
+            Object.entries(populationData.skills.levelCounts).forEach(([level, count]) => {
+                if (count > 0) {
+                    const percentage = Math.round((count / populationData.skills.totalSkills * 100));
+                    const levelIcons = {
+                        novice: '🔰',
+                        apprentice: '🥉', 
+                        journeyman: '🥈',
+                        expert: '🥇',
+                        grandmaster: '💎'
+                    };
+                    
+                    contentHTML += `
+                        <div class="skill-level-bar">
+                            <div class="skill-level-info">
+                                <span class="skill-level-icon">${levelIcons[level]}</span>
+                                <span class="skill-level-name">${level.charAt(0).toUpperCase() + level.slice(1)}</span>
+                                <span class="skill-level-count">${count}</span>
+                            </div>
+                            <div class="skill-level-progress">
+                                <div class="skill-level-fill skill-level-${level}" style="width: ${percentage}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            contentHTML += `
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Add happiness section
+        contentHTML += `
+                <div class="population-section">
+                    <div class="section-header">
+                        <h4><span class="section-icon">😊</span> Happiness & Morale</h4>
+                        <div class="section-subtitle">Population satisfaction and well-being</div>
+                    </div>
+                    <div class="happiness-overview">
+                        <div class="happiness-meter">
+                            <div class="happiness-value">${Math.round(populationData.happiness.average)}%</div>
+                            <div class="happiness-label">Average Happiness</div>
+                        </div>
+                        <div class="happiness-distribution">
+        `;
+        
+        const happinessLabels = {
+            veryUnhappy: { icon: '😢', label: 'Very Unhappy', color: '#e74c3c' },
+            unhappy: { icon: '😞', label: 'Unhappy', color: '#f39c12' },
+            neutral: { icon: '😐', label: 'Neutral', color: '#95a5a6' },
+            happy: { icon: '😊', label: 'Happy', color: '#27ae60' },
+            veryHappy: { icon: '😍', label: 'Very Happy', color: '#2ecc71' }
+        };
+        
+        Object.entries(populationData.happiness.distribution).forEach(([level, count]) => {
+            if (count > 0) {
+                const percentage = Math.round((count / populationData.happiness.total * 100));
+                const info = happinessLabels[level];
+                contentHTML += `
+                    <div class="happiness-bar">
+                        <div class="happiness-info">
+                            <span class="happiness-icon">${info.icon}</span>
+                            <span class="happiness-name">${info.label}</span>
+                            <span class="happiness-count">${count}</span>
+                        </div>
+                        <div class="happiness-progress">
+                            <div class="happiness-fill" style="width: ${percentage}%; background-color: ${info.color}"></div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        contentHTML += `
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="population-actions">
@@ -1632,8 +1850,12 @@ class VillageManager {
                     <span class="btn-icon">📋</span>
                     <span class="btn-text">View Individual Villagers</span>
                 </button>
+                <button class="action-btn secondary" onclick="window.villageManager.showSkillTrainingModal();">
+                    <span class="btn-icon">🎓</span>
+                    <span class="btn-text">Manage Training</span>
+                </button>
                 <button class="action-btn secondary" onclick="window.modalSystem.closeTopModal();">
-                    <span class="btn-icon">📊</span>
+                    <span class="btn-icon">✖️</span>
                     <span class="btn-text">Close Overview</span>
                 </button>
             </div>
@@ -1666,8 +1888,8 @@ class VillageManager {
         }
 
         window.showModal('Population Overview', contentHTML, {
-            maxWidth: '800px',
-            customClass: 'population-modal modern-modal'
+            maxWidth: '900px',
+            customClass: 'population-modal modern-modal enhanced-population'
         });
     }
 
@@ -1811,6 +2033,896 @@ class VillageManager {
             });
         } else {
             console.error('[Village] modalSystem not available');
+        }
+    }
+
+    // Building Management Modal
+    showBuildingManagement(buildingId) {
+        const building = this.gameState.buildings.find(b => b.id === buildingId);
+        if (!building) {
+            console.error('[Village] Building not found for management:', buildingId);
+            return;
+        }
+
+        const bonuses = this.buildingEffectsManager?.getActiveBonuses() || {};
+        const buildingKey = `${building.type}_${building.x},${building.y}`;
+        const buildingBonus = bonuses[buildingKey];
+        const currentLevel = buildingBonus?.level || building.level || 1;
+        const specialization = buildingBonus?.specialization;
+
+        let contentHTML = `
+            <div class="building-management">
+                <div class="building-header">
+                    <div class="building-icon">${window.gameData?.buildingInfo?.[building.type]?.icon || '🏠'}</div>
+                    <div class="building-details">
+                        <h3>${window.gameData?.buildingInfo?.[building.type]?.name || building.type}</h3>
+                        <p>Level ${currentLevel} ${specialization ? `(${specialization})` : ''}</p>
+                        <p class="building-location">Position: ${building.x}, ${building.y}</p>
+                    </div>
+                </div>
+
+                <div class="building-stats">
+                    <h4>🔧 Building Effects</h4>
+                    <div class="effects-grid">
+        `;
+
+        // Show building effects
+        if (buildingBonus?.effects) {
+            Object.entries(buildingBonus.effects).forEach(([effect, value]) => {
+                let displayValue = value;
+                let displayName = effect.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                
+                if (typeof value === 'number') {
+                    if (value < 1 && value > 0) {
+                        displayValue = `+${Math.round(value * 100)}%`;
+                    } else if (value > 1 && value < 10) {
+                        displayValue = `${value.toFixed(1)}x`;
+                    } else {
+                        displayValue = `+${Math.floor(value)}`;
+                    }
+                } else if (typeof value === 'boolean' && value) {
+                    displayValue = 'Enabled';
+                }
+
+                contentHTML += `
+                    <div class="effect-item">
+                        <span class="effect-name">${displayName}:</span>
+                        <span class="effect-value">${displayValue}</span>
+                    </div>
+                `;
+            });
+        } else {
+            contentHTML += `<p class="no-effects">No special effects for this building type.</p>`;
+        }
+
+        contentHTML += `
+                    </div>
+                </div>
+
+                <div class="building-actions">
+                    <h4>⚙️ Building Actions</h4>
+                    <div class="action-buttons">
+        `;
+
+        // Upgrade button
+        if (this.buildingEffectsManager?.canUpgradeBuilding(building.type, `${building.x},${building.y}`)) {
+            const upgradeCost = this.buildingEffectsManager.getBuildingUpgradeCost(building.type, `${building.x},${building.y}`);
+            const canAfford = Object.entries(upgradeCost).every(([resource, cost]) => 
+                (this.gameState.resources[resource] || 0) >= cost
+            );
+
+            contentHTML += `
+                <button class="action-btn upgrade-btn${canAfford ? '' : ' disabled'}" 
+                        onclick="window.villageManager.upgradeBuilding('${building.type}', '${building.x},${building.y}')"
+                        ${canAfford ? '' : 'disabled'}>
+                    🔧 Upgrade to Level ${currentLevel + 1}
+                    <div class="cost-preview">
+                        ${Object.entries(upgradeCost).map(([resource, cost]) => 
+                            `${cost} ${resource}`
+                        ).join(', ')}
+                    </div>
+                </button>
+            `;
+        } else {
+            contentHTML += `
+                <button class="action-btn disabled" disabled>
+                    🔧 Max Level Reached
+                </button>
+            `;
+        }
+
+        // Specialization button (levels 5, 10, 15)
+        if (currentLevel >= 5 && !specialization && [5, 10, 15].includes(currentLevel)) {
+            contentHTML += `
+                <button class="action-btn specialize-btn" 
+                        onclick="window.villageManager.showSpecializationOptions('${building.type}', '${building.x},${building.y}')">
+                    ⭐ Choose Specialization
+                </button>
+            `;
+        }
+
+        // Demolish button
+        contentHTML += `
+                <button class="action-btn demolish-btn" 
+                        onclick="window.villageManager.demolishBuilding('${buildingId}')">
+                    💥 Demolish Building
+                </button>
+        `;
+
+        contentHTML += `
+                    </div>
+                </div>
+
+                <div class="building-workers">
+                    <h4>👷 Workers</h4>
+                    <div class="worker-info">
+        `;
+
+        // Show assigned workers
+        const assignedWorkers = this.getAssignedWorkers(building);
+        const workerSlots = this.getWorkerSlotsForBuilding(building);
+
+        contentHTML += `
+                        <p>Assigned: ${assignedWorkers.length} / ${workerSlots} workers</p>
+                        <div class="worker-list">
+        `;
+
+        assignedWorkers.forEach(worker => {
+            contentHTML += `
+                            <div class="worker-item">
+                                <span class="worker-name">${worker.name}</span>
+                                <span class="worker-role">(${worker.role})</span>
+                            </div>
+            `;
+        });
+
+        if (assignedWorkers.length === 0) {
+            contentHTML += `<p class="no-workers">No workers assigned</p>`;
+        }
+
+        contentHTML += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Show the modal
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: `🏗️ Building Management`,
+                content: contentHTML,
+                width: '600px',
+                className: 'building-management-modal'
+            });
+        }
+    }
+
+    // Upgrade building through effects manager
+    upgradeBuilding(buildingType, position) {
+        if (!this.buildingEffectsManager) {
+            console.error('[Village] Building effects manager not available');
+            return;
+        }
+
+        const upgradeCost = this.buildingEffectsManager.getBuildingUpgradeCost(buildingType, position);
+        
+        // Check if can afford
+        const canAfford = Object.entries(upgradeCost).every(([resource, cost]) => 
+            (this.gameState.resources[resource] || 0) >= cost
+        );
+
+        if (!canAfford) {
+            this.showMessage('Insufficient Resources', 'You don\'t have enough resources to upgrade this building.');
+            return;
+        }
+
+        // Spend resources
+        Object.entries(upgradeCost).forEach(([resource, cost]) => {
+            this.gameState.resources[resource] -= cost;
+        });
+
+        // Upgrade building
+        const newLevel = this.buildingEffectsManager.upgradeBuildingLevel(buildingType, position);
+        
+        this.showNotification(
+            'Building Upgraded!',
+            `${buildingType} upgraded to level ${newLevel}`,
+            'success',
+            3000
+        );
+
+        // Update displays
+        this.renderBuildings();
+        this.gameState.updateResourcesDisplay();
+
+        // Close modal and reopen to show new stats
+        if (window.modalSystem) {
+            window.modalSystem.closeModal();
+        }
+        
+        // Find building and reopen management
+        const building = this.gameState.buildings.find(b => 
+            b.type === buildingType && `${b.x},${b.y}` === position
+        );
+        if (building) {
+            setTimeout(() => this.showBuildingManagement(building.id), 100);
+        }
+    }
+
+    // Show specialization options
+    showSpecializationOptions(buildingType, position) {
+        // Define specializations per building type
+        const specializations = {
+            barracks: [
+                { id: 'elite', name: 'Elite Training', description: 'Trains elite units with +20 morale bonus' },
+                { id: 'rapid', name: 'Rapid Deployment', description: '50% faster unit recruitment' },
+                { id: 'fortified', name: 'Fortified Barracks', description: '+30 defense and siege resistance' }
+            ],
+            workshop: [
+                { id: 'masterwork', name: 'Masterwork Crafting', description: '15% chance for masterwork items' },
+                { id: 'mass', name: 'Mass Production', description: '40% faster crafting speed' },
+                { id: 'precision', name: 'Precision Tools', description: 'Crafted tools last 50% longer' }
+            ],
+            mine: [
+                { id: 'deep', name: 'Deep Mining', description: 'Access rare ores and +15% chance for rare finds' },
+                { id: 'efficient', name: 'Efficient Extraction', description: '60% bonus to ore/stone yield' },
+                { id: 'safe', name: 'Safety First', description: 'No mining accidents, +20% worker satisfaction' }
+            ]
+            // Add more building specializations as needed
+        };
+
+        const availableSpecs = specializations[buildingType] || [];
+        
+        if (availableSpecs.length === 0) {
+            this.showMessage('No Specializations', 'This building type does not have specialization options.');
+            return;
+        }
+
+        let contentHTML = `
+            <div class="specialization-selection">
+                <p>Choose a specialization for your ${buildingType}. This is permanent and cannot be changed.</p>
+                <div class="specialization-options">
+        `;
+
+        availableSpecs.forEach(spec => {
+            contentHTML += `
+                <div class="specialization-option" 
+                     onclick="window.villageManager.applySpecialization('${buildingType}', '${position}', '${spec.id}')">
+                    <h4>${spec.name}</h4>
+                    <p>${spec.description}</p>
+                </div>
+            `;
+        });
+
+        contentHTML += `
+                </div>
+            </div>
+        `;
+
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: '⭐ Choose Specialization',
+                content: contentHTML,
+                width: '500px',
+                className: 'specialization-modal'
+            });
+        }
+    }
+
+    // Apply specialization to building
+    applySpecialization(buildingType, position, specializationId) {
+        if (!this.buildingEffectsManager) {
+            console.error('[Village] Building effects manager not available');
+            return;
+        }
+
+        const success = this.buildingEffectsManager.addBuildingSpecialization(buildingType, position, specializationId);
+        
+        if (success) {
+            this.showNotification(
+                'Specialization Applied!',
+                `${buildingType} has been specialized`,
+                'success',
+                3000
+            );
+
+            // Close modal and return to building management
+            if (window.modalSystem) {
+                window.modalSystem.closeModal();
+            }
+
+            const building = this.gameState.buildings.find(b => 
+                b.type === buildingType && `${b.x},${b.y}` === position
+            );
+            if (building) {
+                setTimeout(() => this.showBuildingManagement(building.id), 100);
+            }
+        }
+    }
+
+    // Demolish building
+    demolishBuilding(buildingId) {
+        const building = this.gameState.buildings.find(b => b.id === buildingId);
+        if (!building) {
+            console.error('[Village] Building not found for demolition:', buildingId);
+            return;
+        }
+
+        // Confirm demolition
+        if (!confirm(`Are you sure you want to demolish this ${building.type}? This action cannot be undone.`)) {
+            return;
+        }
+
+        // Remove building effects
+        if (this.buildingEffectsManager) {
+            this.buildingEffectsManager.removeBuildingEffects(building.type, `${building.x},${building.y}`);
+        }
+
+        // Unassign workers
+        const assignedWorkers = this.getAssignedWorkers(building);
+        assignedWorkers.forEach(worker => {
+            worker.status = 'idle';
+            worker.buildingId = null;
+        });
+
+        // Remove building from gameState
+        this.gameState.buildings = this.gameState.buildings.filter(b => b.id !== buildingId);
+
+        this.showNotification(
+            'Building Demolished',
+            `${building.type} has been demolished`,
+            'info',
+            3000
+        );
+
+        // Update displays
+        this.renderBuildings();
+
+        // Close modal
+        if (window.modalSystem) {
+            window.modalSystem.closeModal();
+        }
+    }
+
+    // Inventory UI Methods
+    showInventoryModal() {
+        if (!window.inventoryManager) {
+            console.error('[Village] InventoryManager not available');
+            return;
+        }
+
+        const inventory = window.inventoryManager.getInventory();
+        const equipped = window.inventoryManager.getEquippedItems();
+
+        const modalContent = `
+            <div class="inventory-modal">
+                <h2>Inventory</h2>
+                <div class="inventory-tabs">
+                    <button class="tab-button active" onclick="window.villageManager.switchInventoryTab('all')">All Items</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('weapons')">Weapons</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('armor')">Armor</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('tools')">Tools</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('magical')">Magical</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('consumables')">Consumables</button>
+                </div>
+                
+                <div class="equipped-items">
+                    <h3>Equipped Items</h3>
+                    <div class="equipment-slots">
+                        <div class="equipment-slot weapon">
+                            <span>Weapon: ${equipped.weapon ? equipped.weapon.name : 'None'}</span>
+                            ${equipped.weapon ? `<button onclick="window.villageManager.unequipItem('weapon')">Unequip</button>` : ''}
+                        </div>
+                        <div class="equipment-slot armor">
+                            <span>Armor: ${equipped.armor ? equipped.armor.name : 'None'}</span>
+                            ${equipped.armor ? `<button onclick="window.villageManager.unequipItem('armor')">Unequip</button>` : ''}
+                        </div>
+                        <div class="equipment-slot shield">
+                            <span>Shield: ${equipped.shield ? equipped.shield.name : 'None'}</span>
+                            ${equipped.shield ? `<button onclick="window.villageManager.unequipItem('shield')">Unequip</button>` : ''}
+                        </div>
+                        <div class="equipment-slot tool">
+                            <span>Tool: ${equipped.tool ? equipped.tool.name : 'None'}</span>
+                            ${equipped.tool ? `<button onclick="window.villageManager.unequipItem('tool')">Unequip</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inventory-items" id="inventory-items">
+                    ${this.renderInventoryItems(inventory, 'all')}
+                </div>
+            </div>
+        `;
+
+        if (window.modalSystem) {
+            window.modalSystem.showModal(modalContent, 'large');
+        }
+    }
+
+    switchInventoryTab(category) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // Update items display
+        const inventory = window.inventoryManager.getInventory();
+        document.getElementById('inventory-items').innerHTML = this.renderInventoryItems(inventory, category);
+    }
+
+    renderInventoryItems(inventory, category) {
+        const filteredItems = category === 'all' ? 
+            inventory : 
+            inventory.filter(item => item.category === category);
+
+        if (filteredItems.length === 0) {
+            return '<p class="no-items">No items in this category</p>';
+        }
+
+        return filteredItems.map(item => `
+            <div class="inventory-item ${item.rarity}" data-item-id="${item.id}">
+                <div class="item-header">
+                    <span class="item-name">${item.name}</span>
+                    <span class="item-quantity">x${item.quantity}</span>
+                </div>
+                <div class="item-description">${item.description}</div>
+                <div class="item-stats">
+                    ${Object.entries(item.effects || {}).map(([stat, value]) => 
+                        `<span class="stat-bonus">+${value} ${stat}</span>`
+                    ).join(' ')}
+                </div>
+                <div class="item-actions">
+                    ${item.category === 'consumables' ? 
+                        `<button onclick="window.villageManager.useInventoryItem('${item.id}')">Use</button>` :
+                        `<button onclick="window.villageManager.equipInventoryItem('${item.id}')">Equip</button>`
+                    }
+                    <button onclick="window.villageManager.showItemDetails('${item.id}')">Details</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    useInventoryItem(itemId) {
+        const result = window.inventoryManager.useItem(itemId);
+        if (result.success) {
+            this.showNotification('Item Used', result.message, 'success', 3000);
+            // Refresh inventory display
+            this.showInventoryModal();
+        } else {
+            this.showNotification('Cannot Use Item', result.message, 'error', 3000);
+        }
+    }
+
+    equipInventoryItem(itemId) {
+        const result = window.inventoryManager.equipItem(itemId);
+        if (result.success) {
+            this.showNotification('Item Equipped', result.message, 'success', 3000);
+            // Refresh inventory display
+            this.showInventoryModal();
+        } else {
+            this.showNotification('Cannot Equip Item', result.message, 'error', 3000);
+        }
+    }
+
+    unequipItem(slot) {
+        const result = window.inventoryManager.unequipItem(slot);
+        if (result.success) {
+            this.showNotification('Item Unequipped', result.message, 'success', 3000);
+            // Refresh inventory display
+            this.showInventoryModal();
+        } else {
+            this.showNotification('Cannot Unequip Item', result.message, 'error', 3000);
+        }
+    }
+
+    showItemDetails(itemId) {
+        const item = window.inventoryManager.getItemById(itemId);
+        if (!item) return;
+
+        const detailsContent = `
+            <div class="item-details">
+                <h3 class="${item.rarity}">${item.name}</h3>
+                <p class="item-category">Category: ${item.category}</p>
+                <p class="item-rarity">Rarity: ${item.rarity}</p>
+                <p class="item-description">${item.description}</p>
+                
+                ${item.effects && Object.keys(item.effects).length > 0 ? `
+                    <div class="item-effects">
+                        <h4>Effects:</h4>
+                        ${Object.entries(item.effects).map(([stat, value]) => 
+                            `<p>+${value} ${stat}</p>`
+                        ).join('')}
+                    </div>
+                ` : ''}
+                
+                ${item.craftingCost ? `
+                    <div class="crafting-cost">
+                        <h4>Crafting Cost:</h4>
+                        ${Object.entries(item.craftingCost).map(([resource, amount]) => 
+                            `<p>${amount} ${resource}</p>`
+                        ).join('')}
+                    </div>
+                ` : ''}
+                
+                ${item.requirements ? `
+                    <div class="requirements">
+                        <h4>Requirements:</h4>
+                        ${Object.entries(item.requirements).map(([req, value]) => 
+                            `<p>${req}: ${value}</p>`
+                        ).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        if (window.modalSystem) {
+            window.modalSystem.showModal(detailsContent, 'medium');
+        }
+    }
+
+    // Debug method to add test items
+    addTestItems() {
+        if (!window.inventoryManager) {
+            console.error('[Village] InventoryManager not available');
+            return;
+        }
+
+        // Add various test items
+        window.inventoryManager.addItem('steel_sword', 1);
+        window.inventoryManager.addItem('chainmail_armor', 1);
+        window.inventoryManager.addItem('steel_pickaxe', 1);
+        window.inventoryManager.addItem('magic_staff', 1);
+        window.inventoryManager.addItem('enchanted_ring', 1);
+        window.inventoryManager.addItem('healing_potion', 5);
+        window.inventoryManager.addItem('rune_of_power', 2);
+
+        this.showNotification('Test Items Added', 'Added various test items to inventory', 'success', 3000);
+        console.log('[Village] Test items added to inventory');
+    }
+
+    /**
+     * Show skill training modal for managing population training programs
+     */
+    showSkillTrainingModal() {
+        console.log('[Village] showSkillTrainingModal called');
+        
+        if (!this.gameState.populationManager || !this.gameState.populationManager.skillSystem) {
+            window.modalSystem.showMessage('Skills Unavailable', 'Skill system is not available in this game.');
+            return;
+        }
+        
+        const populationManager = this.gameState.populationManager;
+        const skillSystem = populationManager.skillSystem;
+        const population = populationManager.getAll();
+        
+        // Get available training programs
+        const trainingPrograms = skillSystem.trainingPrograms;
+        const skillCategories = skillSystem.skillCategories;
+        
+        // Get population eligible for training
+        const eligibleForTraining = population.filter(villager => 
+            villager.age >= 16 && villager.age <= 65 && 
+            villager.status !== 'training' && 
+            villager.status !== 'traveling' &&
+            villager.status !== 'sick'
+        );
+        
+        // Get currently training population
+        const inTraining = population.filter(villager => villager.status === 'training');
+        
+        let contentHTML = `
+            <div class="skill-training-overview">
+                <div class="training-header">
+                    <h3><span class="header-icon">🎓</span> Skill Training Management</h3>
+                    <div class="training-subtitle">Develop your population's expertise through training programs</div>
+                </div>
+                
+                <div class="training-stats">
+                    <div class="training-stat">
+                        <span class="stat-icon">👨‍🎓</span>
+                        <span class="stat-value">${eligibleForTraining.length}</span>
+                        <span class="stat-label">Eligible for Training</span>
+                    </div>
+                    <div class="training-stat">
+                        <span class="stat-icon">📚</span>
+                        <span class="stat-value">${inTraining.length}</span>
+                        <span class="stat-label">Currently Training</span>
+                    </div>
+                    <div class="training-stat">
+                        <span class="stat-icon">👨‍🏫</span>
+                        <span class="stat-value">${population.filter(v => v.mentoring).length}</span>
+                        <span class="stat-label">Active Mentors</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="training-sections">
+        `;
+        
+        // Current Training Section
+        if (inTraining.length > 0) {
+            contentHTML += `
+                <div class="training-section">
+                    <div class="section-header">
+                        <h4><span class="section-icon">📖</span> Current Training Programs</h4>
+                        <div class="section-subtitle">Villagers currently enrolled in training</div>
+                    </div>
+                    <div class="training-list">
+            `;
+            
+            inTraining.forEach(villager => {
+                const training = villager.training;
+                const program = trainingPrograms[training.program];
+                const progress = Math.round((training.progress / program.duration) * 100);
+                const daysLeft = program.duration - training.progress;
+                
+                contentHTML += `
+                    <div class="training-item">
+                        <div class="trainee-info">
+                            <div class="trainee-name">${villager.name}</div>
+                            <div class="training-details">
+                                <span class="training-program">${program.name}</span>
+                                <span class="training-skill">${training.skillName}</span>
+                            </div>
+                        </div>
+                        <div class="training-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progress}%"></div>
+                                <div class="progress-text">${progress}% (${daysLeft} days left)</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            contentHTML += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Available Training Programs
+        contentHTML += `
+            <div class="training-section">
+                <div class="section-header">
+                    <h4><span class="section-icon">🏫</span> Available Training Programs</h4>
+                    <div class="section-subtitle">Start new training programs for your villagers</div>
+                </div>
+                <div class="programs-list">
+        `;
+        
+        Object.entries(trainingPrograms).forEach(([programKey, program]) => {
+            const eligibleCount = eligibleForTraining.filter(villager => {
+                const check = skillSystem.canEnrollInTraining(villager, programKey);
+                return check.canEnroll;
+            }).length;
+            
+            contentHTML += `
+                <div class="training-program">
+                    <div class="program-header">
+                        <div class="program-info">
+                            <div class="program-name">${program.name}</div>
+                            <div class="program-description">${program.description}</div>
+                        </div>
+                        <div class="program-stats">
+                            <div class="program-duration">${program.duration} days</div>
+                            <div class="program-eligible">${eligibleCount} eligible</div>
+                        </div>
+                    </div>
+                    <div class="program-details">
+                        <div class="program-cost">
+                            <strong>Cost:</strong> 
+                            ${Object.entries(program.cost).map(([resource, amount]) => 
+                                `${amount} ${resource}`
+                            ).join(', ')}
+                        </div>
+                        <div class="program-bonus">
+                            <strong>Skill Bonus:</strong> +${program.skillBonus} XP
+                        </div>
+                    </div>
+                    ${eligibleCount > 0 ? `
+                        <button class="start-training-btn" onclick="window.villageManager.showTrainingEnrollment('${programKey}')">
+                            Start Training
+                        </button>
+                    ` : `
+                        <div class="no-eligible">No eligible villagers</div>
+                    `}
+                </div>
+            `;
+        });
+        
+        contentHTML += `
+                </div>
+            </div>
+            
+            <div class="training-section">
+                <div class="section-header">
+                    <h4><span class="section-icon">🎯</span> Skill Categories</h4>
+                    <div class="section-subtitle">Overview of available skill areas</div>
+                </div>
+                <div class="skill-categories">
+        `;
+        
+        Object.entries(skillCategories).forEach(([categoryKey, category]) => {
+            const skillCount = Object.keys(category.skills).length;
+            
+            contentHTML += `
+                <div class="skill-category">
+                    <div class="category-header">
+                        <span class="category-icon">${category.name.split(' ')[0]}</span>
+                        <div class="category-info">
+                            <div class="category-name">${category.name}</div>
+                            <div class="category-count">${skillCount} skills available</div>
+                        </div>
+                    </div>
+                    <div class="category-skills">
+                        ${Object.entries(category.skills).map(([skillKey, skill]) => 
+                            `<span class="skill-tag">${skill.icon} ${skill.name}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            `;
+        });
+        
+        contentHTML += `
+                </div>
+            </div>
+            </div>
+            
+            <div class="training-actions">
+                <button class="action-btn secondary" onclick="window.villageManager.showPopulationView();">
+                    <span class="btn-icon">👥</span>
+                    <span class="btn-text">Back to Population</span>
+                </button>
+                <button class="action-btn secondary" onclick="window.modalSystem.closeTopModal();">
+                    <span class="btn-icon">✖️</span>
+                    <span class="btn-text">Close</span>
+                </button>
+            </div>
+        `;
+        
+        window.showModal('Skill Training', contentHTML, {
+            maxWidth: '1000px',
+            customClass: 'skill-training-modal modern-modal'
+        });
+    }
+
+    /**
+     * Show training enrollment modal for a specific program
+     */
+    showTrainingEnrollment(programKey) {
+        const populationManager = this.gameState.populationManager;
+        const skillSystem = populationManager.skillSystem;
+        const program = skillSystem.trainingPrograms[programKey];
+        const population = populationManager.getAll();
+        
+        // Get eligible villagers for this program
+        const eligibleVillagers = population.filter(villager => {
+            const check = skillSystem.canEnrollInTraining(villager, programKey);
+            return check.canEnroll;
+        });
+        
+        let contentHTML = `
+            <div class="enrollment-overview">
+                <h3>Enroll in ${program.name}</h3>
+                <p>${program.description}</p>
+                
+                <div class="program-details">
+                    <div class="detail-item">
+                        <strong>Duration:</strong> ${program.duration} days
+                    </div>
+                    <div class="detail-item">
+                        <strong>Cost:</strong> ${Object.entries(program.cost).map(([resource, amount]) => 
+                            `${amount} ${resource}`
+                        ).join(', ')}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Skill Bonus:</strong> +${program.skillBonus} XP
+                    </div>
+                </div>
+            </div>
+            
+            <div class="enrollment-form">
+                <h4>Select Villager and Skill</h4>
+                
+                <div class="form-group">
+                    <label for="villager-select">Villager:</label>
+                    <select id="villager-select" class="form-control">
+                        <option value="">Choose a villager...</option>
+                        ${eligibleVillagers.map(villager => 
+                            `<option value="${villager.id}">${villager.name} (Age: ${villager.age}, Role: ${villager.role})</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="skill-category-select">Skill Category:</label>
+                    <select id="skill-category-select" class="form-control" onchange="window.villageManager.updateSkillOptions()">
+                        <option value="">Choose a category...</option>
+                        ${Object.entries(skillSystem.skillCategories).map(([categoryKey, category]) => 
+                            `<option value="${categoryKey}">${category.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="skill-select">Specific Skill:</label>
+                    <select id="skill-select" class="form-control" disabled>
+                        <option value="">First choose a category...</option>
+                    </select>
+                </div>
+                
+                <div class="enrollment-actions">
+                    <button class="action-btn primary" onclick="window.villageManager.confirmTrainingEnrollment('${programKey}')">
+                        Start Training
+                    </button>
+                    <button class="action-btn secondary" onclick="window.villageManager.showSkillTrainingModal()">
+                        Back
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        window.showModal('Enroll in Training', contentHTML, {
+            maxWidth: '600px',
+            customClass: 'enrollment-modal modern-modal'
+        });
+    }
+
+    /**
+     * Update skill options based on selected category
+     */
+    updateSkillOptions() {
+        const categorySelect = document.getElementById('skill-category-select');
+        const skillSelect = document.getElementById('skill-select');
+        const selectedCategory = categorySelect.value;
+        
+        skillSelect.innerHTML = '';
+        skillSelect.disabled = true;
+        
+        if (selectedCategory) {
+            const skillSystem = this.gameState.populationManager.skillSystem;
+            const category = skillSystem.skillCategories[selectedCategory];
+            
+            skillSelect.innerHTML = '<option value="">Choose a skill...</option>';
+            Object.entries(category.skills).forEach(([skillKey, skill]) => {
+                const option = document.createElement('option');
+                option.value = skillKey;
+                option.textContent = `${skill.icon} ${skill.name}`;
+                skillSelect.appendChild(option);
+            });
+            skillSelect.disabled = false;
+        }
+    }
+
+    /**
+     * Confirm training enrollment with selected villager and skill
+     */
+    confirmTrainingEnrollment(programKey) {
+        const villagerSelect = document.getElementById('villager-select');
+        const categorySelect = document.getElementById('skill-category-select');
+        const skillSelect = document.getElementById('skill-select');
+        
+        const villagerId = parseInt(villagerSelect.value);
+        const skillCategory = categorySelect.value;
+        const skillName = skillSelect.value;
+        
+        if (!villagerId || !skillCategory || !skillName) {
+            window.modalSystem.showMessage('Incomplete Selection', 'Please select a villager, skill category, and specific skill.');
+            return;
+        }
+        
+        const result = this.gameState.populationManager.startTraining(villagerId, programKey, skillCategory, skillName);
+        
+        if (result.success) {
+            window.modalSystem.showMessage('Training Started', 
+                `Training has begun! The villager will complete their training in ${result.program.duration} days.`
+            );
+            this.showSkillTrainingModal(); // Refresh the training modal
+        } else {
+            window.modalSystem.showMessage('Training Failed', result.reason);
         }
     }
 }

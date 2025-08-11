@@ -153,6 +153,97 @@ function bindTopRightPopups(game) {
         if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
+    // Wiki button with enhanced error handling
+    const wikiBtn = document.getElementById('wiki-btn');
+    console.log('[UI] Wiki button element found:', !!wikiBtn);
+    console.log('[UI] Modal system available:', !!window.modalSystem);
+    console.log('[UI] WikiData available:', !!window.WikiData);
+    
+    if (wikiBtn) {
+        // Set up the click handler with enhanced tracking
+        const setupWikiHandler = () => {
+            if (window.modalSystem) {
+                console.log('[UI] Setting up wiki button handler');
+                wikiBtn.onclick = (e) => {
+                    // console.log('🔥 [CLICK TRACKER] Wiki button clicked!');
+                    // console.log('🔥 [CLICK TRACKER] Event details:', e);
+                    // console.log('🔥 [CLICK TRACKER] Button element:', e.target);
+                    // console.log('🔥 [CLICK TRACKER] Timestamp:', new Date().toISOString());
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    try {
+                        console.log('[UI] Wiki button clicked - triggering modal');
+                        console.log('[UI] Modal system exists:', !!window.modalSystem);
+                        console.log('[UI] ShowWikiMenu function exists:', !!window.modalSystem.showWikiMenu);
+                        
+                        const result = window.modalSystem.showWikiMenu();
+                        // console.log('🔥 [CLICK TRACKER] Modal creation result:', result);
+                        
+                        // Check if modal actually appeared in DOM
+                        setTimeout(() => {
+                            const modal = document.getElementById('wiki-modal') || document.getElementById('wiki') || document.querySelector('.wiki-modal');
+                            const overlay = document.getElementById('modal-overlay');
+                            // console.log('🔥 [CLICK TRACKER] Modal element in DOM:', !!modal);
+                            // console.log('🔥 [CLICK TRACKER] Modal actual ID:', modal ? modal.id : 'N/A');
+                            // console.log('🔥 [CLICK TRACKER] Overlay element in DOM:', !!overlay);
+                            // console.log('🔥 [CLICK TRACKER] Overlay display style:', overlay ? overlay.style.display : 'N/A');
+                            // console.log('🔥 [CLICK TRACKER] Overlay visible:', overlay ? overlay.style.display !== 'none' : false);
+                            
+                            if (modal) {
+                                // console.log('🔥 [CLICK TRACKER] Modal innerHTML length:', modal.innerHTML.length);
+                                // console.log('🔥 [CLICK TRACKER] Modal classes:', modal.className);
+                                // console.log('🔥 [CLICK TRACKER] Modal computed styles:', window.getComputedStyle(modal).display);
+                                
+                                // Check for navigation buttons
+                                const navButtons = modal.querySelectorAll('.wiki-nav-btn');
+                                // console.log('🔥 [CLICK TRACKER] Navigation buttons found:', navButtons.length);
+                                // navButtons.forEach((btn, i) => {
+                                //     console.log(`🔥 [CLICK TRACKER] Nav button ${i}:`, btn.textContent, 'section:', btn.dataset.section);
+                                // });
+                            }
+                        }, 100);
+                        
+                    } catch (error) {
+                        console.error('[UI] Error opening wiki:', error);
+                        console.error('[UI] Error stack:', error.stack);
+                        alert('Wiki system error: ' + error.message);
+                    }
+                };
+                
+                // Keyboard support
+                wikiBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        wikiBtn.click();
+                    }
+                });
+                
+                console.log('[UI] Wiki button handler successfully attached');
+            } else {
+                console.log('[UI] Modal system not ready, retrying in 500ms...');
+                setTimeout(setupWikiHandler, 500);
+            }
+        };
+        
+        // Initial setup attempt
+        setupWikiHandler();
+    } else {
+        console.error('[UI] Wiki button element not found in DOM');
+        // Try again after a delay in case DOM isn't ready
+        setTimeout(() => {
+            const retryBtn = document.getElementById('wiki-btn');
+            if (retryBtn) {
+                console.log('[UI] Wiki button found on retry, setting up handler');
+                // Recursively call this section with the found button
+                // For now, just log that we found it
+            } else {
+                console.error('[UI] Wiki button still not found after retry');
+            }
+        }, 1000);
+    }
+
     // Settings/menu popup
     const settingsBtn = document.getElementById('settings-btn');
     console.log('[UI] Settings button found:', !!settingsBtn);
@@ -164,8 +255,25 @@ function bindTopRightPopups(game) {
     if (settingsBtn && window.modalSystem) {
         console.log('[UI] Setting up settings button click handler...');
         settingsBtn.onclick = () => {
+            // console.log('🔥 [CLICK TRACKER] Settings button clicked!');
+            // console.log('🔥 [CLICK TRACKER] Timestamp:', new Date().toISOString());
             console.log('[UI] Settings modal triggered');
-            window.modalSystem.showSettingsModal();
+            
+            try {
+                const result = window.modalSystem.showSettingsModal();
+                // console.log('🔥 [CLICK TRACKER] Settings modal result:', result);
+                
+                // Check if modal appeared
+                setTimeout(() => {
+                    const modal = document.getElementById('settings');
+                    const overlay = document.getElementById('modal-overlay');
+                    // console.log('🔥 [CLICK TRACKER] Settings modal in DOM:', !!modal);
+                    // console.log('🔥 [CLICK TRACKER] Settings overlay visible:', overlay ? overlay.style.display !== 'none' : false);
+                }, 100);
+                
+            } catch (error) {
+                console.error('[UI] Settings modal error:', error);
+            }
         };
         
         // Also add event listener as a backup
@@ -277,6 +385,55 @@ function performGameReset() {
 // Attach to window for browser compatibility
 window.bindTopRightPopups = bindTopRightPopups;
 window.performGameReset = performGameReset;
+
+// Backup initialization for wiki button if main setup fails
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('[UI] DOM Content Loaded - checking wiki button backup setup');
+    
+    // Wait a bit for all scripts to load
+    setTimeout(() => {
+        const wikiBtn = document.getElementById('wiki-btn');
+        if (wikiBtn && window.modalSystem && !wikiBtn.onclick) {
+            console.log('[UI] Backup wiki button setup triggered');
+            wikiBtn.onclick = (e) => {
+                e.preventDefault();
+                try {
+                    console.log('[UI] Wiki backup handler triggered');
+                    window.modalSystem.showWikiMenu();
+                } catch (error) {
+                    console.error('[UI] Wiki backup handler error:', error);
+                    alert('Wiki error: ' + error.message);
+                }
+            };
+        }
+    }, 1000);
+});
+
+// Additional fallback - check every 2 seconds for the first 10 seconds
+let checkCount = 0;
+const wikiButtonCheck = setInterval(() => {
+    checkCount++;
+    const wikiBtn = document.getElementById('wiki-btn');
+    
+    if (wikiBtn && window.modalSystem && !wikiBtn.onclick) {
+        console.log('[UI] Late wiki button setup - attempt', checkCount);
+        wikiBtn.onclick = (e) => {
+            e.preventDefault();
+            try {
+                console.log('[UI] Late wiki handler triggered');
+                window.modalSystem.showWikiMenu();
+            } catch (error) {
+                console.error('[UI] Late wiki handler error:', error);
+            }
+        };
+        clearInterval(wikiButtonCheck);
+    }
+    
+    if (checkCount >= 5) { // Stop after 10 seconds
+        clearInterval(wikiButtonCheck);
+        console.log('[UI] Wiki button check ended after', checkCount, 'attempts');
+    }
+}, 2000);
 
 // ===== MINI TOAST NOTIFICATIONS =====
 // Ultra-lightweight notifications for small changes (resource updates, building completion)

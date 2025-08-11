@@ -264,13 +264,48 @@ class PopulationManager {
             ...details
         };
         this.population.push(inhabitant);
+        
+        console.log(`[PopulationManager] Added inhabitant: ${inhabitant.name} (age ${inhabitant.age}, role: ${inhabitant.role}), Total population: ${this.population.length}`);
+        
+        // Update gameState population count immediately if available
+        if (window.gameState && typeof window.gameState.updatePopulationCount === 'function') {
+            window.gameState.updatePopulationCount();
+        }
+        
+        // Emit population change event
+        if (window.eventBus) {
+            window.eventBus.emit('population-changed', { 
+                type: 'villager-added', 
+                villager: inhabitant,
+                totalPopulation: this.population.length 
+            });
+        }
+        
         return inhabitant;
     }
 
     removeInhabitant(id) {
         const idx = this.population.findIndex(p => p.id === id);
         if (idx !== -1) {
-            return this.population.splice(idx, 1)[0];
+            const removed = this.population.splice(idx, 1)[0];
+            
+            console.log(`[PopulationManager] Removed inhabitant: ${removed.name} (ID: ${removed.id}), Total population: ${this.population.length}`);
+            
+            // Update gameState population count immediately if available
+            if (window.gameState && typeof window.gameState.updatePopulationCount === 'function') {
+                window.gameState.updatePopulationCount();
+            }
+            
+            // Emit population change event
+            if (window.eventBus) {
+                window.eventBus.emit('population-changed', { 
+                    type: 'villager-removed', 
+                    villager: removed,
+                    totalPopulation: this.population.length 
+                });
+            }
+            
+            return removed;
         }
         return null;
     }
@@ -395,8 +430,286 @@ class PopulationManager {
         return generated;
     }
 
+    /**
+     * Generate a well-distributed population with proper age brackets and skills
+     * @param {number} targetSize - Target population size
+     * @param {boolean} focusOnAdults - Whether to focus on working-age adults
+     */
+    generateDistributedPopulation(targetSize = 10, focusOnAdults = true) {
+        console.log(`[PopulationManager] Generating distributed population of ${targetSize} villagers...`);
+        
+        // Clear existing population
+        this.population = [];
+        this.nextId = 1;
+        
+        // Age distribution weights (focused on adults as requested)
+        const ageDistribution = focusOnAdults ? {
+            children: 0.15,     // 15% children (0-27)
+            youngAdults: 0.35,  // 35% young adults (28-60)
+            adults: 0.35,       // 35% prime adults (61-120)
+            middleAged: 0.10,   // 10% middle-aged (121-180)
+            elderly: 0.05       // 5% elderly (181+)
+        } : {
+            children: 0.25,
+            youngAdults: 0.25,
+            adults: 0.25,
+            middleAged: 0.15,
+            elderly: 0.10
+        };
+        
+        const roles = ['farmer', 'crafter', 'builder', 'guard', 'trader', 'scholar', 'worker'];
+        const skills = ['farming', 'crafting', 'building', 'combat', 'leadership', 'scholarship'];
+        
+        for (let i = 0; i < targetSize; i++) {
+            const rand = Math.random();
+            let age, ageGroup;
+            
+            // Determine age based on distribution
+            if (rand < ageDistribution.children) {
+                age = Math.floor(Math.random() * 28); // 0-27
+                ageGroup = 'child';
+            } else if (rand < ageDistribution.children + ageDistribution.youngAdults) {
+                age = 28 + Math.floor(Math.random() * 33); // 28-60
+                ageGroup = 'young adult';
+            } else if (rand < ageDistribution.children + ageDistribution.youngAdults + ageDistribution.adults) {
+                age = 61 + Math.floor(Math.random() * 60); // 61-120
+                ageGroup = 'adult';
+            } else if (rand < ageDistribution.children + ageDistribution.youngAdults + ageDistribution.adults + ageDistribution.middleAged) {
+                age = 121 + Math.floor(Math.random() * 60); // 121-180
+                ageGroup = 'middle-aged';
+            } else {
+                age = 181 + Math.floor(Math.random() * 50); // 181-230
+                ageGroup = 'elderly';
+            }
+            
+            // Generate randomized skills for adults
+            let villagerSkills = [];
+            if (age > 27) {
+                const numSkills = 1 + Math.floor(Math.random() * 3); // 1-3 skills
+                const selectedSkills = [...skills].sort(() => 0.5 - Math.random()).slice(0, numSkills);
+                villagerSkills = selectedSkills;
+            }
+            
+            // Create villager with appropriate traits
+            const villager = {
+                age: age,
+                name: this.generateRandomName(),
+                role: age > 27 ? roles[Math.floor(Math.random() * roles.length)] : 'child',
+                status: age > 27 ? 'idle' : 'child',
+                skills: villagerSkills,
+                gender: Math.random() < 0.5 ? 'male' : 'female',
+                happiness: 60 + Math.floor(Math.random() * 30), // 60-90 happiness
+                productivity: age > 27 ? (0.7 + Math.random() * 0.6) : 0.1, // 0.7-1.3 for adults
+                traits: this.generateRandomTraits(ageGroup)
+            };
+            
+            this.addInhabitant(villager);
+        }
+        
+        console.log(`[PopulationManager] Generated ${this.population.length} villagers`);
+        this.logAgeDistribution();
+        
+        return this.population;
+    }
+
+    /**
+     * Generate a random name
+     */
+    generateRandomName() {
+        const firstNames = ['Aldric', 'Berta', 'Cedric', 'Dana', 'Erik', 'Freya', 'Gareth', 'Hilda', 'Ivan', 'Jora', 'Kael', 'Luna', 'Magnus', 'Nora', 'Osric', 'Petra'];
+        return firstNames[Math.floor(Math.random() * firstNames.length)];
+    }
+
+    /**
+     * Generate random traits based on age group
+     */
+    generateRandomTraits(ageGroup) {
+        const traits = ['hardworking', 'cheerful', 'wise', 'brave', 'social', 'innovative'];
+        const numTraits = Math.random() < 0.5 ? 1 : 0; // 50% chance for a trait
+        if (numTraits === 0) return [];
+        return [traits[Math.floor(Math.random() * traits.length)]];
+    }
+
+    /**
+     * Log current population age distribution for debugging
+     */
+    logAgeDistribution() {
+        const distribution = {
+            children: 0,
+            youngAdults: 0,
+            adults: 0,
+            middleAged: 0,
+            elderly: 0
+        };
+        
+        this.population.forEach(villager => {
+            if (villager.age <= 27) distribution.children++;
+            else if (villager.age <= 60) distribution.youngAdults++;
+            else if (villager.age <= 120) distribution.adults++;
+            else if (villager.age <= 180) distribution.middleAged++;
+            else distribution.elderly++;
+        });
+        
+        console.log('[PopulationManager] Age Distribution:', distribution);
+    }
+
     toJSON() {
         return this.population;
+    }
+
+    /**
+     * Get detailed population statistics for the population view modal
+     */
+    getDetailedStatistics() {
+        if (this.population.length === 0) {
+            return {
+                total: 0,
+                demographics: { averageAge: 0, workingAge: 0, employed: 0 },
+                happiness: { average: 0, distribution: {}, total: 0 },
+                productivity: { average: 0 },
+                ageGroups: {},
+                jobGroups: {},
+                skills: { available: false }
+            };
+        }
+
+        // Calculate age groups with proper structure for UI
+        const ageGroupData = {
+            children: { name: '👶 Children', age: '0-27 days', count: this.population.filter(p => p.age <= 27).length },
+            youngAdults: { name: '💪 Young Adults', age: '28-60 days', count: this.population.filter(p => p.age >= 28 && p.age <= 60).length },
+            adults: { name: '👨 Adults', age: '61-120 days', count: this.population.filter(p => p.age >= 61 && p.age <= 120).length },
+            middleAged: { name: '👨‍💼 Middle-Aged', age: '121-180 days', count: this.population.filter(p => p.age >= 121 && p.age <= 180).length },
+            elderly: { name: '👴 Elderly', age: '181+ days', count: this.population.filter(p => p.age >= 181).length }
+        };
+
+        // Calculate job groups with proper structure for UI
+        const roleDistribution = {};
+        this.population.forEach(person => {
+            const role = person.role || 'unemployed';
+            roleDistribution[role] = (roleDistribution[role] || 0) + 1;
+        });
+
+        const jobGroupData = {};
+        Object.entries(roleDistribution).forEach(([role, count]) => {
+            const roleNames = {
+                'farmer': '🌾 Farmers',
+                'crafter': '🔨 Crafters', 
+                'builder': '🏗️ Builders',
+                'guard': '⚔️ Guards',
+                'trader': '💰 Traders',
+                'scholar': '📚 Scholars',
+                'worker': '👷 Workers',
+                'child': '👶 Children',
+                'elder': '👴 Elders',
+                'player': '👑 Monarch',
+                'unemployed': '🆔 Unemployed'
+            };
+            
+            jobGroupData[role] = {
+                name: roleNames[role] || `❓ ${role}`,
+                count: count,
+                description: `Workers in ${role} role`
+            };
+        });
+
+        // Calculate happiness distribution
+        const happinessDistribution = {};
+        const happinessTotal = this.population.length;
+        this.population.forEach(person => {
+            const happiness = person.happiness || 50;
+            let level;
+            if (happiness >= 90) level = 'veryHappy';
+            else if (happiness >= 75) level = 'happy';
+            else if (happiness >= 50) level = 'neutral';
+            else if (happiness >= 25) level = 'unhappy';
+            else level = 'veryUnhappy';
+            
+            happinessDistribution[level] = (happinessDistribution[level] || 0) + 1;
+        });
+
+        // Calculate skills data
+        let totalSkills = 0;
+        let skillLevelCounts = {};
+        this.population.forEach(person => {
+            if (person.skills) {
+                if (Array.isArray(person.skills)) {
+                    totalSkills += person.skills.length;
+                } else if (typeof person.skills === 'object') {
+                    Object.values(person.skills).forEach(level => {
+                        totalSkills++;
+                        const levelKey = `Level ${level || 1}`;
+                        skillLevelCounts[levelKey] = (skillLevelCounts[levelKey] || 0) + 1;
+                    });
+                }
+            }
+        });
+
+        // Calculate averages
+        const averageAge = this.population.reduce((sum, p) => sum + (p.age || 0), 0) / this.population.length;
+        const averageHappiness = this.population.reduce((sum, p) => sum + (p.happiness || 50), 0) / this.population.length;
+        const averageProductivity = this.population.reduce((sum, p) => sum + (p.productivity || 1.0), 0) / this.population.length;
+        
+        const workingAge = ageGroupData.youngAdults.count + ageGroupData.adults.count + ageGroupData.middleAged.count;
+        const employed = this.population.filter(p => p.role && p.role !== 'unemployed' && p.role !== 'child').length;
+
+        // Return structure that matches what the UI expects
+        return {
+            total: this.population.length,
+            demographics: {
+                averageAge: Math.round(averageAge),
+                workingAge: workingAge,
+                employed: employed,
+                children: ageGroupData.children.count,
+                elderly: ageGroupData.elderly.count,
+                averageHappiness: Math.round(averageHappiness),
+                totalSkills: totalSkills
+            },
+            happiness: {
+                average: averageHappiness,
+                distribution: happinessDistribution,
+                total: happinessTotal
+            },
+            productivity: {
+                average: averageProductivity
+            },
+            ageGroups: ageGroupData,
+            jobGroups: jobGroupData,
+            skills: {
+                available: totalSkills > 0,
+                totalSkills: totalSkills,
+                averageSkillsPerVillager: totalSkills / this.population.length,
+                levelCounts: skillLevelCounts
+            },
+            training: {
+                mentors: this.population.filter(p => p.role === 'elder' || p.role === 'scholar').length,
+                total: this.population.filter(p => p.age >= 28).length // Adults who can train
+            },
+            genderDistribution: {
+                male: this.population.filter(p => p.gender === 'male').length,
+                female: this.population.filter(p => p.gender === 'female').length
+            },
+            roleDistribution: roleDistribution,
+            statusDistribution: {}
+        };
+    }
+
+    /**
+     * Get all population members for display
+     */
+    getAllMembers() {
+        return this.population.map(person => ({
+            id: person.id,
+            name: person.name,
+            age: person.age,
+            role: person.role,
+            status: person.status,
+            gender: person.gender,
+            happiness: person.happiness || 50,
+            productivity: person.productivity || 1.0,
+            skills: person.skills || [],
+            traits: person.traits || [],
+            location: person.location || 'village'
+        }));
     }
 }
 

@@ -22,15 +22,20 @@ class WorldManager {
         this.gameState = gameState;
         this.game = game;
         this.worldGrid = null;
-        this.hexSize = 25; // Better size for visibility and fit
+        this.hexSize = 20; // Slightly smaller to fit larger map
         
         // Set global reference immediately in constructor
         window.worldManager = this;
-        this.mapWidth = 3; // 3 columns for compact grid
-        this.mapHeight = 3; // 3 rows for compact grid (but hexagonal offset will reduce visible tiles)
+        this.mapWidth = 7; // Expanded to 7x7 grid for more exploration
+        this.mapHeight = 7; // Larger world for exploration
         this.selectedHex = null;
-        this.playerVillageHex = null;
+        this.playerVillageHex = { row: 3, col: 3 }; // Center of 7x7 grid
         this.selectedArmy = null;
+        
+        // Exploration system
+        this.explorationRadius = 1; // How far scouts can see from explored areas
+        this.discoveredTiles = new Set();
+        this.scoutableTiles = new Set();
         
         // Hex map data structure
         this.hexMap = [];
@@ -43,7 +48,7 @@ class WorldManager {
             battles: []
         };
         
-        // Tutorial tutorial state
+        // Exploration tutorial state
         this.tutorialMode = true;
         
         // Set global reference for onclick handlers
@@ -93,14 +98,9 @@ class WorldManager {
             
             console.log('[World] Initializing hexagonal world map...');
             this.setupWorldUI();
-            this.generateTerrain();
+            this.applyVisualsToAllTerrain();
             this.placeTutorialElements();
-            // Reveal all tiles in the 3x3 grid
-            for (let row = 0; row < this.mapHeight; row++) {
-                for (let col = 0; col < this.mapWidth; col++) {
-                    this.hexMap[row][col].discovered = true;
-                }
-            }
+            // Only reveal the player's village initially - exploration needed for others
             this.renderHexMap();
             this.setupHexInteraction();
             
@@ -111,27 +111,215 @@ class WorldManager {
     }
     
     initializeHexMap() {
-        // Create simple 3x3 square grid with 9 tiles
+        // Create larger 7x7 grid with diverse terrain
         for (let row = 0; row < this.mapHeight; row++) {
             this.hexMap[row] = [];
             for (let col = 0; col < this.mapWidth; col++) {
+                const isPlayerVillage = row === this.playerVillageHex.row && col === this.playerVillageHex.col;
+                const isAdjacent = this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col);
+                
+                // Generate terrain first
+                const terrain = this.generateTerrain(row, col);
+                
                 this.hexMap[row][col] = {
                     row,
                     col,
-                    terrain: 'grass',
-                    discovered: row === 1 && col === 1, // Center hex (player village) starts discovered
-                    fogOfWar: !(row === 1 && col === 1), // All hexes except center start with fog of war
+                    terrain: terrain,
+                    discovered: isPlayerVillage, // Only player village starts discovered
+                    fogOfWar: !isPlayerVillage,
+                    scoutable: isPlayerVillage || isAdjacent, // Player can scout adjacent tiles
                     units: [],
-                    resources: null,
-                    buildings: [],
+                    resources: this.generateResources(row, col),
+                    buildings: isPlayerVillage ? ['village'] : [],
                     weather: 'clear',
-                    elevation: 0
+                    elevation: this.generateElevation(row, col),
+                    explorationValue: this.generateExplorationValue(row, col),
+                    biome: this.generateBiomeForTerrain(terrain), // Pass terrain directly
+                    landmarks: this.generateLandmarks(row, col)
                 };
             }
         }
         
+        // Initialize discovered tiles set
+        this.discoveredTiles.add(`${this.playerVillageHex.row},${this.playerVillageHex.col}`);
+        this.updateScoutableTiles();
+        
         // Initialize expeditions array
         this.expeditions = [];
+    }
+
+    // Helper method to check if two tiles are adjacent
+    isAdjacent(row1, col1, row2, col2) {
+        const rowDiff = Math.abs(row1 - row2);
+        const colDiff = Math.abs(col1 - col2);
+        return (rowDiff <= 1 && colDiff <= 1) && !(rowDiff === 0 && colDiff === 0);
+    }
+
+    // Generate diverse terrain types
+    generateTerrain(row, col) {
+        const terrainTypes = ['grass', 'forest', 'hills', 'mountains', 'swamp', 'desert', 'plains', 'river'];
+        const centerRow = this.playerVillageHex.row;
+        const centerCol = this.playerVillageHex.col;
+        const distance = Math.abs(row - centerRow) + Math.abs(col - centerCol);
+        
+        // Player village is always grass
+        if (row === centerRow && col === centerCol) return 'grass';
+        
+        // Use pseudo-random generation based on position
+        const seed = row * 7 + col + (row * col);
+        const random = Math.abs(Math.sin(seed)) * 10000;
+        const terrainIndex = Math.floor(random % terrainTypes.length);
+        
+        // Bias certain terrains based on distance from center
+        if (distance >= 4) {
+            // Outer edges more likely to have extreme terrain
+            const extremeTerrains = ['mountains', 'desert', 'swamp'];
+            if (random % 100 < 40) {
+                return extremeTerrains[Math.floor(random % extremeTerrains.length)];
+            }
+        }
+        
+        return terrainTypes[terrainIndex];
+    }
+
+    // Generate elevation for terrain
+    generateElevation(row, col) {
+        const centerRow = this.playerVillageHex.row;
+        const centerCol = this.playerVillageHex.col;
+        const distance = Math.abs(row - centerRow) + Math.abs(col - centerCol);
+        const seed = row * 13 + col * 7;
+        const random = Math.abs(Math.sin(seed)) * 100;
+        
+        // Generally higher elevation further from center
+        return Math.floor(random + distance * 20);
+    }
+
+    // Generate biomes for richer world
+    generateBiomeForTerrain(terrain) {
+        const biomes = {
+            grass: ['temperate_grassland', 'meadow', 'prairie'],
+            forest: ['deciduous_forest', 'coniferous_forest', 'mixed_forest'],
+            hills: ['rolling_hills', 'rocky_hills', 'grassy_hills'],
+            mountains: ['snow_peaks', 'rocky_mountains', 'volcanic_peaks'],
+            swamp: ['marshland', 'bog', 'wetlands'],
+            desert: ['sand_dunes', 'rocky_desert', 'oasis'],
+            plains: ['open_plains', 'steppes', 'savanna'],
+            river: ['flowing_river', 'wide_river', 'stream']
+        };
+        
+        const options = biomes[terrain] || ['unknown'];
+        const seed = terrain.length; // Simple seed based on terrain name length
+        const random = Math.abs(Math.sin(seed)) * 100;
+        return options[Math.floor(random % options.length)];
+    }
+
+    // Generate resources for exploration rewards
+    generateResources(row, col) {
+        const seed = row * 17 + col * 23;
+        const random = Math.abs(Math.sin(seed)) * 100;
+        
+        // 30% chance of having explorable resources
+        if (random < 30) {
+            const resourceTypes = ['iron_deposit', 'gold_vein', 'rare_herbs', 'ancient_ruins', 'stone_quarry', 'fertile_soil'];
+            const resourceIndex = Math.floor(random % resourceTypes.length);
+            return {
+                type: resourceTypes[resourceIndex],
+                abundance: Math.floor(random % 5) + 1, // 1-5 abundance
+                discovered: false
+            };
+        }
+        return null;
+    }
+
+    // Generate exploration value (what scouts discover)
+    generateExplorationValue(row, col) {
+        const seed = row * 19 + col * 29;
+        const random = Math.abs(Math.sin(seed)) * 100;
+        
+        return {
+            intel: Math.floor(random % 50) + 10, // 10-60 intel points
+            secrets: random < 20 ? Math.floor(random % 3) + 1 : 0, // 0-3 secrets
+            tradingPosts: random < 15 ? true : false,
+            dangerLevel: Math.floor(random % 5) + 1 // 1-5 danger
+        };
+    }
+
+    // Generate landmarks for interesting exploration
+    generateLandmarks(row, col) {
+        const seed = row * 31 + col * 37;
+        const random = Math.abs(Math.sin(seed)) * 100;
+        
+        if (random < 25) { // 25% chance of landmark
+            const landmarks = [
+                'ancient_tower', 'abandoned_settlement', 'mysterious_cave', 
+                'old_battlefield', 'sacred_grove', 'crystal_formation',
+                'forgotten_temple', 'trader_camp', 'bandit_hideout'
+            ];
+            const landmarkIndex = Math.floor(random % landmarks.length);
+            return landmarks[landmarkIndex];
+        }
+        return null;
+    }
+
+    // Update which tiles can be scouted
+    updateScoutableTiles() {
+        this.scoutableTiles.clear();
+        
+        // Add all tiles adjacent to discovered tiles
+        for (const tileKey of this.discoveredTiles) {
+            const [row, col] = tileKey.split(',').map(Number);
+            
+            // Check all adjacent tiles
+            for (let r = row - 1; r <= row + 1; r++) {
+                for (let c = col - 1; c <= col + 1; c++) {
+                    if (r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth) {
+                        const adjKey = `${r},${c}`;
+                        if (!this.discoveredTiles.has(adjKey)) {
+                            this.scoutableTiles.add(adjKey);
+                            if (this.hexMap[r] && this.hexMap[r][c]) {
+                                this.hexMap[r][c].scoutable = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Reveal new territories when scouts discover them
+    revealNewTerritories(count = 1) {
+        const availableForDiscovery = Array.from(this.scoutableTiles);
+        let revealed = 0;
+        
+        while (revealed < count && availableForDiscovery.length > 0) {
+            // Pick a random scoutable tile
+            const randomIndex = Math.floor(Math.random() * availableForDiscovery.length);
+            const tileKey = availableForDiscovery[randomIndex];
+            const [row, col] = tileKey.split(',').map(Number);
+            
+            // Reveal the tile
+            if (this.hexMap[row] && this.hexMap[row][col]) {
+                this.hexMap[row][col].discovered = true;
+                this.hexMap[row][col].fogOfWar = false;
+                this.discoveredTiles.add(tileKey);
+                
+                // Remove from available list
+                availableForDiscovery.splice(randomIndex, 1);
+                revealed++;
+                
+                console.log(`[World] Discovered new territory at (${row}, ${col}): ${this.hexMap[row][col].terrain}`);
+            }
+        }
+        
+        // Update scoutable tiles after discoveries
+        this.updateScoutableTiles();
+        
+        // Re-render the map to show new discoveries
+        if (this.worldGrid) {
+            this.renderHexMap();
+        }
+        
+        return revealed;
     }
     
     setupWorldUI() {
@@ -205,8 +393,10 @@ class WorldManager {
                     targetPanel.classList.add('active');
                 }
                 
-                // Disable quests tab for now
-                if (tab.dataset.tab === 'quests') {
+                // Update content based on active tab
+                if (tab.dataset.tab === 'battles') {
+                    this.updateBattlesTab();
+                } else if (tab.dataset.tab === 'quests') {
                     window.showToast('🔒 Quest system not yet implemented', {
                         icon: '📜',
                         type: 'info',
@@ -215,44 +405,375 @@ class WorldManager {
                 }
             });
         });
+        
+        // Initialize battles tab on first load
+        this.updateBattlesTab();
     }
     
-    generateTerrain() {
-        // Generate uniform forest terrain for testing square grid display
+    updateBattlesTab() {
+        const battlesTab = document.getElementById('battles-tab');
+        if (!battlesTab) return;
+        
+        // Get active battles from battle manager
+        const battleManager = this.gameState.battleManager;
+        if (!battleManager) {
+            battlesTab.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">Battle system not initialized.</p>';
+            return;
+        }
+        
+        const activeBattles = battleManager.getActiveBattles();
+        
+        if (activeBattles.length === 0) {
+            battlesTab.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No active battles. Encounters will appear when your expeditions meet enemy forces.</p>';
+            return;
+        }
+        
+        let battleHTML = '<div class="battles-list">';
+        
+        activeBattles.forEach((battle, index) => {
+            const summary = battleManager.getBattleSummary(battle);
+            const difficultyClass = summary.difficulty <= 2 ? 'easy' : summary.difficulty <= 3 ? 'medium' : 'hard';
+            
+            battleHTML += `
+                <div class="battle-card ${difficultyClass}" data-battle-id="${battle.id}">
+                    <div class="battle-header">
+                        <h4>⚔️ ${summary.location}</h4>
+                        <span class="battle-type">${summary.type.toUpperCase()}</span>
+                    </div>
+                    <div class="battle-info">
+                        <div class="enemy-info">
+                            <span class="enemy-name">👹 ${summary.enemy}</span>
+                            <span class="difficulty-badge difficulty-${difficultyClass}">
+                                ${'★'.repeat(summary.difficulty)}
+                            </span>
+                        </div>
+                        <div class="environment">
+                            <span class="weather">${battleManager.getWeatherIcon(summary.weather)} ${summary.weather}</span>
+                            <span class="terrain">${battleManager.getTerrainIcon(summary.terrain)} ${summary.terrain}</span>
+                        </div>
+                    </div>
+                    <div class="battle-actions">
+                        <button class="btn primary battle-btn" onclick="worldManager.startBattle('${battle.id}')">
+                            Enter Battle
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        battleHTML += '</div>';
+        
+        // Add styles for battle cards
+        battleHTML += `
+            <style>
+                .battles-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                
+                .battle-card {
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    padding: 12px;
+                    border: 2px solid #e9ecef;
+                    transition: border-color 0.2s;
+                }
+                
+                .battle-card.easy {
+                    border-left: 4px solid #27ae60;
+                }
+                
+                .battle-card.medium {
+                    border-left: 4px solid #f39c12;
+                }
+                
+                .battle-card.hard {
+                    border-left: 4px solid #e74c3c;
+                }
+                
+                .battle-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                }
+                
+                .battle-header h4 {
+                    margin: 0;
+                    font-size: 14px;
+                    color: #2c3e50;
+                }
+                
+                .battle-time {
+                    font-size: 12px;
+                    color: #7f8c8d;
+                    background: #ecf0f1;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                }
+                
+                .battle-info {
+                    margin-bottom: 10px;
+                }
+                
+                .enemy-info {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 5px;
+                }
+                
+                .enemy-name {
+                    font-weight: bold;
+                    color: #e74c3c;
+                }
+                
+                .difficulty-badge {
+                    font-size: 12px;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    color: white;
+                }
+                
+                .difficulty-easy {
+                    background: #27ae60;
+                }
+                
+                .difficulty-medium {
+                    background: #f39c12;
+                }
+                
+                .difficulty-hard {
+                    background: #e74c3c;
+                }
+                
+                .environment {
+                    display: flex;
+                    gap: 10px;
+                    font-size: 12px;
+                    color: #7f8c8d;
+                }
+                
+                .battle-actions {
+                    display: flex;
+                    justify-content: center;
+                }
+                
+                .battle-btn {
+                    padding: 6px 12px;
+                    font-size: 12px;
+                    border-radius: 5px;
+                    background: #3498db;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                
+                .battle-btn:hover {
+                    background: #2980b9;
+                }
+            </style>
+        `;
+        
+        battlesTab.innerHTML = battleHTML;
+    }
+    
+    startBattle(battleId) {
+        const battleManager = this.gameState.battleManager;
+        if (!battleManager) return;
+        
+        const battle = battleManager.getActiveBattles().find(b => b.id === battleId);
+        if (battle) {
+            battleManager.triggerBattle(battle);
+        }
+    }
+    
+    // Method to create army encounters when expeditions meet enemies
+    createArmyEncounter(encounterData) {
+        const battleManager = this.gameState.battleManager;
+        if (!battleManager) return null;
+        
+        // Create encounter-based battle
+        const battle = battleManager.triggerArmyEncounter({
+            playerArmy: encounterData.playerArmy || this.generateBasicPlayerArmy(),
+            enemyArmy: encounterData.enemyArmy,
+            location: encounterData.location,
+            terrain: encounterData.terrain,
+            weather: encounterData.weather
+        });
+        
+        // Update battles tab to show new encounter
+        this.updateBattlesTab();
+        
+        return battle;
+    }
+    
+    // Helper method to generate a basic player army for encounters
+    generateBasicPlayerArmy() {
+        const villagers = this.gameState.villagers || [];
+        const army = [];
+        
+        // Convert some villagers to army units
+        const availableVillagers = villagers.slice(0, Math.min(5, villagers.length));
+        
+        availableVillagers.forEach(villager => {
+            const unitType = this.getUnitTypeFromProfession(villager.profession);
+            const existingUnit = army.find(u => u.type === unitType);
+            
+            if (existingUnit) {
+                existingUnit.count++;
+            } else {
+                army.push({
+                    type: unitType,
+                    count: 1
+                });
+            }
+        });
+        
+        // Ensure at least some basic units
+        if (army.length === 0) {
+            army.push({ type: 'militia', count: 2 });
+        }
+        
+        return army;
+    }
+    
+    getUnitTypeFromProfession(profession) {
+        const professionToUnit = {
+            'Guard': 'veteran_soldier',
+            'Blacksmith': 'heavy_infantry',
+            'Woodcutter': 'archer',
+            'Builder': 'engineer',
+            'Merchant': 'scout',
+            'Miner': 'sapper'
+        };
+        
+        return professionToUnit[profession] || 'militia';
+    }
+    
+    // Method called when expeditions are launched to check for encounters
+    checkForExpeditionEncounters(expeditionData) {
+        // 30% chance of encounter during expedition
+        if (Math.random() < 0.3) {
+            const encounterData = this.generateRandomEncounter(expeditionData);
+            return this.createArmyEncounter(encounterData);
+        }
+        return null;
+    }
+    
+    // Generate a random enemy encounter based on expedition location
+    generateRandomEncounter(expeditionData) {
+        const enemyTypes = [
+            {
+                name: 'Bandit Patrol',
+                size: 'small',
+                basePower: 80,
+                unitType: 'bandit',
+                description: 'A small group of highway bandits'
+            },
+            {
+                name: 'Goblin Raiding Party',
+                size: 'medium',
+                basePower: 120,
+                unitType: 'goblin',
+                description: 'Aggressive goblin raiders'
+            },
+            {
+                name: 'Orc Warband',
+                size: 'medium',
+                basePower: 150,
+                unitType: 'orc',
+                description: 'Fierce orc warriors'
+            },
+            {
+                name: 'Wild Beast Pack',
+                size: 'small',
+                basePower: 90,
+                unitType: 'beast',
+                description: 'Dangerous wild animals'
+            },
+            {
+                name: 'Undead Patrol',
+                size: 'large',
+                basePower: 180,
+                unitType: 'undead',
+                description: 'Shambling undead creatures'
+            }
+        ];
+        
+        const selectedEnemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        
+        return {
+            playerArmy: expeditionData.army || this.generateBasicPlayerArmy(),
+            enemyArmy: selectedEnemy,
+            location: expeditionData.location || 'Unknown Territory',
+            terrain: expeditionData.terrain || this.getRandomTerrain(),
+            weather: expeditionData.weather || this.getRandomWeather()
+        };
+    }
+    
+    getRandomTerrain() {
+        const terrains = ['plains', 'forest', 'hills', 'swamp', 'desert', 'mountains'];
+        return terrains[Math.floor(Math.random() * terrains.length)];
+    }
+    
+    getRandomWeather() {
+        const weathers = ['clear', 'rain', 'fog', 'storm', 'snow', 'wind'];
+        return weathers[Math.floor(Math.random() * weathers.length)];
+    }
+    
+    applyVisualsToAllTerrain() {
+        // Apply visual styling to all terrain tiles
         for (let row = 0; row < this.mapHeight; row++) {
             for (let col = 0; col < this.mapWidth; col++) {
                 const hex = this.hexMap[row][col];
                 
-                // Set all terrain to forest for consistent display
-                hex.terrain = 'forest';
-                hex.symbol = '🌲';
-                hex.color = '#2d5a27';
-                
-                // Add elevation variation
-                hex.elevation = Math.floor(Math.random() * 3);
+                // Set terrain symbols and colors based on terrain type
+                this.applyTerrainVisuals(hex);
                 
                 // Add weather effects
-                const weatherTypes = ['clear', 'cloudy', 'rain', 'fog'];
+                const weatherTypes = ['clear', 'cloudy', 'misty'];
                 hex.weather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
             }
         }
     }
+
+    applyTerrainVisuals(hex) {
+        const terrainVisuals = {
+            grass: { symbol: '�', color: '#4a7c59', bgColor: '#7fb069' },
+            forest: { symbol: '🌲', color: '#2d5a27', bgColor: '#4f7942' },
+            hills: { symbol: '⛰️', color: '#8b7355', bgColor: '#a0956b' },
+            mountains: { symbol: '🏔️', color: '#706c61', bgColor: '#8a8680' },
+            swamp: { symbol: '🟤', color: '#4a5d23', bgColor: '#6b7c32' },
+            desert: { symbol: '🏜️', color: '#deb887', bgColor: '#f4e4bc' },
+            plains: { symbol: '🌾', color: '#9aad7c', bgColor: '#b8c99c' },
+            river: { symbol: '🌊', color: '#4682b4', bgColor: '#87ceeb' },
+            village: { symbol: '🏘️', color: '#d4a574', bgColor: '#e8c299' }
+        };
+
+        const visual = terrainVisuals[hex.terrain] || terrainVisuals.grass;
+        hex.symbol = visual.symbol;
+        hex.color = visual.color;
+        hex.bgColor = visual.bgColor;
+    }
     
     placeTutorialElements() {
-        // Place player village at center
-        const centerRow = Math.floor(this.mapHeight / 2);
-        const centerCol = Math.floor(this.mapWidth / 2);
+        // Place player village at center of 7x7 grid
+        const centerRow = this.playerVillageHex.row;
+        const centerCol = this.playerVillageHex.col;
         
         const villageHex = this.hexMap[centerRow][centerCol];
         villageHex.terrain = 'village';
-        villageHex.symbol = '🏰';
-        villageHex.color = '#f39c12';
         villageHex.buildings = ['Town Center', 'Houses', 'Farms'];
         villageHex.discovered = true;
         villageHex.isPlayerVillage = true;
-        this.playerVillageHex = { row: centerRow, col: centerCol };
         
-        console.log('[World] Tutorial elements placed - Village at', centerRow, centerCol);
+        // Apply village visuals
+        this.applyTerrainVisuals(villageHex);
+        
+        console.log(`[World] Tutorial elements placed - Village at (${centerRow}, ${centerCol})`);
     }
     
     renderHexMap() {
@@ -402,19 +923,33 @@ class WorldManager {
         
         // Create square shape with CSS - apply fog of war styling
         if (hex.fogOfWar) {
-            // Fog of war tiles
-            squareButton.style.background = 'linear-gradient(45deg, #2c3e50, #34495e)';
-            squareButton.style.borderRadius = '8px';
-            squareButton.style.border = '2px solid #7f8c8d';
-            squareButton.style.opacity = '0.6';
-            squareButton.textContent = '🌫️';
-            squareButton.style.color = '#95a5a6';
+            // Check if this tile is scoutable
+            if (hex.scoutable) {
+                // Scoutable but not yet discovered
+                squareButton.style.background = 'linear-gradient(45deg, #3498db, #2980b9)';
+                squareButton.style.borderRadius = '8px';
+                squareButton.style.border = '2px solid #3498db';
+                squareButton.style.opacity = '0.8';
+                squareButton.textContent = '👁️';
+                squareButton.style.color = '#ecf0f1';
+                squareButton.title = 'Scoutable Territory - Send scouts to explore!';
+            } else {
+                // Fog of war tiles
+                squareButton.style.background = 'linear-gradient(45deg, #2c3e50, #34495e)';
+                squareButton.style.borderRadius = '8px';
+                squareButton.style.border = '2px solid #7f8c8d';
+                squareButton.style.opacity = '0.6';
+                squareButton.textContent = '🌫️';
+                squareButton.style.color = '#95a5a6';
+                squareButton.title = 'Unexplored Territory';
+            }
         } else {
             // Discovered tiles
-            squareButton.style.background = hex.color || '#4a90a4';
+            squareButton.style.background = `linear-gradient(145deg, ${hex.bgColor || '#4a90a4'}, ${hex.color || '#2980b9'})`;
             squareButton.style.borderRadius = '8px';
             squareButton.style.border = '2px solid rgba(255,255,255,0.3)';
             squareButton.style.opacity = '1';
+            squareButton.title = `${hex.terrain} - ${hex.biome || 'Unknown biome'}`;
         }
         
         squareButton.style.cursor = 'pointer';
@@ -447,9 +982,14 @@ class WorldManager {
         
         // Add terrain symbol or unit indicators
         if (hex.fogOfWar) {
-            // Don't show details for fog of war tiles - just show fog icon
-            squareButton.textContent = '🌫️';
-            squareButton.style.color = '#95a5a6';
+            // Don't show details for fog of war tiles
+            if (hex.scoutable) {
+                squareButton.textContent = '👁️';
+                squareButton.style.color = '#ecf0f1';
+            } else {
+                squareButton.textContent = '🌫️';
+                squareButton.style.color = '#95a5a6';
+            }
         } else if (armyAtPosition && scoutsAtPosition) {
             // Show both army and scouts
             squareButton.innerHTML = `<div style="position: relative;">
@@ -760,12 +1300,27 @@ class WorldManager {
             content += `</div>`;
         }
         
-        if (hex.discovered) {
+        // Show appropriate exploration actions based on hex status
+        if (hex.scoutable && hex.fogOfWar) {
+            content += `
+                <div class="hex-actions">
+                    <button class="action-btn primary" onclick="window.safeWorldManagerCall?.('exploreHex', ${row}, ${col}) || (window.worldManager && window.worldManager.exploreHex?.(${row}, ${col}))">
+                        🗺️ Send Scouts to Explore
+                    </button>
+                </div>
+            `;
+        } else if (hex.discovered) {
             content += `
                 <div class="hex-actions">
                     <button class="action-btn secondary" onclick="window.safeWorldManagerCall?.('exploreHex', ${row}, ${col}) || (window.worldManager && window.worldManager.exploreHex?.(${row}, ${col}))">
-                        🔍 Explore Further
+                        🔍 Detailed Exploration
                     </button>
+                </div>
+            `;
+        } else if (hex.fogOfWar) {
+            content += `
+                <div class="hex-info-note" style="color: #95a5a6; font-style: italic; margin-top: 10px;">
+                    This territory is too distant to explore directly. Discover adjacent areas first.
                 </div>
             `;
         }
@@ -1744,8 +2299,11 @@ class WorldManager {
         }
         
         // Trigger exploration achievement
-        if (window.gameState && window.gameState.achievements) {
-            window.gameState.achievements.triggerTileExplored();
+        if (window.achievementSystem) {
+            window.achievementSystem.triggerTileExplored();
+            console.log('[WorldManager] Tile exploration achievement triggered');
+        } else {
+            console.warn('[WorldManager] Achievement system not available for tile exploration');
         }
         
         // Start scout selection process
@@ -1897,22 +2455,45 @@ class WorldManager {
             return;
         }
 
+        // Check if this hex is scoutable
+        const targetHex = this.hexMap[targetRow][targetCol];
+        if (!targetHex.scoutable && targetHex.fogOfWar) {
+            window.showToast('❌ This area is too far to scout! Explore adjacent areas first.', {
+                icon: '🗺️',
+                type: 'error',
+                timeout: 3000
+            });
+            // Re-enable the button
+            if (confirmButton) {
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Send Scouts';
+            }
+            return;
+        }
+
         // Calculate travel distance (Manhattan distance for simplicity)
         const playerPos = this.playerVillageHex;
         const distance = Math.abs(targetRow - playerPos.row) + Math.abs(targetCol - playerPos.col);
         
-        // Create expedition (allowing multiple expeditions to the same location for stationing)
+        // Determine expedition type based on hex status
+        let expeditionType = 'explore'; // Default to exploration
+        if (targetHex.discovered) {
+            expeditionType = 'further_explore'; // Already discovered, doing detailed exploration
+        }
+        
+        // Create exploration expedition
         const expedition = {
             id: `expedition_${Date.now()}`,
             scouts: selectedScouts,
             targetHex: { row: targetRow, col: targetCol },
             currentHex: { row: playerPos.row, col: playerPos.col },
             status: 'traveling',
+            type: expeditionType,
             progress: 0,
             travelDistance: distance,
-            daysRemaining: distance,
+            daysRemaining: Math.max(distance, 1), // Minimum 1 day
+            explorationDaysRemaining: 2 + selectedScouts.length, // Exploration time based on scout count
             startDay: window.gameState.currentDay,
-            isStationed: false, // Will be true when scouts reach destination and stay there
             returningHome: false
         };
 
@@ -1936,8 +2517,15 @@ class WorldManager {
         // Remove modal FIRST to prevent double-clicking
         modal.remove();
 
-        // Show confirmation
-        window.showToast(`🔍 ${selectedScouts.length} scouts sent to explore hex (${targetRow}, ${targetCol})! ${distance} day${distance > 1 ? 's' : ''} travel time.`, {
+        // Show confirmation message based on expedition type
+        let message;
+        if (expeditionType === 'explore') {
+            message = `�️ ${selectedScouts.length} scouts sent to explore uncharted territory at (${targetRow}, ${targetCol})! Travel time: ${distance} day${distance > 1 ? 's' : ''}.`;
+        } else {
+            message = `🔍 ${selectedScouts.length} scouts sent for detailed exploration at (${targetRow}, ${targetCol})! Travel time: ${distance} day${distance > 1 ? 's' : ''}.`;
+        }
+        
+        window.showToast(message, {
             icon: '🗺️',
             type: 'success',
             timeout: 4000

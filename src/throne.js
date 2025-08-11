@@ -88,9 +88,32 @@ class ThroneManager {
     }
     
     init() {
+        // Check if throne view is unlocked
+        const throneContent = document.getElementById('throne-content');
+        const lockedView = document.querySelector('#throne-view .locked-view');
+        
+        // Show appropriate view based on unlock state
+        if (window.unlockSystem && window.unlockSystem.isViewUnlocked('throne')) {
+            if (lockedView) lockedView.style.display = 'none';
+            if (throneContent) throneContent.style.display = 'block';
+            
+            // Initialize dynasty system
+            this.initializeDynasty();
+            
+            // Initialize merge system
+            this.initializeMergeSystem();
+        } else {
+            if (lockedView) lockedView.style.display = 'block';
+            if (throneContent) throneContent.style.display = 'none';
+            console.log('[Throne] Throne view is locked');
+            return;
+        }
+    }
+    
+    initializeMergeSystem() {
         this.mergeGrid = document.getElementById('merge-grid');
         if (!this.mergeGrid) {
-            console.warn('[Throne] merge-grid element not found, skipping throne initialization');
+            console.warn('[Throne] merge-grid element not found, skipping merge initialization');
             return;
         }
         
@@ -385,6 +408,13 @@ class ThroneManager {
         this.placeItemInSlot(item1, item1.slotIndex);
         
         this.gameState.logBattleEvent(`🌟 ${oldConfig.name} transformed into ${newConfig.name}!`);
+        
+        // Trigger Divine Altar achievement
+        if (newType === 'altar' && window.achievementSystem) {
+            window.achievementSystem.triggerDivineAltar();
+            console.log('[Throne] Divine Altar achievement triggered');
+        }
+        
         this.updateActiveBonuses();
         this.createMergeEffect(item1.slotIndex);
     }
@@ -522,6 +552,383 @@ class ThroneManager {
     getArmyBonus(bonusType) {
         const bonuses = this.gameState.activeBonuses || {};
         return bonuses[bonusType] || 0;
+    }
+    
+    // Dynasty Management Methods
+    initializeDynasty() {
+        // Initialize Royal Family Manager if it doesn't exist
+        if (!this.gameState.royalFamily) {
+            this.gameState.royalFamily = new RoyalFamilyManager(this.gameState);
+            
+            // Get dynasty name from game state or use default
+            const dynastyName = this.gameState.dynastyName || "Dynasty Founder";
+            this.gameState.royalFamily.initializeRoyalFamily(dynastyName);
+            
+            console.log('[Throne] Dynasty initialized');
+        }
+        
+        this.setupDynastyTabs();
+        this.updateDynastyDisplay();
+    }
+    
+    setupDynastyTabs() {
+        // Setup tab switching
+        const tabBtns = document.querySelectorAll('.throne-tab-btn');
+        const tabs = document.querySelectorAll('.throne-tab');
+        
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetTab = btn.dataset.tab;
+                
+                // Remove active class from all tabs and buttons
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabs.forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding tab
+                btn.classList.add('active');
+                const tab = document.getElementById(targetTab + '-tab');
+                if (tab) {
+                    tab.classList.add('active');
+                }
+                
+                // Update content when switching to dynasty tab
+                if (targetTab === 'dynasty') {
+                    this.updateDynastyDisplay();
+                }
+            });
+        });
+        
+        // Setup dynasty action buttons
+        this.setupDynastyActions();
+    }
+    
+    setupDynastyActions() {
+        const marriageBtn = document.getElementById('arrange-marriage-btn');
+        const tutorBtn = document.getElementById('hire-tutor-btn');
+        const successionBtn = document.getElementById('succession-plan-btn');
+        
+        if (marriageBtn) {
+            marriageBtn.addEventListener('click', () => this.showMarriageModal());
+        }
+        
+        if (tutorBtn) {
+            tutorBtn.addEventListener('click', () => this.showTutorModal());
+        }
+        
+        if (successionBtn) {
+            successionBtn.addEventListener('click', () => this.showSuccessionModal());
+        }
+    }
+    
+    updateDynastyDisplay() {
+        if (!this.gameState.royalFamily) return;
+        
+        this.updateMonarchCard();
+        this.updateFamilyTree();
+        this.updateSuccessionOrder();
+        this.updateDynastyStats();
+    }
+    
+    updateMonarchCard() {
+        const monarchCard = document.getElementById('current-monarch');
+        if (!monarchCard || !this.gameState.royalFamily.currentMonarch) return;
+        
+        const monarch = this.gameState.royalFamily.currentMonarch;
+        
+        monarchCard.innerHTML = `
+            <div class="monarch-info">
+                <div class="monarch-portrait">👑</div>
+                <div class="monarch-details">
+                    <h4>${monarch.name}</h4>
+                    <p>Age: ${monarch.age} years | Reign: ${(this.gameState.day || 0) - monarch.reignStart} days</p>
+                </div>
+            </div>
+            <div class="monarch-stats">
+                <div class="stat-item">
+                    <div>Leadership</div>
+                    <div>${monarch.skills.leadership}</div>
+                </div>
+                <div class="stat-item">
+                    <div>Military</div>
+                    <div>${monarch.skills.military}</div>
+                </div>
+                <div class="stat-item">
+                    <div>Diplomacy</div>
+                    <div>${monarch.skills.diplomacy}</div>
+                </div>
+                <div class="stat-item">
+                    <div>Economics</div>
+                    <div>${monarch.skills.economics}</div>
+                </div>
+            </div>
+            <div class="member-traits">
+                ${monarch.traits.map(trait => `<span class="trait-badge">${trait.replace('_', ' ')}</span>`).join('')}
+            </div>
+        `;
+    }
+    
+    updateFamilyTree() {
+        const familyTree = document.getElementById('royal-family-tree');
+        if (!familyTree || !this.gameState.royalFamily) return;
+        
+        const family = this.gameState.royalFamily.royalFamily;
+        
+        if (family.length <= 1) {
+            familyTree.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No other family members yet. Arrange a marriage to expand the royal line.</p>';
+            return;
+        }
+        
+        const familyHtml = family
+            .filter(member => member.id !== this.gameState.royalFamily.currentMonarch.id)
+            .map(member => this.createFamilyMemberHtml(member))
+            .join('');
+        
+        familyTree.innerHTML = familyHtml;
+    }
+    
+    createFamilyMemberHtml(member) {
+        const memberIcon = this.getMemberIcon(member);
+        const memberClass = this.getMemberClass(member);
+        
+        return `
+            <div class="family-member ${memberClass}">
+                <div class="member-icon">${memberIcon}</div>
+                <div class="member-details">
+                    <div class="member-name">${member.name}</div>
+                    <div class="member-info">
+                        ${member.status} • Age: ${member.age}
+                        ${member.education ? ` • ${member.education.focus || 'General Education'}` : ''}
+                    </div>
+                    <div class="member-traits">
+                        ${member.traits.map(trait => `<span class="trait-badge">${trait.replace('_', ' ')}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    getMemberIcon(member) {
+        switch (member.status) {
+            case 'heir': return '👤';
+            case 'royal_spouse': return '💒';
+            default: return '👥';
+        }
+    }
+    
+    getMemberClass(member) {
+        switch (member.status) {
+            case 'heir': return 'heir';
+            case 'royal_spouse': return 'spouse';
+            default: return 'child';
+        }
+    }
+    
+    updateSuccessionOrder() {
+        const successionList = document.getElementById('succession-order');
+        if (!successionList || !this.gameState.royalFamily) return;
+        
+        const succession = this.gameState.royalFamily.successionOrder;
+        
+        if (succession.length === 0) {
+            successionList.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No eligible heirs. The royal line needs children!</p>';
+            return;
+        }
+        
+        const successionHtml = succession.map((heir, index) => `
+            <div class="succession-item">
+                <div class="succession-rank">${index + 1}</div>
+                <div class="member-details">
+                    <div class="member-name">${heir.name}</div>
+                    <div class="member-info">Age: ${heir.age} • Leadership: ${heir.skills.leadership}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        successionList.innerHTML = successionHtml;
+    }
+    
+    updateDynastyStats() {
+        const statsContainer = document.getElementById('dynasty-stats');
+        if (!statsContainer || !this.gameState.royalFamily) return;
+        
+        const stats = this.gameState.royalFamily.getRoyalFamilyStats();
+        
+        statsContainer.innerHTML = `
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-value">${stats.totalFamily}</div>
+                <div class="dynasty-stat-label">Family Members</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-value">${stats.heirs}</div>
+                <div class="dynasty-stat-label">Eligible Heirs</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-value">${stats.dynastyAge}</div>
+                <div class="dynasty-stat-label">Days of Reign</div>
+            </div>
+            <div class="dynasty-stat">
+                <div class="dynasty-stat-value">${this.gameState.dynastyGeneration || 1}</div>
+                <div class="dynasty-stat-label">Generation</div>
+            </div>
+        `;
+    }
+    
+    showMarriageModal() {
+        if (!window.modalSystem) return;
+        
+        const marriageCandidates = this.generateMarriageCandidates();
+        
+        const candidateHtml = marriageCandidates.map(candidate => `
+            <div class="candidate-card" style="
+                background: rgba(255,255,255,0.1); 
+                padding: 1rem; 
+                margin: 0.5rem 0; 
+                border-radius: 6px;
+                cursor: pointer;
+                border: 2px solid transparent;
+            " onmouseover="this.style.borderColor='#1abc9c'" onmouseout="this.style.borderColor='transparent'"
+               onclick="window.game.throneManager.arrangeMarriage('${candidate.id}')">
+                <h4>${candidate.name}</h4>
+                <p>Age: ${candidate.age} • Origin: ${candidate.origin}</p>
+                <p>Traits: ${candidate.traits.join(', ') || 'None'}</p>
+                <p style="color: #1abc9c;">Click to arrange marriage</p>
+            </div>
+        `).join('');
+        
+        window.modalSystem.showModal({
+            title: '💒 Arrange Royal Marriage',
+            content: `
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <p>Select a suitable marriage partner for the royal family:</p>
+                    ${candidateHtml}
+                </div>
+            `,
+            width: '500px'
+        });
+    }
+    
+    generateMarriageCandidates() {
+        // Generate random marriage candidates
+        const candidates = [];
+        const names = ['Lady Eleanor', 'Lord William', 'Duchess Margaret', 'Duke Henry', 'Lady Catherine', 'Lord Richard'];
+        const origins = ['Local Nobility', 'Foreign Royalty', 'Distinguished Military', 'Wealthy Merchant Family'];
+        
+        for (let i = 0; i < 3; i++) {
+            candidates.push({
+                id: `candidate_${Date.now()}_${i}`,
+                name: names[Math.floor(Math.random() * names.length)],
+                age: 20 + Math.floor(Math.random() * 15),
+                origin: origins[Math.floor(Math.random() * origins.length)],
+                traits: this.generateRandomTraits()
+            });
+        }
+        
+        return candidates;
+    }
+    
+    generateRandomTraits() {
+        const allTraits = ['intelligent', 'charismatic', 'strong', 'wise', 'cunning', 'healthy'];
+        const numTraits = Math.floor(Math.random() * 3);
+        const traits = [];
+        
+        for (let i = 0; i < numTraits; i++) {
+            const trait = allTraits[Math.floor(Math.random() * allTraits.length)];
+            if (!traits.includes(trait)) {
+                traits.push(trait);
+            }
+        }
+        
+        return traits;
+    }
+    
+    arrangeMarriage(candidateId) {
+        if (!this.gameState.royalFamily) return;
+        
+        // Close the modal
+        if (window.modalSystem) {
+            window.modalSystem.closeTopModal();
+        }
+        
+        // Find available royal family member to marry
+        const availableRoyals = this.gameState.royalFamily.royalFamily.filter(
+            member => !member.spouse && member.age >= 18 && member.age <= 45
+        );
+        
+        if (availableRoyals.length === 0) {
+            if (window.showToast) {
+                window.showToast('No eligible royal family members for marriage', {
+                    icon: '💔',
+                    type: 'error'
+                });
+            }
+            return;
+        }
+        
+        // Use the first available royal (could be enhanced to let player choose)
+        const royal = availableRoyals[0];
+        
+        // Create spouse data
+        const spouseData = {
+            name: `Spouse of ${royal.name}`,
+            age: royal.age + Math.floor(Math.random() * 6) - 3,
+            origin: 'arranged_marriage'
+        };
+        
+        // Arrange the marriage
+        const success = this.gameState.royalFamily.arrangeMarriage(royal.id, spouseData);
+        
+        if (success) {
+            this.updateDynastyDisplay();
+            
+            if (window.showToast) {
+                window.showToast(`${royal.name} has married! The royal line grows stronger.`, {
+                    icon: '💒',
+                    type: 'success'
+                });
+            }
+        }
+    }
+    
+    showTutorModal() {
+        if (window.showToast) {
+            window.showToast('Tutor system coming in future updates!', {
+                icon: '🎓',
+                type: 'info'
+            });
+        }
+    }
+    
+    showSuccessionModal() {
+        if (!this.gameState.royalFamily) return;
+        
+        const succession = this.gameState.royalFamily.successionOrder;
+        
+        const successionHtml = succession.length > 0 
+            ? succession.map((heir, index) => `
+                <div style="background: rgba(241,196,15,0.1); padding: 1rem; margin: 0.5rem 0; border-radius: 6px;">
+                    <h4>${index + 1}. ${heir.name}</h4>
+                    <p>Age: ${heir.age} • Leadership: ${heir.skills.leadership}</p>
+                    <p>Traits: ${heir.traits.join(', ') || 'None'}</p>
+                </div>
+            `).join('')
+            : '<p style="color: #888; font-style: italic;">No eligible heirs in the succession line.</p>';
+        
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: '📜 Line of Succession',
+                content: `
+                    <p>Current order of royal succession:</p>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        ${successionHtml}
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #bdc3c7;">
+                        <strong>Note:</strong> Succession order is based on age and legitimacy. 
+                        Only heirs aged 16+ are eligible to rule.
+                    </p>
+                `,
+                width: '450px'
+            });
+        }
     }
 }
 

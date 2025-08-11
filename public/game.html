@@ -9,7 +9,10 @@
     
     <!-- Game Scripts -->
     <script src="../src/gameData.js"></script>
+    <script src="../src/wikiData.js"></script>
     <script src="../src/systems/core/eventBus.js"></script>
+    <script src="../src/skillSystem.js"></script>
+    <script src="../src/populationManager.js"></script>
     <script src="../src/gameState.js"></script>
     <script src="../src/utils/errorRecovery.js"></script>
     <script src="../src/modalSystem.js"></script>
@@ -17,7 +20,12 @@
     <script src="../src/achievements.js"></script>
     <script src="../src/unlockSystem.js"></script>
     <script src="../src/tutorial.js"></script>
-    <script src="../src/populationManager.js"></script>
+    <script src="../src/royalFamily.js"></script>
+    <script src="../src/buildingEffects.js"></script>
+    <script src="../src/buildingTutorial.js"></script>
+    <script src="../src/constructionManager.js"></script>
+    <script src="../src/inventoryManager.js"></script>
+    <script src="../src/expeditionInventory.js"></script>
     <script src="../src/village.js"></script>
     <script src="../src/throne.js"></script>
     <script src="../src/battle.js"></script>
@@ -27,6 +35,7 @@
     <script src="../src/uiPopups.js"></script>
     <script src="../src/eventBusIntegrations.js"></script>
     <script src="../src/worldManager.js"></script>
+    <script src="../src/statsIntegration.js"></script>
     <script src="../src/app.js"></script>
     <script src="../src/main.js"></script>
 </head>
@@ -94,11 +103,62 @@
                     <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
                         <span>🗺️</span>
                     </button>
+                    <button id="wiki-btn" class="icon-btn" title="Game Wiki & Documentation">
+                        <span>📖</span>
+                    </button>
                     <button id="settings-btn" class="icon-btn" title="Settings">
                         <span>⚙️</span>
                     </button>
                     <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
                         <span id="achievements-icon">🏆</span>
+                    </button>
+                    <button id="inventory-btn" class="icon-btn" title="Inventory" onclick="
+                        console.log('=== INVENTORY BUTTON CLICKED ===');
+                        try {
+                            console.log('window.villageManager:', typeof window.villageManager);
+                            console.log('window.inventoryManager:', typeof window.inventoryManager);
+                            console.log('window.gameState:', typeof window.gameState);
+                            
+                            // Try method 1: villageManager
+                            if (window.villageManager && window.villageManager.showInventoryModal) {
+                                console.log('Trying villageManager.showInventoryModal...');
+                                window.villageManager.showInventoryModal();
+                                return;
+                            }
+                            
+                            // Try method 2: check if systems need initialization
+                            console.log('VillageManager method not available, checking initialization...');
+                            if (window.gameState && !window.inventoryManager) {
+                                console.log('Attempting to initialize inventory...');
+                                if (window.gameState.initializeInventory) {
+                                    window.gameState.initializeInventory();
+                                }
+                                if (window.gameState.inventory) {
+                                    window.inventoryManager = window.gameState.inventory;
+                                    console.log('Inventory manager initialized and exposed');
+                                }
+                            }
+                            
+                            // Try method 3: manual modal
+                            if (window.modalSystem) {
+                                console.log('Falling back to manual modal...');
+                                window.modalSystem.showModal({
+                                    id: 'inventory-fallback',
+                                    title: 'Inventory System',
+                                    content: '<p>Inventory system is initializing...</p><p>Please try again in a moment.</p>',
+                                    modalType: 'inventory-fallback'
+                                });
+                                return;
+                            }
+                            
+                            alert('Inventory system not ready. Check console for details.');
+                            
+                        } catch (error) {
+                            console.error('Inventory button error:', error);
+                            alert('Error opening inventory: ' + error.message);
+                        }
+                    ">
+                        <span>🎒</span>
                     </button>
                 </div>
             </div>
@@ -123,144 +183,192 @@
                     </div>
                 </div>
 
-                <!-- Scout Report Bar -->
-                <div class="scout-report-bar">
-                    <div class="scout-info">
-                        <span class="day-counter">Day <span id="current-day">1</span></span>
-                        <div class="scout-progress-container">
-                            <span class="scout-status" id="scout-status">Scouts gathering intelligence...</span>
-                            <div class="scout-progress-bar">
-                                <div class="scout-progress-fill" id="scout-progress-fill"></div>
-                                <span class="scout-progress-text" id="scout-progress-text">Day 1 of 5</span>
-                            </div>
+                <!-- Objective Bar -->
+                <div class="objective-bar">
+                    <div class="objective-info">
+                        <div class="objective-container">
+                            <span class="objective-status" id="objective-status">No Task Selected...</span>
                         </div>
                     </div>
-                    <!-- Day controls removed from top bar - now only in sidebar -->
                 </div>
 
                 <div class="village-content">
-                    <!-- Production Planner (Left) -->
-                    <div class="production-planner">
-                        <h3>🏭 Production Planner</h3>
-                        
-                        <div class="planner-section">
-                            <h4>⚔️ Crafting Queue</h4>
-                            <div class="crafting-options">
-                                <div class="craft-item">
-                                    <span class="craft-icon">⚔️</span>
-                                    <span class="craft-name">Weapon</span>
-                                    <span class="craft-cost">5⚙️ 2🪙</span>
-                                    <button class="craft-btn" onclick="craftItem('weapon')">Craft</button>
-                                </div>
-                                <div class="craft-item">
-                                    <span class="craft-icon">🔨</span>
-                                    <span class="craft-name">Tool</span>
-                                    <span class="craft-cost">3⚙️ 1🪙</span>
-                                    <button class="craft-btn" onclick="craftItem('tool')">Craft</button>
-                                </div>
-                                <div class="craft-item">
-                                    <span class="craft-icon">🛡️</span>
-                                    <span class="craft-name">Armor</span>
-                                    <span class="craft-cost">8⚙️ 3🪙</span>
-                                    <button class="craft-btn" onclick="craftItem('armor')">Craft</button>
-                                </div>
-                            </div>
+                    <!-- Village Grid (Left Panel) -->
+                    <div class="village-grid-panel">
+                        <div id="village-grid" class="village-grid">
+                            <!-- Generated by village.js -->
                         </div>
-                    </div>
-
-                    <!-- Village Grid (Middle - Dominates) -->
-                    <div id="village-grid" class="village-grid">
-                        <!-- Generated by village.js -->
                     </div>
                     
-                    <!-- Village Manager (Right) -->
-                    <div class="village-manager">
-                        <h3>🏘️ Village Manager</h3>
+                    <!-- Management Panel (Right Panel) -->
+                    <div class="management-panel">
+                        <!-- Panel Navigation -->
+                        <div class="panel-nav">
+                            <button class="panel-nav-btn active" data-panel="manager">👥 Village Manager</button>
+                            <button class="panel-nav-btn" data-panel="buildings">🏗️ Buildings</button>
+                            <button class="panel-nav-btn" data-panel="production">📊 Production</button>
+                        </div>
                         
-                        <div class="manager-section">
-                            <h4>📊 Production</h4>
-                            <div class="production-table">
-                                <div class="production-header">
-                                    <div class="column-header">Resource</div>
-                                    <div class="column-header">Gain</div>
-                                    <div class="column-header">Loss</div>
-                                    <div class="column-header">Net</div>
-                                </div>
-                                <div class="production-row">
-                                    <div class="resource-cell">
-                                        <span class="production-icon">🌾</span>
-                                        <span class="resource-name">Food</span>
+                        <!-- Village Manager Tab (Default) -->
+                        <div class="panel-tab active" id="manager-tab">
+                            <div class="manager-section">
+                                <h4>👥 Population</h4>
+                                <div class="population-info">
+                                    <div class="population-stat">
+                                        <span>Current: <span id="manager-population">0</span></span>
                                     </div>
-                                    <div class="gain-cell">+<span id="daily-food-production">0</span></div>
-                                    <div class="loss-cell">-<span id="daily-food-consumption">0</span></div>
-                                    <div class="net-cell"><span id="daily-food-net">0</span></div>
-                                </div>
-                                <div class="production-row">
-                                    <div class="resource-cell">
-                                        <span class="production-icon">🪵</span>
-                                        <span class="resource-name">Wood</span>
+                                    <div class="population-stat">
+                                        <span>Capacity: <span id="manager-population-cap">0</span></span>
                                     </div>
-                                    <div class="gain-cell">+<span id="daily-wood-production">0</span></div>
-                                    <div class="loss-cell">-<span id="daily-wood-consumption">0</span></div>
-                                    <div class="net-cell"><span id="daily-wood-net">0</span></div>
-                                </div>
-                                <div class="production-row">
-                                    <div class="resource-cell">
-                                        <span class="production-icon">🗿</span>
-                                        <span class="resource-name">Stone</span>
+                                    <div class="population-stat">
+                                        <span>Weekly Growth: <span id="population-growth-rate">+0</span></span>
                                     </div>
-                                    <div class="gain-cell">+<span id="daily-stone-production">0</span></div>
-                                    <div class="loss-cell">-<span id="daily-stone-consumption">0</span></div>
-                                    <div class="net-cell"><span id="daily-stone-net">0</span></div>
-                                </div>
-                                <div class="production-row">
-                                    <div class="resource-cell">
-                                        <span class="production-icon">⚒️</span>
-                                        <span class="resource-name">Metal</span>
+                                    <div class="population-stat">
+                                        <span>Expected Deaths: <span id="population-death-rate">0</span>/week</span>
                                     </div>
-                                    <div class="gain-cell">+<span id="daily-metal-production">0</span></div>
-                                    <div class="loss-cell">-<span id="daily-metal-consumption">0</span></div>
-                                    <div class="net-cell"><span id="daily-metal-net">0</span></div>
-                                </div>
-                                <div class="production-row">
-                                    <div class="resource-cell">
-                                        <span class="production-icon">⚙️</span>
-                                        <span class="resource-name">Production</span>
+                                    <div class="population-stat">
+                                        <span>Net Change: <span id="population-net-change">+0</span>/week</span>
                                     </div>
-                                    <div class="gain-cell">+<span id="daily-production-gain">0</span></div>
-                                    <div class="loss-cell">-<span id="daily-production-consumption">0</span></div>
-                                    <div class="net-cell"><span id="daily-production-net">0</span></div>
+                                </div>
+                                <div class="population-actions">
+                                    <button id="population-view-btn" class="population-view-button">👥 View Population</button>
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Buildings Tab -->
+                        <div class="panel-tab" id="buildings-tab">
+                            <div class="building-grid">
+                                <div class="building-category">
+                                    <h4>🏛️ Essential Buildings</h4>
+                                    <div class="building-row" id="essential-buildings">
+                                        <!-- Basic buildings needed to start -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>🏭 Production Buildings</h4>
+                                    <div class="building-row" id="production-buildings">
+                                        <!-- Resource gathering and processing -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>🔧 Craft & Trade Buildings</h4>
+                                    <div class="building-row" id="craft-buildings">
+                                        <!-- Workshops, blacksmiths, markets -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>⚔️ Military Buildings</h4>
+                                    <div class="building-row" id="military-buildings">
+                                        <!-- Defense and training -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>👑 Royal Buildings</h4>
+                                    <div class="building-row" id="royal-buildings">
+                                        <!-- Dynasty and prestige -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>📚 Knowledge Buildings</h4>
+                                    <div class="building-row" id="knowledge-buildings">
+                                        <!-- Research and learning -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>🔮 Advanced Buildings</h4>
+                                    <div class="building-row" id="advanced-buildings">
+                                        <!-- Late game and special -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Production Tab -->
+                        <div class="panel-tab" id="production-tab">
+                            <div class="manager-section">
+                                <h4>📊 Daily Production</h4>
+                                <div class="production-table">
+                                    <div class="production-header">
+                                        <div class="column-header">Resource</div>
+                                        <div class="column-header">Gain</div>
+                                        <div class="column-header">Loss</div>
+                                        <div class="column-header">Net</div>
+                                    </div>
+                                    <div class="production-row">
+                                        <div class="resource-cell">
+                                            <span class="production-icon">🌾</span>
+                                            <span class="resource-name">Food</span>
+                                        </div>
+                                        <div class="gain-cell">+<span id="daily-food-production">0</span></div>
+                                        <div class="loss-cell">-<span id="daily-food-consumption">0</span></div>
+                                        <div class="net-cell"><span id="daily-food-net">0</span></div>
+                                    </div>
+                                    <div class="production-row">
+                                        <div class="resource-cell">
+                                            <span class="production-icon">🪵</span>
+                                            <span class="resource-name">Wood</span>
+                                        </div>
+                                        <div class="gain-cell">+<span id="daily-wood-production">0</span></div>
+                                        <div class="loss-cell">-<span id="daily-wood-consumption">0</span></div>
+                                        <div class="net-cell"><span id="daily-wood-net">0</span></div>
+                                    </div>
+                                    <div class="production-row">
+                                        <div class="resource-cell">
+                                            <span class="production-icon">🗿</span>
+                                            <span class="resource-name">Stone</span>
+                                        </div>
+                                        <div class="gain-cell">+<span id="daily-stone-production">0</span></div>
+                                        <div class="loss-cell">-<span id="daily-stone-consumption">0</span></div>
+                                        <div class="net-cell"><span id="daily-stone-net">0</span></div>
+                                    </div>
+                                    <div class="production-row">
+                                        <div class="resource-cell">
+                                            <span class="production-icon">⚒️</span>
+                                            <span class="resource-name">Metal</span>
+                                        </div>
+                                        <div class="gain-cell">+<span id="daily-metal-production">0</span></div>
+                                        <div class="loss-cell">-<span id="daily-metal-consumption">0</span></div>
+                                        <div class="net-cell"><span id="daily-metal-net">0</span></div>
+                                    </div>
+                                    <div class="production-row">
+                                        <div class="resource-cell">
+                                            <span class="production-icon">⚙️</span>
+                                            <span class="resource-name">Production</span>
+                                        </div>
+                                        <div class="gain-cell">+<span id="daily-production-gain">0</span></div>
+                                        <div class="loss-cell">-<span id="daily-production-consumption">0</span></div>
+                                        <div class="net-cell"><span id="daily-production-net">0</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="manager-section">
+                                <h4>⚔️ Crafting Queue</h4>
+                                <div class="crafting-options">
+                                    <div class="craft-item">
+                                        <span class="craft-icon">⚔️</span>
+                                        <span class="craft-name">Weapon</span>
+                                        <span class="craft-cost">5⚙️ 2🪙</span>
+                                        <button class="craft-btn" onclick="craftItem('weapon')">Craft</button>
+                                    </div>
+                                    <div class="craft-item">
+                                        <span class="craft-icon">🔨</span>
+                                        <span class="craft-name">Tool</span>
+                                        <span class="craft-cost">3⚙️ 1🪙</span>
+                                        <button class="craft-btn" onclick="craftItem('tool')">Craft</button>
+                                    </div>
+                                    <div class="craft-item">
+                                        <span class="craft-icon">🛡️</span>
+                                        <span class="craft-name">Armor</span>
+                                        <span class="craft-cost">8⚙️ 3🪙</span>
+                                        <button class="craft-btn" onclick="craftItem('armor')">Craft</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                        <div class="manager-section">
-                            <h4>👥 Population</h4>
-                            <div class="population-info">
-                                <div class="population-stat">
-                                    <span>Current: <span id="manager-population">0</span></span>
-                                </div>
-                                <div class="population-stat">
-                                    <span>Capacity: <span id="manager-population-cap">0</span></span>
-                                </div>
-                                <div class="population-stat">
-                                    <span>Weekly Growth: <span id="population-growth-rate">+0</span></span>
-                                </div>
-                                <div class="population-stat">
-                                    <span>Expected Deaths: <span id="population-death-rate">0</span>/week</span>
-                                </div>
-                                <div class="population-stat">
-                                    <span>Net Change: <span id="population-net-change">+0</span>/week</span>
-                                </div>
-                            </div>
-                            <div class="population-actions" style="display: flex; gap: 8px; margin-top: 8px;">
-                                <button id="population-view-btn" class="population-view-button">� View Population</button>
-                            </div>
-                        </div>
-
-                        <div class="manager-section">
-                            <!-- Time Controls moved to nav -->
-                        </div>
     <style>
         .time-controls .time-btn {
             background: #222;
@@ -324,7 +432,7 @@
             transform: translateX(-50%);
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             z-index: 1;
         }
 
@@ -405,7 +513,7 @@
             transition: all 0.2s ease;
             font-size: 16px;
             width: 36px;
-            height: 32px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -432,21 +540,23 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 0.8em;
+            font-size: 0.75em;
             color: #e2e8f0;
-            margin-right: 12px;
-            min-width: 110px;
+            margin-right: 16px;
+            min-width: 100px;
             background: linear-gradient(145deg, #2d3748 0%, #1a202c 100%);
             border: 2px solid #4a5568;
-            border-radius: 8px;
-            padding: 8px 12px;
+            border-radius: 6px;
+            padding: 6px 10px;
             box-shadow: 
-                0 3px 6px rgba(0,0,0,0.3),
+                0 2px 4px rgba(0,0,0,0.3),
                 inset 0 1px 0 rgba(255,255,255,0.1),
                 inset 0 -1px 0 rgba(0,0,0,0.2);
             position: relative;
             overflow: hidden;
-            gap: 4px;
+            gap: 2px;
+            height: 36px;
+            justify-content: center;
         }
 
         .current-day-nav::before {
@@ -461,35 +571,35 @@
 
         .season-info, .total-day-info {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            line-height: 1.1;
+            line-height: 1;
+            gap: 4px;
         }
 
         .season-info span:first-child {
             color: #f7fafc;
             font-weight: 700;
-            font-size: 1em;
+            font-size: 1.1em;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
         .season-info span:last-child {
             color: #38b2ac;
             font-weight: 600;
-            font-size: 0.9em;
-            text-shadow: 0 0 6px rgba(56, 178, 172, 0.4);
+            font-size: 1em;
+            text-shadow: 0 0 4px rgba(56, 178, 172, 0.4);
         }
 
         .total-day-info span:first-child {
             color: #a0aec0;
             font-weight: 600;
-            font-size: 0.8em;
+            font-size: 0.9em;
         }
 
         .total-day-info span:last-child {
             color: #edf2f7;
             font-weight: 700;
-            font-size: 0.9em;
+            font-size: 1em;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
@@ -497,20 +607,20 @@
             background: linear-gradient(145deg, #4a5568 0%, #2d3748 50%, #1a202c 100%);
             color: #e2e8f0;
             border: 2px solid #4a5568;
-            border-radius: 8px;
+            border-radius: 6px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             outline: none;
-            font-size: 0.85em;
-            padding: 8px 14px;
+            font-size: 0.8em;
+            padding: 8px 12px;
             min-width: 50px;
             height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
             box-shadow: 
-                0 4px 6px rgba(0,0,0,0.3),
+                0 2px 4px rgba(0,0,0,0.3),
                 inset 0 1px 0 rgba(255,255,255,0.1),
                 inset 0 -1px 0 rgba(0,0,0,0.2);
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
@@ -533,10 +643,10 @@
             background: linear-gradient(145deg, #38b2ac 0%, #319795 50%, #2c7a7b 100%);
             color: #fff;
             border-color: #38b2ac;
-            transform: translateY(-3px) scale(1.05);
+            transform: translateY(-2px) scale(1.02);
             box-shadow: 
-                0 8px 15px rgba(0,0,0,0.4),
-                0 0 20px rgba(56, 178, 172, 0.3),
+                0 4px 8px rgba(0,0,0,0.4),
+                0 0 12px rgba(56, 178, 172, 0.3),
                 inset 0 1px 0 rgba(255,255,255,0.2),
                 inset 0 -1px 0 rgba(0,0,0,0.1);
         }
@@ -559,12 +669,12 @@
         }
 
         .time-controls-nav .auto-play-button {
-            min-width: 80px;
-            gap: 6px;
+            min-width: 75px;
+            gap: 5px;
         }
 
         .time-controls-nav .end-day-button {
-            min-width: 85px;
+            min-width: 80px;
         }
 
         /* Add pulsing animation for active auto-play */
@@ -586,6 +696,285 @@
                     0 0 25px rgba(56, 178, 172, 0.6),
                     inset 0 1px 0 rgba(255,255,255,0.2),
                     inset 0 -1px 0 rgba(0,0,0,0.1);
+            }
+        }
+    </style>
+
+    <!-- New 2-Panel Layout CSS -->
+    <style>
+        /* Village Content Layout - 2 Panel System */
+        .village-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+            width: 100%;
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        /* Village Grid Panel (Left) */
+        .village-grid-panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            overflow: auto;
+        }
+
+        .village-grid {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Management Panel (Right) */
+        .management-panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Panel Navigation */
+        .panel-nav {
+            display: flex;
+            background: #222;
+            border-bottom: 1px solid #333;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .panel-nav-btn {
+            flex: 1;
+            background: #222;
+            color: #e0e0e0;
+            border: none;
+            padding: 12px 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .panel-nav-btn:hover {
+            background: #2a2a2a;
+            color: #fff;
+        }
+
+        .panel-nav-btn.active {
+            background: #2a2a2a;
+            color: #fff;
+            border-bottom-color: #4CAF50;
+        }
+
+        .panel-nav-btn:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .panel-nav-btn:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        /* Panel Tabs */
+        .panel-tab {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .panel-tab.active {
+            display: block;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .stat-item {
+            background: #222;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.8em;
+            color: #bbb;
+            margin-bottom: 2px;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        /* Building Grid */
+        .building-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .building-category {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .building-category h4 {
+            margin: 0 0 8px 0;
+            color: #e0e0e0;
+            font-size: 0.9em;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+
+        .building-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        /* Building Buttons */
+        .building-btn {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 6px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #e0e0e0;
+            text-align: center;
+        }
+
+        .building-btn:hover {
+            background: #2a2a2a;
+            border-color: #4CAF50;
+            transform: translateY(-1px);
+        }
+
+        .building-icon {
+            font-size: 1.5em;
+            margin-bottom: 4px;
+        }
+
+        .building-name {
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-bottom: 2px;
+            color: #fff;
+        }
+
+        .building-cost {
+            font-size: 0.7em;
+            color: #bbb;
+        }
+
+        /* Enhanced Speed Controls */
+        .time-controls .time-btn {
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
+            border: 2px solid #333 !important;
+            color: #e0e0e0 !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            font-weight: 600 !important;
+            cursor: pointer;
+            transition: all 0.3s ease !important;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+        }
+
+        .time-controls .time-btn:hover {
+            background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
+            border-color: #4CAF50 !important;
+            color: #fff !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4) !important;
+        }
+
+        .time-controls .time-btn.selected,
+        .time-controls .time-btn:active {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
+            border-color: #4CAF50 !important;
+            color: #fff !important;
+            transform: translateY(0) !important;
+            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
+        }
+
+        .time-controls .time-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .time-controls .time-btn:hover::before {
+            left: 100%;
+        }
+
+        /* Modal Stats Styling */
+        .stats-grid-modal {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .stat-item-modal {
+            background: #333;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .stat-label-modal {
+            font-size: 0.85em;
+            color: #bbb;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .stat-value-modal {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .village-content {
+                grid-template-columns: 1.5fr 1fr;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .village-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr auto;
+                height: auto;
+            }
+            
+            .management-panel {
+                max-height: 400px;
             }
         }
     </style>
@@ -663,15 +1052,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (seasonNavElement && window.gameState.season) {
                 seasonNavElement.textContent = window.gameState.season;
             }
-            if (dayNavElement && window.gameState.currentDay) {
-                dayNavElement.textContent = `Day ${window.gameState.currentDay}`;
+            
+            // Calculate total days played across all seasons
+            if (dayNavElement && window.gameState.currentDay && window.gameState.currentSeasonIndex !== undefined && window.gameState.daysInSeason) {
+                const totalDays = (window.gameState.currentSeasonIndex * window.gameState.daysInSeason) + window.gameState.currentDay;
+                dayNavElement.textContent = `Day ${totalDays}`;
             }
             
-            // Calculate days within current season (assuming 30 days per season)
+            // Show current day within the season
             if (seasonDayElement && window.gameState.currentDay) {
-                const daysPerSeason = 30; // This should match your game's season length
-                const seasonDay = ((window.gameState.currentDay - 1) % daysPerSeason) + 1;
-                seasonDayElement.textContent = `Day ${seasonDay}`;
+                seasonDayElement.textContent = `Day ${window.gameState.currentDay}`;
             }
             
             // Update auto-play button state
@@ -686,18 +1076,153 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Call update function after a short delay to ensure gameState is loaded
     setTimeout(updateNavigationTimeControls, 500);
+    
+    // Set up periodic updates to keep navigation in sync
+    setInterval(updateNavigationTimeControls, 1000);
+    
+    // Listen for day change events if eventBus is available
+    if (window.eventBus) {
+        window.eventBus.on && window.eventBus.on('day-ended', updateNavigationTimeControls);
+        window.eventBus.on && window.eventBus.on('resources-updated', updateNavigationTimeControls);
+    }
 });
 </script>
-                    </div>
 
-                    <!-- Building List (Far Right) -->
-                    <div class="building-menu">
-                        <h3>🏗️ Buildings</h3>
-                        <div class="building-list-container">
-                            <div class="building-list" id="building-list">
-                                <!-- Building buttons will be generated dynamically by JavaScript -->
-                            </div>
-                        </div>
+<!-- Panel Switching JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Panel switching functionality
+    const panelNavBtns = document.querySelectorAll('.panel-nav-btn');
+    const panelTabs = document.querySelectorAll('.panel-tab');
+    
+    panelNavBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetPanel = this.dataset.panel;
+            
+            // Remove active class from all buttons and tabs
+            panelNavBtns.forEach(b => b.classList.remove('active'));
+            panelTabs.forEach(t => t.classList.remove('active'));
+            
+            // Add active class to clicked button and corresponding tab
+            this.classList.add('active');
+            const targetTab = document.getElementById(targetPanel + '-tab');
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+            
+            // Update building tabs when buildings panel is opened
+            if (targetPanel === 'buildings') {
+                updateBuildingGrid();
+            }
+        });
+    });
+    
+    // Update stats display
+    function updateStatsDisplay() {
+        if (window.gameState && window.gameState.stats) {
+            const stats = window.gameState.stats;
+            
+            // Update stat values if elements exist
+            const totalDaysEl = document.getElementById('stat-total-days');
+            if (totalDaysEl) totalDaysEl.textContent = stats.totalDaysElapsed || 1;
+            
+            const peakPopEl = document.getElementById('stat-peak-population');
+            if (peakPopEl) peakPopEl.textContent = stats.peakPopulation || 1;
+            
+            const buildingsEl = document.getElementById('stat-buildings-built');
+            if (buildingsEl) buildingsEl.textContent = stats.buildingsBuilt || 0;
+            
+            const seasonsEl = document.getElementById('stat-seasons-passed');
+            if (seasonsEl) seasonsEl.textContent = Math.floor((stats.totalDaysElapsed || 1) / 28) || 0;
+        }
+    }
+    
+    // Update building grid in buildings tab
+    function updateBuildingGrid() {
+        const essentialContainer = document.getElementById('essential-buildings');
+        const housingContainer = document.getElementById('housing-buildings');
+        const militaryContainer = document.getElementById('military-buildings');
+        
+        if (!essentialContainer || !housingContainer || !militaryContainer) return;
+        
+        // Clear existing content
+        essentialContainer.innerHTML = '';
+        housingContainer.innerHTML = '';
+        militaryContainer.innerHTML = '';
+        
+        // Get building data from global scope
+        if (typeof buildingData !== 'undefined') {
+            // Essential buildings
+            const essentialBuildings = ['farm', 'house', 'well'];
+            essentialBuildings.forEach(buildingId => {
+                if (buildingData[buildingId]) {
+                    essentialContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
+                }
+            });
+            
+            // Housing & Production buildings
+            const housingBuildings = ['mill', 'workshop', 'market', 'inn'];
+            housingBuildings.forEach(buildingId => {
+                if (buildingData[buildingId]) {
+                    housingContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
+                }
+            });
+            
+            // Military & Advanced buildings
+            const militaryBuildings = ['barracks', 'blacksmith', 'tower', 'temple'];
+            militaryBuildings.forEach(buildingId => {
+                if (buildingData[buildingId]) {
+                    militaryContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
+                }
+            });
+        }
+    }
+    
+    // Create building button element
+    function createBuildingButton(buildingId, buildingInfo) {
+        const button = document.createElement('button');
+        button.className = 'building-btn';
+        button.innerHTML = `
+            <div class="building-icon">${buildingInfo.icon || '🏠'}</div>
+            <div class="building-name">${buildingInfo.name || buildingId}</div>
+            <div class="building-cost">${formatCost(buildingInfo.cost)}</div>
+        `;
+        
+        button.addEventListener('click', function() {
+            if (window.village && typeof window.village.buildBuilding === 'function') {
+                window.village.buildBuilding(buildingId);
+            }
+        });
+        
+        return button;
+    }
+    
+    // Format cost display
+    function formatCost(cost) {
+        if (!cost) return '';
+        const costParts = [];
+        if (cost.food) costParts.push(`${cost.food}🌾`);
+        if (cost.wood) costParts.push(`${cost.wood}🪵`);
+        if (cost.stone) costParts.push(`${cost.stone}🗿`);
+        if (cost.metal) costParts.push(`${cost.metal}⚒️`);
+        if (cost.production) costParts.push(`${cost.production}⚙️`);
+        return costParts.join(' ');
+    }
+    
+    // Update display on game events
+    if (window.eventBus) {
+        window.eventBus.on('day-ended', updateStatsDisplay);
+        window.eventBus.on('resources-updated', updateStatsDisplay);
+        window.eventBus.on('building-built', updateBuildingGrid);
+    }
+    
+    // Initial update
+    setTimeout(() => {
+        updateStatsDisplay();
+        updateBuildingGrid();
+    }, 500);
+});
+</script>
                     </div>
                 </div>
             </div>
@@ -705,6 +1230,67 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- World View -->
             <div id="world-view" class="game-view">
                 <!-- WorldManager will populate this dynamically -->
+                
+                <!-- Battle Modal (hidden by default) -->
+                <div id="battle-modal" class="battle-modal" style="display: none;">
+                    <div class="battle-modal-content">
+                        <div class="battle-header">
+                            <h2>⚔️ Battle: <span id="battle-location">Northern Plains</span></h2>
+                            <button id="close-battle-modal" class="close-btn">×</button>
+                            <div class="weather-terrain-display">
+                                <span id="weather-display">🌤️ Clear</span>
+                                <span id="terrain-display">🌾 Plains</span>
+                            </div>
+                        </div>
+                        
+                        <div class="battle-content">
+                            <!-- Battle Viewing Options -->
+                            <div class="battle-options">
+                                <button id="watch-battle-btn" class="btn primary">�️ Watch Battle</button>
+                                <button id="auto-resolve-btn" class="btn">⚡ Auto-Resolve</button>
+                                <button id="pause-battle-btn" class="btn" style="display: none;">⏸️ Pause</button>
+                            </div>
+                            
+                            <!-- Battle Field -->
+                            <div class="battle-field-container">
+                                <div id="battle-field" class="battle-field">
+                                    <!-- Battle visualization will be rendered here -->
+                                </div>
+                                
+                                <!-- Battle Controls -->
+                                <div class="battle-controls">
+                                    <div class="battle-speed-controls">
+                                        <button id="speed-1x" class="speed-btn active">1x</button>
+                                        <button id="speed-2x" class="speed-btn">2x</button>
+                                        <button id="speed-4x" class="speed-btn">4x</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Battle Progress -->
+                            <div class="battle-progress">
+                                <div class="army-status">
+                                    <div class="player-army">
+                                        <h4>🛡️ Your Army</h4>
+                                        <div id="player-army-units"></div>
+                                    </div>
+                                    <div class="enemy-army">
+                                        <h4>⚔️ Enemy Army</h4>
+                                        <div id="enemy-army-units"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Battle Log -->
+                            <div class="battle-log-panel">
+                                <h3>📜 Battle Log</h3>
+                                <div id="battle-log" class="battle-log">
+                                    <div class="log-entry">Battle ready to begin...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Monarch View -->
@@ -713,6 +1299,163 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h2>👑 Monarch's Court</h2>
                     <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
                 </div>
+                
+                <!-- Unlocked Monarch Content -->
+                <div id="monarch-content" class="monarch-content" style="display: none;">
+                    <div class="monarch-header">
+                        <h2>👑 Royal Court & Dynasty Management</h2>
+                        <p>Manage your royal investments, advisors, and dynasty legacy</p>
+                    </div>
+                    
+                    <!-- Royal Investment System -->
+                    <div class="monarch-section">
+                        <h3>💰 Royal Investments</h3>
+                        <div class="investment-categories">
+                            <!-- Village Investments -->
+                            <div class="investment-category">
+                                <h4>🏘️ Village Development</h4>
+                                <div class="investment-grid">
+                                    <div class="investment-item">
+                                        <div class="investment-icon">⚡</div>
+                                        <div class="investment-details">
+                                            <h5>Production Boost</h5>
+                                            <p>+10% efficiency to all buildings</p>
+                                            <div class="investment-cost">Cost: 100 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="100" data-type="productionBoost">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🏗️</div>
+                                        <div class="investment-details">
+                                            <h5>New Building Types</h5>
+                                            <p>Unlock advanced buildings</p>
+                                            <div class="investment-cost">Cost: 250 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="250" data-type="buildingTypes">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🤖</div>
+                                        <div class="investment-details">
+                                            <h5>Automation Level Up</h5>
+                                            <p>Improve citizen automation</p>
+                                            <div class="investment-cost">Cost: 500 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="500" data-type="automationLevel">Invest</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Military Investments -->
+                            <div class="investment-category">
+                                <h4>⚔️ Military Excellence</h4>
+                                <div class="investment-grid">
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🔍</div>
+                                        <div class="investment-details">
+                                            <h5>Army Scouts</h5>
+                                            <p>Improve AI battle decision-making</p>
+                                            <div class="investment-cost">Cost: 200 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="200" data-type="armyScouts">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">⭐</div>
+                                        <div class="investment-details">
+                                            <h5>Elite Generals</h5>
+                                            <p>Hire better commanders</p>
+                                            <div class="investment-cost">Cost: 400 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="400" data-type="eliteGenerals">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🎓</div>
+                                        <div class="investment-details">
+                                            <h5>Tactical Academy</h5>
+                                            <p>Commanders learn faster</p>
+                                            <div class="investment-cost">Cost: 800 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="800" data-type="tacticalAcademy">Invest</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Legacy Investments -->
+                            <div class="investment-category">
+                                <h4>🏰 Dynasty Legacy</h4>
+                                <div class="investment-grid">
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🏘️</div>
+                                        <div class="investment-details">
+                                            <h5>Parallel Villages</h5>
+                                            <p>Run multiple villages simultaneously</p>
+                                            <div class="investment-cost">Cost: 1000 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="1000" data-type="parallelVillages">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">🔄</div>
+                                        <div class="investment-details">
+                                            <h5>Prestige Automation</h5>
+                                            <p>Remember placement orders</p>
+                                            <div class="investment-cost">Cost: 2000 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="2000" data-type="prestigeAutomation">Invest</button>
+                                    </div>
+                                    
+                                    <div class="investment-item">
+                                        <div class="investment-icon">👑</div>
+                                        <div class="investment-details">
+                                            <h5>Dynasty Progression</h5>
+                                            <p>Multi-generational upgrades</p>
+                                            <div class="investment-cost">Cost: 5000 💰</div>
+                                        </div>
+                                        <button class="investment-btn" data-cost="5000" data-type="dynastyProgression">Invest</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Royal Advisors Section -->
+                    <div class="monarch-section">
+                        <h3>🎭 Royal Advisors</h3>
+                        <div id="advisor-panel" class="advisor-panel">
+                            <!-- Advisor content will be populated by monarch.js -->
+                        </div>
+                    </div>
+                    
+                    <!-- Dynasty Reset Tools -->
+                    <div class="monarch-section">
+                        <h3>⚰️ Dynasty Management</h3>
+                        <div class="dynasty-tools">
+                            <div class="dynasty-info">
+                                <h4>📊 Current Dynasty Status</h4>
+                                <div id="dynasty-stats" class="dynasty-stats">
+                                    <!-- Will be populated by monarch.js -->
+                                </div>
+                            </div>
+                            
+                            <div class="prestige-actions">
+                                <h4>🔄 Dynasty Actions</h4>
+                                <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
+                                <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige Reset)</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Investment Status Display -->
+                    <div class="monarch-section">
+                        <h3>📈 Active Investments</h3>
+                        <div id="investment-status" class="investment-status">
+                            <!-- Will be populated by monarch.js -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Throne View -->
@@ -720,6 +1463,98 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="locked-view">
                     <h2>🏰 The Throne</h2>
                     <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
+                </div>
+                
+                <!-- Unlocked Throne Content -->
+                <div id="throne-content" class="throne-content" style="display: none;">
+                    <div class="throne-header">
+                        <h2>🏰 The Royal Throne</h2>
+                        <p>Manage your dynasty, royal family, and ceremonial artifacts</p>
+                    </div>
+                    
+                    <!-- Throne Navigation Tabs -->
+                    <div class="throne-tabs">
+                        <button class="throne-tab-btn active" data-tab="dynasty">👑 Dynasty</button>
+                        <button class="throne-tab-btn" data-tab="merge">✨ Artifacts</button>
+                        <button class="throne-tab-btn" data-tab="court">🏛️ Court</button>
+                    </div>
+                    
+                    <!-- Dynasty Tab -->
+                    <div id="dynasty-tab" class="throne-tab active">
+                        <div class="dynasty-content">
+                            <!-- Current Monarch Section -->
+                            <div class="dynasty-section">
+                                <h3>👑 Current Monarch</h3>
+                                <div id="current-monarch" class="monarch-card">
+                                    <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Royal Family Tree -->
+                            <div class="dynasty-section">
+                                <h3>🌳 Royal Family</h3>
+                                <div id="royal-family-tree" class="family-tree">
+                                    <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Marriage & Heirs -->
+                            <div class="dynasty-section">
+                                <h3>💒 Marriage & Succession</h3>
+                                <div class="dynasty-actions">
+                                    <button id="arrange-marriage-btn" class="dynasty-btn">💒 Arrange Marriage</button>
+                                    <button id="hire-tutor-btn" class="dynasty-btn">🎓 Hire Tutors</button>
+                                    <button id="succession-plan-btn" class="dynasty-btn">📜 Succession Plan</button>
+                                </div>
+                                <div id="succession-order" class="succession-list">
+                                    <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Dynasty Stats -->
+                            <div class="dynasty-section">
+                                <h3>📊 Dynasty Legacy</h3>
+                                <div id="dynasty-stats" class="dynasty-stats">
+                                    <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Artifacts Tab -->
+                    <div id="merge-tab" class="throne-tab">
+                        <div class="throne-merge-content">
+                            <div class="merge-header">
+                                <h3>✨ Royal Artifacts</h3>
+                                <p>Merge ceremonial items to create powerful artifacts</p>
+                            </div>
+                            
+                            <div class="merge-container">
+                                <div id="merge-grid" class="merge-grid">
+                                    <!-- Throne merge system will populate this -->
+                                </div>
+                                
+                                <div class="merge-info">
+                                    <h4>🎁 Active Bonuses</h4>
+                                    <div id="active-bonuses">
+                                        <p>No bonuses yet - start merging!</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Court Tab -->
+                    <div id="court-tab" class="throne-tab">
+                        <div class="court-content">
+                            <h3>🏛️ Royal Court</h3>
+                            <p>Manage advisors, nobles, and court affairs</p>
+                            <div id="court-affairs" class="court-panel">
+                                <!-- Will be populated by JS -->
+                                <p style="color: #888; font-style: italic;">Court management coming in future updates...</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -827,6 +1662,620 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             100% {
                 opacity: 1;
+            }
+        }
+    </style>
+
+    <style>
+        /* Battle Modal Styles */
+        .battle-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .battle-modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            width: 95%;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-btn:hover {
+            color: #000;
+        }
+
+        .battle-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            margin-right: 40px;
+            padding: 15px;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .weather-terrain-display {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+        }
+
+        .battle-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .battle-options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .battle-field-container,
+        .battle-progress,
+        .battle-log-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .battle-field {
+            height: 300px;
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+            border-radius: 8px;
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .battle-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .battle-speed-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .speed-btn {
+            padding: 5px 12px;
+            background: #ecf0f1;
+            border: 1px solid #bdc3c7;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .speed-btn.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .army-status {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .player-army,
+        .enemy-army {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid #ddd;
+        }
+
+        .player-army {
+            border-color: #27ae60;
+        }
+
+        .enemy-army {
+            border-color: #e74c3c;
+        }
+
+        .battle-log {
+            height: 150px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-entry:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .army-unit-card {
+            background: #fff;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .army-unit-card:hover {
+            border-color: #3498db;
+            transform: translateY(-2px);
+        }
+
+        .unit-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .unit-type {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .unit-stats {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .battle-field {
+            background: linear-gradient(135deg, #f1c40f, #f39c12);
+            border: 3px solid #d35400;
+            border-radius: 10px;
+            height: 400px;
+            position: relative;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .battle-unit, .battle-enemy {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .battle-unit {
+            background: #27ae60;
+            color: white;
+        }
+
+        .battle-enemy {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .army-actions,
+        .battle-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .btn.primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn.primary:hover {
+            background: #2980b9;
+        }
+
+        .btn:not(.primary) {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn:not(.primary):hover {
+            background: #7f8c8d;
+        }
+
+        .battle-log {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            padding: 2px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        /* Monarch View Styles */
+        .monarch-content {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 2rem;
+            overflow-y: auto;
+            height: calc(100vh - 120px);
+        }
+
+        .monarch-header {
+            background: linear-gradient(135deg, #8e44ad, #9b59b6);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            border: 2px solid #1abc9c;
+            box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);
+        }
+
+        .monarch-header h2 {
+            margin: 0 0 0.5rem 0;
+            color: #f1c40f;
+            font-size: 2rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .monarch-header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .monarch-section {
+            background: #222;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .monarch-section h3 {
+            color: #1abc9c;
+            margin: 0 0 1rem 0;
+            font-size: 1.4rem;
+            border-bottom: 2px solid #333;
+            padding-bottom: 0.5rem;
+        }
+
+        .investment-categories {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .investment-category {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .investment-category h4 {
+            color: #f39c12;
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .investment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .investment-item {
+            background: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .investment-item:hover {
+            border-color: #1abc9c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.3);
+        }
+
+        .investment-icon {
+            font-size: 2rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #34495e, #2c3e50);
+            border-radius: 50%;
+            border: 2px solid #1abc9c;
+            box-shadow: 0 2px 8px rgba(26, 188, 156, 0.2);
+        }
+
+        .investment-details {
+            flex: 1;
+        }
+
+        .investment-details h5 {
+            color: #ecf0f1;
+            margin: 0 0 0.5rem 0;
+            font-size: 1rem;
+        }
+
+        .investment-details p {
+            color: #bdc3c7;
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        .investment-cost {
+            color: #f1c40f;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .investment-btn {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3);
+        }
+
+        .investment-btn:hover {
+            background: linear-gradient(135deg, #229954, #27ae60);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+        }
+
+        .investment-btn:disabled {
+            background: #555;
+            color: #888;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .advisor-panel {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 2px solid #1abc9c;
+        }
+
+        .dynasty-tools {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .dynasty-info, .prestige-actions {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .dynasty-info h4, .prestige-actions h4 {
+            color: #e74c3c;
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .dynasty-btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3);
+        }
+
+        .dynasty-btn:hover {
+            background: linear-gradient(135deg, #2980b9, #3498db);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .dynasty-btn.danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+        }
+
+        .dynasty-btn.danger:hover {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+        }
+
+        .investment-status {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .dynasty-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .dynasty-stat {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .dynasty-stat-label {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .dynasty-stat-value {
+            color: #f1c40f;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .dynasty-tools {
+                grid-template-columns: 1fr;
+            }
+            
+            .investment-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .monarch-content {
+                padding: 1rem;
+            }
+            
+            .monarch-header {
+                padding: 1rem;
+            }
+            
+            .monarch-header h2 {
+                font-size: 1.5rem;
+            }
+            
+            .investment-item {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        /* Inheritance Calculation Modal Styles */
+        .dynasty-calculation {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .inheritance-breakdown {
+            margin: 1rem 0;
+        }
+
+        .inheritance-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .inheritance-item:last-child {
+            border-bottom: none;
+        }
+
+        .inheritance-label {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+        }
+
+        .inheritance-value {
+            color: #f1c40f;
+            font-weight: bold;
+        }
+
+        .inheritance-total {
+            background: #2a2a2a;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .inheritance-total .inheritance-label {
+            color: #ecf0f1;
+            font-size: 1rem;
+        }
+
+        .inheritance-total .inheritance-value {
+            color: #2ecc71;
+            font-size: 1.2rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .battle-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .commander-panel,
+            .army-panel {
+                grid-column: 1;
+            }
+            
+            .battle-field-container,
+            .battle-log-panel {
+                grid-column: 1;
             }
         }
     </style>
@@ -977,4 +2426,22 @@ function craftItem(itemType) {
     console.log('GameState not available for crafting');
     return false;
 }
+
+// Ensure dynasty features are properly initialized
+document.addEventListener('DOMContentLoaded', function() {
+    // Listen for throne view unlock events
+    if (window.eventBus) {
+        window.eventBus.on('content_unlocked', function(data) {
+            if (data.contentId === 'throne_view' && window.game && window.game.throneManager) {
+                console.log('[Dynasty] Throne view unlocked - reinitializing dynasty features');
+                // Re-initialize throne manager to show dynasty content
+                setTimeout(() => {
+                    if (window.game.throneManager.init) {
+                        window.game.throneManager.init();
+                    }
+                }, 100);
+            }
+        });
+    }
+});
 </script>

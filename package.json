@@ -1,10 +1,16 @@
 {
   "name": "idle-dynasty-builder",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Idle: Dynasty Builder - Lead your people from humble beginnings to a thriving dynasty in this idle strategy game.",
   "scripts": {
     "start": "npx serve . -l 8000",
-    "dev": "npx serve . -l 8000 --no-clipboard"
+    "dev": "npx serve . -l 8000 --no-clipboard",
+    "build:wiki": "node scripts/build-wiki.js",
+    "watch:wiki": "nodemon --watch docs/wiki --ext md --exec \"npm run build:wiki\"",
+    "prebuild": "npm run build:wiki",
+    "build": "npm run build:wiki && node scripts/update-version-json.js",
+    "predeploy": "npm run build",
+    "deploy": "npm run build && npx serve . -l 8000 --single"
   },
   "keywords": [
     "idle",
@@ -18,6 +24,8 @@
   "author": "tanner-malt",
   "license": "MIT",
   "devDependencies": {
-    "serve": "^14.2.0"
+    "serve": "^14.2.0",
+    "marked": "^4.3.0",
+    "nodemon": "^3.0.0"
   }
 }

@@ -11,7 +11,7 @@
 | **SimpleTutorial** | `src/simpleTutorial.js` | `src/systems/features/simpleTutorial.js` | New player guidance | Tutorial overlays |
 | **Achievements** | `src/achievements.js` | `src/systems/features/achievements.js` | Progress tracking | Achievement popups |
 | **Village** | `src/village.js` | `src/systems/gameplay/village.js` | Building management | Village grid, building buttons |
-| **Battle** | `src/battle.js` | `src/systems/gameplay/battle.js` | Combat system | Battle interface |
+| **Battle** | `src/battle.js` | `src/systems/gameplay/battle.js` | Combat system | **World View Integration** |
 | **Quest** | `src/quest.js` | `src/systems/gameplay/quest.js` | Mission system | Quest panels |
 
 ## 🎨 Visual System Documentation
@@ -172,6 +172,73 @@ Village Grid:
 │ Actions:                            │
 │ [Reset Tutorial] [Reload Game]      │
 │ [Export Save] [Load Backup]         │
+└─────────────────────────────────────┘
+```
+
+## ⚔️ Battle System Integration Update
+
+### New Battle System Architecture (December 2024)
+
+The battle system has been redesigned to be encounter-based, following realistic army movement mechanics:
+
+#### Integration Flow
+```
+[Expeditions] ──encounter──> [Enemy Forces] ──battle──> [Battle Modal]
+     │                             │                        │
+     ├── Army Movement             ├── Encounter Detection   ├── Watch/Auto-Resolve
+     ├── Territory Exploration     ├── Army Comparison      ├── Speed Controls
+     └── Enemy Detection           └── Battle Creation      └── Battle Log
+```
+
+#### Key Features of Encounter-Based System
+
+1. **Realistic Encounters**: Battles occur only when armies actually meet during expeditions
+2. **Dynamic Battle Creation**: Each encounter creates a unique battle based on the armies involved
+3. **Army Composition Matters**: Your expedition army determines your battle strength
+4. **Territory-Based**: Encounters happen based on where your expeditions go
+5. **Strategic Decision Making**: Players decide which territories to explore knowing the risks
+
+#### UI Components
+
+```
+World View → Battles Tab:
+┌─────────────────────────────────────┐
+│ ⚔️ Battles                          │
+├─────────────────────────────────────┤
+│ 🌄 Northern Plains    [ENCOUNTER]   │
+│ 👹 Goblin Raiders    ★★☆           │
+│ ☀️ Clear  🌾 Plains               │
+│ [Enter Battle]                      │
+├─────────────────────────────────────┤
+│ 🏔️ Eastern Mountains [ENCOUNTER]   │
+│ 👺 Orc Warband      ★★★           │
+│ 🌧️ Rain   ⛰️ Hills                │
+│ [Enter Battle]                      │
+└─────────────────────────────────────┘
+```
+
+```
+Battle Modal (When Engaged):
+┌─────────────────────────────────────┐
+│ ⚔️ Battle: Northern Plains      [×] │
+│ ☀️ Clear  🌾 Plains                │
+├─────────────────────────────────────┤
+│ [👁️ Watch Battle] [⚡ Auto-Resolve] │
+├─────────────────────────────────────┤
+│ ┌─────────────────────────────────┐ │
+│ │     🏹    ⚔️      👹    👺     │ │
+│ │       🛡️       💀      👹     │ │
+│ │ [Speed: 1x][2x][4x]  [⏸️ Pause] │ │
+│ └─────────────────────────────────┘ │
+├─────────────────────────────────────┤
+│ 🛡️ Your Army    👹 Enemy Army      │
+│ Archers x3       Goblins x5         │
+│ Militia x2       Orcs x2            │
+├─────────────────────────────────────┤
+│ 📜 Battle Log:                      │
+│ [14:32] Expedition encounters foe!  │
+│ [14:32] Your archers advance...     │
+│ [14:33] Goblins charge forward...   │
 └─────────────────────────────────────┘
 ```
 

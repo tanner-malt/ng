@@ -23,6 +23,11 @@ class EventBusIntegrations {
             this.handleResourceUpdate();
         });
 
+        // Population update events
+        window.eventBus.on('population-changed', (data) => {
+            this.handlePopulationUpdate(data);
+        });
+
         // Building events
         window.eventBus.on('building_placed', (data) => {
             this.handleBuildingPlaced(data);
@@ -52,6 +57,11 @@ class EventBusIntegrations {
             window.villageManager.updateResourceDisplay();
         }
 
+        // Also update the main game UI to keep displays in sync
+        if (window.gameState) {
+            window.gameState.updateUI();
+        }
+
         // Note: Achievement checking is now handled by specific event listeners in app.js
         // to avoid circular loops when achievements grant resources
 
@@ -61,6 +71,30 @@ class EventBusIntegrations {
         }
         
         // Note: Autosave handles periodic saving, no need to save on every resource update
+    }
+
+    handlePopulationUpdate(data) {
+        console.log('[EventBusIntegrations] Population update event received:', data);
+        
+        // Update population-specific displays
+        if (window.gameState) {
+            // Ensure gameState population count is in sync with population manager
+            if (data && (data.type === 'added' || data.type === 'deaths')) {
+                window.gameState.updatePopulationCount();
+            }
+            
+            window.gameState.updateVillageManagerDisplay();
+            
+            // Update the main UI as well for consistency
+            window.gameState.updateUI();
+        }
+
+        // Update village manager display if available
+        if (window.villageManager) {
+            window.villageManager.updateResourceDisplay();
+        }
+        
+        console.log('[EventBusIntegrations] Population displays updated');
     }
 
     handleBuildingPlaced(data) {

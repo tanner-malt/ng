@@ -119,7 +119,7 @@ class UnlockSystem {
             name: 'World Map',
             description: 'Explore the surrounding lands',
             conditions: [
-                { type: 'achievement', achievement: 'feeding_people' }
+                { type: 'achievement', achievement: 'military_establishment' }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('world')
@@ -128,10 +128,9 @@ class UnlockSystem {
         this.registerUnlock('monarch_view', {
             type: 'view',
             name: 'Monarch Screen',
-            description: 'Manage your royal affairs',
+            description: 'Manage your royal affairs and dynasty legacy',
             conditions: [
-                { type: 'building_count', building: 'farm', count: 2 },
-                { type: 'resource', resource: 'population', amount: 20 }
+                { type: 'achievement', achievement: 'become_king' }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('monarch')
@@ -140,10 +139,9 @@ class UnlockSystem {
         this.registerUnlock('throne_view', {
             type: 'view',
             name: 'Throne Room',
-            description: 'Handle diplomatic and royal matters',
+            description: 'Access the throne\'s full power and royal family management',
             conditions: [
-                { type: 'building_count', building: 'house', count: 3 },
-                { type: 'resource', resource: 'gold', amount: 100 }
+                { type: 'achievement', achievement: 'all_things_end' }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('throne')
@@ -500,6 +498,11 @@ class UnlockSystem {
             navBtn.style.opacity = '1';
             navBtn.style.pointerEvents = 'auto';
             console.log(`[UnlockSystem] View unlocked: ${viewName}`);
+        }
+        
+        // Call the game's unlockView method if available
+        if (window.game && window.game.unlockView) {
+            window.game.unlockView(viewName);
         }
     }
 

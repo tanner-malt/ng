@@ -53,10 +53,7 @@ class AchievementSystem {
             description: 'Named your noble dynasty',
             icon: '👑',
             type: 'tutorial',
-            hidden: false,
-            reward: { prestige: 10 },
-            unlocked: true, // Start unlocked for testing
-            unlockedAt: new Date()
+            reward: { wood: 75 }
         });
 
         this.defineAchievement('first_settlement', {
@@ -64,7 +61,6 @@ class AchievementSystem {
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            hidden: false,
             reward: { wood: 75, stone: 500}
         });
 
@@ -73,7 +69,6 @@ class AchievementSystem {
             description: 'Built 3 Houses',
             icon: '🏠',
             type: 'building',
-            hidden: false,
             requirement: { houses_built: 3 }, // Requires 3 houses built
             reward: { population: 10, wood: 500 }
         });
@@ -83,7 +78,6 @@ class AchievementSystem {
             description: 'Built your first Farm',
             icon: '🌾',
             type: 'building',
-            hidden: false,
             reward: { food: 50 }
         });
 
@@ -92,7 +86,6 @@ class AchievementSystem {
             description: 'Built your first Barracks',
             icon: '⚔️',
             type: 'building',
-            hidden: false,
             reward: { soldiers: 1 }
         });
 
@@ -101,7 +94,6 @@ class AchievementSystem {
             description: 'Completed the tutorial and unlocked Battle Mode',
             icon: '🎓',
             type: 'tutorial',
-            hidden: false,
             reward: { gold: 500, influence: 25, prestige: 50 }
         });
 
@@ -111,7 +103,6 @@ class AchievementSystem {
             description: 'Built your first farm',
             icon: '🌾',
             type: 'building',
-            hidden: false,
             reward: { food: 100 }
         });
 
@@ -121,7 +112,6 @@ class AchievementSystem {
             description: 'Built 10 buildings total',
             icon: '🏗️',
             type: 'building',
-            hidden: false,
             requirement: { buildings_built: 10 },
             reward: { gold: 200, prestige: 50 }
         });
@@ -132,7 +122,6 @@ class AchievementSystem {
             description: 'Accumulated 1000 gold',
             icon: '💰',
             type: 'resource',
-            hidden: false,
             requirement: { gold: 1000 },
             reward: { prestige: 25 }
         });
@@ -142,7 +131,6 @@ class AchievementSystem {
             description: 'Have 500 gold, 200 food, and 50 population',
             icon: '🏰',
             type: 'resource',
-            hidden: false,
             requirement: { 
                 gold: 500, 
                 food: 200, 
@@ -156,7 +144,6 @@ class AchievementSystem {
             description: 'Reached 100 population',
             icon: '👥',
             type: 'resource',
-            hidden: false,
             requirement: { population: 100 },
             reward: { influence: 50 }
         });
@@ -166,7 +153,6 @@ class AchievementSystem {
             description: 'Reached 50 population',
             icon: '🏘️',
             type: 'resource',
-            hidden: false,
             requirement: { population: 50 },
             reward: { population: 15, gold: 300 }
         });
@@ -176,9 +162,99 @@ class AchievementSystem {
             description: 'Your dynasty attracts settlers from afar',
             icon: '🚶‍♂️🚶‍♀️',
             type: 'special',
-            hidden: false,
             requirement: { population: 25 },
             reward: { population: 25, food: 200 }
+        });
+
+        // Additional population achievements
+        this.defineAchievement('first_settlement', {
+            title: 'First Settlement',
+            description: 'Reached 10 population - your dynasty takes root',
+            icon: '🏡',
+            type: 'population',
+            requirement: { population: 10 },
+            reward: { food: 100, wood: 50 }
+        });
+
+        this.defineAchievement('great_city', {
+            title: 'Great City',
+            description: 'Reached 200 population - a true urban center',
+            icon: '🏙️',
+            type: 'population',
+            requirement: { population: 200 },
+            reward: { gold: 1000, influence: 100 }
+        });
+
+        this.defineAchievement('metropolis', {
+            title: 'Metropolis',
+            description: 'Reached 500 population - a massive dynastic center',
+            icon: '🌆',
+            type: 'population',
+            requirement: { population: 500 },
+            reward: { gold: 5000, influence: 500, prestige: 200 }
+        });
+
+        this.defineAchievement('welcoming_refuge', {
+            title: 'Welcoming Refuge',
+            description: 'Welcomed 10 immigrants to your dynasty',
+            icon: '🤝',
+            type: 'immigration',
+            requirement: { total_immigrants: 10 },
+            reward: { population: 5, happiness: 10 }
+        });
+
+        this.defineAchievement('immigration_hub', {
+            title: 'Immigration Hub',
+            description: 'Welcomed 50 immigrants - your dynasty is renowned',
+            icon: '🌍',
+            type: 'immigration',
+            requirement: { total_immigrants: 50 },
+            reward: { population: 15, gold: 500, influence: 50 }
+        });
+
+        this.defineAchievement('baby_boom', {
+            title: 'Baby Boom',
+            description: 'Celebrated 25 births in your dynasty',
+            icon: '👶',
+            type: 'births',
+            requirement: { total_births: 25 },
+            reward: { food: 300, happiness: 15 }
+        });
+
+        this.defineAchievement('generational_legacy', {
+            title: 'Generational Legacy',
+            description: 'Celebrated 100 births - multiple generations thrive',
+            icon: '👨‍👩‍👧‍👦',
+            type: 'births',
+            requirement: { total_births: 100 },
+            reward: { gold: 1500, influence: 100, prestige: 100 }
+        });
+
+        this.defineAchievement('content_populace', {
+            title: 'Content Populace',
+            description: 'Maintained 85% average happiness with 20+ population',
+            icon: '😊',
+            type: 'happiness',
+            requirement: { avg_happiness: 85, min_population: 20 },
+            reward: { happiness: 20, gold: 300 }
+        });
+
+        this.defineAchievement('utopian_society', {
+            title: 'Utopian Society',
+            description: 'Achieved 95% average happiness with 50+ population',
+            icon: '🌟',
+            type: 'happiness',
+            requirement: { avg_happiness: 95, min_population: 50 },
+            reward: { happiness: 30, gold: 1000, influence: 200, prestige: 150 }
+        });
+
+        this.defineAchievement('dynasty_pinnacle', {
+            title: 'Dynasty Pinnacle',
+            description: 'Reached a peak population of 1000 - legendary status',
+            icon: '👑',
+            type: 'peak_population',
+            requirement: { peak_population: 1000 },
+            reward: { gold: 10000, influence: 1000, prestige: 500 }
         });
 
         // Combat achievements
@@ -187,7 +263,6 @@ class AchievementSystem {
             description: 'Won 10 battles',
             icon: '🗡️',
             type: 'combat',
-            hidden: false,
             requirement: { battles_won: 10 },
             reward: { military_exp: 200, prestige: 100 }
         });
@@ -198,7 +273,6 @@ class AchievementSystem {
             description: 'Built at least one of every building type',
             icon: '🏰',
             type: 'special',
-            hidden: false,
             reward: { prestige: 200, influence: 100 }
         });
 
@@ -208,8 +282,133 @@ class AchievementSystem {
             description: 'Explored a tile in the world view',
             icon: '🗺️',
             type: 'exploration',
-            hidden: false,
             reward: { metal: 15, influence: 10 }
+        });
+
+        // Throne room achievements
+        this.defineAchievement('divine_merger', {
+            title: 'Divine Merger',
+            description: 'Created a Divine Altar in the Throne Room',
+            icon: '⛩️',
+            type: 'special',
+            reward: { prestige: 100, influence: 50 }
+        });
+
+        // Monarch view achievements
+        this.defineAchievement('royal_investor', {
+            title: 'Royal Investor',
+            description: 'Made your first prestige investment',
+            icon: '💎',
+            type: 'special',
+            reward: { prestige: 25, gold: 200 }
+        });
+
+        // View unlock achievements
+        this.defineAchievement('become_king', {
+            title: 'Become King',
+            description: 'Ascended to the throne and established royal authority',
+            icon: '👑',
+            type: 'special',
+            reward: { prestige: 100, influence: 75, gold: 1000 }
+        });
+
+        this.defineAchievement('all_things_end', {
+            title: 'All Things End',
+            description: 'Achieved the ultimate milestone and unlocked the throne\'s full power',
+            icon: '🏰',
+            type: 'special',
+            reward: { prestige: 500, influence: 200, gold: 5000 }
+        });
+
+        // High-priority achievements from wiki analysis
+        this.defineAchievement('master_builder', {
+            title: 'Master Builder',
+            description: 'Build 10 different types of buildings',
+            icon: '🏗️',
+            type: 'building',
+            requirement: { building_types_built: 10 },
+            reward: { stone: 1000, wood: 1000, gold: 500 }
+        });
+
+        this.defineAchievement('population_boom', {
+            title: 'Population Boom',
+            description: 'Reach 100 total population',
+            icon: '👥',
+            type: 'population',
+            requirement: { total_population: 100 },
+            reward: { food: 2000, gold: 500 }
+        });
+
+        this.defineAchievement('royal_bloodline', {
+            title: 'Royal Bloodline',
+            description: 'Have 5 royal family members alive simultaneously',
+            icon: '👑',
+            type: 'dynasty',
+            requirement: { royal_family_count: 5 },
+            reward: { prestige: 200, influence: 100 }
+        });
+
+        this.defineAchievement('expedition_master', {
+            title: 'Expedition Master',
+            description: 'Complete 5 successful expeditions',
+            icon: '🗺️',
+            type: 'exploration',
+            requirement: { expeditions_completed: 5 },
+            reward: { gold: 1000, metal: 500 }
+        });
+
+        this.defineAchievement('elite_army', {
+            title: 'Elite Army',
+            description: 'Have all 7 unit types available in your forces',
+            icon: '⚔️',
+            type: 'combat',
+            requirement: { unit_types_available: 7 },
+            reward: { metal: 1000, gold: 750 }
+        });
+
+        this.defineAchievement('seasonal_master', {
+            title: 'Seasonal Master',
+            description: 'Successfully navigate through all 8 seasonal periods',
+            icon: '🌸',
+            type: 'survival',
+            requirement: { seasons_survived: 8 },
+            reward: { food: 1500, wood: 1000 }
+        });
+
+        this.defineAchievement('master_craftsman', {
+            title: 'Master Craftsman',
+            description: 'Have a villager reach Grandmaster skill level',
+            icon: '🔨',
+            type: 'population',
+            requirement: { grandmaster_villagers: 1 },
+            reward: { gold: 800, prestige: 150 }
+        });
+
+        this.defineAchievement('multi_generational', {
+            title: 'Multi-Generational',
+            description: 'Rule for 3+ consecutive generations',
+            icon: '⏳',
+            type: 'dynasty',
+            requirement: { generations_ruled: 3 },
+            reward: { prestige: 300, influence: 150 }
+        });
+
+        this.defineAchievement('map_explorer', {
+            title: 'Map Explorer',
+            description: 'Reveal 50% of the world map through exploration',
+            icon: '🗺️',
+            type: 'exploration',
+            requirement: { map_revealed_percent: 50 },
+            reward: { gold: 600, influence: 100 }
+        });
+
+        this.defineAchievement('balanced_economy', {
+            title: 'Balanced Economy',
+            description: 'Have 1,000+ of all basic resources simultaneously',
+            icon: '💰',
+            type: 'economic',
+            requirement: { balanced_resources: true },
+            reward: { gold: 1000, prestige: 100 }
         });
 
         console.log('[Achievements] Initialized', Object.keys(this.achievements).length, 'achievements');
@@ -280,6 +479,85 @@ class AchievementSystem {
         this.unlock('first_exploration');
     }
 
+    // Trigger achievement for creating Divine Altar in throne room
+    triggerDivineAltar() {
+        this.unlock('divine_merger');
+    }
+
+    // Trigger achievement for making first prestige investment
+    triggerFirstInvestment() {
+        this.unlock('royal_investor');
+    }
+
+    // Trigger achievement for becoming king (unlock Monarch view)
+    triggerBecomeKing() {
+        this.unlock('become_king');
+    }
+
+    // Trigger achievement for ultimate milestone (unlock Throne view)
+    triggerAllThingsEnd() {
+        this.unlock('all_things_end');
+    }
+
+    // Trigger population milestone achievements
+    triggerPopulationBoom() {
+        if (this.isUnlocked('population_boom')) return;
+        this.unlock('population_boom');
+    }
+
+    // Trigger building achievement
+    triggerMasterBuilder() {
+        if (this.isUnlocked('master_builder')) return;
+        this.unlock('master_builder');
+    }
+
+    // Trigger expedition achievement
+    triggerExpeditionMaster() {
+        if (this.isUnlocked('expedition_master')) return;
+        this.unlock('expedition_master');
+    }
+
+    // Trigger dynasty achievements
+    triggerRoyalBloodline() {
+        if (this.isUnlocked('royal_bloodline')) return;
+        this.unlock('royal_bloodline');
+    }
+
+    triggerMultiGenerational() {
+        if (this.isUnlocked('multi_generational')) return;
+        this.unlock('multi_generational');
+    }
+
+    // Trigger military achievement
+    triggerEliteArmy() {
+        if (this.isUnlocked('elite_army')) return;
+        this.unlock('elite_army');
+    }
+
+    // Trigger survival achievement
+    triggerSeasonalMaster() {
+        if (this.isUnlocked('seasonal_master')) return;
+        this.unlock('seasonal_master');
+    }
+
+    // Trigger skill achievement
+    triggerMasterCraftsman() {
+        if (this.isUnlocked('master_craftsman')) return;
+        this.unlock('master_craftsman');
+    }
+
+    // Trigger exploration achievement
+    triggerMapExplorer() {
+        if (this.isUnlocked('map_explorer')) return;
+        this.unlock('map_explorer');
+    }
+
+    // Trigger economic achievement
+    triggerBalancedEconomy() {
+        if (this.isUnlocked('balanced_economy')) return;
+        this.unlock('balanced_economy');
+    }
+
     // Check if an achievement is unlocked
     isUnlocked(achievementId) {
         const achievement = this.achievements[achievementId];
@@ -296,7 +574,6 @@ class AchievementSystem {
             description: config.description,
             icon: config.icon || '🏆',
             type: config.type || 'general',
-            hidden: false, // Always visible
             requirement: config.requirement || null,
             reward: config.reward || {},
             // Preserve existing unlock status if it exists, otherwise use config or default to false
@@ -364,31 +641,19 @@ class AchievementSystem {
         // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
             if (resource === 'population' && amount > 0) {
-                // Use the new generateMassPopulation method for better distribution
+                // Use generateMassPopulation for proper distribution
                 if (window.gameState.generateMassPopulation) {
                     const generated = window.gameState.generateMassPopulation(amount);
                     if (generated && generated.length) {
                         populationGained += generated.length;
                         console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
                     } else {
-                        console.warn(`[Achievements] generateMassPopulation returned no results for ${amount} villagers`);
+                        console.warn(`[Achievements] generateMassPopulation failed, incrementing population counter`);
+                        window.gameState.population = (window.gameState.population || 0) + amount;
+                        populationGained += amount;
                     }
-                } else if (window.gameState.populationManager && window.GameData && typeof window.GameData.generatePopulationMember === 'function') {
-                    // Fallback to old method if new one isn't available
-                    const names = window.GameData && window.GameData.populationNames ? window.GameData.populationNames : ["Alex", "Sam", "Jamie", "Taylor", "Jordan", "Morgan", "Casey", "Riley", "Drew", "Cameron"];
-                    for (let i = 0; i < amount; i++) {
-                        const pop = window.GameData.generatePopulationMember(names);
-                        window.gameState.populationManager.addInhabitant(pop);
-                    }
-                    // Update population count if tracked separately
-                    if (typeof window.gameState.population === 'number') {
-                        window.gameState.population += amount;
-                    } else {
-                        window.gameState.population = window.gameState.populationManager.getAll().length;
-                    }
-                    populationGained += amount;
                 } else {
-                    // Last resort: just increment population number
+                    console.warn(`[Achievements] generateMassPopulation not available, incrementing population counter`);
                     window.gameState.population = (window.gameState.population || 0) + amount;
                     populationGained += amount;
                 }
@@ -541,7 +806,8 @@ class AchievementSystem {
                         case 'food':
                         case 'stone':
                         case 'wood':
-                            current = window.gameState.resources[resource] || 0;
+                        case 'metal':
+                            current = (window.gameState.resources && window.gameState.resources[resource]) || 0;
                             break;
                         case 'population':
                             current = window.gameState.population || 0;
@@ -562,6 +828,60 @@ class AchievementSystem {
                         case 'towncenters_built':
                             current = this.stats[resource] || 0;
                             break;
+                        case 'building_types_built':
+                            // Count unique building types built
+                            if (window.gameState.buildings) {
+                                const uniqueTypes = new Set(window.gameState.buildings.map(b => b.type));
+                                current = uniqueTypes.size;
+                            }
+                            break;
+                        case 'total_population':
+                            // Use populationManager if available, otherwise fallback to gameState
+                            if (window.gameState.populationManager) {
+                                current = window.gameState.populationManager.getAll().length;
+                            } else {
+                                current = window.gameState.population || 0;
+                            }
+                            break;
+                        case 'royal_family_count':
+                            // Placeholder - would need royal family system implementation
+                            current = window.gameState.royalFamilyCount || 0;
+                            break;
+                        case 'expeditions_completed':
+                            current = window.gameState.expeditionsCompleted || 0;
+                            break;
+                        case 'unit_types_available':
+                            // Placeholder - would check available unit types from military system
+                            current = window.gameState.unitTypesAvailable || 0;
+                            break;
+                        case 'seasons_survived':
+                            // Based on total seasons passed (8 seasons per year)
+                            current = window.gameState.stats.totalSeasonsPassed || 0;
+                            break;
+                        case 'grandmaster_villagers':
+                            // Placeholder - would check villager skill levels
+                            current = window.gameState.grandmasterVillagers || 0;
+                            break;
+                        case 'generations_ruled':
+                            current = window.gameState.generationsRuled || 1;
+                            break;
+                        case 'map_revealed_percent':
+                            current = window.gameState.mapRevealedPercent || 0;
+                            break;
+                        case 'balanced_resources':
+                            // Check if all basic resources are >= 1000
+                            if (window.gameState.resources) {
+                                const resources = window.gameState.resources;
+                                current = (resources.gold >= 1000 && resources.food >= 1000 && 
+                                          resources.wood >= 1000 && resources.stone >= 1000) ? 1 : 0;
+                                // For balanced_resources, required should be true (1)
+                                required = 1;
+                            }
+                            break;
+                        default:
+                            // Try to get from gameState directly if not found above
+                            current = window.gameState[resource] || 0;
+                            break;
                     }
 
                     if (current < required) {
@@ -575,7 +895,32 @@ class AchievementSystem {
             }
         });
         
+        // Check for "All Things End" ultimate achievement
+        this.checkUltimateAchievement();
+        
         this.isCheckingRequirements = false;
+    }
+
+    // Check if player qualifies for the ultimate achievement
+    checkUltimateAchievement() {
+        if (this.isUnlocked('all_things_end')) return;
+
+        // Check if player has reached multiple significant milestones
+        const majorAchievements = [
+            'population_boom',     // 100 population
+            'prosperous_kingdom',  // 500 gold, 200 food, 50 population
+            'warrior_king',        // 10 battles won
+            'master_builder',      // 10 buildings built
+            'wealthy_ruler'        // 1000 gold
+        ];
+
+        const unlockedMajorAchievements = majorAchievements.filter(id => this.isUnlocked(id));
+        
+        // Trigger "All Things End" if player has 4+ major achievements and become_king
+        if (unlockedMajorAchievements.length >= 4 && this.isUnlocked('become_king')) {
+            console.log('[Achievements] Ultimate achievement conditions met:', unlockedMajorAchievements);
+            this.triggerAllThingsEnd();
+        }
     }
 
     getProgress(achievementId) {
@@ -594,7 +939,8 @@ class AchievementSystem {
                 case 'food':
                 case 'stone':
                 case 'wood':
-                    current = window.gameState.resources[resource] || 0;
+                case 'metal':
+                    current = (window.gameState.resources && window.gameState.resources[resource]) || 0;
                     break;
                 case 'population':
                     current = window.gameState.population || 0;
@@ -614,6 +960,10 @@ class AchievementSystem {
                 case 'barracks_built':
                 case 'towncenters_built':
                     current = this.stats[resource] || 0;
+                    break;
+                default:
+                    // Try to get from gameState directly if not found above
+                    current = window.gameState[resource] || 0;
                     break;
             }
 
@@ -719,8 +1069,9 @@ class AchievementSystem {
     renderAchievementRow(achievement) {
         const isUnlocked = achievement.unlocked;
         const icon = isUnlocked ? achievement.icon : '🔒';
-        const title = isUnlocked ? achievement.title : '???';
-        const description = isUnlocked ? achievement.description : 'Achievement locked';
+        // Always show real title and description, even if locked
+        const title = achievement.title;
+        const description = achievement.description;
         let progressBar = '';
         let date = '';
         if (!isUnlocked && achievement.requirement) {
@@ -823,78 +1174,6 @@ class AchievementSystem {
                 if (achievement.requirement) {
                     const progress = this.getProgress(achievement.id);
                     console.log(`   Progress: ${progress.percentage}%`);
-                }
-            }
-        });
-    }
-
-    // Fix achievement data corruption
-    fixAchievementData() {
-        console.log('[Achievements] Fixing data corruption...');
-        
-        // Clear corrupted unlocked array
-        this.unlockedAchievements = [];
-        
-        // Rebuild unlocked array from achievement objects
-        Object.values(this.achievements).forEach(achievement => {
-            if (achievement.unlocked) {
-                this.unlockedAchievements.push(achievement.id);
-            }
-        });
-        
-        // Force check all requirements and unlock eligible achievements
-        this.forceCheckAllRequirements();
-        
-        this.saveToStorage();
-        console.log('[Achievements] Data corruption fixed');
-    }
-    
-    // Force check all requirements ignoring flags
-    forceCheckAllRequirements() {
-        console.log('[Achievements] Force checking all achievement requirements...');
-        
-        Object.values(this.achievements).forEach(achievement => {
-            if (!achievement.unlocked && achievement.requirement) {
-                let meetsRequirement = true;
-
-                Object.entries(achievement.requirement).forEach(([resource, required]) => {
-                    let current = 0;
-                    switch (resource) {
-                        case 'gold':
-                        case 'food':
-                        case 'stone':
-                        case 'wood':
-                            current = window.gameState.resources[resource] || 0;
-                            break;
-                        case 'population':
-                            current = window.gameState.population || 0;
-                            break;
-                        case 'battles_won':
-                            current = window.gameState.battlesWon || 0;
-                            break;
-                        case 'influence':
-                            current = window.gameState.influence || 0;
-                            break;
-                        case 'prestige':
-                            current = window.gameState.prestige || 0;
-                            break;
-                        case 'buildings_built':
-                        case 'houses_built':
-                        case 'farms_built':
-                        case 'barracks_built':
-                        case 'towncenters_built':
-                            current = this.stats[resource] || 0;
-                            break;
-                    }
-
-                    if (current < required) {
-                        meetsRequirement = false;
-                    }
-                });
-
-                if (meetsRequirement) {
-                    console.log(`[Achievements] Force unlocking eligible: ${achievement.id}`);
-                    this.unlock(achievement.id);
                 }
             }
         });
