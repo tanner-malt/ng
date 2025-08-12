@@ -2,38 +2,30 @@
 // Manages war gear, tools, magical artifacts, and other items
 
 class InventoryManager {
-    constructor(gameState) {
+    constructor(gameState, skipDefaults = false) {
         this.gameState = gameState;
         this.inventory = new Map(); // item_id -> { item, quantity, metadata }
         this.equippedItems = new Map(); // slot -> item_id
         this.itemDefinitions = this.initializeItemDefinitions();
         
-        // Load inventory from localStorage if available
-        this.loadInventory();
-        
-        // Add default items if inventory is empty
-        if (this.inventory.size === 0) {
+        // Add default items if inventory is empty and not skipping defaults
+        if (!skipDefaults && this.inventory.size === 0) {
             this.addDefaultItems();
         }
     }
 
-    // Add default starter items
+        // Add default starter items
     addDefaultItems() {
         console.log('[Inventory] Adding default starter items');
+        
+        // Add essential city building items first
+        this.addItem('tent', 5); // For building placement
+        this.addItem('haste_rune_iii', 2); // For productivity acceleration
         
         // Add some basic starter gear
         this.addItem('iron_sword', 1);
         this.addItem('leather_armor', 1);
         this.addItem('wooden_shield', 1);
-        this.addItem('iron_pickaxe', 1);
-        
-        // Add some consumables
-        this.addItem('health_potion', 3);
-        this.addItem('energy_potion', 2);
-        
-        // Add a magical item
-        this.addItem('crystal_shard', 1);
-        this.addItem('rune_of_haste', 1);
         
         console.log('[Inventory] Default items added successfully');
     }
@@ -288,6 +280,54 @@ class InventoryManager {
 
             // MAGICAL ARTIFACTS
             magical: {
+                haste_rune: {
+                    id: 'haste_rune',
+                    name: 'Haste Rune',
+                    category: 'consumable',
+                    subcategory: 'rune',
+                    icon: '⚡',
+                    rarity: 'common',
+                    description: 'A magical rune that boosts productivity by 2x for selected job',
+                    effects: { productivityMultiplier: 2 },
+                    consumable: true,
+                    stackable: true,
+                    maxStack: 20,
+                    targetable: true, // Can target specific jobs
+                    craftable: true,
+                    craftCost: { arcaneEssence: 3, stone: 5 }
+                },
+                haste_rune_ii: {
+                    id: 'haste_rune_ii',
+                    name: 'Haste Rune II',
+                    category: 'consumable',
+                    subcategory: 'rune',
+                    icon: '⚡⚡',
+                    rarity: 'uncommon',
+                    description: 'An enhanced magical rune that boosts productivity by 3x for selected job',
+                    effects: { productivityMultiplier: 3 },
+                    consumable: true,
+                    stackable: true,
+                    maxStack: 20,
+                    targetable: true, // Can target specific jobs
+                    craftable: true,
+                    craftCost: { arcaneEssence: 8, stone: 10, gold: 5 }
+                },
+                haste_rune_iii: {
+                    id: 'haste_rune_iii',
+                    name: 'Haste Rune III',
+                    category: 'consumable',
+                    subcategory: 'rune',
+                    icon: '⚡⚡⚡',
+                    rarity: 'rare',
+                    description: 'A powerful magical rune that boosts productivity by 4x for selected job',
+                    effects: { productivityMultiplier: 4 },
+                    consumable: true,
+                    stackable: true,
+                    maxStack: 20,
+                    targetable: true, // Can target specific jobs
+                    craftable: true,
+                    craftCost: { arcaneEssence: 15, stone: 20, gold: 15 }
+                },
                 runes_of_haste: {
                     id: 'runes_of_haste',
                     name: 'Runes of Haste',
@@ -458,6 +498,42 @@ class InventoryManager {
                     maxStack: 10,
                     craftable: true,
                     craftCost: { crystal_shard: 3, gold: 20 }
+                },
+                haste_rune: {
+                    id: 'haste_rune',
+                    name: 'Haste Rune',
+                    category: 'magical',
+                    subcategory: 'rune',
+                    icon: '⚡',
+                    rarity: 'uncommon',
+                    description: 'A magical rune that speeds up construction and crafting',
+                    effects: { constructionSpeedBonus: 25, craftingSpeedBonus: 25, duration: 30 },
+                    consumable: true,
+                    stackable: true,
+                    maxStack: 20,
+                    craftable: true,
+                    craftCost: { crystal_shard: 1, gold: 10 }
+                }
+            },
+
+            // BUILDING ITEMS
+            buildings: {
+                tent: {
+                    id: 'tent',
+                    name: 'Tent',
+                    category: 'building',
+                    subcategory: 'shelter',
+                    icon: '🏕️',
+                    rarity: 'common',
+                    description: 'A portable shelter that can be placed to provide housing and worker jobs',
+                    effects: { housing: 5, builderJobs: 2 },
+                    consumable: true, // Used when placed
+                    stackable: true,
+                    maxStack: 50,
+                    craftable: true,
+                    craftCost: { wood: 10, fabric: 5 },
+                    placeable: true, // Can be placed as building
+                    buildingType: 'tent'
                 }
             }
         };
@@ -688,30 +764,6 @@ class InventoryManager {
         }
     }
 
-    // Save inventory to localStorage
-    saveInventory() {
-        const saveData = {
-            inventory: Array.from(this.inventory.entries()),
-            equipped: Array.from(this.equippedItems.entries())
-        };
-        localStorage.setItem('gameInventory', JSON.stringify(saveData));
-    }
-
-    // Load inventory from localStorage
-    loadInventory() {
-        const saved = localStorage.getItem('gameInventory');
-        if (saved) {
-            try {
-                const saveData = JSON.parse(saved);
-                this.inventory = new Map(saveData.inventory || []);
-                this.equippedItems = new Map(saveData.equipped || []);
-                console.log('[Inventory] Loaded inventory from save');
-            } catch (e) {
-                console.warn('[Inventory] Error loading inventory:', e);
-            }
-        }
-    }
-
     // Get all items in inventory format expected by UI
     getInventory() {
         const inventoryArray = [];
@@ -812,9 +864,90 @@ class InventoryManager {
         
         return rarityValues[itemDef.rarity] || 10;
     }
+
+    // Place a building item from inventory
+    placeBuilding(itemId, x = null, y = null) {
+        const item = this.inventory.get(itemId);
+        if (!item || !item.item.placeable) {
+            console.warn('[Inventory] Item cannot be placed as building:', itemId);
+            return false;
+        }
+
+        // Check if we have the item
+        if (!this.hasItem(itemId, 1)) {
+            console.warn('[Inventory] Not enough items to place:', itemId);
+            return false;
+        }
+
+        // Fallback: add to gameState buildings list and consume item
+        if (this.gameState && this.gameState.buildings) {
+            const building = {
+                id: Date.now() + Math.random(),
+                type: item.item.buildingType,
+                level: 1,
+                built: true,
+                x: x,
+                y: y
+            };
+            
+            this.gameState.buildings.push(building);
+            this.removeItem(itemId, 1);
+            
+            console.log('[Inventory] Building added to gameState:', building);
+            return true;
+        }
+
+        console.warn('[Inventory] Unable to place building - no placement system available');
+        return false;
+    }
+
+    // Check if item can be placed as building
+    canPlaceBuilding(itemId) {
+        const item = this.inventory.get(itemId);
+        return item && item.item.placeable && item.item.buildingType;
+    }
+
+    // Serialize for unified save system
+    serialize() {
+        return {
+            version: '1.0',
+            inventory: Array.from(this.inventory.entries()),
+            equippedItems: Array.from(this.equippedItems.entries())
+        };
+    }
+
+    // Deserialize from unified save system
+    deserialize(data) {
+        if (!data || !data.inventory) {
+            console.warn('[InventoryManager] Invalid save data format');
+            return false;
+        }
+
+        try {
+            // Restore inventory
+            this.inventory = new Map(data.inventory);
+            
+            // Restore equipped items
+            if (data.equippedItems) {
+                this.equippedItems = new Map(data.equippedItems);
+            }
+            
+            console.log('[InventoryManager] Data deserialized successfully');
+            return true;
+        } catch (error) {
+            console.error('[InventoryManager] Failed to deserialize data:', error);
+            return false;
+        }
+    }
 }
 
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = InventoryManager;
+}
+
+// Export to global window for browser use
+if (typeof window !== 'undefined') {
+    window.InventoryManager = InventoryManager;
+    console.log('[InventoryManager] Class exported to window object');
 }

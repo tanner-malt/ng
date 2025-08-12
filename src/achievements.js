@@ -116,6 +116,15 @@ class AchievementSystem {
             reward: { gold: 200, prestige: 50 }
         });
 
+        this.defineAchievement('build_and_they_will_come', {
+            title: 'Build and They Will Come',
+            description: 'Built your first Builders Hut',
+            icon: '🔨',
+            type: 'building',
+            reward: { gold: 100, prestige: 25 },
+            unlocks: ['keep'] // Unlocks the keep building
+        });
+
         // Resource achievements with multiple conditions
         this.defineAchievement('wealthy_ruler', {
             title: 'Wealthy Ruler',
@@ -173,7 +182,7 @@ class AchievementSystem {
             icon: '🏡',
             type: 'population',
             requirement: { population: 10 },
-            reward: { food: 100, wood: 50 }
+            reward: { food: 100, wood: 75 }
         });
 
         this.defineAchievement('great_city', {
@@ -438,12 +447,16 @@ class AchievementSystem {
             case 'townCenter':
                 this.stats.towncenters_built++;
                 break;
+            case 'buildersHut':
+                // No specific stat tracking needed for buildersHut
+                break;
         }
 
         const achievementMap = {
             'townCenter': 'first_settlement',
             'farm': 'feeding_people',
-            'barracks': 'military_establishment'
+            'barracks': 'military_establishment',
+            'buildersHut': 'build_and_they_will_come'
         };
 
         const achievementId = achievementMap[buildingType];
@@ -617,6 +630,16 @@ class AchievementSystem {
         // Show modal notification
         if (!silent) {
             this.showAchievementModal(achievement);
+        }
+
+        // Handle building unlocks
+        if (achievement.unlocks && achievement.unlocks.length > 0) {
+            achievement.unlocks.forEach(buildingType => {
+                if (window.gameState && window.gameState.unlockBuilding) {
+                    window.gameState.unlockBuilding(buildingType);
+                    console.log(`[Achievements] Unlocked building: ${buildingType}`);
+                }
+            });
         }
 
         // Trigger unlock system check (delayed to avoid recursive calls)

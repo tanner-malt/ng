@@ -24,6 +24,8 @@
     <script src="../src/buildingEffects.js"></script>
     <script src="../src/buildingTutorial.js"></script>
     <script src="../src/constructionManager.js"></script>
+    <script src="../src/jobManager.js"></script>
+    <script src="../src/tileManager.js"></script>
     <script src="../src/inventoryManager.js"></script>
     <script src="../src/expeditionInventory.js"></script>
     <script src="../src/village.js"></script>
@@ -232,6 +234,7 @@
                                 </div>
                                 <div class="population-actions">
                                     <button id="population-view-btn" class="population-view-button">👥 View Population</button>
+                                    <button id="jobs-btn" class="population-view-button" style="margin-left: 10px;">🔨 Manage Jobs</button>
                                 </div>
                             </div>
                         </div>
@@ -1475,6 +1478,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <!-- Throne Navigation Tabs -->
                     <div class="throne-tabs">
                         <button class="throne-tab-btn active" data-tab="dynasty">👑 Dynasty</button>
+                        <button class="throne-tab-btn" data-tab="equipment">⚔️ Equipment</button>
                         <button class="throne-tab-btn" data-tab="merge">✨ Artifacts</button>
                         <button class="throne-tab-btn" data-tab="court">🏛️ Court</button>
                     </div>
@@ -1516,6 +1520,40 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <h3>📊 Dynasty Legacy</h3>
                                 <div id="dynasty-stats" class="dynasty-stats">
                                     <!-- Will be populated by JS -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Equipment Tab -->
+                    <div id="equipment-tab" class="throne-tab">
+                        <div class="equipment-content">
+                            <div class="equipment-header">
+                                <h3>⚔️ Royal Armory</h3>
+                                <p>Manage weapons, armor, and equipment for your armies and royal guard</p>
+                            </div>
+                            
+                            <div class="equipment-sections">
+                                <!-- Current Equipment -->
+                                <div class="equipment-section">
+                                    <h4>👑 Royal Equipment</h4>
+                                    <div id="royal-equipment" class="equipped-items">
+                                        <!-- Will be populated by JS -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Equipment Categories -->
+                                <div class="equipment-section">
+                                    <h4>🗡️ Available Equipment</h4>
+                                    <div class="equipment-tabs">
+                                        <button class="equipment-category-btn active" data-category="weapons">⚔️ Weapons</button>
+                                        <button class="equipment-category-btn" data-category="armor">🛡️ Armor</button>
+                                        <button class="equipment-category-btn" data-category="tools">🔨 Tools</button>
+                                        <button class="equipment-category-btn" data-category="magical">✨ Magical</button>
+                                    </div>
+                                    <div id="equipment-list" class="equipment-inventory">
+                                        <!-- Will be populated by JS -->
+                                    </div>
                                 </div>
                             </div>
                         </div>

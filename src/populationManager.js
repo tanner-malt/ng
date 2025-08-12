@@ -513,6 +513,132 @@ class PopulationManager {
     }
 
     /**
+     * Generate specific starting population for dynasty games
+     * Creates royal family member + specific professions
+     */
+    generateStartingDynastyPopulation() {
+        console.log('[PopulationManager] Generating starting dynasty population...');
+        
+        // Clear existing population
+        this.population = [];
+        this.nextId = 1;
+        
+        // 1. Create the royal family member (the player character)
+        const royalMember = {
+            age: 30 + Math.floor(Math.random() * 20), // 30-50 years old
+            name: this.generateRandomName() + ' the First',
+            role: 'royal',
+            status: 'ruling',
+            skills: ['leadership', 'combat', 'scholarship'],
+            gender: Math.random() < 0.5 ? 'male' : 'female',
+            happiness: 80,
+            productivity: 1.2,
+            traits: ['noble', 'charismatic', 'educated']
+        };
+        this.addInhabitant(royalMember);
+        
+        // 2. Add one dedicated builder
+        const builder = {
+            age: 25 + Math.floor(Math.random() * 15), // 25-40 years old
+            name: this.generateRandomName(),
+            role: 'builder',
+            status: 'idle',
+            skills: ['building', 'crafting'],
+            gender: Math.random() < 0.5 ? 'male' : 'female',
+            happiness: 70,
+            productivity: 1.0,
+            traits: ['hardworking', 'skilled']
+        };
+        this.addInhabitant(builder);
+        
+        // 3. Add 3 more villagers with useful starting roles
+        const startingRoles = ['farmer', 'guard', 'worker'];
+        for (let i = 0; i < 3; i++) {
+            const villager = {
+                age: 20 + Math.floor(Math.random() * 25), // 20-45 years old
+                name: this.generateRandomName(),
+                role: startingRoles[i],
+                status: 'idle',
+                skills: this.getSkillsForRole(startingRoles[i]),
+                gender: Math.random() < 0.5 ? 'male' : 'female',
+                happiness: 60 + Math.floor(Math.random() * 20),
+                productivity: 0.8 + Math.random() * 0.4,
+                traits: this.generateRandomTraits('adult')
+            };
+            this.addInhabitant(villager);
+        }
+        
+        console.log('[PopulationManager] Generated starting dynasty population:');
+        this.population.forEach(p => {
+            console.log(`  - ${p.name}: ${p.role} (age ${p.age})`);
+        });
+        
+        return this.population;
+    }
+
+    /**
+     * Get appropriate skills for a given role
+     */
+    getSkillsForRole(role) {
+        const roleSkills = {
+            'farmer': ['farming'],
+            'builder': ['building', 'crafting'], 
+            'guard': ['combat'],
+            'worker': ['crafting'],
+            'crafter': ['crafting'],
+            'scholar': ['scholarship'],
+            'trader': ['leadership'],
+            'royal': ['leadership', 'combat', 'scholarship']
+        };
+        return roleSkills[role] || ['crafting'];
+    }
+
+    /**
+     * Generate population with preferred professions
+     * @param {number} count - Number of people to generate  
+     * @param {string[]} preferredProfessions - Array of preferred roles
+     * @returns {array} Array of generated inhabitants
+     */
+    generatePopulationWithPreferences(count, preferredProfessions = []) {
+        const generated = [];
+        console.log(`[PopulationManager] Generating ${count} people with preferred professions:`, preferredProfessions);
+        
+        for (let i = 0; i < count; i++) {
+            // Determine role - prefer specified professions for first few
+            let role = 'worker'; // default
+            if (i < preferredProfessions.length) {
+                role = preferredProfessions[i];
+            } else {
+                // Random role for extras
+                const allRoles = ['farmer', 'builder', 'guard', 'crafter', 'worker', 'trader'];
+                role = allRoles[Math.floor(Math.random() * allRoles.length)];
+            }
+            
+            // Generate age (focus on working adults)
+            const age = 20 + Math.floor(Math.random() * 40); // 20-60 years old
+            
+            const villager = {
+                age: age,
+                name: this.generateRandomName(),
+                role: role,
+                status: 'idle',
+                skills: this.getSkillsForRole(role),
+                gender: Math.random() < 0.5 ? 'male' : 'female',
+                happiness: 60 + Math.floor(Math.random() * 30),
+                productivity: 0.7 + Math.random() * 0.6,
+                traits: this.generateRandomTraits('adult')
+            };
+            
+            const inhabitant = this.addInhabitant(villager);
+            generated.push(inhabitant);
+        }
+        
+        console.log(`[PopulationManager] Generated ${count} inhabitants with roles:`, 
+            generated.map(p => p.role));
+        return generated;
+    }
+
+    /**
      * Generate a random name
      */
     generateRandomName() {

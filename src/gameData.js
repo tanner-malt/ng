@@ -17,10 +17,14 @@ const GameData = {
 
     // Building costs - what resources are required to build each building
     buildingCosts: {
+        // Starter Buildings
+        tent: { wood: 5 }, // Very cheap starter building
+        
         // Essential Buildings
         townCenter: { wood: 50 },
         house: { wood: 25 },
         farm: { wood: 20 },
+        buildersHut: { wood: 30, stone: 15 }, // Professional building for builders
         
         // Production Buildings  
         sawmill: { wood: 40, stone: 20 },
@@ -55,23 +59,51 @@ const GameData = {
 
     // Building production - what resources buildings generate per day/cycle
     buildingProduction: {
+        // Starter Buildings
+        tent: {
+            populationCapacity: 5, // Provides housing for 5 people
+            jobs: {
+                builder: 2 // Provides 2 builder jobs
+            }
+        },
+        
         // Essential Buildings
         townCenter: { 
             population: 2, 
         },
         house: { 
-            populationCapacity: 5 // Each house provides capacity for 5 population
+            populationCapacity: 5, // Each house provides capacity for 5 population
+            jobs: {
+                crafter: 1 // Houses provide basic crafting jobs
+            }
         },
         farm: { 
-            food: 10 
+            food: 10, // Legacy resource production (to be phased out)
+            jobs: {
+                farmer: 2 // Provides 2 farmer jobs
+            }
+        },
+        buildersHut: {
+            jobs: {
+                builder: 4, // Provides 4 builder jobs (more efficient than tents)
+                foreman: 1 // Provides 1 foreman job for construction management
+            }
         },
         
         // Production Buildings
         sawmill: { 
-            wood: 8 
+            wood: 8, // Legacy resource production (to be phased out)
+            jobs: {
+                woodcutter: 3, // Provides 3 woodcutter jobs
+                sawyer: 1 // Provides 1 sawyer job
+            }
         },
         quarry: { 
-            stone: 6 
+            stone: 6, // Legacy resource production (to be phased out)
+            jobs: {
+                miner: 2, // Provides 2 miner jobs
+                stonecutter: 1 // Provides 1 stonecutter job
+            }
         },
         lumberMill: { 
             wood: 4, // Lower wood production but makes planks
@@ -151,6 +183,9 @@ const GameData = {
 
     // Construction times - how many days/hours it takes to build each building
     constructionTimes: {
+        // Starter Buildings
+        tent: 1, // Quick to build
+        
         // Essential Buildings
         townCenter: 3,
         house: 1,
@@ -187,6 +222,13 @@ const GameData = {
 
     // Building metadata - icons, names, descriptions
     buildingInfo: {
+        // Starter Buildings
+        tent: {
+            icon: '⛺',
+            name: 'Tent',
+            description: 'Temporary shelter that provides basic housing and builder jobs'
+        },
+        
         // Essential Buildings
         townCenter: {
             icon: '🏛️',
@@ -202,6 +244,11 @@ const GameData = {
             icon: '🌾',
             name: 'Farm',
             description: 'Produces food for your settlement'
+        },
+        buildersHut: {
+            icon: '🔨',
+            name: 'Builders Hut',
+            description: 'Professional building facility that provides efficient construction workers'
         },
         
         // Production Buildings

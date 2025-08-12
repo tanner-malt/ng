@@ -100,6 +100,9 @@ class ThroneManager {
             // Initialize dynasty system
             this.initializeDynasty();
             
+            // Initialize equipment system
+            this.initializeEquipment();
+            
             // Initialize merge system
             this.initializeMergeSystem();
         } else {
@@ -595,11 +598,21 @@ class ThroneManager {
                 if (targetTab === 'dynasty') {
                     this.updateDynastyDisplay();
                 }
+                // Update content when switching to equipment tab
+                if (targetTab === 'equipment') {
+                    this.updateEquipmentDisplay();
+                }
             });
         });
         
         // Setup dynasty action buttons
         this.setupDynastyActions();
+    }
+    
+    initializeEquipment() {
+        // Equipment initialization will happen when the tab is clicked
+        // But we can setup initial event listeners here
+        this.setupEquipmentCategoryButtons();
     }
     
     setupDynastyActions() {
@@ -928,6 +941,172 @@ class ThroneManager {
                 `,
                 width: '450px'
             });
+        }
+    }
+    
+    updateEquipmentDisplay() {
+        this.updateRoyalEquipment();
+        this.updateEquipmentList('weapons');
+        this.setupEquipmentCategoryButtons();
+    }
+    
+    updateRoyalEquipment() {
+        const royalEquipmentDiv = document.getElementById('royal-equipment');
+        if (!royalEquipmentDiv || !window.inventoryManager) return;
+        
+        const equipped = window.inventoryManager.getEquippedItems();
+        
+        const equipmentHtml = `
+            <div class="equipment-slots">
+                <div class="equipment-slot">
+                    <h5>⚔️ Royal Weapon</h5>
+                    <div class="slot-content">
+                        ${equipped.weapon ? 
+                            `<div class="equipped-item">
+                                <strong>${equipped.weapon.name}</strong>
+                                <p>${equipped.weapon.description || 'A royal weapon'}</p>
+                                <button onclick="window.throneManager.unequipItem('weapon')" class="unequip-btn">Unequip</button>
+                            </div>` : 
+                            '<p class="empty-slot">No weapon equipped</p>'
+                        }
+                    </div>
+                </div>
+                
+                <div class="equipment-slot">
+                    <h5>🛡️ Royal Armor</h5>
+                    <div class="slot-content">
+                        ${equipped.armor ? 
+                            `<div class="equipped-item">
+                                <strong>${equipped.armor.name}</strong>
+                                <p>${equipped.armor.description || 'Royal armor'}</p>
+                                <button onclick="window.throneManager.unequipItem('armor')" class="unequip-btn">Unequip</button>
+                            </div>` : 
+                            '<p class="empty-slot">No armor equipped</p>'
+                        }
+                    </div>
+                </div>
+                
+                <div class="equipment-slot">
+                    <h5>🔨 Royal Tool</h5>
+                    <div class="slot-content">
+                        ${equipped.tool ? 
+                            `<div class="equipped-item">
+                                <strong>${equipped.tool.name}</strong>
+                                <p>${equipped.tool.description || 'A royal tool'}</p>
+                                <button onclick="window.throneManager.unequipItem('tool')" class="unequip-btn">Unequip</button>
+                            </div>` : 
+                            '<p class="empty-slot">No tool equipped</p>'
+                        }
+                    </div>
+                </div>
+                
+                <div class="equipment-slot">
+                    <h5>✨ Royal Shield</h5>
+                    <div class="slot-content">
+                        ${equipped.shield ? 
+                            `<div class="equipped-item">
+                                <strong>${equipped.shield.name}</strong>
+                                <p>${equipped.shield.description || 'A royal shield'}</p>
+                                <button onclick="window.throneManager.unequipItem('shield')" class="unequip-btn">Unequip</button>
+                            </div>` : 
+                            '<p class="empty-slot">No shield equipped</p>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        royalEquipmentDiv.innerHTML = equipmentHtml;
+    }
+    
+    setupEquipmentCategoryButtons() {
+        const categoryBtns = document.querySelectorAll('.equipment-category-btn');
+        
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const category = btn.dataset.category;
+                
+                // Remove active class from all buttons
+                categoryBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Update equipment list for selected category
+                this.updateEquipmentList(category);
+            });
+        });
+    }
+    
+    updateEquipmentList(category) {
+        const equipmentListDiv = document.getElementById('equipment-list');
+        if (!equipmentListDiv || !window.inventoryManager) return;
+        
+        const inventory = window.inventoryManager.getInventory();
+        let items = [];
+        
+        // Filter items by category
+        switch(category) {
+            case 'weapons':
+                items = inventory.filter(item => item.type === 'weapon');
+                break;
+            case 'armor':
+                items = inventory.filter(item => item.type === 'armor');
+                break;
+            case 'tools':
+                items = inventory.filter(item => item.type === 'tool');
+                break;
+            case 'magical':
+                items = inventory.filter(item => item.type === 'magical');
+                break;
+        }
+        
+        if (items.length === 0) {
+            equipmentListDiv.innerHTML = `<p class="no-items">No ${category} available in your armory.</p>`;
+            return;
+        }
+        
+        const itemsHtml = items.map(item => `
+            <div class="equipment-item">
+                <div class="item-info">
+                    <h6>${item.name}</h6>
+                    <p>${item.description || 'Military equipment'}</p>
+                    ${item.stats ? `<div class="item-stats">${Object.entries(item.stats).map(([stat, value]) => `${stat}: +${value}`).join(', ')}</div>` : ''}
+                </div>
+                <div class="item-actions">
+                    <button onclick="window.throneManager.equipItem('${item.id}')" class="equip-btn">Equip</button>
+                </div>
+            </div>
+        `).join('');
+        
+        equipmentListDiv.innerHTML = itemsHtml;
+    }
+    
+    equipItem(itemId) {
+        if (!window.inventoryManager) return;
+        
+        const success = window.inventoryManager.equipItem(itemId);
+        if (success) {
+            this.updateRoyalEquipment();
+            this.updateEquipmentList(document.querySelector('.equipment-category-btn.active')?.dataset.category || 'weapons');
+            
+            // Show notification
+            if (window.modalSystem) {
+                window.modalSystem.showNotification('Equipment successfully updated!', { type: 'success' });
+            }
+        }
+    }
+    
+    unequipItem(slotType) {
+        if (!window.inventoryManager) return;
+        
+        const success = window.inventoryManager.unequipItem(slotType);
+        if (success) {
+            this.updateRoyalEquipment();
+            this.updateEquipmentList(document.querySelector('.equipment-category-btn.active')?.dataset.category || 'weapons');
+            
+            // Show notification
+            if (window.modalSystem) {
+                window.modalSystem.showNotification('Equipment unequipped successfully!', { type: 'success' });
+            }
         }
     }
 }

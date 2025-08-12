@@ -1883,6 +1883,295 @@ body {
     border: 1px solid rgba(26, 188, 156, 0.3);
 }
 
+/* Equipment Tab */
+.equipment-content {
+    padding: 1.5rem;
+}
+
+.equipment-header {
+    margin-bottom: 2rem;
+}
+
+.equipment-header h3 {
+    color: #1abc9c;
+    margin-bottom: 0.5rem;
+}
+
+.equipment-header p {
+    color: #bdc3c7;
+    font-size: 0.9rem;
+}
+
+.equipment-sections {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 2rem;
+    height: calc(100vh - 300px);
+}
+
+.equipment-section {
+    background: rgba(52, 73, 94, 0.6);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid rgba(26, 188, 156, 0.3);
+}
+
+.equipment-section h4 {
+    color: #1abc9c;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+/* Royal Equipment Display */
+.equipment-slots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.equipment-slot {
+    background: rgba(44, 62, 80, 0.8);
+    border-radius: 6px;
+    padding: 1rem;
+    border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.equipment-slot h5 {
+    color: #3498db;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.equipped-item {
+    color: #ecf0f1;
+}
+
+.equipped-item strong {
+    color: #1abc9c;
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.equipped-item p {
+    color: #bdc3c7;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.unequip-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.unequip-btn:hover {
+    background: #c0392b;
+}
+
+.empty-slot {
+    color: #7f8c8d;
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+/* Equipment Categories */
+.equipment-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.equipment-category-btn {
+    background: rgba(52, 73, 94, 0.8);
+    color: #bdc3c7;
+    border: 1px solid rgba(149, 165, 166, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.equipment-category-btn:hover {
+    background: rgba(52, 152, 219, 0.3);
+    border-color: #3498db;
+}
+
+.equipment-category-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+/* Equipment List */
+.equipment-inventory {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.equipment-item {
+    background: rgba(44, 62, 80, 0.6);
+    border: 1px solid rgba(149, 165, 166, 0.2);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    transition: all 0.2s;
+}
+
+.equipment-item:hover {
+    border-color: rgba(26, 188, 156, 0.5);
+    background: rgba(44, 62, 80, 0.8);
+}
+
+.item-info {
+    flex: 1;
+}
+
+.item-info h6 {
+    color: #1abc9c;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+.item-info p {
+    color: #bdc3c7;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.item-stats {
+    color: #3498db;
+    font-size: 0.8rem;
+}
+
+.item-actions {
+    margin-left: 1rem;
+}
+
+.equip-btn {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 0.85rem;
+}
+
+.equip-btn:hover {
+    background: #229954;
+}
+
+.no-items {
+    color: #7f8c8d;
+    text-align: center;
+    padding: 2rem;
+    font-style: italic;
+}
+
+/* Inventory Notice */
+.inventory-notice {
+    background: rgba(52, 152, 219, 0.2);
+    border: 1px solid rgba(52, 152, 219, 0.3);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.inventory-notice p {
+    color: #3498db;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.inventory-notice strong {
+    color: #1abc9c;
+}
+
+/* Job Targeting Modal */
+.job-targeting-modal {
+    padding: 1rem;
+}
+
+.worker-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 1rem 0;
+}
+
+.worker-option {
+    margin-bottom: 0.5rem;
+}
+
+.worker-btn {
+    width: 100%;
+    background: rgba(44, 62, 80, 0.8);
+    border: 1px solid rgba(26, 188, 156, 0.3);
+    border-radius: 6px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.worker-btn:hover {
+    background: rgba(26, 188, 156, 0.2);
+    border-color: #1abc9c;
+}
+
+.worker-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.worker-info strong {
+    color: #1abc9c;
+    font-size: 1rem;
+}
+
+.worker-role {
+    color: #3498db;
+    font-size: 0.9rem;
+    text-transform: capitalize;
+}
+
+.boost-info {
+    color: #f39c12;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.cancel-btn {
+    background: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+
+.cancel-btn:hover {
+    background: #95a5a6;
+}
+
+.no-workers-modal {
+    text-align: center;
+    padding: 1rem;
+}
+
 /* Responsive Dynasty Layout */
 @media (max-width: 1024px) {
     .dynasty-content {
@@ -5499,11 +5788,6 @@ html {
 .population-stat span:last-child {
     color: var(--text-primary);
     font-weight: 600;
-}
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 /* Production Table Styles */

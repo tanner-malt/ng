@@ -1401,7 +1401,7 @@ class ModalSystem {
                     try {
                         const saveData = e.target.result;
                         JSON.parse(saveData); // Validate JSON
-                        localStorage.setItem('gameState', saveData);
+                        localStorage.setItem('idleDynastyBuilder', saveData);
                         this.showNotification('Save imported successfully! Reload the page to apply.', { type: 'success' });
                     } catch (err) {
                         this.showNotification('Invalid save file', { type: 'error' });

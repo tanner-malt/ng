@@ -28,6 +28,14 @@ class EventBusIntegrations {
             this.handlePopulationUpdate(data);
         });
 
+        window.eventBus.on('population_gained', (data) => {
+            this.handlePopulationUpdate(data);
+        });
+
+        window.eventBus.on('population_died', (data) => {
+            this.handlePopulationUpdate(data);
+        });
+
         // Building events
         window.eventBus.on('building_placed', (data) => {
             this.handleBuildingPlaced(data);

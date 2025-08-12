@@ -254,6 +254,8 @@ class VillageManager {
             this.initProductionPlanner();
             console.log('[Village] Setting up population view button...');
             this.setupPopulationViewButton();
+            console.log('[Village] Setting up jobs management button...');
+            this.setupJobsButton();
             console.log('[Village] Village initialization complete');
         } catch (error) {
             console.error('[Village] Error during initialization:', error);
@@ -1086,14 +1088,48 @@ class VillageManager {
         `;
 
         if (isUnderConstruction) {
-            const daysLeft = Math.max(0, GameData.buildingCosts[building.type].time - building.constructionProgress);
-            contentHTML += `
-                <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
-                    <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
-                    <div style="color: #ecf0f1; font-size: 11px;">Progress: ${building.constructionProgress}/${GameData.buildingCosts[building.type].time} days</div>
-                    <div style="color: #ecf0f1; font-size: 11px;">${daysLeft} days remaining</div>
-                </div>
-            `;
+            // Get construction progress from the new construction system
+            const constructionProgress = this.gameState.constructionManager?.getConstructionProgress(building.id);
+            
+            if (constructionProgress) {
+                // Use wiki-documented construction system data
+                const progressPercent = constructionProgress.progressPercent;
+                const remainingTime = constructionProgress.remainingTime;
+                const totalTime = constructionProgress.totalBuildTime;
+                const assignedWorkers = constructionProgress.assignedWorkers;
+                const maxWorkers = constructionProgress.maxWorkers;
+                const season = constructionProgress.currentSeason;
+                
+                contentHTML += `
+                    <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
+                        <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${progressPercent}% complete</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Time remaining: ${Math.ceil(remainingTime)} days</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Workers: ${assignedWorkers}/${maxWorkers}</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Season: ${season}</div>
+                        
+                        <!-- Efficiency breakdown -->
+                        <div style="margin-top: 5px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <div style="color: #95a5a6; font-size: 10px;">Efficiency Modifiers:</div>
+                            <div style="color: #ecf0f1; font-size: 10px;">⚡ Skill: ${Math.round((constructionProgress.skillEfficiency - 1) * 100)}%</div>
+                            <div style="color: #ecf0f1; font-size: 10px;">🌤️ Season: ${Math.round((constructionProgress.seasonalEfficiency - 1) * 100)}%</div>
+                            <div style="color: #ecf0f1; font-size: 10px;">👥 Teamwork: ${Math.round((constructionProgress.teamworkBonus - 1) * 100)}%</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Fallback for legacy construction system
+                const constructionTime = GameData.constructionTimes?.[building.type] || 2;
+                const progress = building.constructionProgress || 0;
+                const daysLeft = Math.max(0, constructionTime - progress);
+                contentHTML += `
+                    <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
+                        <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${progress}/${constructionTime} days</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">${daysLeft} days remaining</div>
+                    </div>
+                `;
+            }
         }
 
         // Production info
@@ -1489,6 +1525,186 @@ class VillageManager {
         } else {
             console.error('[Village] population-view-btn element not found');
         }
+    }
+
+    setupJobsButton() {
+        const jobsBtn = document.getElementById('jobs-btn');
+        if (jobsBtn) {
+            jobsBtn.addEventListener('click', () => {
+                this.showJobsManagement();
+            });
+            console.log('[Village] Jobs button event listener added');
+        } else {
+            console.warn('[Village] Jobs button not found');
+        }
+    }
+
+    showJobsManagement() {
+        // Initialize job manager if not already done
+        if (!this.gameState.jobManager) {
+            this.gameState.jobManager = new JobManager(this.gameState);
+        }
+
+        // Update available jobs
+        this.gameState.jobManager.updateAvailableJobs();
+
+        const availableJobs = this.gameState.jobManager.getAllAvailableJobs();
+        const availableWorkers = this.gameState.jobManager.getAvailableWorkers();
+        const jobSummary = this.gameState.jobManager.getJobSummary();
+
+        let contentHTML = `
+            <div style="padding: 20px; max-width: 800px;">
+                <h2 style="color: #3498db; margin-bottom: 20px; text-align: center;">🔨 Jobs Management</h2>
+                
+                <!-- Summary Stats -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                    <div style="background: rgba(52, 152, 219, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="color: #3498db; font-weight: bold;">Total Jobs</div>
+                        <div style="color: #ecf0f1; font-size: 18px;">${jobSummary.totalJobs}</div>
+                    </div>
+                    <div style="background: rgba(46, 204, 113, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="color: #2ecc71; font-weight: bold;">Filled Jobs</div>
+                        <div style="color: #ecf0f1; font-size: 18px;">${jobSummary.totalWorkers}</div>
+                    </div>
+                    <div style="background: rgba(241, 196, 15, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
+                        <div style="color: #f1c40f; font-weight: bold;">Available Workers</div>
+                        <div style="color: #ecf0f1; font-size: 18px;">${availableWorkers.length}</div>
+                    </div>
+                </div>
+        `;
+
+        // Available Jobs Section
+        if (availableJobs.length > 0) {
+            contentHTML += `
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #2ecc71; margin-bottom: 15px;">📋 Available Job Positions</h3>
+                    <div style="display: grid; gap: 10px;">
+            `;
+
+            availableJobs.forEach(job => {
+                const jobIcon = this.getJobIcon(job.jobType);
+                contentHTML += `
+                    <div style="background: rgba(39, 174, 96, 0.1); border: 1px solid #27ae60; border-radius: 8px; padding: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 20px;">${job.buildingIcon}</span>
+                                <div>
+                                    <div style="color: #2ecc71; font-weight: bold;">${jobIcon} ${job.jobType.charAt(0).toUpperCase() + job.jobType.slice(1)}</div>
+                                    <div style="color: #bdc3c7; font-size: 12px;">${job.buildingType} (${job.position.x}, ${job.position.y})</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: #ecf0f1; font-size: 14px;">${job.currentWorkers}/${job.maxWorkers} filled</div>
+                                <div style="color: #f39c12; font-size: 12px;">${job.availableSlots} available</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            contentHTML += `</div></div>`;
+        }
+
+        // Available Workers Section
+        if (availableWorkers.length > 0) {
+            contentHTML += `
+                <div style="margin-bottom: 25px;">
+                    <h3 style="color: #e74c3c; margin-bottom: 15px;">👥 Available Workers</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
+            `;
+
+            availableWorkers.slice(0, 8).forEach(worker => { // Show first 8 workers
+                const bestSkill = this.getBestSkill(worker.skills);
+                contentHTML += `
+                    <div style="background: rgba(231, 76, 60, 0.1); border: 1px solid #e74c3c; border-radius: 8px; padding: 10px;">
+                        <div style="color: #e74c3c; font-weight: bold; margin-bottom: 5px;">${worker.name}</div>
+                        <div style="color: #bdc3c7; font-size: 12px; margin-bottom: 3px;">Age: ${worker.age}</div>
+                        <div style="color: #bdc3c7; font-size: 12px; margin-bottom: 3px;">Health: ${worker.health}%</div>
+                        ${bestSkill ? `<div style="color: #f39c12; font-size: 12px;">Best: ${bestSkill.name} (${bestSkill.level})</div>` : ''}
+                    </div>
+                `;
+            });
+
+            if (availableWorkers.length > 8) {
+                contentHTML += `
+                    <div style="background: rgba(149, 165, 166, 0.1); border: 1px solid #95a5a6; border-radius: 8px; padding: 10px; display: flex; align-items: center; justify-content: center;">
+                        <div style="color: #95a5a6; text-align: center;">
+                            <div style="font-weight: bold;">+${availableWorkers.length - 8} more</div>
+                            <div style="font-size: 12px;">workers available</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            contentHTML += `</div></div>`;
+        }
+
+        // Auto-assign button
+        contentHTML += `
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="window.villageManager.autoAssignAllWorkers()" 
+                        style="background: linear-gradient(45deg, #3498db, #2ecc71); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                    🔄 Auto-Assign Workers
+                </button>
+            </div>
+        `;
+
+        contentHTML += `</div>`;
+
+        // Show the modal
+        if (window.showModal) {
+            window.showModal('Jobs Management', contentHTML);
+        } else {
+            console.warn('[Village] showModal function not available');
+        }
+    }
+
+    getJobIcon(jobType) {
+        const icons = {
+            farmer: '🌾',
+            woodcutter: '🪓',
+            sawyer: '🪚',
+            miner: '⛏️',
+            stonecutter: '🔨',
+            builder: '🔨',
+            crafter: '⚒️'
+        };
+        return icons[jobType] || '👷';
+    }
+
+    getBestSkill(skills) {
+        if (!skills || Object.keys(skills).length === 0) return null;
+        
+        let bestSkill = null;
+        let highestLevel = 0;
+        
+        Object.entries(skills).forEach(([skillName, level]) => {
+            if (level > highestLevel) {
+                highestLevel = level;
+                bestSkill = { name: skillName, level };
+            }
+        });
+        
+        return bestSkill;
+    }
+
+    autoAssignAllWorkers() {
+        if (!this.gameState.jobManager) {
+            this.gameState.jobManager = new JobManager(this.gameState);
+        }
+        
+        const assigned = this.gameState.jobManager.autoAssignWorkers();
+        
+        if (window.showNotification) {
+            window.showNotification(
+                `🔄 Auto-Assignment Complete!`,
+                `Assigned ${assigned} workers to available jobs`,
+                { timeout: 3000, icon: '👷' }
+            );
+        }
+        
+        // Refresh the jobs panel
+        setTimeout(() => this.showJobsManagement(), 500);
     }
 
     initializePopulationManager() {
@@ -2389,44 +2605,33 @@ class VillageManager {
     showInventoryModal() {
         if (!window.inventoryManager) {
             console.error('[Village] InventoryManager not available');
-            return;
+            // Try to initialize if not available
+            if (window.gameState && window.gameState.ensureInventoryManager) {
+                window.gameState.ensureInventoryManager();
+            }
+            if (!window.inventoryManager) {
+                return;
+            }
         }
 
         const inventory = window.inventoryManager.getInventory();
         const equipped = window.inventoryManager.getEquippedItems();
+        
+        // Get city inventory from tile manager if available
+        const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
 
         const modalContent = `
             <div class="inventory-modal">
-                <h2>Inventory</h2>
+                <h2>City Inventory & Army Supplies</h2>
                 <div class="inventory-tabs">
                     <button class="tab-button active" onclick="window.villageManager.switchInventoryTab('all')">All Items</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('weapons')">Weapons</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('armor')">Armor</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('tools')">Tools</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('magical')">Magical</button>
                     <button class="tab-button" onclick="window.villageManager.switchInventoryTab('consumables')">Consumables</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('building')">Building Items</button>
+                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('city')">City Storage</button>
                 </div>
                 
-                <div class="equipped-items">
-                    <h3>Equipped Items</h3>
-                    <div class="equipment-slots">
-                        <div class="equipment-slot weapon">
-                            <span>Weapon: ${equipped.weapon ? equipped.weapon.name : 'None'}</span>
-                            ${equipped.weapon ? `<button onclick="window.villageManager.unequipItem('weapon')">Unequip</button>` : ''}
-                        </div>
-                        <div class="equipment-slot armor">
-                            <span>Armor: ${equipped.armor ? equipped.armor.name : 'None'}</span>
-                            ${equipped.armor ? `<button onclick="window.villageManager.unequipItem('armor')">Unequip</button>` : ''}
-                        </div>
-                        <div class="equipment-slot shield">
-                            <span>Shield: ${equipped.shield ? equipped.shield.name : 'None'}</span>
-                            ${equipped.shield ? `<button onclick="window.villageManager.unequipItem('shield')">Unequip</button>` : ''}
-                        </div>
-                        <div class="equipment-slot tool">
-                            <span>Tool: ${equipped.tool ? equipped.tool.name : 'None'}</span>
-                            ${equipped.tool ? `<button onclick="window.villageManager.unequipItem('tool')">Unequip</button>` : ''}
-                        </div>
-                    </div>
+                <div class="inventory-notice">
+                    <p><strong>📍 Note:</strong> Equipment and weapons are managed in the <strong>Throne Room</strong> → Equipment tab</p>
                 </div>
 
                 <div class="inventory-items" id="inventory-items">
@@ -2436,7 +2641,11 @@ class VillageManager {
         `;
 
         if (window.modalSystem) {
-            window.modalSystem.showModal(modalContent, 'large');
+            window.modalSystem.showModal({
+                title: 'Inventory',
+                content: modalContent,
+                className: 'large'
+            });
         }
     }
 
@@ -2453,16 +2662,35 @@ class VillageManager {
     }
 
     renderInventoryItems(inventory, category) {
-        const filteredItems = category === 'all' ? 
-            inventory : 
-            inventory.filter(item => item.category === category);
+        let filteredItems;
+        
+        if (category === 'city') {
+            // Show city storage from tile manager
+            const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
+            filteredItems = Object.entries(cityInventory).map(([itemId, data]) => ({
+                id: itemId,
+                name: itemId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                category: 'city',
+                quantity: data.quantity,
+                locations: data.locations,
+                description: `Stored in city locations: ${data.locations.length} tiles`
+            }));
+        } else {
+            // Filter out equipment items (weapons, armor, tools, magical) - these go to throne room
+            const equipmentTypes = ['weapon', 'armor', 'tool', 'magical'];
+            const nonEquipmentInventory = inventory.filter(item => !equipmentTypes.includes(item.type));
+            
+            filteredItems = category === 'all' ? 
+                nonEquipmentInventory : 
+                nonEquipmentInventory.filter(item => item.category === category);
+        }
 
         if (filteredItems.length === 0) {
             return '<p class="no-items">No items in this category</p>';
         }
 
         return filteredItems.map(item => `
-            <div class="inventory-item ${item.rarity}" data-item-id="${item.id}">
+            <div class="inventory-item ${item.rarity || 'common'}" data-item-id="${item.id}">
                 <div class="item-header">
                     <span class="item-name">${item.name}</span>
                     <span class="item-quantity">x${item.quantity}</span>
@@ -2474,14 +2702,362 @@ class VillageManager {
                     ).join(' ')}
                 </div>
                 <div class="item-actions">
-                    ${item.category === 'consumables' ? 
-                        `<button onclick="window.villageManager.useInventoryItem('${item.id}')">Use</button>` :
-                        `<button onclick="window.villageManager.equipInventoryItem('${item.id}')">Equip</button>`
+                    ${category === 'city' ? 
+                        `<button onclick="window.villageManager.viewCityItemLocations('${item.id}')">View Locations</button>` :
+                        this.renderItemActionButtons(item)
                     }
                     <button onclick="window.villageManager.showItemDetails('${item.id}')">Details</button>
                 </div>
             </div>
         `).join('');
+    }
+
+    renderItemActionButtons(item) {
+        const buttons = [];
+        
+        if (item.category === 'consumables') {
+            buttons.push(`<button onclick="window.villageManager.useInventoryItem('${item.id}')">Use</button>`);
+        } else if (item.category === 'building' && window.inventoryManager.canPlaceBuilding && window.inventoryManager.canPlaceBuilding(item.id)) {
+            buttons.push(`<button onclick="window.villageManager.placeBuildingItem('${item.id}')">Place Building</button>`);
+        } else {
+            buttons.push(`<button onclick="window.villageManager.equipInventoryItem('${item.id}')">Equip</button>`);
+        }
+        
+        return buttons.join(' ');
+    }
+
+    // Use inventory item (for consumables)
+    useInventoryItem(itemId) {
+        if (!window.inventoryManager) {
+            console.warn('[Village] Inventory manager not available');
+            return;
+        }
+
+        const itemDef = window.inventoryManager.getItemDefinition(itemId);
+        if (!itemDef) {
+            console.error('[Village] Item definition not found:', itemId);
+            return;
+        }
+
+        // Check if item is targetable (like haste runes)
+        if (itemDef.targetable && itemDef.effects && itemDef.effects.productivityMultiplier) {
+            this.showJobTargetingModal(itemId, itemDef);
+        } else {
+            // Regular consumable use
+            const success = window.inventoryManager.useItem(itemId);
+            if (success) {
+                if (window.modalSystem) {
+                    window.modalSystem.showNotification(`Used ${itemDef.name}!`, { type: 'success' });
+                }
+            }
+        }
+    }
+
+    // Show job targeting modal for haste runes
+    showJobTargetingModal(itemId, itemDef) {
+        if (!window.gameState || !window.gameState.populationManager) {
+            console.warn('[Village] Population manager not available');
+            return;
+        }
+
+        const population = window.gameState.populationManager.getAll();
+        const workers = population.filter(p => p.role !== 'child' && p.role !== 'royal');
+
+        if (workers.length === 0) {
+            if (window.modalSystem) {
+                window.modalSystem.showModal({
+                    title: 'No Workers Available',
+                    content: `
+                        <div class="no-workers-modal">
+                            <p>There are no workers available to boost with the ${itemDef.name}.</p>
+                            <button onclick="window.modalSystem.closeTopModal()">OK</button>
+                        </div>
+                    `,
+                    width: '300px'
+                });
+            }
+            return;
+        }
+
+        const workerOptions = workers.map(worker => `
+            <div class="worker-option">
+                <button onclick="window.villageManager.applyHasteRuneToWorker('${itemId}', ${worker.id})" class="worker-btn">
+                    <div class="worker-info">
+                        <strong>${worker.name}</strong>
+                        <span class="worker-role">${worker.role}</span>
+                        <span class="boost-info">→ ${itemDef.effects.productivityMultiplier}x productivity</span>
+                    </div>
+                </button>
+            </div>
+        `).join('');
+
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: `Use ${itemDef.name}`,
+                content: `
+                    <div class="job-targeting-modal">
+                        <p>Select a worker to boost their productivity by ${itemDef.effects.productivityMultiplier}x:</p>
+                        <div class="worker-list">
+                            ${workerOptions}
+                        </div>
+                        <button onclick="window.modalSystem.closeTopModal()" class="cancel-btn">Cancel</button>
+                    </div>
+                `,
+                width: '450px'
+            });
+        }
+    }
+
+    // Apply haste rune to specific worker
+    applyHasteRuneToWorker(itemId, workerId) {
+        if (!window.inventoryManager || !window.gameState || !window.gameState.populationManager) {
+            console.warn('[Village] Required managers not available');
+            return;
+        }
+
+        const itemDef = window.inventoryManager.getItemDefinition(itemId);
+        const worker = window.gameState.populationManager.getById(workerId);
+        
+        if (!itemDef || !worker) {
+            console.error('[Village] Item or worker not found');
+            return;
+        }
+
+        // Use the item from inventory
+        const success = window.inventoryManager.useItem(itemId);
+        if (success) {
+            // Apply productivity boost to worker
+            const multiplier = itemDef.effects.productivityMultiplier;
+            worker.productivityBoost = {
+                multiplier: multiplier,
+                source: itemDef.name,
+                duration: 24, // 24 hours/days
+                startDay: window.gameState.currentDay || 1
+            };
+
+            // Close modal
+            if (window.modalSystem) {
+                window.modalSystem.closeTopModal();
+            }
+
+            // Show success notification
+            if (window.modalSystem) {
+                window.modalSystem.showNotification(
+                    `${worker.name} now has ${multiplier}x productivity from ${itemDef.name}!`, 
+                    { type: 'success' }
+                );
+            }
+
+            console.log('[Village] Applied productivity boost:', {
+                worker: worker.name,
+                multiplier: multiplier,
+                duration: 24
+            });
+
+            // Update UI
+            this.gameState?.updateUI();
+        }
+    }
+
+    // View city item locations
+    viewCityItemLocations(itemId) {
+        if (!window.tileManager) {
+            console.warn('[Village] Tile manager not available');
+            return;
+        }
+
+        const locations = window.tileManager.findItemLocations(itemId);
+        const locationText = locations.map(loc => `(${loc.x}, ${loc.y}): ${loc.quantity}`).join('<br>');
+        
+        if (window.modalSystem) {
+            window.modalSystem.showModal(`
+                <div class="item-locations-modal">
+                    <h3>${itemId} Locations</h3>
+                    <div class="locations-list">
+                        ${locationText || 'No locations found'}
+                    </div>
+                    <button onclick="window.modalSystem.closeModal()">Close</button>
+                </div>
+            `, 'medium');
+        }
+    }
+
+    // Place building item
+    placeBuildingItem(itemId) {
+        if (!window.inventoryManager) {
+            console.warn('[Village] Inventory manager not available');
+            return;
+        }
+
+        // Close the inventory modal first
+        if (window.modalSystem) {
+            window.modalSystem.closeTopModal();
+        }
+
+        // Enable building placement mode
+        this.enterBuildingPlacementMode(itemId);
+    }
+
+    // Enter building placement mode for inventory items
+    enterBuildingPlacementMode(itemId) {
+        console.log('[Village] Entering building placement mode for:', itemId);
+        
+        // Set building mode
+        this.buildMode = {
+            active: true,
+            itemId: itemId,
+            buildingType: itemId, // For tents, the itemId is the building type
+            source: 'inventory'
+        };
+        
+        // Show placement instructions
+        if (window.modalSystem) {
+            window.modalSystem.showNotification(
+                `Click on an empty tile to place your ${itemId}. Right-click to cancel.`, 
+                { type: 'info', duration: 5000 }
+            );
+        }
+        
+        // Update UI to show building mode
+        this.gameState?.updateUI();
+        
+        // Add event listeners for placement
+        this.setupBuildingPlacementListeners();
+    }
+
+    // Setup listeners for building placement from inventory
+    setupBuildingPlacementListeners() {
+        const gameView = document.getElementById('village-view');
+        if (!gameView) return;
+        
+        // Remove existing listeners
+        this.removeBuildingPlacementListeners();
+        
+        // Add click listener for placement
+        this.placementClickHandler = (event) => {
+            if (!this.buildMode || !this.buildMode.active) return;
+            
+            // Get tile coordinates from click (this would need to be implemented based on your tile system)
+            const rect = event.target.getBoundingClientRect();
+            const x = Math.floor((event.clientX - rect.left) / 32); // Assuming 32px tiles
+            const y = Math.floor((event.clientY - rect.top) / 32);
+            
+            this.attemptBuildingPlacement(x, y);
+        };
+        
+        // Add right-click listener for cancellation
+        this.placementCancelHandler = (event) => {
+            if (event.button === 2) { // Right click
+                event.preventDefault();
+                this.cancelBuildingPlacement();
+            }
+        };
+        
+        gameView.addEventListener('click', this.placementClickHandler);
+        gameView.addEventListener('contextmenu', this.placementCancelHandler);
+    }
+
+    // Attempt to place building at coordinates
+    attemptBuildingPlacement(x, y) {
+        if (!this.buildMode || !window.inventoryManager || !window.tileManager) return;
+        
+        console.log('[Village] Attempting to place building at:', x, y);
+        
+        // Check if tile is valid and empty
+        const tile = window.tileManager.getTileAt(x, y);
+        if (!tile) {
+            console.log('[Village] Invalid tile coordinates');
+            return;
+        }
+        
+        if (tile.building) {
+            if (window.modalSystem) {
+                window.modalSystem.showNotification('Tile already occupied!', { type: 'warning' });
+            }
+            return;
+        }
+        
+        // Get the item definition to determine building type
+        const item = window.inventoryManager?.getItemDefinition(this.buildMode.itemId);
+        if (!item || !item.buildingType) {
+            console.error('[Village] Invalid item for building placement:', this.buildMode.itemId);
+            return;
+        }
+        
+        // Check if we have the item in inventory
+        if (!window.inventoryManager.hasItem(this.buildMode.itemId, 1)) {
+            window.modalSystem.showNotification('You don\'t have this item!', { type: 'error' });
+            return;
+        }
+        
+        // Remove the item from inventory first
+        if (!window.inventoryManager.removeItem(this.buildMode.itemId, 1)) {
+            window.modalSystem.showNotification('Failed to consume item!', { type: 'error' });
+            return;
+        }
+        
+        // Place the building using the same system as normal buildings
+        const buildingType = item.buildingType;
+        const success = this.placeBuilding(buildingType, x, y);
+        
+        if (success) {
+            console.log('[Village] Building placed successfully');
+            
+            // Grant level 1 immediately (or ensure level 0 provides benefits)
+            if (window.tileManager) {
+                const placedTile = window.tileManager.getTileAt(x, y);
+                if (placedTile && placedTile.building) {
+                    placedTile.building.level = 1; // Grant level 1 immediately
+                    console.log('[Village] Building granted level 1');
+                }
+            }
+            
+            // Re-render buildings to show the new one
+            this.renderBuildings();
+            
+            // Show success notification
+            if (window.modalSystem) {
+                window.modalSystem.showNotification(
+                    `${this.buildMode.itemId} placed successfully!`, 
+                    { type: 'success' }
+                );
+            }
+            
+            // Exit building mode
+            this.cancelBuildingPlacement();
+            
+            // Update UI
+            this.gameState?.updateUI();
+        } else {
+            // Refund the item since placement failed
+            window.inventoryManager.addItem(this.buildMode.itemId, 1);
+            if (window.modalSystem) {
+                window.modalSystem.showNotification('Failed to place building!', { type: 'error' });
+            }
+        }
+    }
+
+    // Cancel building placement mode
+    cancelBuildingPlacement() {
+        console.log('[Village] Cancelling building placement mode');
+        
+        this.buildMode = { active: false };
+        this.removeBuildingPlacementListeners();
+        
+        if (window.modalSystem) {
+            window.modalSystem.showNotification('Building placement cancelled', { type: 'info' });
+        }
+        
+        this.gameState?.updateUI();
+    }
+
+    // Remove building placement listeners
+    removeBuildingPlacementListeners() {
+        const gameView = document.getElementById('village-view');
+        if (gameView && this.placementClickHandler) {
+            gameView.removeEventListener('click', this.placementClickHandler);
+            gameView.removeEventListener('contextmenu', this.placementCancelHandler);
+        }
     }
 
     useInventoryItem(itemId) {

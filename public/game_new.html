@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Village Dynasty Game</title>
+    <link rel="stylesheet" href="game.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        #main-header {
+            background: #2c3e50;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #34495e;
+        }
+        
+        .nav-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .nav-btn {
+            background: #34495e;
+            color: #ecf0f1;
+            border: 1px solid #2c3e50;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .nav-btn:hover {
+            background: #1abc9c;
+            color: #fff;
+        }
+        
+        .nav-btn.active {
+            background: #e74c3c;
+            color: #fff;
+        }
+        
+        .nav-btn.locked {
+            background: #7f8c8d;
+            color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        /* Game Content */
+        #game-content {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        .game-view {
+            display: none;
+            width: 100%;
+            height: 100%;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        
+        .game-view.active {
+            display: block;
+        }
+        
+        /* World View Specific */
+        #world-view {
+            background: #1a1a1a;
+            color: white;
+        }
+        
+        #simple-world-map {
+            width: 400px;
+            height: 400px;
+            background: #333;
+            border: 3px solid #666;
+            position: relative;
+            margin: 2rem auto;
+        }
+        
+        /* Village View */
+        #village-view {
+            background: #2c5530;
+            color: white;
+        }
+        
+        /* Battle View */
+        #battle-view {
+            background: #5c2c2c;
+            color: white;
+        }
+        
+        /* Monarch View */
+        #monarch-view {
+            background: #5c4c2c;
+            color: white;
+        }
+        
+        /* Throne View */
+        #throne-view {
+            background: #4c2c5c;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Header -->
+        <header id="main-header">
+            <div id="view-navigation" class="nav-group">
+                <button class="nav-btn locked" data-view="village">Village (LOCKED)</button>
+                <button class="nav-btn active" data-view="world">World</button>
+                <button class="nav-btn locked" data-view="battle">Battle (LOCKED)</button>
+                <button class="nav-btn locked" data-view="monarch">Monarch (LOCKED)</button>
+                <button class="nav-btn" data-view="throne">Throne</button>
+            </div>
+            <div>
+                <span>Day: <span id="current-day">1</span></span>
+                <span>Season: <span id="current-season">Spring</span></span>
+            </div>
+        </header>
+
+        <!-- Game Content -->
+        <div id="game-content">
+            <!-- Village View -->
+            <div id="village-view" class="game-view">
+                <h1>🏘️ Village View</h1>
+                <p>Your village management interface will go here.</p>
+            </div>
+
+            <!-- World View -->
+            <div id="world-view" class="game-view active">
+                <h1>🗺️ World Map</h1>
+                <div style="margin-bottom: 1rem;">
+                    <span>Dynasty: <span id="dynasty-name">Noble House</span></span>
+                    <span style="margin-left: 2rem;">Population: <span id="population">10</span></span>
+                </div>
+                <div id="simple-world-map">
+                    <!-- World tiles will be added here by JavaScript -->
+                </div>
+                <div style="margin-top: 1rem;">
+                    <p>Click tiles to explore and manage armies</p>
+                    <button onclick="window.simpleWorldManager && window.simpleWorldManager.renderTiles()" 
+                            style="background: #2196F3; color: white; border: none; padding: 8px 16px; margin: 8px; cursor: pointer; border-radius: 4px;">
+                        Render Tiles
+                    </button>
+                </div>
+            </div>
+
+            <!-- Battle View -->
+            <div id="battle-view" class="game-view">
+                <h1>⚔️ Battle View</h1>
+                <p>Battle interface will go here.</p>
+            </div>
+
+            <!-- Monarch View -->
+            <div id="monarch-view" class="game-view">
+                <h1>👑 Monarch View</h1>
+                <p>Monarch interface will go here.</p>
+            </div>
+
+            <!-- Throne View -->
+            <div id="throne-view" class="game-view">
+                <h1>🏰 Throne View</h1>
+                <p>Throne room interface will go here.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Game Scripts -->
+    <script src="../src/systems/core/eventBus.js"></script>
+    <script src="../src/gameData.js"></script>
+    <script src="../src/gameState.js"></script>
+    <script src="../src/unlockSystem.js"></script>
+    <script src="../src/utils/errorRecovery.js"></script>
+    <script src="../src/app.js"></script>
+
+    <!-- Simple World Manager for debugging -->
+    <script src="../simple_world.js"></script>
+
+    <!-- View Switching Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[Navigation] Setting up view switching...');
+            
+            // Simple view switching
+            function switchView(viewName) {
+                console.log('[Navigation] Switching to view:', viewName);
+                
+                // Hide all views
+                document.querySelectorAll('.game-view').forEach(view => {
+                    view.classList.remove('active');
+                });
+                
+                // Show target view
+                const targetView = document.getElementById(viewName + '-view');
+                if (targetView) {
+                    targetView.classList.add('active');
+                    console.log('[Navigation] Activated view:', viewName);
+                    
+                    // Initialize world view if needed
+                    if (viewName === 'world') {
+                        if (!window.simpleWorldManager && window.SimpleWorldManager) {
+                            console.log('[Navigation] Creating SimpleWorldManager...');
+                            window.simpleWorldManager = new SimpleWorldManager({
+                                dynastyName: 'Noble House',
+                                day: 1,
+                                season: 'Spring'
+                            });
+                        }
+                        if (window.simpleWorldManager) {
+                            console.log('[Navigation] Initializing world view...');
+                            setTimeout(() => {
+                                window.simpleWorldManager.renderTiles();
+                            }, 100);
+                        }
+                    }
+                }
+                
+                // Update nav buttons
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const activeBtn = document.querySelector(`[data-view="${viewName}"]`);
+                if (activeBtn) {
+                    activeBtn.classList.add('active');
+                }
+            }
+            
+            // Setup navigation buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (this.classList.contains('locked')) {
+                        console.log('[Navigation] View locked:', this.getAttribute('data-view'));
+                        return;
+                    }
+                    const view = this.getAttribute('data-view');
+                    switchView(view);
+                });
+            });
+            
+            // Initialize world view by default
+            setTimeout(() => {
+                switchView('world');
+            }, 500);
+            
+            console.log('[Navigation] Navigation setup complete');
+        });
+    </script>
+</body>
+</html>
