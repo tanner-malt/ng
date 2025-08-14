@@ -18,8 +18,9 @@ class InventoryManager {
     addDefaultItems() {
         console.log('[Inventory] Adding default starter items');
         
-        // Add essential city building items first
-        this.addItem('tent', 5); // For building placement
+                // Initialize default items
+        this.addItem('tent', 2); // For building placement - reduced from 5
+        this.addItem('foundersWagon', 1); // Mobile administrative center
         this.addItem('haste_rune_iii', 2); // For productivity acceleration
         
         // Add some basic starter gear
@@ -534,6 +535,22 @@ class InventoryManager {
                     craftCost: { wood: 10, fabric: 5 },
                     placeable: true, // Can be placed as building
                     buildingType: 'tent'
+                },
+                foundersWagon: {
+                    id: 'foundersWagon',
+                    name: 'Founders Wagon',
+                    category: 'building',
+                    subcategory: 'administration',
+                    icon: '🚛',
+                    rarity: 'rare',
+                    description: 'Mobile storage and administrative center that provides housing, jobs, and storage',
+                    effects: { housing: 3, gathererJobs: 2, crafterJobs: 1, storage: 300 },
+                    consumable: true, // Used when placed
+                    stackable: true,
+                    maxStack: 5,
+                    craftable: false,
+                    placeable: true, // Can be placed as building
+                    buildingType: 'foundersWagon'
                 }
             }
         };
@@ -926,6 +943,14 @@ class InventoryManager {
         try {
             // Restore inventory
             this.inventory = new Map(data.inventory);
+            
+            // Migration: Rename cityWagon to foundersWagon if it exists
+            if (this.inventory.has('cityWagon')) {
+                const cityWagonData = this.inventory.get('cityWagon');
+                this.inventory.set('foundersWagon', cityWagonData);
+                this.inventory.delete('cityWagon');
+                console.log('[InventoryManager] Migrated cityWagon to foundersWagon');
+            }
             
             // Restore equipped items
             if (data.equippedItems) {

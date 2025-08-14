@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Test - Idle Dynasty</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .test-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Idle Dynasty - Deployment Test</h1>
+    <p>This page tests the resource loading fixes for deployment issues.</p>
+
+    <div class="test-section">
+        <h2>📋 Resource Loading Tests</h2>
+        <div id="test-results">
+            <div class="test-item">
+                <strong>Version.json Test:</strong> <span id="version-status">Testing...</span>
+                <div id="version-details"></div>
+            </div>
+            <div class="test-item">
+                <strong>WikiData.js Test:</strong> <span id="wikidata-status">Testing...</span>
+                <div id="wikidata-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Actions</h2>
+        <button onclick="runTests()">🔄 Re-run Tests</button>
+        <button onclick="window.open('public/game.html', '_blank')">🎮 Open Game</button>
+        <button onclick="window.open('/', '_blank')">🏠 Open Main Page</button>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Test Results</h2>
+        <div id="detailed-results"></div>
+    </div>
+
+    <script>
+        // Test version.json loading with multiple paths
+        async function testVersionJson() {
+            const paths = [
+                'public/version.json',
+                './version.json',
+                '../version.json',
+                'version.json'
+            ];
+
+            const statusEl = document.getElementById('version-status');
+            const detailsEl = document.getElementById('version-details');
+            
+            statusEl.innerHTML = '<span class="error">Testing...</span>';
+            detailsEl.innerHTML = '';
+
+            for (const path of paths) {
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        const data = await response.json();
+                        statusEl.innerHTML = `<span class="success">✓ Found at: ${path}</span>`;
+                        detailsEl.innerHTML = `<small>Version: ${data.version}</small>`;
+                        return { success: true, path, data };
+                    }
+                } catch (error) {
+                    // Continue to next path
+                }
+            }
+
+            statusEl.innerHTML = '<span class="error">✗ Failed to load from any path</span>';
+            detailsEl.innerHTML = '<small>Tried: ' + paths.join(', ') + '</small>';
+            return { success: false, paths };
+        }
+
+        // Test WikiData loading
+        async function testWikiData() {
+            const statusEl = document.getElementById('wikidata-status');
+            const detailsEl = document.getElementById('wikidata-details');
+            
+            statusEl.innerHTML = '<span class="error">Testing...</span>';
+            detailsEl.innerHTML = '';
+
+            // Check if WikiData is already loaded globally
+            if (window.WikiData) {
+                statusEl.innerHTML = '<span class="success">✓ Already loaded globally</span>';
+                detailsEl.innerHTML = '<small>WikiData object found in window</small>';
+                return { success: true, source: 'global' };
+            }
+
+            // Try loading from different paths
+            const paths = [
+                '../src/wikiData.js',
+                './wikiData.js',
+                'public/wikiData.js',
+                'src/wikiData.js',
+                'wikiData.js'
+            ];
+
+            for (const path of paths) {
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        statusEl.innerHTML = `<span class="success">✓ Accessible at: ${path}</span>`;
+                        detailsEl.innerHTML = `<small>File size: ${response.headers.get('content-length')} bytes</small>`;
+                        return { success: true, path };
+                    }
+                } catch (error) {
+                    // Continue to next path
+                }
+            }
+
+            statusEl.innerHTML = '<span class="error">✗ Not accessible from any path</span>';
+            detailsEl.innerHTML = '<small>Tried: ' + paths.join(', ') + '</small>';
+            return { success: false, paths };
+        }
+
+        // Run all tests
+        async function runTests() {
+            console.log('Starting deployment tests...');
+            
+            const results = {
+                version: await testVersionJson(),
+                wikiData: await testWikiData()
+            };
+
+            // Update detailed results
+            const detailedEl = document.getElementById('detailed-results');
+            detailedEl.innerHTML = `
+                <h3>Test Summary</h3>
+                <pre>${JSON.stringify(results, null, 2)}</pre>
+                <h3>Console Output</h3>
+                <p><em>Check browser console for additional details</em></p>
+            `;
+
+            console.log('Test results:', results);
+            return results;
+        }
+
+        // Auto-run tests on page load
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>

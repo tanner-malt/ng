@@ -20,21 +20,29 @@ class JobManager {
         this.jobEfficiency.set('stonecutter', { stone: 5 }); // Stonecutters produce 5 stone per day
         this.jobEfficiency.set('builder', { construction: 1 }); // Builders contribute to construction
         this.jobEfficiency.set('crafter', { production: 1 }); // Crafters provide general production bonus
+        this.jobEfficiency.set('gatherer', { food: 0.25, wood: 0.25, stone: 0.2, production: 0.5 }); // Gatherers provide mixed resources
     }
 
     // Update available jobs based on current buildings
     updateAvailableJobs() {
         this.availableJobs.clear();
         
+        const totalBuildings = this.gameState.buildings.length;
+        let completedBuildings = 0;
+        let buildingsWithJobs = 0;
+        
         this.gameState.buildings.forEach(building => {
             if (building.level > 0 && building.built) {
+                completedBuildings++;
                 const production = GameData.buildingProduction[building.type];
                 if (production && production.jobs) {
                     this.availableJobs.set(building.id, { ...production.jobs });
+                    buildingsWithJobs++;
                 }
             }
         });
 
+        console.log(`[JobManager] Buildings: ${totalBuildings} total, ${completedBuildings} completed, ${buildingsWithJobs} provide jobs`);
         console.log(`[JobManager] Updated available jobs: ${this.availableJobs.size} buildings with jobs`);
     }
 
@@ -95,13 +103,13 @@ class JobManager {
             return false;
         }
 
-        // Check if worker is already assigned to another job
+        // Check if worker is already assigned to a BUILDING job (not population role)
         if (worker.jobAssignment) {
-            console.warn(`[JobManager] Worker ${worker.name} is already assigned to ${worker.jobAssignment.jobType}`);
+            console.warn(`[JobManager] Worker ${worker.name} is already assigned to building job: ${worker.jobAssignment.jobType}`);
             return false;
         }
 
-        // Assign worker to job
+        // Assign worker to building job
         if (!this.jobAssignments.has(buildingId)) {
             this.jobAssignments.set(buildingId, {});
         }
@@ -113,15 +121,15 @@ class JobManager {
 
         buildingJobs[jobType].push(workerId);
 
-        // Update worker status
+        // Update worker status - this is BUILDING job assignment, separate from population role
         worker.jobAssignment = {
             buildingId,
             jobType,
             assignedDay: this.gameState.currentDay || 0
         };
-        worker.status = 'working';
+        worker.status = 'working'; // Working in building job
 
-        console.log(`[JobManager] Assigned ${worker.name} to ${jobType} job at ${buildingId}`);
+        console.log(`[JobManager] Assigned ${worker.name} (population role: ${worker.role}) to building job: ${jobType} at ${buildingId}`);
         return true;
     }
 
@@ -162,6 +170,8 @@ class JobManager {
 
     // Calculate daily resource production from all job assignments
     calculateDailyProduction() {
+        console.log('[JobManager] calculateDailyProduction() called');
+        
         const production = {
             food: 0,
             wood: 0,
@@ -171,22 +181,39 @@ class JobManager {
             production: 0
         };
 
+        console.log(`[JobManager] Job assignments: ${this.jobAssignments.size} buildings`);
+        
         this.jobAssignments.forEach((jobTypes, buildingId) => {
+            console.log(`[JobManager] Building ${buildingId} has jobs:`, Object.keys(jobTypes));
+            
             Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
+                console.log(`[JobManager] Processing ${jobType}: ${workerIds.length} workers`);
+                
                 const efficiency = this.jobEfficiency.get(jobType);
-                if (!efficiency) return;
+                if (!efficiency) {
+                    console.log(`[JobManager] ⚠️ No efficiency defined for job type: ${jobType}`);
+                    return;
+                }
+                
+                console.log(`[JobManager] Job ${jobType} efficiency:`, efficiency);
 
                 workerIds.forEach(workerId => {
                     const worker = this.getWorkerById(workerId);
-                    if (!worker) return;
+                    if (!worker) {
+                        console.log(`[JobManager] ⚠️ Worker ${workerId} not found`);
+                        return;
+                    }
 
                     // Calculate worker efficiency based on skills and conditions
                     const workerEfficiency = this.calculateWorkerEfficiency(worker, jobType);
+                    console.log(`[JobManager] Worker ${worker.name} efficiency: ${workerEfficiency.toFixed(2)}`);
                     
                     // Add production for each resource type this job produces
                     Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
                         if (production.hasOwnProperty(resourceType)) {
-                            production[resourceType] += baseAmount * workerEfficiency;
+                            const resourceGenerated = baseAmount * workerEfficiency;
+                            production[resourceType] += resourceGenerated;
+                            console.log(`[JobManager] ${worker.name} (${jobType}) produced ${resourceGenerated.toFixed(2)} ${resourceType}`);
                         }
                     });
 
@@ -195,6 +222,7 @@ class JobManager {
             });
         });
 
+        console.log('[JobManager] Total daily production:', production);
         return production;
     }
 
@@ -234,6 +262,7 @@ class JobManager {
 
     // Get available workers for job assignment
     getAvailableWorkers() {
+        console.log('[JobManager] Getting available workers...');
         const allWorkers = [];
         
         if (this.gameState.populationManager?.population && Array.isArray(this.gameState.populationManager.population)) {
@@ -242,24 +271,148 @@ class JobManager {
             allWorkers.push(...this.gameState.population);
         }
 
-        return allWorkers.filter(worker => 
-            worker.status === 'idle' && 
-            worker.age >= 16 && 
-            worker.age <= 70 && 
-            (worker.health || 100) >= 50
-        ).map(worker => ({
+        console.log(`[JobManager] Total population: ${allWorkers.length}`);
+        
+        // Filter for workers available for building jobs
+        // Note: worker.role (farmer, guard, etc.) is just background flavor
+        // worker.jobAssignment is for actual building jobs
+        const availableWorkers = allWorkers.filter(worker => {
+            const isOldEnough = worker.age >= 16;
+            const isYoungEnough = worker.age <= 70;
+            const isHealthy = (worker.health || 100) >= 50;
+            const hasNoBuildingJob = !worker.jobAssignment; // No building job assignment
+            
+            const available = isOldEnough && isYoungEnough && isHealthy && hasNoBuildingJob;
+            
+            if (!available) {
+                console.log(`[JobManager] ${worker.name} unavailable: age=${worker.age}, health=${worker.health}, hasJob=${!!worker.jobAssignment}`);
+            }
+            
+            return available;
+        }).map(worker => ({
             id: worker.id,
             name: worker.name,
             age: worker.age,
+            role: worker.role, // Background role (farmer, guard, etc.) - just flavor
             skills: worker.skills || {},
             health: worker.health || 100,
             happiness: worker.happiness || 75,
-            jobAssignment: worker.jobAssignment || null
+            jobAssignment: worker.jobAssignment || null, // Building job assignment
+            status: worker.status || 'idle'
         }));
+        
+        console.log(`[JobManager] Available workers: ${availableWorkers.length}`);
+        availableWorkers.forEach(w => {
+            console.log(`[JobManager] - ${w.name} (${w.role}) age ${w.age}, no building job`);
+        });
+
+        return availableWorkers;
     }
 
-    // Auto-assign workers to available jobs
+    // Auto-assign workers to available jobs with optimization
     autoAssignWorkers() {
+        console.log('[JobManager] Auto-assigning workers with optimization...');
+        
+        // First, redistribute workers if we have better job opportunities
+        this.optimizeWorkerAssignments();
+        
+        const availableWorkers = this.getAvailableWorkers();
+        const availableJobs = this.getAllAvailableJobs();
+        
+        console.log(`[JobManager] After optimization: ${availableWorkers.length} available workers, ${availableJobs.length} available jobs`);
+        
+        if (availableWorkers.length === 0 || availableJobs.length === 0) {
+            return 0;
+        }
+
+        let assignedCount = 0;
+        
+        // Prioritize builder jobs first (they're always important for construction)
+        const prioritizedJobs = [...availableJobs].sort((a, b) => {
+            if (a.jobType === 'builder' && b.jobType !== 'builder') return -1;
+            if (b.jobType === 'builder' && a.jobType !== 'builder') return 1;
+            return 0;
+        });
+
+        let workerIndex = 0;
+        for (const job of prioritizedJobs) {
+            let slotsToFill = Math.min(job.availableSlots, availableWorkers.length - workerIndex);
+            
+            for (let i = 0; i < slotsToFill; i++) {
+                if (workerIndex >= availableWorkers.length) break;
+                
+                if (this.assignWorkerToJob(availableWorkers[workerIndex].id, job.buildingId, job.jobType)) {
+                    assignedCount++;
+                }
+                workerIndex++;
+            }
+        }
+
+        if (assignedCount > 0) {
+            console.log(`[JobManager] Auto-assigned ${assignedCount} workers to jobs`);
+        }
+
+        return assignedCount;
+    }
+
+    // Optimize worker assignments when new jobs become available
+    optimizeWorkerAssignments() {
+        console.log('[JobManager] Optimizing worker assignments...');
+        
+        const allJobs = this.getAllAvailableJobs();
+        const totalJobSlots = allJobs.reduce((sum, job) => sum + job.totalSlots, 0);
+        const assignedWorkers = this.getTotalAssignedWorkers();
+        
+        console.log(`[JobManager] Total job slots: ${totalJobSlots}, Currently assigned: ${assignedWorkers}`);
+        
+        // If we have more job slots than assigned workers, we might want to redistribute
+        if (totalJobSlots > assignedWorkers) {
+            console.log('[JobManager] New job opportunities detected, checking for redistribution...');
+            
+            // Check if we can release some workers from overstaffed jobs
+            this.releaseExcessWorkers();
+        }
+    }
+
+    // Release workers from overstaffed or low-priority positions
+    releaseExcessWorkers() {
+        let releasedCount = 0;
+        
+        this.jobAssignments.forEach((jobTypes, buildingId) => {
+            Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
+                // Houses provide crafter jobs, but if we have many crafter jobs and few gatherer jobs,
+                // we might want to balance better
+                if (jobType === 'crafter' && workerIds.length > 1) {
+                    // Keep only 1 crafter per house for now, release others
+                    const workersToRelease = workerIds.slice(1);
+                    workersToRelease.forEach(workerId => {
+                        if (this.removeWorkerFromJob(workerId)) {
+                            releasedCount++;
+                            console.log(`[JobManager] Released excess crafter worker ${workerId} from building ${buildingId}`);
+                        }
+                    });
+                }
+            });
+        });
+        
+        if (releasedCount > 0) {
+            console.log(`[JobManager] Released ${releasedCount} workers for reassignment`);
+        }
+    }
+
+    // Get total number of workers currently assigned to jobs
+    getTotalAssignedWorkers() {
+        let total = 0;
+        this.jobAssignments.forEach((jobTypes) => {
+            Object.values(jobTypes).forEach(workerIds => {
+                total += workerIds.length;
+            });
+        });
+        return total;
+    }
+
+    // Auto-assign workers to available jobs (legacy method name for compatibility)
+    autoAssignWorkers_old() {
         const availableWorkers = this.getAvailableWorkers();
         const availableJobs = this.getAllAvailableJobs();
         
@@ -337,9 +490,65 @@ class JobManager {
 
         return summary;
     }
+
+    // Debug function for browser console
+    debugJobSystem() {
+        console.log('=== JOB SYSTEM DEBUG ===');
+        console.log('Available jobs by building:');
+        this.availableJobs.forEach((jobs, buildingId) => {
+            console.log(`  Building ${buildingId}:`, jobs);
+        });
+        
+        console.log('Current job assignments:');
+        this.jobAssignments.forEach((jobTypes, buildingId) => {
+            console.log(`  Building ${buildingId}:`);
+            Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
+                console.log(`    ${jobType}: ${workerIds.length} workers -`, workerIds);
+            });
+        });
+        
+        console.log('Worker statuses:');
+        const workers = this.getAvailableWorkers();
+        const allPop = this.gameState.populationManager?.population || this.gameState.population || [];
+        allPop.forEach(worker => {
+            console.log(`  ${worker.name}: role=${worker.role}, status=${worker.status}, jobAssignment=${worker.jobAssignment ? worker.jobAssignment.jobType : 'none'}`);
+        });
+        
+        const production = this.calculateDailyProduction();
+        console.log('Current daily production:', production);
+        console.log('========================');
+        
+        return {
+            availableJobs: Object.fromEntries(this.availableJobs),
+            jobAssignments: Object.fromEntries(this.jobAssignments),
+            production
+        };
+    }
+
+    // Call this when new buildings complete to optimize worker distribution
+    onBuildingCompleted(buildingId) {
+        console.log(`[JobManager] Building ${buildingId} completed, optimizing worker assignments...`);
+        
+        // First auto-assign any available workers to new jobs
+        const newAssignments = this.autoAssignWorkers();
+        
+        if (newAssignments > 0) {
+            console.log(`[JobManager] Assigned ${newAssignments} workers to jobs from newly completed building`);
+        }
+        
+        // Update UI to reflect changes
+        if (typeof village !== 'undefined' && village.updateWorkerAssignments) {
+            village.updateWorkerAssignments();
+        }
+    }
 }
 
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = JobManager;
+}
+
+// Make available globally for debugging and game initialization
+if (typeof window !== 'undefined') {
+    window.JobManager = JobManager;
 }

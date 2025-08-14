@@ -19,6 +19,7 @@ const GameData = {
     buildingCosts: {
         // Starter Buildings
         tent: { wood: 5 }, // Very cheap starter building
+        foundersWagon: {}, // Free to place from inventory
         
         // Essential Buildings
         townCenter: { wood: 50 },
@@ -61,15 +62,27 @@ const GameData = {
     buildingProduction: {
         // Starter Buildings
         tent: {
-            populationCapacity: 5, // Provides housing for 5 people
+            populationCapacity: 4, // Provides housing for 4 people (reduced from 5)
             jobs: {
-                builder: 2 // Provides 2 builder jobs
+                builder: 2, // Provides 2 builder jobs
+                gatherer: 2 // Provides 2 gatherer jobs
             }
         },
         
         // Essential Buildings
+        foundersWagon: {
+            populationCapacity: 3, // Provides housing for 3 people
+            jobs: {
+                gatherer: 2, // Provides 2 gatherer jobs
+                crafter: 1 // Provides 1 crafter job
+            }
+        },
         townCenter: { 
-            population: 2, 
+            population: 2,
+            jobs: {
+                gatherer: 3, // Provides 3 gatherer jobs
+                crafter: 2 // Provides 2 crafter jobs
+            }
         },
         house: { 
             populationCapacity: 5, // Each house provides capacity for 5 population
@@ -181,43 +194,47 @@ const GameData = {
         }
     },
 
-    // Construction times - how many days/hours it takes to build each building
-    constructionTimes: {
+    // Construction point requirements - how many work points each building requires
+    constructionPoints: {
         // Starter Buildings
-        tent: 1, // Quick to build
+        tent: 15, // Quick to build
         
         // Essential Buildings
-        townCenter: 3,
-        house: 1,
-        farm: 2,
+        townCenter: 50,
+        house: 25,
+        farm: 35,
         
         // Production Buildings
-        sawmill: 3,
-        quarry: 4,
-        lumberMill: 4,
-        mine: 5,
-        workshop: 4,
-        blacksmith: 4,
+        sawmill: 45,
+        quarry: 60,
+        lumberMill: 55,
+        mine: 75,
+        workshop: 50,
+        blacksmith: 55,
         
         // Trade & Culture Buildings  
-        market: 5,
-        temple: 6,
-        academy: 7,
-        university: 12,
+        market: 70,
+        temple: 85,
+        academy: 100,
+        university: 180,
         
         // Royal Buildings
-        keep: 5,
-        monument: 10, // Multi-generational construction
+        keep: 80,
+        monument: 200, // Multi-generational construction
         
         // Military Buildings
-        barracks: 3,
-        fortifications: 4,
-        militaryAcademy: 6,
-        castle: 10,
+        barracks: 45,
+        fortifications: 65,
+        militaryAcademy: 90,
+        castle: 150,
         
         // Advanced Buildings
-        magicalTower: 8,
-        grandLibrary: 7
+        magicalTower: 120,
+        grandLibrary: 110,
+        
+        // Special Buildings
+        buildersHut: 40,
+        foundersWagon: 0 // Pre-built
     },
 
     // Building metadata - icons, names, descriptions
@@ -230,6 +247,11 @@ const GameData = {
         },
         
         // Essential Buildings
+        foundersWagon: {
+            icon: '🚛',
+            name: 'Founders Wagon',
+            description: 'Mobile storage and administrative center that can be placed immediately'
+        },
         townCenter: {
             icon: '🏛️',
             name: 'Town Center',
@@ -464,11 +486,11 @@ const GameData = {
     formatBuildingButton: function(buildingType) {
         const info = this.buildingInfo[buildingType];
         const cost = this.formatCost(buildingType);
-        const time = this.constructionTimes[buildingType];
+        const points = this.constructionPoints[buildingType];
         
         if (!info) return buildingType;
         
-        return `${info.icon} ${info.name} ${cost} - ${time} day${time > 1 ? 's' : ''}`;
+        return `${info.icon} ${info.name} ${cost} - ${points} work points`;
     },
 
     getBuildingIcon: function(buildingType) {
@@ -524,6 +546,12 @@ const GameData = {
             // Granaries, warehouses, etc. could add storage here
             if (building.type === 'market' && building.level > 0) {
                 buildingBonus += 200; // Markets provide general storage
+            }
+            if (building.type === 'foundersWagon' && building.level > 0) {
+                buildingBonus += 300; // Founders wagons provide mobile storage
+            }
+            if (building.type === 'townCenter' && building.level > 0) {
+                buildingBonus += 400; // Town centers provide substantial storage
             }
         });
         

@@ -12,16 +12,32 @@ function loadGameVersion() {
         window.GAME_VERSION = '0.0.1';
     }
     
-    // Try to load the actual version from version.json
-    fetch('/public/version.json')
-        .then(response => response.json())
-        .then(data => {
-            window.GAME_VERSION = data.version || '0.0.1';
-            console.log('[Main] Game version loaded:', window.GAME_VERSION);
-        })
-        .catch(error => {
-            console.log('[Main] Could not load version.json, using fallback version:', window.GAME_VERSION);
-        });
+    // Try multiple possible paths for version.json
+    const possiblePaths = [
+        'public/version.json',  // From root
+        './version.json',       // From current directory
+        '../version.json',      // One level up
+        'version.json'          // Same directory
+    ];
+    
+    async function tryLoadVersion(paths) {
+        for (const path of paths) {
+            try {
+                const response = await fetch(path);
+                if (response.ok) {
+                    const data = await response.json();
+                    window.GAME_VERSION = data.version || '0.0.1';
+                    console.log('[Main] Game version loaded from', path, ':', window.GAME_VERSION);
+                    return;
+                }
+            } catch (error) {
+                // Continue to next path
+            }
+        }
+        console.log('[Main] Could not load version.json from any path, using fallback version:', window.GAME_VERSION);
+    }
+    
+    tryLoadVersion(possiblePaths);
 }
 
 // Main game initialization function

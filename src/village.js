@@ -256,9 +256,46 @@ class VillageManager {
             this.setupPopulationViewButton();
             console.log('[Village] Setting up jobs management button...');
             this.setupJobsButton();
+            
+            // Set up event listeners for building completion
+            this.setupEventListeners();
+            
             console.log('[Village] Village initialization complete');
         } catch (error) {
             console.error('[Village] Error during initialization:', error);
+        }
+    }
+    
+    // Setup event listeners for village management
+    setupEventListeners() {
+        if (window.eventBus) {
+            // Listen for building completion to auto-assign workers
+            window.eventBus.on('buildingCompleted', (data) => {
+                console.log('[Village] Building completed, auto-assigning workers:', data);
+                
+                // Find the completed building
+                const building = this.gameState.buildings.find(b => 
+                    b.type === data.buildingType && 
+                    b.x === data.position?.x && 
+                    b.y === data.position?.y &&
+                    b.built === true
+                );
+                
+                if (building) {
+                    this.autoAssignWorkersToBuilding(building);
+                    
+                    // Show notification about completion with workers
+                    const requiredWorkers = this.getBuildingWorkerRequirement(building.type);
+                    if (requiredWorkers > 0 && window.modalSystem) {
+                        window.modalSystem.showNotification(
+                            `${building.type} completed! Workers assigned automatically.`,
+                            { type: 'success', duration: 4000 }
+                        );
+                    }
+                }
+            });
+            
+            console.log('[Village] Event listeners setup complete');
         }
     }
     
@@ -509,6 +546,99 @@ class VillageManager {
         
         // Show ghost building preview on hover
         this.setupBuildPreview();
+    }
+    
+    // Setup ghost preview for inventory building items
+    setupInventoryBuildPreview(itemId) {
+        // Get item definition to determine building appearance
+        const itemDef = window.inventoryManager?.getItemDefinition(itemId);
+        if (!itemDef) return;
+        
+        // Create ghost building element
+        const ghost = document.createElement('div');
+        ghost.className = 'ghost-building';
+        ghost.style.position = 'absolute';
+        ghost.style.width = this.gridSize + 'px';
+        ghost.style.height = this.gridSize + 'px';
+        ghost.style.backgroundColor = 'rgba(76, 175, 80, 0.5)';
+        ghost.style.border = '2px dashed #4CAF50';
+        ghost.style.borderRadius = '4px';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.zIndex = '1000';
+        ghost.style.display = 'none';
+        ghost.innerHTML = `<div style="text-align: center; line-height: ${this.gridSize-4}px; font-size: 20px;">${itemDef.icon || '🏕️'}</div>`;
+        
+        // Add to grid
+        this.villageGrid.appendChild(ghost);
+        this.ghostBuilding = ghost;
+        
+        // Setup mouse move listener for ghost
+        this.ghostMoveHandler = (e) => {
+            if (!this.buildMode || !this.buildMode.active) return;
+            
+            const rect = this.villageGrid.getBoundingClientRect();
+            // Account for view offset (panning/scrolling)
+            const offsetX = this.viewOffsetX || 0;
+            const offsetY = this.viewOffsetY || 0;
+            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
+            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
+            
+            // Check if position is valid
+            const tileX = Math.floor(x / this.gridSize);
+            const tileY = Math.floor(y / this.gridSize);
+            const isValid = this.isValidBuildingPosition(tileX, tileY);
+            
+            // Update ghost appearance
+            ghost.style.left = x + 'px';
+            ghost.style.top = y + 'px';
+            ghost.style.display = 'block';
+            ghost.style.backgroundColor = isValid ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)';
+            ghost.style.borderColor = isValid ? '#4CAF50' : '#f44336';
+        };
+        
+        this.villageGrid.addEventListener('mousemove', this.ghostMoveHandler);
+        
+        // Hide ghost when mouse leaves grid
+        this.ghostLeaveHandler = () => {
+            if (this.ghostBuilding) {
+                this.ghostBuilding.style.display = 'none';
+            }
+        };
+        
+        this.villageGrid.addEventListener('mouseleave', this.ghostLeaveHandler);
+    }
+    
+    // Validate if position is good for building placement
+    isValidBuildingPosition(x, y) {
+        // Check bounds
+        if (!this.isWithinBounds(x, y)) return false;
+        
+        // Check if tile is empty (if tileManager exists)
+        if (window.tileManager) {
+            const tile = window.tileManager.getTileAt(x, y);
+            return tile && !tile.building;
+        }
+        
+        // Basic bounds check if no tile manager
+        return true;
+    }
+    
+    // Remove ghost preview
+    removeGhostPreview() {
+        if (this.ghostBuilding) {
+            this.ghostBuilding.remove();
+            this.ghostBuilding = null;
+        }
+        
+        if (this.ghostMoveHandler) {
+            this.villageGrid.removeEventListener('mousemove', this.ghostMoveHandler);
+            this.ghostMoveHandler = null;
+        }
+        
+        if (this.ghostLeaveHandler) {
+            this.villageGrid.removeEventListener('mouseleave', this.ghostLeaveHandler);
+            this.ghostLeaveHandler = null;
+        }
     }
     
     exitBuildMode() {
@@ -782,9 +912,24 @@ class VillageManager {
     }
     
     isPositionFree(x, y) {
-        return !this.gameState.buildings.some(building => 
+        // Check both the buildings array AND the tile manager for conflicts
+        
+        // First check if any building exists at these pixel coordinates
+        const buildingExists = this.gameState.buildings.some(building => 
             building.x === x && building.y === y
         );
+        
+        if (buildingExists) return false;
+        
+        // Also check tile manager if available (convert pixel coordinates to tile coordinates)
+        if (window.tileManager) {
+            const tileX = Math.floor(x / this.gridSize);
+            const tileY = Math.floor(y / this.gridSize);
+            const tile = window.tileManager.getTileAt(tileX, tileY);
+            if (tile && tile.building) return false;
+        }
+        
+        return true;
     }
     
     isWithinBounds(x, y) {
@@ -802,7 +947,7 @@ class VillageManager {
         if (!this.gameState.canAfford(type)) {
             console.log('[Village] Cannot afford building:', type);
             this.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.');
-            return;
+            return false;
         }
         
         // Spend resources first
@@ -810,21 +955,18 @@ class VillageManager {
         if (!spendSuccess) {
             console.error('[Village] Failed to spend resources for building');
             this.showMessage('Construction Failed', 'Unable to spend resources for construction.');
-            return;
+            return false;
         }
         
-        // Queue building for construction
-        const buildingId = this.gameState.queueBuilding(type, x, y);
-        console.log('[Village] Building queued with ID:', buildingId);
+        // Add to build queue instead of immediate construction
+        const buildingId = this.gameState.addToBuildQueue(type, x, y);
+        console.log('[Village] Building added to queue with ID:', buildingId);
         
         // Trigger tutorial event for building placement
         if (window.eventBus) {
-            const eventData = { type: type, x: x, y: y, id: buildingId };
-            console.log('[Village] Emitting building_placed event with data:', eventData);
-            window.eventBus.emit('building_placed', eventData);
-            console.log('[Village] building_placed event emitted successfully');
-        } else {
-            console.error('[Village] EventBus not available for building_placed event');
+            const eventData = { type: type, x: x, y: y, id: buildingId, queued: true };
+            console.log('[Village] Emitting building_queued event with data:', eventData);
+            window.eventBus.emit('building_queued', eventData);
         }
 
         // Trigger building achievement
@@ -839,16 +981,291 @@ class VillageManager {
             }, 100);
         }
         
-        // Toast notification is now handled by gameState.queueBuilding()
-        // No need for duplicate notifications here
+        // Show queue notification
+        if (window.modalSystem) {
+            window.modalSystem.showNotification(
+                `${type} added to build queue. Construction will begin at end of day.`,
+                { type: 'info', duration: 4000 }
+            );
+        }
         
-        // Re-render buildings to show construction site immediately (level 0 building)
+        // Re-render to show build queue marker
         this.renderBuildings();
         
-        // Milestone-based unlocking handled by achievement system
-        // Building types trigger achievements which unlock views automatically
+        // Save game state
+        this.gameState?.save();
         
-        // Note: exitBuildMode() is now handled by the caller to support multi-building placement
+        return true;
+    }
+    
+    // Place inventory building immediately (no construction queue)
+    placeInventoryBuilding(type, x, y) {
+        console.log('[Village] placeInventoryBuilding called with:', { type, x, y });
+        
+        // Check if tile is valid first
+        if (window.tileManager) {
+            const tile = window.tileManager.getTileAt(x, y);
+            if (!tile) {
+                console.error('[Village] Invalid tile coordinates for placement');
+                return false;
+            }
+            if (tile.building) {
+                console.error('[Village] Tile already occupied');
+                return false;
+            }
+        }
+        
+        // Also check for pixel coordinate conflicts with other buildings
+        const pixelX = x * this.gridSize;
+        const pixelY = y * this.gridSize;
+        const buildingAtPosition = this.gameState.buildings.find(building => 
+            building.x === pixelX && building.y === pixelY
+        );
+        if (buildingAtPosition) {
+            console.error('[Village] Position already occupied by building:', buildingAtPosition.type);
+            return false;
+        }
+        
+        // Create building with full functionality immediately
+        const id = Date.now() + Math.random();
+        const building = { 
+            id, 
+            type, 
+            level: 1, // Inventory buildings start at level 1
+            built: true, // Already built
+            x: pixelX, // Convert tile coordinates to pixel coordinates
+            y: pixelY, // Convert tile coordinates to pixel coordinates
+            startedAt: Date.now(),
+            source: 'inventory' // Mark as inventory-placed
+        };
+        
+        // Place in tile manager first (this will handle tile assignment)
+        if (window.tileManager) {
+            // Get the tile and manually assign the building to avoid duplication
+            const tile = window.tileManager.getTileAt(x, y);
+            tile.building = building;
+            console.log('[TileManager] Placed', type, 'at', x, y);
+        }
+        
+        // Add to buildings list (only once, here)
+        this.gameState.buildings.push(building);
+        
+        // Auto-assign workers if population manager is available
+        this.autoAssignWorkersToBuilding(building);
+        
+        // Apply building effects immediately
+        if (window.villageManager?.buildingEffectsManager) {
+            window.villageManager.buildingEffectsManager.applyBuildingEffects(
+                building.type, 
+                `${building.x},${building.y}`
+            );
+        }
+        
+        // Trigger events
+        if (window.eventBus) {
+            window.eventBus.emit('building_placed', { type, x, y, id, immediate: true });
+            window.eventBus.emit('building_completed', { 
+                buildingType: type, 
+                buildingLevel: 1, 
+                position: { x, y },
+                immediate: true 
+            });
+        }
+        
+        // Trigger achievements
+        if (window.achievementSystem) {
+            window.achievementSystem.triggerBuildingPlaced(type);
+        }
+        
+        // Check for unlocks
+        if (window.unlockSystem) {
+            setTimeout(() => {
+                window.unlockSystem.checkAllUnlocks();
+            }, 100);
+        }
+        
+        // Save game state
+        this.gameState?.save();
+        
+        console.log('[Village] Inventory building placed immediately with ID:', id);
+        return true;
+    }
+    
+    // Auto-assign workers to a newly placed building
+    autoAssignWorkersToBuilding(building) {
+        if (!window.populationManager) return;
+        
+        // Get building requirements
+        const requiredWorkers = this.getBuildingWorkerRequirement(building.type);
+        if (requiredWorkers <= 0) return;
+        
+        // Find available workers
+        const population = window.populationManager.getPopulation();
+        const availableWorkers = population.filter(person => 
+            person.job === 'idle' || person.job === 'unemployed'
+        );
+        
+        // Assign workers up to requirement
+        const workersToAssign = Math.min(requiredWorkers, availableWorkers.length);
+        for (let i = 0; i < workersToAssign; i++) {
+            const worker = availableWorkers[i];
+            if (window.jobManager) {
+                window.jobManager.assignWorkerToBuilding(worker.id, building.id, building.type);
+            }
+        }
+        
+        if (workersToAssign > 0) {
+            console.log(`[Village] Auto-assigned ${workersToAssign} workers to ${building.type}`);
+            
+            // Show notification about worker assignment
+            if (window.modalSystem) {
+                window.modalSystem.showNotification(
+                    `${workersToAssign} workers automatically assigned to ${building.type}`,
+                    { type: 'info', duration: 3000 }
+                );
+            }
+        }
+    }
+    
+    // Get worker requirement for building type
+    getBuildingWorkerRequirement(buildingType) {
+        const workerRequirements = {
+            tent: 2,
+            farm: 1,
+            sawmill: 2,
+            quarry: 2,
+            workshop: 2,
+            blacksmith: 1,
+            barracks: 3,
+            house: 0, // No workers needed
+            townCenter: 5, // Town center should have workers for gatherer jobs
+            foundersWagon: 3 // Founders wagon has gatherer and crafter jobs
+        };
+        
+        return workerRequirements[buildingType] || 1;
+    }
+    
+    // Show construction priority modal
+    showConstructionPriorityModal(buildingId) {
+        // Find the building
+        const building = this.gameState.buildings.find(b => b.id === buildingId);
+        if (!building) return;
+        
+        // Check if it's in build queue or construction site
+        const queueItem = this.gameState.buildQueue.find(item => item.id === buildingId);
+        const constructionSite = this.gameState.constructionSites.find(site => site.buildingId === buildingId);
+        
+        let currentPriority = 'normal';
+        let status = 'Unknown';
+        let progressInfo = '';
+        
+        if (queueItem) {
+            currentPriority = queueItem.priority;
+            status = 'Queued for Construction';
+            const position = this.gameState.buildQueue.findIndex(item => item.id === buildingId) + 1;
+            progressInfo = `Queue Position: #${position}`;
+        } else if (constructionSite) {
+            status = 'Under Construction';
+            const progress = ((constructionSite.totalBuildTime - constructionSite.remainingTime) / constructionSite.totalBuildTime * 100).toFixed(1);
+            progressInfo = `Progress: ${progress}% (${constructionSite.remainingTime} days remaining)`;
+        }
+        
+        const modalContent = `
+            <div class="construction-priority-modal">
+                <h2>🏗️ Construction Management</h2>
+                <div class="building-info">
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <div style="font-size: 36px; margin-bottom: 5px;">${this.getBuildingSymbol(building.type, building.level)}</div>
+                        <div style="font-weight: bold; color: #3498db; font-size: 18px;">${building.type}</div>
+                        <div style="color: #95a5a6; font-size: 14px;">Level ${building.level} → ${building.level + 1}</div>
+                    </div>
+                    
+                    <div class="status-panel" style="background: rgba(52, 152, 219, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                        <div style="color: #3498db; font-weight: bold; margin-bottom: 5px;">📋 Status: ${status}</div>
+                        <div style="color: #ecf0f1; font-size: 14px;">${progressInfo}</div>
+                    </div>
+                    
+                    ${queueItem ? `
+                    <div class="priority-section">
+                        <h3 style="color: #e74c3c; margin-bottom: 10px;">🔥 Construction Priority</h3>
+                        <p style="font-size: 14px; color: #bdc3c7; margin-bottom: 15px;">
+                            Higher priority buildings will be constructed first when the day ends.
+                        </p>
+                        
+                        <div class="priority-buttons" style="display: flex; gap: 8px; margin-bottom: 15px;">
+                            <button class="priority-btn ${currentPriority === 'high' ? 'active' : ''}" 
+                                    onclick="window.villageManager.setBuildingPriority('${buildingId}', 'high')" 
+                                    style="flex: 1; padding: 8px; border: 2px solid #e74c3c; background: ${currentPriority === 'high' ? '#e74c3c' : 'transparent'}; color: ${currentPriority === 'high' ? 'white' : '#e74c3c'}; border-radius: 4px; cursor: pointer;">
+                                🔥 High Priority
+                            </button>
+                            <button class="priority-btn ${currentPriority === 'normal' ? 'active' : ''}" 
+                                    onclick="window.villageManager.setBuildingPriority('${buildingId}', 'normal')" 
+                                    style="flex: 1; padding: 8px; border: 2px solid #f39c12; background: ${currentPriority === 'normal' ? '#f39c12' : 'transparent'}; color: ${currentPriority === 'normal' ? 'white' : '#f39c12'}; border-radius: 4px; cursor: pointer;">
+                                ⚡ Normal
+                            </button>
+                            <button class="priority-btn ${currentPriority === 'low' ? 'active' : ''}" 
+                                    onclick="window.villageManager.setBuildingPriority('${buildingId}', 'low')" 
+                                    style="flex: 1; padding: 8px; border: 2px solid #95a5a6; background: ${currentPriority === 'low' ? '#95a5a6' : 'transparent'}; color: ${currentPriority === 'low' ? 'white' : '#95a5a6'}; border-radius: 4px; cursor: pointer;">
+                                🐌 Low Priority
+                            </button>
+                        </div>
+                        
+                        <div class="queue-info" style="background: rgba(241, 196, 15, 0.1); padding: 10px; border-radius: 6px; border-left: 3px solid #f1c40f;">
+                            <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">💡 Build Queue Info</div>
+                            <div style="color: #ecf0f1; font-size: 11px; margin-top: 4px;">
+                                Construction begins at the end of each day. Builders work on high priority items first.
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    ${constructionSite ? `
+                    <div class="construction-details">
+                        <h3 style="color: #27ae60; margin-bottom: 10px;">⚙️ Construction Details</h3>
+                        <div style="background: rgba(39, 174, 96, 0.1); padding: 10px; border-radius: 6px;">
+                            <div style="color: #27ae60; font-size: 14px; margin-bottom: 8px;">
+                                Workers Assigned: ${constructionSite.assignedWorkers?.length || 0}/${constructionSite.maxWorkers || 'N/A'}
+                            </div>
+                            <div style="color: #ecf0f1; font-size: 12px;">
+                                Efficiency: ${((constructionSite.skillEfficiency || 1) * 100).toFixed(0)}%
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button onclick="window.modalSystem.closeModal()" 
+                            style="padding: 10px 20px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: 'Construction Management',
+                content: modalContent,
+                className: 'construction-priority-modal'
+            });
+        }
+    }
+    
+    // Set building priority in queue
+    setBuildingPriority(buildingId, priority) {
+        if (this.gameState.setBuildPriority(buildingId, priority)) {
+            // Refresh the modal
+            this.showConstructionPriorityModal(buildingId);
+            
+            // Show feedback
+            if (window.modalSystem) {
+                window.modalSystem.showNotification(
+                    `Priority set to ${priority}`,
+                    { type: 'success', duration: 2000 }
+                );
+            }
+        }
     }
     
     startBuildingProduction(buildingId) {
@@ -1011,34 +1428,60 @@ class VillageManager {
     
     renderBuildings() {
         const container = this.getGridContainer();
+        if (!container) {
+            console.error('[Village] Grid container not found - cannot render buildings');
+            return;
+        }
+        
         // Clear existing buildings (but not building sites)
         container.querySelectorAll('.building:not(.building-site)').forEach(el => el.remove());
         
         console.log('[Village] Rendering buildings - count:', this.gameState.buildings.length);
+        console.log('[Village] Container size:', container.offsetWidth, 'x', container.offsetHeight);
         
-        // Render all completed buildings
+        // Group buildings by coordinates to detect overlaps
+        const buildingsByPosition = {};
         this.gameState.buildings.forEach(building => {
-            console.log('[Village] Rendering building:', building.type, 'at', building.x, building.y);
+            const key = `${building.x},${building.y}`;
+            if (!buildingsByPosition[key]) {
+                buildingsByPosition[key] = [];
+            }
+            buildingsByPosition[key].push(building);
+        });
+        
+        // Log overlapping buildings
+        Object.entries(buildingsByPosition).forEach(([position, buildings]) => {
+            if (buildings.length > 1) {
+                console.warn(`[Village] Multiple buildings at ${position}:`, buildings.map(b => b.type));
+            }
+        });
+        
+        // Render all buildings (both completed and under construction)
+        this.gameState.buildings.forEach(building => {
+            console.log('[Village] Rendering building:', building.type, 'at pixel coords', building.x, building.y, 'level:', building.level, 'built:', building.built);
+            
             const buildingEl = document.createElement('div');
             buildingEl.className = `building ${building.type}`;
             buildingEl.style.left = building.x + 'px';
             buildingEl.style.top = building.y + 'px';
-            buildingEl.style.width = '48px';
-            buildingEl.style.height = '48px';
-            buildingEl.style.display = 'flex';
-            buildingEl.style.alignItems = 'center';
-            buildingEl.style.justifyContent = 'center';
-            buildingEl.style.fontSize = '28px';
-            buildingEl.style.backgroundColor = 'rgba(46, 204, 113, 0.3)';
-            buildingEl.style.border = '2px solid #2ecc71';
-            buildingEl.style.borderRadius = '8px';
-            buildingEl.style.cursor = 'pointer';
-            buildingEl.style.transition = 'all 0.3s ease';
+            
+            // Use consistent size with CSS
+            buildingEl.style.width = '45px';
+            buildingEl.style.height = '45px';
             buildingEl.style.position = 'absolute';
             buildingEl.style.zIndex = '10';
             
-            buildingEl.textContent = this.getBuildingSymbol(building.type, building.level);
-            buildingEl.title = `${building.type} (Level ${building.level}) - Click for info`;
+            // Only override colors for construction status, let CSS handle the rest
+            if (building.level === 0 || !building.built) {
+                buildingEl.style.border = '2px solid #f1c40f';
+                buildingEl.style.backgroundColor = 'rgba(241, 196, 15, 0.7)';
+                buildingEl.title = `${building.type} (Under Construction) - Click for info`;
+            } else {
+                // Let CSS handle the styling for completed buildings
+                buildingEl.title = `${building.type} (Level ${building.level}) - Click for info`;
+            }
+            
+            buildingEl.textContent = this.getBuildingSymbol(building.type, building.level !== undefined ? building.level : 1);
             buildingEl.dataset.buildingId = building.id;
             
             // Add hover effect
@@ -1056,19 +1499,22 @@ class VillageManager {
             buildingEl.addEventListener('click', (e) => {
                 e.stopPropagation();
                 
+                // Construction site - show priority modal
+                if (building.level === 0) {
+                    this.showConstructionPriorityModal(building.id);
+                }
                 // Use new building management modal for completed buildings
-                if (building.level > 0) {
+                else if (building.level > 0) {
                     this.showBuildingManagement(building.id);
-                } else {
-                    // Keep old info modal for construction sites
-                    this.showBuildingInfo(building);
                 }
             });
             
             container.appendChild(buildingEl);
+            console.log('[Village] Added building element to container:', building.type, 'at', building.x, building.y);
         });
         
-        console.log(`[Village] Rendered ${this.gameState.buildings.length} completed buildings`);
+        console.log(`[Village] Rendered ${this.gameState.buildings.length} buildings to container`);
+        console.log('[Village] Container now has', container.querySelectorAll('.building').length, 'building elements');
     }
     
     showBuildingInfo(building) {
@@ -1088,24 +1534,26 @@ class VillageManager {
         `;
 
         if (isUnderConstruction) {
-            // Get construction progress from the new construction system
+            // Get construction progress from the work-point construction system
             const constructionProgress = this.gameState.constructionManager?.getConstructionProgress(building.id);
             
             if (constructionProgress) {
-                // Use wiki-documented construction system data
+                // Use work-point construction system data
                 const progressPercent = constructionProgress.progressPercent;
-                const remainingTime = constructionProgress.remainingTime;
-                const totalTime = constructionProgress.totalBuildTime;
-                const assignedWorkers = constructionProgress.assignedWorkers;
-                const maxWorkers = constructionProgress.maxWorkers;
+                const currentPoints = constructionProgress.currentPoints;
+                const totalPoints = constructionProgress.totalPoints;
+                const pointsRemaining = constructionProgress.pointsRemaining;
+                const assignedBuilders = constructionProgress.assignedBuilders;
+                const dailyProgress = constructionProgress.dailyProgress;
+                const estimatedDays = constructionProgress.estimatedCompletion;
                 const season = constructionProgress.currentSeason;
                 
                 contentHTML += `
                     <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
                         <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
-                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${progressPercent}% complete</div>
-                        <div style="color: #ecf0f1; font-size: 11px;">Time remaining: ${Math.ceil(remainingTime)} days</div>
-                        <div style="color: #ecf0f1; font-size: 11px;">Workers: ${assignedWorkers}/${maxWorkers}</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${Math.round(currentPoints)}/${totalPoints} work points (${progressPercent}%)</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Builders: ${assignedBuilders} (+${dailyProgress.toFixed(1)} points/day)</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Estimated completion: ${estimatedDays === Infinity ? 'No builders' : estimatedDays + ' days'}</div>
                         <div style="color: #ecf0f1; font-size: 11px;">Season: ${season}</div>
                         
                         <!-- Efficiency breakdown -->
@@ -1119,14 +1567,14 @@ class VillageManager {
                 `;
             } else {
                 // Fallback for legacy construction system
-                const constructionTime = GameData.constructionTimes?.[building.type] || 2;
+                const constructionPoints = GameData.constructionPoints?.[building.type] || 25;
                 const progress = building.constructionProgress || 0;
-                const daysLeft = Math.max(0, constructionTime - progress);
+                const pointsLeft = Math.max(0, constructionPoints - progress);
                 contentHTML += `
                     <div style="background: rgba(241, 196, 15, 0.2); padding: 8px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #f1c40f;">
                         <div style="color: #f1c40f; font-weight: bold; font-size: 12px;">🏗️ UNDER CONSTRUCTION</div>
-                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${progress}/${constructionTime} days</div>
-                        <div style="color: #ecf0f1; font-size: 11px;">${daysLeft} days remaining</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">Progress: ${progress}/${constructionPoints} work points</div>
+                        <div style="color: #ecf0f1; font-size: 11px;">${pointsLeft} points remaining</div>
                     </div>
                 `;
             }
@@ -1243,7 +1691,10 @@ class VillageManager {
             mine: '⛏️',
             lumberMill: '🪓',
             magicalTower: '🔮',
-            grandLibrary: '🏛️'
+            grandLibrary: '🏛️',
+            tent: '⛺',
+            foundersWagon: '🚛',
+            buildersHut: '🏗️'
         };
         return symbols[type] || '?';
     }
@@ -2667,9 +3118,19 @@ class VillageManager {
         if (category === 'city') {
             // Show city storage from tile manager
             const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
+            
+            // Name mapping for better display
+            const itemNames = {
+                'foundersWagon': 'Founders Wagon',
+                'tent': 'Tent',
+                'haste_rune': 'Haste Rune',
+                'haste_rune_ii': 'Haste Rune II',
+                'haste_rune_iii': 'Haste Rune III'
+            };
+            
             filteredItems = Object.entries(cityInventory).map(([itemId, data]) => ({
                 id: itemId,
-                name: itemId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                name: itemNames[itemId] || itemId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
                 category: 'city',
                 quantity: data.quantity,
                 locations: data.locations,
@@ -2867,12 +3328,27 @@ class VillageManager {
         }
 
         const locations = window.tileManager.findItemLocations(itemId);
-        const locationText = locations.map(loc => `(${loc.x}, ${loc.y}): ${loc.quantity}`).join('<br>');
+        const locationText = locations.map(loc => {
+            if (loc.isCityStorage) {
+                return `City Storage: ${loc.quantity} available`;
+            } else {
+                return `Tile (${loc.x}, ${loc.y}): ${loc.quantity}`;
+            }
+        }).join('<br>');
+        
+        // Get proper item name
+        const itemNames = {
+            'foundersWagon': 'Founders Wagon',
+            'tent': 'Tent',
+            'haste_rune': 'Haste Rune',
+            'haste_rune_ii': 'Haste Rune II',
+            'haste_rune_iii': 'Haste Rune III'
+        };
         
         if (window.modalSystem) {
             window.modalSystem.showModal(`
                 <div class="item-locations-modal">
-                    <h3>${itemId} Locations</h3>
+                    <h3>${itemNames[itemId] || itemId} Locations</h3>
                     <div class="locations-list">
                         ${locationText || 'No locations found'}
                     </div>
@@ -2910,6 +3386,10 @@ class VillageManager {
             source: 'inventory'
         };
         
+        // Add visual indicators like regular build mode
+        this.villageGrid.classList.add('build-mode');
+        this.villageGrid.style.cursor = 'crosshair';
+        
         // Show placement instructions
         if (window.modalSystem) {
             window.modalSystem.showNotification(
@@ -2920,6 +3400,9 @@ class VillageManager {
         
         // Update UI to show building mode
         this.gameState?.updateUI();
+        
+        // Setup ghost preview for inventory items
+        this.setupInventoryBuildPreview(itemId);
         
         // Add event listeners for placement
         this.setupBuildingPlacementListeners();
@@ -2937,10 +3420,12 @@ class VillageManager {
         this.placementClickHandler = (event) => {
             if (!this.buildMode || !this.buildMode.active) return;
             
-            // Get tile coordinates from click (this would need to be implemented based on your tile system)
-            const rect = event.target.getBoundingClientRect();
-            const x = Math.floor((event.clientX - rect.left) / 32); // Assuming 32px tiles
-            const y = Math.floor((event.clientY - rect.top) / 32);
+            // Get tile coordinates from click using the village grid bounds and accounting for view offset
+            const rect = this.villageGrid.getBoundingClientRect();
+            const offsetX = this.viewOffsetX || 0;
+            const offsetY = this.viewOffsetY || 0;
+            const x = Math.floor((event.clientX - rect.left - offsetX) / this.gridSize); // Use actual grid size
+            const y = Math.floor((event.clientY - rect.top - offsetY) / this.gridSize);
             
             this.attemptBuildingPlacement(x, y);
         };
@@ -2996,21 +3481,19 @@ class VillageManager {
             return;
         }
         
-        // Place the building using the same system as normal buildings
+        // Place the building using different logic for inventory items
         const buildingType = item.buildingType;
-        const success = this.placeBuilding(buildingType, x, y);
+        let success = false;
+        
+        // For inventory items like tents, place immediately without construction
+        if (this.buildMode.source === 'inventory') {
+            success = this.placeInventoryBuilding(buildingType, x, y);
+        } else {
+            success = this.placeBuilding(buildingType, x, y);
+        }
         
         if (success) {
             console.log('[Village] Building placed successfully');
-            
-            // Grant level 1 immediately (or ensure level 0 provides benefits)
-            if (window.tileManager) {
-                const placedTile = window.tileManager.getTileAt(x, y);
-                if (placedTile && placedTile.building) {
-                    placedTile.building.level = 1; // Grant level 1 immediately
-                    console.log('[Village] Building granted level 1');
-                }
-            }
             
             // Re-render buildings to show the new one
             this.renderBuildings();
@@ -3042,6 +3525,14 @@ class VillageManager {
         console.log('[Village] Cancelling building placement mode');
         
         this.buildMode = { active: false };
+        
+        // Remove visual indicators
+        this.villageGrid.classList.remove('build-mode');
+        this.villageGrid.style.cursor = '';
+        
+        // Remove ghost preview
+        this.removeGhostPreview();
+        
         this.removeBuildingPlacementListeners();
         
         if (window.modalSystem) {

@@ -27,6 +27,7 @@ class TileManager {
         if (!skipDefaults) {
             this.addItemToInventory('haste_rune', 2);
             this.addItemToInventory('tent', 5);
+            this.addItemToInventory('foundersWagon', 1);
         }
         
         // Only setup initial town if explicitly requested (disabled by default)
@@ -63,7 +64,6 @@ class TileManager {
         const centerX = Math.floor(this.width / 2);
         const centerY = Math.floor(this.height / 2);
         
-        // Place building without auto-saving during setup
         this.placeBuildingAtInternal(centerX, centerY, 'townCenter');
         
         console.log('[TileManager] Initial town center placed at', centerX, centerY);
@@ -289,6 +289,20 @@ class TileManager {
     // Find all tiles with a specific item
     findItemLocations(itemId) {
         const locations = [];
+        
+        // Check city inventory first (for portable items like tents, foundersWagon)
+        if (this.cityInventory.has(itemId)) {
+            const cityItem = this.cityInventory.get(itemId);
+            // City inventory items are stored centrally, not at specific locations
+            locations.push({
+                x: 'City',
+                y: 'Storage',
+                quantity: cityItem.quantity,
+                isCityStorage: true
+            });
+        }
+        
+        // Also check individual tiles for items placed on the map
         for (let x = 0; x < this.width; x++) {
             for (let y = 0; y < this.height; y++) {
                 const tile = this.grid[x][y];
@@ -296,7 +310,8 @@ class TileManager {
                     locations.push({
                         x: x,
                         y: y,
-                        quantity: tile.items.get(itemId)
+                        quantity: tile.items.get(itemId),
+                        isCityStorage: false
                     });
                 }
             }
@@ -365,25 +380,50 @@ class TileManager {
         };
     }
 
-    // Main deserialize method for unified save system
+        // Main deserialize method for unified save system
     deserialize(data) {
-        if (!data || !data.grid || !data.cityInventory) {
-            console.warn('[TileManager] Invalid save data format');
-            return false;
-        }
-
         try {
-            // Restore grid
-            this.deserializeGrid(data.grid);
+            // Clear current state
+            this.initializeGrid();
+            this.cityInventory.clear();
             
-            // Restore inventory
-            this.deserializeCityInventory(data.cityInventory);
+            // Restore grid and inventory from save data
+            if (data.grid) {
+                this.deserializeGrid(data.grid);
+            }
+            if (data.cityInventory) {
+                this.deserializeCityInventory(data.cityInventory);
+            }
+            
+            // Ensure essential starter items exist (compatibility fix)
+            this.ensureStarterItems();
             
             console.log('[TileManager] Data deserialized successfully');
             return true;
         } catch (error) {
             console.error('[TileManager] Failed to deserialize data:', error);
             return false;
+        }
+    }
+    
+    // Ensure starter items exist in city inventory (for save compatibility)
+    ensureStarterItems() {
+        // Check if foundersWagon exists, if not add it
+        if (!this.cityInventory.has('foundersWagon')) {
+            console.log('[TileManager] Adding missing foundersWagon to existing save');
+            this.addItemToInventory('foundersWagon', 1);
+        }
+        
+        // Check if tents exist, if not add some
+        if (!this.cityInventory.has('tent')) {
+            console.log('[TileManager] Adding missing tents to existing save');
+            this.addItemToInventory('tent', 5);
+        }
+        
+        // Check if haste runes exist, if not add some
+        if (!this.cityInventory.has('haste_rune')) {
+            console.log('[TileManager] Adding missing haste runes to existing save');
+            this.addItemToInventory('haste_rune', 2);
         }
     }
 
@@ -469,10 +509,17 @@ class TileManager {
     deserializeCityInventory(inventoryData) {
         this.cityInventory.clear();
         Object.entries(inventoryData).forEach(([itemId, data]) => {
-            this.cityInventory.set(itemId, {
+            // Migration: Rename cityWagon to foundersWagon
+            const migratedItemId = itemId === 'cityWagon' ? 'foundersWagon' : itemId;
+            
+            this.cityInventory.set(migratedItemId, {
                 quantity: data.quantity,
                 locations: data.locations || []
             });
+            
+            if (itemId === 'cityWagon') {
+                console.log('[TileManager] Migrated cityWagon to foundersWagon in city inventory');
+            }
         });
     }
     

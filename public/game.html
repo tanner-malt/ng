@@ -9,7 +9,42 @@
     
     <!-- Game Scripts -->
     <script src="../src/gameData.js"></script>
-    <script src="../src/wikiData.js"></script>
+    <script>
+        // Try to load wikiData.js from multiple possible locations
+        function loadWikiData() {
+            const possiblePaths = [
+                '../src/wikiData.js',  // Original path
+                './wikiData.js',       // Same directory as game.html
+                'src/wikiData.js',     // From root
+                'wikiData.js'          // Current directory
+            ];
+            
+            let loadIndex = 0;
+            
+            function tryLoadScript() {
+                if (loadIndex >= possiblePaths.length) {
+                    console.error('[WikiData] Could not load wikiData.js from any location');
+                    return;
+                }
+                
+                const script = document.createElement('script');
+                script.src = possiblePaths[loadIndex];
+                script.onload = function() {
+                    console.log('[WikiData] Successfully loaded from:', possiblePaths[loadIndex]);
+                };
+                script.onerror = function() {
+                    console.log('[WikiData] Failed to load from:', possiblePaths[loadIndex]);
+                    loadIndex++;
+                    tryLoadScript();
+                };
+                document.head.appendChild(script);
+            }
+            
+            tryLoadScript();
+        }
+        
+        loadWikiData();
+    </script>
     <script src="../src/systems/core/eventBus.js"></script>
     <script src="../src/skillSystem.js"></script>
     <script src="../src/populationManager.js"></script>

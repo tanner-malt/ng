@@ -1137,20 +1137,35 @@ class ModalSystem {
                 currentVersion = window.GAME_VERSION;
             } else {
                 // Try to fetch from version.json if not already loaded
-                fetch('/public/version.json')
-                    .then(response => response.json())
-                    .then(data => {
-                        currentVersion = data.version || '0.0.1';
-                        window.GAME_VERSION = currentVersion;
-                        // Update the version display if modal is still open
-                        const versionElement = document.getElementById('current-version');
-                        if (versionElement) {
-                            versionElement.textContent = `v${currentVersion}`;
+                const possiblePaths = [
+                    'public/version.json',
+                    './version.json',
+                    '../version.json',
+                    'version.json'
+                ];
+                
+                async function tryLoadVersion(paths) {
+                    for (const path of paths) {
+                        try {
+                            const response = await fetch(path);
+                            if (response.ok) {
+                                const data = await response.json();
+                                currentVersion = data.version || '0.0.1';
+                                window.GAME_VERSION = currentVersion;
+                                // Update the version display if modal is still open
+                                const versionElement = document.getElementById('current-version');
+                                if (versionElement) {
+                                    versionElement.textContent = `v${currentVersion}`;
+                                }
+                                return;
+                            }
+                        } catch (error) {
+                            // Continue to next path
                         }
-                    })
-                    .catch(() => {
-                        console.log('[Settings] Could not load version.json, using fallback');
-                    });
+                    }
+                }
+                
+                tryLoadVersion(possiblePaths);
             }
         } catch (error) {
             console.log('[Settings] Error loading version:', error);

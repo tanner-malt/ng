@@ -16,6 +16,8 @@ class UnlockSystem {
         this.unlockCallbacks = new Map();
         
         // Start with basic content unlocked
+        // Basic starting content
+        this.unlockedContent.add('foundersWagon');
         this.unlockedContent.add('townCenter');
         
         this.initializeUnlockConditions();
@@ -464,6 +466,7 @@ class UnlockSystem {
 
     getBuildingIcon(buildingType) {
         const icons = {
+            foundersWagon: '🚛',
             townCenter: '🏛️',
             house: '🏠',
             farm: '🌾',
@@ -564,11 +567,11 @@ class UnlockSystem {
             const saveData = localStorage.getItem('unlockSystem');
             if (saveData) {
                 const parsed = JSON.parse(saveData);
-                this.unlockedContent = new Set(parsed.unlockedContent || ['townCenter']);
+                this.unlockedContent = new Set(parsed.unlockedContent || ['foundersWagon', 'townCenter']);
             }
         } catch (error) {
             console.warn('[UnlockSystem] Error loading from storage:', error);
-            this.unlockedContent = new Set(['townCenter']);
+            this.unlockedContent = new Set(['foundersWagon', 'townCenter']);
         }
     }
 
@@ -578,10 +581,10 @@ class UnlockSystem {
     }
 
     resetUnlocks() {
-        this.unlockedContent = new Set(['townCenter']);
+        this.unlockedContent = new Set(['foundersWagon', 'townCenter']);
         this.saveToStorage();
         this.updateBuildingButtons();
-        console.log('[UnlockSystem] All unlocks reset (except townCenter)');
+        console.log('[UnlockSystem] All unlocks reset (except foundersWagon and townCenter)');
     }
 
     // Debug methods

@@ -411,7 +411,7 @@ class PopulationManager {
                 role: role,
                 status: 'idle',
                 location: 'village',
-                skills: []
+                skills: this.getSkillsForRole(role)
             });
             
             generated.push(inhabitant);
@@ -482,19 +482,20 @@ class PopulationManager {
                 ageGroup = 'elderly';
             }
             
-            // Generate randomized skills for adults
+            // Generate proper skills for adults using roles
             let villagerSkills = [];
+            let role = 'child';
+            
             if (age > 27) {
-                const numSkills = 1 + Math.floor(Math.random() * 3); // 1-3 skills
-                const selectedSkills = [...skills].sort(() => 0.5 - Math.random()).slice(0, numSkills);
-                villagerSkills = selectedSkills;
+                role = roles[Math.floor(Math.random() * roles.length)];
+                villagerSkills = this.getSkillsForRole(role);
             }
             
             // Create villager with appropriate traits
             const villager = {
                 age: age,
                 name: this.generateRandomName(),
-                role: age > 27 ? roles[Math.floor(Math.random() * roles.length)] : 'child',
+                role: role,
                 status: age > 27 ? 'idle' : 'child',
                 skills: villagerSkills,
                 gender: Math.random() < 0.5 ? 'male' : 'female',
@@ -543,7 +544,7 @@ class PopulationManager {
             name: this.generateRandomName(),
             role: 'builder',
             status: 'idle',
-            skills: ['building', 'crafting'],
+            skills: this.getSkillsForRole('builder'),
             gender: Math.random() < 0.5 ? 'male' : 'female',
             happiness: 70,
             productivity: 1.0,
@@ -577,9 +578,33 @@ class PopulationManager {
     }
 
     /**
-     * Get appropriate skills for a given role
+     * Get appropriate skills for a given role with proper XP values
      */
     getSkillsForRole(role) {
+        // Use SkillSystem to generate proper skill structures with XP values
+        if (typeof window !== 'undefined' && window.SkillSystem && window.skillSystemReady) {
+            const skillSystem = new window.SkillSystem();
+            
+            // Map role to SkillSystem types
+            const roleToSkillType = {
+                'farmer': 'experienced',       // Experienced in agriculture
+                'builder': 'master',           // Craftsman with construction skills
+                'guard': 'military',           // Military skills
+                'worker': 'default',           // Basic skills
+                'crafter': 'master',           // Crafting skills
+                'scholar': 'trader',           // Knowledge/leadership skills
+                'trader': 'trader',            // Trading/leadership skills
+                'royal': 'master'              // High-level skills
+            };
+            
+            const skillType = roleToSkillType[role] || 'default';
+            const generatedSkills = skillSystem.generateImmigrantSkills(skillType);
+            
+            console.log(`[PopulationManager] Generated skills for ${role}:`, generatedSkills);
+            return generatedSkills;
+        }
+        
+        // Fallback to simple skill arrays if SkillSystem not available
         const roleSkills = {
             'farmer': ['farming'],
             'builder': ['building', 'crafting'], 
