@@ -27,7 +27,7 @@ function testWorkPointConstruction() {
     
     // Test 1: Check construction points data
     console.log('\n1. Testing Construction Points Data:');
-    const testBuildings = ['house', 'tent', 'townCenter', 'farm', 'sawmill'];
+    const testBuildings = ['house', 'tent', 'townCenter', 'farm', 'woodcutterLodge'];
     testBuildings.forEach(buildingType => {
         const points = GameData.constructionPoints?.[buildingType];
         console.log(`  ${buildingType}: ${points} work points`);

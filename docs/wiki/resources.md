@@ -16,9 +16,9 @@ Life force of your kingdom - essential for population growth
 
 ### 🌲 Wood
 Your basic building material for early expansion
-- **Sources:** Sawmills, expeditions, idle villagers
+- **Sources:** Woodcutter lodges, expeditions, idle villagers
 - **Uses:** Most building construction, basic upgrades
-- **💡 Strategy:** Build multiple sawmills early for rapid expansion
+- **💡 Strategy:** Build multiple woodcutter lodges early for rapid expansion
 
 ### 🪨 Stone
 Durable material for advanced structures
@@ -34,7 +34,7 @@ Specialized resource for weapons and elite buildings
 
 ### ⚙️ Production
 Industrial resource for crafting equipment
-- **Sources:** Workshop (3/day), Blacksmith (4/day), Sawmill (1/day), Quarry (1/day)
+- **Sources:** Workshop (3/day), Blacksmith (4/day), Woodcutter Lodge (1/day), Quarry (1/day)
 - **Uses:** Crafting weapons (5⚙️), tools (3⚙️), armor (8⚙️)
 - **💡 Crafting:** Combine with gold to create powerful equipment
 
@@ -102,7 +102,7 @@ Unemployed working-age villagers (16-190 years) automatically contribute resourc
 
 ### 🎯 Early Game Priority
 1. **Food Security:** Build farms first - hungry villagers = no growth
-2. **Wood Production:** Multiple sawmills for building materials
+2. **Wood Production:** Multiple woodcutter lodges for building materials
 3. **Population Growth:** Houses to support larger workforce
 
 ### ⚖️ Mid Game Balance

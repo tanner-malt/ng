@@ -75,13 +75,13 @@ Idle: Dynasty Builder is a browser-based idle/strategy game. The codebase is org
 When you start a new game, the tutorial guides you step-by-step. You'll name your dynasty, learn how to build your village, manage resources, explore the world, and prepare for battles. The tutorial is interactive and story-driven, helping you unlock new features as you progress. It also connects with the achievement and message systems, so you always know what you've accomplished.
 
 ### 2. Village Management
-Your village is the heart of your dynasty. You can place and upgrade buildings, each with its own purpose—houses for population, farms for food, sawmills for wood, and so on. Building takes time, and where you place things matters: terrain types like forest, hills, and water affect your strategy. As your village grows, supply chains become visible, showing how resources flow. Automation features help you manage production as your prestige increases.
+Your village is the heart of your dynasty. You can place and upgrade buildings, each with its own purpose—houses for population, farms for food, woodcutter lodges for wood, and so on. Building takes time, and where you place things matters: terrain types like forest, hills, and water affect your strategy. As your village grows, supply chains become visible, showing how resources flow. Automation features help you manage production as your prestige increases.
 
 **Buildings you can construct:**
 - Town Center: Boosts all production, increases population capacity
 - House: Lets you support more villagers
 - Farm: Produces food
-- Sawmill: Produces wood
+- Woodcutter Lodge: Produces wood
 - Quarry: Produces stone
 - Market: Generates gold, improves trade
 - Barracks: Trains soldiers, improves defense
@@ -148,7 +148,7 @@ As you play, you'll unlock achievements for reaching milestones—like building 
 | Town Center   | Boosts all production, pop. capacity      |
 | House         | Increases population cap                  |
 | Farm          | Produces food                             |
-| Sawmill       | Produces wood                             |
+| Woodcutter Lodge | Produces wood                             |
 | Quarry        | Produces stone                            |
 | Market        | Generates gold, boosts trade              |
 | Barracks      | Trains soldiers, provides defense         |

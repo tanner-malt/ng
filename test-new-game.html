@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test New Game Initialization</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+        }
+
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #333;
+        }
+
+        .error {
+            border-left-color: red;
+            background: #ffe0e0;
+        }
+
+        .success {
+            border-left-color: green;
+            background: #e0ffe0;
+        }
+
+        button {
+            padding: 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>New Game Initialization Test</h1>
+    <button onclick="clearStorageAndReload()">Clear Storage & Test Fresh Game</button>
+    <button onclick="testCurrentGame()">Test Current Game State</button>
+    <button onclick="resetAndTest()">Reset Game & Test</button>
+
+    <div id="results"></div>
+
+    <script>
+        function log(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = 'log ' + type;
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function clearStorageAndReload() {
+            log('Clearing localStorage and reloading for fresh game test...');
+            localStorage.clear();
+            sessionStorage.clear();
+            setTimeout(() => {
+                window.location.href = '/public/game.html';
+            }, 1000);
+        }
+
+        function testCurrentGame() {
+            log('Testing current game state...');
+
+            // Navigate to game and test after a delay
+            const iframe = document.createElement('iframe');
+            iframe.src = '/public/game.html';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        const gameWindow = iframe.contentWindow;
+                        const gameState = gameWindow.gameState;
+
+                        if (!gameState) {
+                            log('ERROR: gameState not found', 'error');
+                            return;
+                        }
+
+                        log(`Buildings count: ${gameState.buildings ? gameState.buildings.length : 'undefined'}`);
+                        log(`Population cap: ${gameState.populationCap}`);
+                        log(`Population: ${gameState.population}`);
+
+                        if (gameState.buildings && gameState.buildings.length > 0) {
+                            log(`Building types: ${gameState.buildings.map(b => b.type).join(', ')}`, 'success');
+                        } else {
+                            log('WARNING: No buildings found!', 'error');
+                        }
+
+                        if (gameState.populationCap > 1 && gameState.populationCap < 15) {
+                            log(`Population cap looks correct: ${gameState.populationCap}`, 'success');
+                        } else {
+                            log(`Population cap issue: ${gameState.populationCap}`, 'error');
+                        }
+
+                    } catch (error) {
+                        log('ERROR: ' + error.message, 'error');
+                    }
+                    document.body.removeChild(iframe);
+                }, 3000);
+            };
+        }
+
+        function resetAndTest() {
+            log('Testing reset game functionality...');
+            const iframe = document.createElement('iframe');
+            iframe.src = '/public/game.html';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+
+            iframe.onload = () => {
+                setTimeout(() => {
+                    try {
+                        const gameWindow = iframe.contentWindow;
+                        if (gameWindow.app && gameWindow.app.resetGame) {
+                            log('Calling resetGame()...');
+                            gameWindow.app.resetGame();
+
+                            setTimeout(() => {
+                                const gameState = gameWindow.gameState;
+                                log(`After reset - Buildings: ${gameState.buildings ? gameState.buildings.length : 'undefined'}`);
+                                log(`After reset - Population cap: ${gameState.populationCap}`);
+                            }, 2000);
+                        } else {
+                            log('ERROR: app.resetGame not found', 'error');
+                        }
+                    } catch (error) {
+                        log('ERROR: ' + error.message, 'error');
+                    }
+                }, 3000);
+            };
+        }
+    </script>
+</body>
+
+</html>

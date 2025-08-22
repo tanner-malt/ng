@@ -1,15 +1,114 @@
-// populationManager.js - Manages population details, roles, and assignments
-// Used by both VillageManager and WorldManager
+// populationManager.js - Enhanced Population Management with Skills and Job Optimization
+// Manages population details, roles, assignments, and skill progression
 
 console.log('[PopulationManager] Script starting to load...');
 
 class PopulationManager {
     constructor(initialPopulation = []) {
         console.log('[PopulationManager] Constructor called with:', initialPopulation);
-        // Each inhabitant: { id, name, role, age, status, location, skills, ... }
+        // Each inhabitant: { id, name, role, age, status, location, skills, experience, ... }
         this.population = initialPopulation;
         this.nextId = initialPopulation.length > 0 ? Math.max(...initialPopulation.map(p => p.id)) + 1 : 1;
+
+        // Skill system constants
+        this.skillLevels = {
+            novice: { min: 0, max: 100, title: 'Novice', efficiency: 1.0 },
+            apprentice: { min: 101, max: 300, title: 'Apprentice', efficiency: 1.25 },
+            journeyman: { min: 301, max: 600, title: 'Journeyman', efficiency: 1.5 },
+            expert: { min: 601, max: 1000, title: 'Expert', efficiency: 1.75 },
+            master: { min: 1001, max: Infinity, title: 'Master', efficiency: 2.0 }
+        };
+
+        // Job to skill mapping - ONLY for actual job types that exist in buildings
+        this.jobSkillMapping = {
+            farmer: ['Agriculture'],
+            builder: ['Carpentry', 'Masonry', 'Engineering'],
+            gatherer: ['Hunting', 'Forestry', 'Agriculture'],
+            woodcutter: ['Forestry'],
+            crafter: ['Carpentry', 'Blacksmithing'], // From houses, town center, founders wagon
+            sawyer: ['Forestry', 'Carpentry'], // From woodcutter lodges
+            foreman: ['Carpentry', 'Masonry', 'Engineering', 'Administration'], // From builder huts
+            // Legacy roles that don't have jobs but exist for flavor/battle system
+            guard: ['Melee Combat', 'Archery'], // Used in battle system
+            merchant: ['Trade', 'Administration'] // Used for trading
+        };
+
+        // Training preferences - global setting
+        this.trainingMode = 'balanced'; // 'training', 'resources', 'balanced'
+
         console.log('[PopulationManager] Constructor completed, nextId:', this.nextId);
+    }
+
+    /**
+     * Process daily population changes - aging, births, and deaths
+     * This is the main method called by GameState.processPopulationGrowth()
+     * @param {object} gameState - Current game state for resource checks
+     */
+    simulateDay(gameState) {
+        console.log(`[PopulationManager] simulateDay() - Starting day ${gameState?.day || 'unknown'} with ${this.population.length} villagers`);
+
+        // 1. Process aging and deaths first
+        const agingResult = this.processAging();
+
+        // 2. Calculate and process births
+        const foodAbundant = (gameState?.resources?.food || 0) > 500;
+        const foodScarce = (gameState?.resources?.food || 0) < 50;
+
+        const birthResult = this.calculateDailyGrowth({
+            foodAbundant: foodAbundant,
+            foodScarce: foodScarce
+        });
+
+        // 3. Actually add new births to population
+        if (birthResult.births > 0) {
+            for (let i = 0; i < birthResult.births; i++) {
+                const newborn = {
+                    name: this.generateRandomName() + ' the Younger',
+                    age: 0, // Start as newborn
+                    gender: Math.random() < 0.5 ? 'male' : 'female',
+                    role: 'child',
+                    status: 'child',
+                    health: 100,
+                    happiness: 80,
+                    productivity: 0.1, // Children have minimal productivity
+                    skills: [],
+                    experience: {},
+                    traits: this.generateRandomTraits('child')
+                };
+
+                this.addInhabitant(newborn);
+                console.log(`[PopulationManager] Birth: ${newborn.name} (${newborn.gender})`);
+            }
+
+            // Emit birth event
+            if (window.eventBus) {
+                window.eventBus.emit('population_birth', {
+                    births: birthResult.births,
+                    twins: birthResult.twins,
+                    totalPopulation: this.population.length
+                });
+            }
+        }
+
+        // 4. Process daily skill progression
+        this.processDailySkillProgression();
+
+        // 5. Log daily summary
+        const summary = {
+            startingPopulation: this.population.length + agingResult.deaths - birthResult.births,
+            births: birthResult.births,
+            deaths: agingResult.deaths,
+            finalPopulation: this.population.length,
+            netChange: birthResult.births - agingResult.deaths,
+            averageAge: this.population.length > 0 ?
+                Math.round(this.population.reduce((sum, v) => sum + v.age, 0) / this.population.length) : 0
+        };
+
+        if (summary.births > 0 || summary.deaths > 0) {
+            console.log(`[PopulationManager] Daily Summary:`, summary);
+        }
+
+        return summary;
     }
 
     /**
@@ -20,46 +119,80 @@ class PopulationManager {
         let deaths = 0;
         const diedVillagers = [];
         const beforeCount = this.population.length;
-        
-        // Age all villagers by 1 day and check for death
+
+        // Age all villagers by 1 day and check for death probability
         this.population.forEach(villager => {
             if (typeof villager.age === 'number') {
                 villager.age += 1;
-                
-                // Death at age 198 (tripled from 66)
-                if (villager.age >= 198) {
+
+                // Probability-based death system starting at 180 days
+                const deathChance = this.calculateDeathProbability(villager.age);
+                if (Math.random() < deathChance) {
                     diedVillagers.push({
                         name: villager.name,
                         role: villager.role,
-                        age: villager.age
+                        age: villager.age,
+                        deathChance: (deathChance * 100).toFixed(1) + '%'
                     });
                     deaths++;
                 }
             }
         });
-        
+
         // Remove deceased villagers
         if (deaths > 0) {
-            this.population = this.population.filter(villager => villager.age < 198);
-            console.log(`[PopulationManager] ${deaths} villagers died of old age. Population: ${beforeCount} -> ${this.population.length}`);
+            const deceasedIds = diedVillagers.map(v =>
+                this.population.find(p => p.name === v.name && p.age === v.age)?.id
+            ).filter(id => id);
+
+            // Preserve knowledge before removing villagers (if monarch upgrade is available)
+            deceasedIds.forEach(id => {
+                const deceased = this.population.find(p => p.id === id);
+                if (deceased) this.preserveKnowledgeOnDeath(deceased);
+            });
+
+            this.population = this.population.filter(villager =>
+                !deceasedIds.includes(villager.id)
+            );
+            console.log(`[PopulationManager] ${deaths} villagers died. Population: ${beforeCount} -> ${this.population.length}`);
         }
-        
+
         return { deaths, diedVillagers };
     }
 
     /**
-     * Get population organized into groups (Stellaris-style)
+     * Calculate death probability based on age
+     * Death probability starts at 180 days and increases gradually
+     */
+    calculateDeathProbability(age) {
+        if (age < 180) return 0; // No death before 180 days
+
+        // Gradual increase from 180 to 220 days
+        // At 180: 0.1% chance, At 200: 2% chance, At 220: 50% chance
+        const ageAbove180 = age - 180;
+        const maxAge = 220 - 180; // 40 days of death probability
+
+        // Exponential curve for realistic aging
+        const normalizedAge = Math.min(ageAbove180 / maxAge, 1);
+        const deathProbability = 0.001 + (0.499 * Math.pow(normalizedAge, 2.5));
+
+        return Math.min(deathProbability, 0.8); // Cap at 80% max daily chance
+    }
+
+    /**
+     * Get population organized into groups with updated age brackets
      * @returns {object} - organized population data
      */
     getPopulationGroups() {
         const groups = {
-            children: { name: '👶 Children', age: '0-27 days', count: 0, villagers: [] },
-            youngAdults: { name: '💪 Young Adults', age: '28-45 days', count: 0, villagers: [] },
-            adults: { name: '🧑‍💼 Adults', age: '46-75 days', count: 0, villagers: [] },
-            middleAged: { name: '👨‍🦳 Middle-Aged', age: '76-150 days', count: 0, villagers: [] },
-            elderly: { name: '👴 Elderly', age: '151-197 days', count: 0, villagers: [] }
+            children: { name: '👶 Children', age: '0-15 days', count: 0, villagers: [] },
+            youngAdults: { name: '🧑 Young Adults', age: '16-60 days', count: 0, villagers: [] },
+            adults: { name: '👨 Adults', age: '61-120 days', count: 0, villagers: [] },
+            middleAged: { name: '👱 Middle Aged', age: '121-160 days', count: 0, villagers: [] },
+            mature: { name: '🧔 Mature', age: '161-190 days', count: 0, villagers: [] },
+            elderly: { name: '👴 Elderly', age: '191+ days', count: 0, villagers: [] }
         };
-        
+
         const jobGroups = {
             unemployed: { name: '🏠 Unemployed', description: 'Available workers', count: 0, villagers: [] },
             farmers: { name: '🧑‍🌾 Farmers', description: 'Food production', count: 0, villagers: [] },
@@ -71,27 +204,30 @@ class PopulationManager {
             drafted: { name: '🪖 Military', description: 'Serving in armies', count: 0, villagers: [] },
             other: { name: '👤 Other', description: 'Miscellaneous roles', count: 0, villagers: [] }
         };
-        
+
         // Categorize population
         this.population.forEach(villager => {
             // Age groups
-            if (villager.age <= 27) {
+            if (villager.age <= 15) {
                 groups.children.villagers.push(villager);
                 groups.children.count++;
-            } else if (villager.age <= 45) {
+            } else if (villager.age <= 60) {
                 groups.youngAdults.villagers.push(villager);
                 groups.youngAdults.count++;
-            } else if (villager.age <= 75) {
+            } else if (villager.age <= 120) {
                 groups.adults.villagers.push(villager);
                 groups.adults.count++;
-            } else if (villager.age <= 150) {
+            } else if (villager.age <= 160) {
                 groups.middleAged.villagers.push(villager);
                 groups.middleAged.count++;
+            } else if (villager.age <= 190) {
+                groups.mature.villagers.push(villager);
+                groups.mature.count++;
             } else {
                 groups.elderly.villagers.push(villager);
                 groups.elderly.count++;
             }
-            
+
             // Job groups
             if (villager.status === 'drafted') {
                 jobGroups.drafted.villagers.push(villager);
@@ -125,17 +261,17 @@ class PopulationManager {
                 }
             }
         });
-        
+
         return {
             total: this.population.length,
             ageGroups: groups,
             jobGroups: jobGroups,
             demographics: {
-                averageAge: this.population.length > 0 ? 
+                averageAge: this.population.length > 0 ?
                     Math.round(this.population.reduce((sum, v) => sum + v.age, 0) / this.population.length) : 0,
                 maleCount: this.population.filter(v => v.gender === 'male').length,
                 femaleCount: this.population.filter(v => v.gender === 'female').length,
-                workingAge: this.population.filter(v => v.age >= 28 && v.age <= 180).length,
+                workingAge: this.population.filter(v => v.age >= 16 && v.age <= 190).length,
                 employed: this.population.filter(v => v.status === 'working').length,
                 unemployed: this.population.filter(v => v.status === 'idle').length
             }
@@ -150,7 +286,7 @@ class PopulationManager {
     calculateExpectedDeaths(timeframe = 'daily') {
         const daysToDeath = 198; // Death age
         const multiplier = timeframe === 'monthly' ? 30 : 1;
-        
+
         // Group villagers by age proximity to death
         const ageGroups = {
             imminent: { name: 'Imminent (197+ days)', count: 0, villagers: [] }, // 1 day or less
@@ -159,7 +295,7 @@ class PopulationManager {
             moderate: { name: 'Moderate Risk (170-179 days)', count: 0, villagers: [] }, // 19-28 days
             low: { name: 'Low Risk (160-169 days)', count: 0, villagers: [] } // 29-38 days
         };
-        
+
         this.population.forEach(villager => {
             if (villager.age >= 197) {
                 ageGroups.imminent.villagers.push(villager);
@@ -178,23 +314,23 @@ class PopulationManager {
                 ageGroups.low.count++;
             }
         });
-        
+
         // Calculate expected deaths based on timeframe
         let expectedDeaths = 0;
         let imminentDeaths = ageGroups.imminent.count;
-        
+
         if (timeframe === 'daily') {
             // Daily: count those who will die in the next day
             expectedDeaths = ageGroups.imminent.count;
         } else if (timeframe === 'monthly') {
             // Monthly: estimate deaths over 30 days
-            expectedDeaths = ageGroups.imminent.count + 
-                            Math.ceil(ageGroups.veryHigh.count * 0.9) + // 90% of very high risk
-                            Math.ceil(ageGroups.high.count * 0.6) + // 60% of high risk
-                            Math.ceil(ageGroups.moderate.count * 0.3) + // 30% of moderate risk
-                            Math.ceil(ageGroups.low.count * 0.1); // 10% of low risk
+            expectedDeaths = ageGroups.imminent.count +
+                Math.ceil(ageGroups.veryHigh.count * 0.9) + // 90% of very high risk
+                Math.ceil(ageGroups.high.count * 0.6) + // 60% of high risk
+                Math.ceil(ageGroups.moderate.count * 0.3) + // 30% of moderate risk
+                Math.ceil(ageGroups.low.count * 0.1); // 10% of low risk
         }
-        
+
         return {
             expectedDeaths,
             imminentDeaths,
@@ -206,28 +342,28 @@ class PopulationManager {
 
     /**
      * Calculate daily population growth based on eligible couples and food status.
-     * - Each eligible couple (adults and middle-aged 46–150 days) tries for a child every day
-     * - Base chance: 1/7 per couple per day (so +1 per week per couple, before modifiers)
+     * - Each eligible couple (working age 16–190 days) tries for a child every day
+     * - Base chance: 1/120 per couple per day (so ~1 per 17 weeks per couple, before modifiers)
      * - Modifiers: +50% if food abundant, -50% if food scarce, 0 if sick/traveling
-     * - 1% chance for twins per birth
+     * - 1% chance for twins per birth (no pregnancy system - births are immediate)
      * @param {object} options - { foodAbundant: bool, foodScarce: bool }
      * @returns {object} { births, twins, bonus, eligibleCouples }
      */
     calculateDailyGrowth(options = {}) {
-        // Find eligible adults and middle-aged by gender
-        const breedingAge = this.population.filter(p => p.age >= 46 && p.age <= 150 && p.status !== 'sick' && p.status !== 'traveling');
+        // Find eligible working-age adults by gender
+        const breedingAge = this.population.filter(p => p.age >= 16 && p.age <= 190 && p.status !== 'sick' && p.status !== 'traveling');
         const males = breedingAge.filter(p => p.gender === 'male');
         const females = breedingAge.filter(p => p.gender === 'female');
         const eligibleCouples = Math.min(males.length, females.length);
         if (eligibleCouples === 0) return { births: 0, twins: 0, bonus: 0, eligibleCouples: 0 };
 
-        // Base: Each couple has a 1/7 chance per day
-        let baseChance = 1 / 7;
+        // Base: Each couple has a 2.5/100 chance per day (~2.5% daily chance for faster growth)
+        let baseChance = 2.5 / 100;
         let bonus = 0;
-        if (options.foodAbundant) bonus += 0.5;
+        if (options.foodAbundant) bonus += 0.75; // Increased food bonus
         if (options.foodScarce) bonus -= 0.5;
-        // Clamp bonus to [-0.5, 0.5]
-        bonus = Math.max(-0.5, Math.min(0.5, bonus));
+        // Clamp bonus to [-0.5, 0.75]
+        bonus = Math.max(-0.5, Math.min(0.75, bonus));
         let finalChance = baseChance * (1 + bonus);
         finalChance = Math.max(0, finalChance); // No negative chance
 
@@ -236,7 +372,7 @@ class PopulationManager {
         for (let i = 0; i < eligibleCouples; i++) {
             if (Math.random() < finalChance) {
                 births++;
-                if (Math.random() < 0.01) twins++;
+                if (Math.random() < 0.015) twins++; // Slightly increased twin chance
             }
         }
         births += twins; // Each twin birth adds one more child
@@ -248,8 +384,22 @@ class PopulationManager {
         // If age is not specified, default to 0 (newborn)
         const age = details.age !== undefined ? details.age : 0;
         // Determine if this villager is a child (not eligible to work)
-        const isChild = age <= 27;
+        const isChild = age <= 15;
         const canWork = !isChild;
+
+        // Initialize experience and skills
+        const experience = details.experience || {};
+        const skills = details.skills || [];
+
+        // If no skills provided but role is specified, add appropriate skills
+        if (skills.length === 0 && details.role && this.jobSkillMapping[details.role]) {
+            this.jobSkillMapping[details.role].forEach(skill => {
+                if (!experience[skill]) {
+                    experience[skill] = Math.floor(Math.random() * 50); // Random starting XP
+                }
+            });
+        }
+
         const inhabitant = {
             id: this.nextId++,
             name: details.name || `Inhabitant ${this.nextId}`,
@@ -257,30 +407,38 @@ class PopulationManager {
             age: age,
             status: details.status || 'idle',
             location: details.location || 'village',
-            skills: details.skills || [],
+            skills: skills,
+            experience: experience,
             gender: details.gender || (Math.random() < 0.5 ? 'male' : 'female'),
             isChild,
             canWork,
+            happiness: details.happiness || 70,
+            productivity: details.productivity || 0.8,
+            health: details.health || 100, // Initialize health to 100%
+            traits: details.traits || [],
             ...details
         };
         this.population.push(inhabitant);
-        
+
         console.log(`[PopulationManager] Added inhabitant: ${inhabitant.name} (age ${inhabitant.age}, role: ${inhabitant.role}), Total population: ${this.population.length}`);
-        
+
         // Update gameState population count immediately if available
         if (window.gameState && typeof window.gameState.updatePopulationCount === 'function') {
             window.gameState.updatePopulationCount();
         }
-        
+
         // Emit population change event
         if (window.eventBus) {
-            window.eventBus.emit('population-changed', { 
-                type: 'villager-added', 
+            window.eventBus.emit('population-changed', {
+                type: 'villager-added',
                 villager: inhabitant,
-                totalPopulation: this.population.length 
+                totalPopulation: this.population.length
             });
         }
-        
+
+        // Trigger job optimization after adding new population
+        this.optimizeJobAssignments();
+
         return inhabitant;
     }
 
@@ -288,23 +446,23 @@ class PopulationManager {
         const idx = this.population.findIndex(p => p.id === id);
         if (idx !== -1) {
             const removed = this.population.splice(idx, 1)[0];
-            
+
             console.log(`[PopulationManager] Removed inhabitant: ${removed.name} (ID: ${removed.id}), Total population: ${this.population.length}`);
-            
+
             // Update gameState population count immediately if available
             if (window.gameState && typeof window.gameState.updatePopulationCount === 'function') {
                 window.gameState.updatePopulationCount();
             }
-            
+
             // Emit population change event
             if (window.eventBus) {
-                window.eventBus.emit('population-changed', { 
-                    type: 'villager-removed', 
+                window.eventBus.emit('population-changed', {
+                    type: 'villager-removed',
                     villager: removed,
-                    totalPopulation: this.population.length 
+                    totalPopulation: this.population.length
                 });
             }
-            
+
             return removed;
         }
         return null;
@@ -332,12 +490,553 @@ class PopulationManager {
     }
 
     updateStatus(id, status) {
-        const inhabitant = this.getInhabitant(id);
-        if (inhabitant) {
-            inhabitant.status = status;
+        const villager = this.getInhabitant(id);
+        if (villager) {
+            villager.status = status;
+            console.log(`[PopulationManager] Updated status for ${villager.name}: ${status}`);
+
+            // Trigger job optimization when status changes
+            this.optimizeJobAssignments();
             return true;
         }
         return false;
+    }
+
+    // ===== SKILL AND EXPERIENCE SYSTEM =====
+
+    /**
+     * Get skill level information for a villager
+     * @param {object} villager - The villager object
+     * @param {string} skillName - Name of the skill
+     * @returns {object} - { level, title, efficiency, xp }
+     */
+    getSkillLevel(villager, skillName) {
+        const xp = villager.experience[skillName] || 0;
+        for (const [levelKey, levelData] of Object.entries(this.skillLevels)) {
+            if (xp >= levelData.min && xp <= levelData.max) {
+                return {
+                    level: levelKey,
+                    title: levelData.title,
+                    efficiency: levelData.efficiency,
+                    xp: xp
+                };
+            }
+        }
+        return this.skillLevels.novice;
+    }
+
+    /**
+     * Get best skill for a villager based on experience
+     * @param {object} villager - The villager object
+     * @returns {object} - { skillName, level, title, efficiency, xp }
+     */
+    getBestSkill(villager) {
+        let bestSkill = null;
+        let bestXp = -1;
+
+        for (const [skillName, xp] of Object.entries(villager.experience || {})) {
+            if (xp > bestXp) {
+                bestXp = xp;
+                bestSkill = skillName;
+            }
+        }
+
+        if (bestSkill) {
+            const skillLevel = this.getSkillLevel(villager, bestSkill);
+            return {
+                skillName: bestSkill,
+                ...skillLevel
+            };
+        }
+
+        return {
+            skillName: 'None',
+            level: 'novice',
+            title: 'Novice',
+            efficiency: 1.0,
+            xp: 0
+        };
+    }
+
+    /**
+     * Award experience to a villager in a specific skill
+     * @param {number} villagerId - ID of the villager
+     * @param {string} skillName - Name of the skill
+     * @param {number} xpAmount - Amount of XP to award
+     * @returns {object|null} - Level up information if leveled up
+     */
+    awardExperience(villagerId, skillName, xpAmount) {
+        const villager = this.getInhabitant(villagerId);
+        if (!villager) return null;
+
+        // Initialize experience if not present
+        if (!villager.experience) villager.experience = {};
+        if (!villager.experience[skillName]) villager.experience[skillName] = 0;
+
+        // Age-based learning: younger villagers (16-30) learn 25% faster
+        let learningMultiplier = 1.0;
+        if (villager.age >= 16 && villager.age <= 30) {
+            learningMultiplier = 1.25;
+        }
+
+        // Apply training mode multipliers
+        if (this.trainingMode === 'training') {
+            learningMultiplier *= 2.0; // Double XP in training mode
+        }
+
+        // Check for mentorship bonus (nearby expert/master villagers)
+        const mentorshipBonus = this.getMentorshipBonus(villager, skillName);
+        learningMultiplier *= mentorshipBonus;
+
+        // Apply village-wide elder wisdom bonus
+        const elderBonuses = this.getElderBonuses();
+        learningMultiplier *= (1 + elderBonuses.wisdomBonus);
+
+        const finalXpAmount = Math.round(xpAmount * learningMultiplier);
+
+        const oldLevel = this.getSkillLevel(villager, skillName);
+        villager.experience[skillName] += finalXpAmount;
+        const newLevel = this.getSkillLevel(villager, skillName);
+
+        // Check if leveled up
+        if (oldLevel.level !== newLevel.level) {
+            console.log(`[PopulationManager] ${villager.name} leveled up in ${skillName}: ${oldLevel.title} -> ${newLevel.title}`);
+
+            // Emit level up event
+            if (window.eventBus) {
+                window.eventBus.emit('villager-level-up', {
+                    villager: villager,
+                    skill: skillName,
+                    oldLevel: oldLevel,
+                    newLevel: newLevel
+                });
+            }
+
+            return {
+                villager: villager,
+                skill: skillName,
+                oldLevel: oldLevel,
+                newLevel: newLevel
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Calculate mentorship bonus based on skill level difference
+     * Expert/Master villagers provide XP bonus to nearby learners
+     */
+    getMentorshipBonus(villager, skillName) {
+        // Find villagers with expert/master level in the same skill
+        const mentors = this.population.filter(mentor => {
+            if (mentor.id === villager.id) return false; // Can't mentor yourself
+
+            const mentorSkillLevel = this.getSkillLevel(mentor, skillName);
+            return mentorSkillLevel.level === 'expert' || mentorSkillLevel.level === 'master';
+        });
+
+        if (mentors.length === 0) return 1.0; // No bonus without mentors
+
+        // Calculate bonus based on skill level difference
+        const villagerSkillLevel = this.getSkillLevel(villager, skillName);
+        const villagerNumericLevel = villagerSkillLevel.numericLevel || 1;
+
+        let bestBonus = 1.0;
+        mentors.forEach(mentor => {
+            const mentorSkillLevel = this.getSkillLevel(mentor, skillName);
+            const levelDifference = mentorSkillLevel.numericLevel - villagerNumericLevel;
+
+            // Bonus increases with skill level difference: +10% per level difference, max +50%
+            const bonus = 1.0 + Math.min(levelDifference * 0.1, 0.5);
+            if (bonus > bestBonus) bestBonus = bonus;
+        });
+
+        return bestBonus;
+    }
+
+    /**
+     * Process daily skill progression for all working villagers
+     * Awards XP based on job performance and mentorship
+     */
+    processDailySkillProgression() {
+        if (typeof window !== 'undefined' && window.gameState && !window.gameState.jobManager) return;
+        if (typeof window === 'undefined') return; // Skip in Node.js environment
+
+        const workplaceGroups = this.getWorkplaceGroups();
+
+        // Process each workplace
+        for (const [buildingId, workers] of Object.entries(workplaceGroups)) {
+            if (workers.length === 0) continue;
+
+            // Find the most experienced worker (mentor)
+            let mentor = null;
+            let mentorTopSkillXp = -1;
+
+            workers.forEach(worker => {
+                const bestSkill = this.getBestSkill(worker);
+                if (bestSkill.xp > mentorTopSkillXp) {
+                    mentorTopSkillXp = bestSkill.xp;
+                    mentor = worker;
+                }
+            });
+
+            // Award XP to all workers
+            workers.forEach(worker => {
+                const jobSkills = this.jobSkillMapping[worker.role] || ['General'];
+
+                jobSkills.forEach(skillName => {
+                    let baseXp = 1;
+                    let mentorshipBonus = 0;
+
+                    // Mentorship bonus if working with more experienced person
+                    if (mentor && mentor.id !== worker.id) {
+                        const workerLevel = this.getSkillLevel(worker, skillName);
+                        const mentorLevel = this.getSkillLevel(mentor, skillName);
+
+                        if (mentorLevel.xp > workerLevel.xp) {
+                            mentorshipBonus = 1; // +1 XP bonus for learning from mentor
+                        }
+                    }
+
+                    // Award XP
+                    this.awardExperience(worker.id, skillName, baseXp + mentorshipBonus);
+                });
+
+                // Mentor also gains teaching XP (smaller amount)
+                if (mentor && mentor.id === worker.id && workers.length > 1) {
+                    const teachingSkills = this.jobSkillMapping[mentor.role] || ['General'];
+                    teachingSkills.forEach(skillName => {
+                        this.awardExperience(mentor.id, skillName, 0.5);
+                    });
+                }
+            });
+        }
+    }
+
+    /**
+     * Get villagers grouped by their workplace/building
+     * @returns {object} - { buildingId: [workers...] }
+     */
+    getWorkplaceGroups() {
+        const groups = {};
+
+        this.population.forEach(villager => {
+            if (villager.status === 'working' && villager.buildingId) {
+                if (!groups[villager.buildingId]) {
+                    groups[villager.buildingId] = [];
+                }
+                groups[villager.buildingId].push(villager);
+            }
+        });
+
+        return groups;
+    }
+
+    // ===== JOB OPTIMIZATION SYSTEM =====
+
+    /**
+     * Calculate job effectiveness score for a villager in a specific job
+     * @param {object} villager - The villager object
+     * @param {string} jobType - Type of job (farmer, builder, etc.)
+     * @returns {number} - Effectiveness score (higher is better)
+     */
+    calculateJobEffectiveness(villager, jobType) {
+        if (villager.age <= 15 || villager.age > 190) return 0; // Can't work
+        if (villager.status === 'drafted' || villager.status === 'sick') return 0;
+
+        const requiredSkills = this.jobSkillMapping[jobType] || [];
+        let skillScore = 1.0; // Base efficiency
+
+        if (requiredSkills.length > 0) {
+            // Calculate average skill level for this job
+            let totalEfficiency = 0;
+            let skillCount = 0;
+
+            requiredSkills.forEach(skillName => {
+                const skillLevel = this.getSkillLevel(villager, skillName);
+                totalEfficiency += skillLevel.efficiency;
+                skillCount++;
+            });
+
+            if (skillCount > 0) {
+                skillScore = totalEfficiency / skillCount;
+            }
+        }
+
+        // Age factor (peak efficiency 25-120 days)
+        let ageFactor = 1.0;
+        if (villager.age < 25) {
+            ageFactor = 0.7 + (villager.age / 25) * 0.3; // 70-100%
+        } else if (villager.age > 120) {
+            ageFactor = Math.max(0.5, 1.0 - ((villager.age - 120) / 70) * 0.5); // 100-50%
+        }
+
+        // Happiness factor
+        const happinessFactor = Math.max(0.5, (villager.happiness || 70) / 100);
+
+        return skillScore * ageFactor * happinessFactor;
+    }
+
+    /**
+     * Optimize job assignments for all available workers
+     * Prioritizes experienced workers for best jobs and training opportunities
+     */
+    optimizeJobAssignments() {
+        if (typeof window !== 'undefined' && window.gameState && !window.gameState.jobManager) return;
+        if (typeof window === 'undefined') return; // Skip in Node.js environment
+
+        // Get available jobs from job manager
+        window.gameState.jobManager.updateAvailableJobs();
+        const availableJobs = window.gameState.jobManager.getAllAvailableJobs();
+
+        if (availableJobs.length === 0) return;
+
+        // Get available workers (working age, not drafted, not already optimally assigned)
+        const availableWorkers = this.population.filter(villager =>
+            villager.age >= 16 && villager.age <= 190 &&
+            villager.status !== 'drafted' &&
+            villager.status !== 'sick'
+        );
+
+        // Clear current assignments for re-optimization
+        availableWorkers.forEach(worker => {
+            if (worker.status === 'working') {
+                worker.status = 'idle';
+                worker.buildingId = null;
+                worker.role = 'peasant';
+            }
+        });
+
+        // Create job-worker effectiveness matrix
+        const assignments = [];
+
+        availableJobs.forEach(job => {
+            const jobType = job.buildingType || job.jobType;
+
+            availableWorkers.forEach(worker => {
+                const effectiveness = this.calculateJobEffectiveness(worker, jobType);
+                if (effectiveness > 0) {
+                    assignments.push({
+                        worker: worker,
+                        job: job,
+                        jobType: jobType,
+                        effectiveness: effectiveness,
+                        trainingValue: this.calculateTrainingValue(worker, jobType)
+                    });
+                }
+            });
+        });
+
+        // Sort assignments by optimization strategy
+        if (this.trainingMode === 'training') {
+            // Prioritize training opportunities, then balance workload
+            assignments.sort((a, b) => {
+                const trainingDiff = b.trainingValue - a.trainingValue;
+                if (Math.abs(trainingDiff) > 0.1) return trainingDiff;
+                // Secondary sort: balance workload (prefer less occupied jobs)
+                const workloadA = (a.job.currentWorkers || 0) / a.job.maxWorkers;
+                const workloadB = (b.job.currentWorkers || 0) / b.job.maxWorkers;
+                return workloadA - workloadB;
+            });
+        } else if (this.trainingMode === 'resources') {
+            // Prioritize maximum efficiency, then balance workload
+            assignments.sort((a, b) => {
+                const effDiff = b.effectiveness - a.effectiveness;
+                if (Math.abs(effDiff) > 0.1) return effDiff;
+                // Secondary sort: balance workload
+                const workloadA = (a.job.currentWorkers || 0) / a.job.maxWorkers;
+                const workloadB = (b.job.currentWorkers || 0) / b.job.maxWorkers;
+                return workloadA - workloadB;
+            });
+        } else {
+            // Balanced approach: consider efficiency, training, AND workload distribution
+            assignments.sort((a, b) => {
+                const scoreA = (a.effectiveness * 0.5) + (a.trainingValue * 0.2);
+                const scoreB = (b.effectiveness * 0.5) + (b.trainingValue * 0.2);
+
+                // Add workload balancing factor (prefer less busy jobs)
+                const workloadA = (a.job.currentWorkers || 0) / a.job.maxWorkers;
+                const workloadB = (b.job.currentWorkers || 0) / b.job.maxWorkers;
+                const workloadScoreA = scoreA + ((1 - workloadA) * 0.3);
+                const workloadScoreB = scoreB + ((1 - workloadB) * 0.3);
+
+                return workloadScoreB - workloadScoreA;
+            });
+        }
+
+        // Assign jobs starting with best matches
+        const usedWorkers = new Set();
+        const usedJobs = new Set();
+        let assignedCount = 0;
+
+        assignments.forEach(assignment => {
+            if (usedWorkers.has(assignment.worker.id) || usedJobs.has(assignment.job.id)) {
+                return; // Worker or job already assigned
+            }
+
+            // Check if job still has capacity
+            if (assignment.job.currentWorkers >= assignment.job.maxWorkers) {
+                return;
+            }
+
+            // Assign worker to job
+            assignment.worker.status = 'working';
+            assignment.worker.role = assignment.jobType;
+            assignment.worker.buildingId = assignment.job.buildingId;
+
+            // Update job capacity
+            assignment.job.currentWorkers = (assignment.job.currentWorkers || 0) + 1;
+
+            usedWorkers.add(assignment.worker.id);
+            if (assignment.job.currentWorkers >= assignment.job.maxWorkers) {
+                usedJobs.add(assignment.job.id);
+            }
+
+            assignedCount++;
+        });
+
+        console.log(`[PopulationManager] Optimized job assignments: ${assignedCount} workers assigned to jobs`);
+
+        // Update job manager with new assignments
+        if (window.gameState.jobManager.refreshAssignments) {
+            window.gameState.jobManager.refreshAssignments();
+        }
+    }
+
+    /**
+     * Calculate training value for a worker in a specific job
+     * Higher values indicate better learning opportunities
+     * @param {object} villager - The villager object
+     * @param {string} jobType - Type of job
+     * @returns {number} - Training value score
+     */
+    calculateTrainingValue(villager, jobType) {
+        const requiredSkills = this.jobSkillMapping[jobType] || [];
+        if (requiredSkills.length === 0) return 0;
+
+        let trainingPotential = 0;
+
+        requiredSkills.forEach(skillName => {
+            const currentLevel = this.getSkillLevel(villager, skillName);
+
+            // Higher training value for lower current skill (room for improvement)
+            if (currentLevel.level === 'novice') trainingPotential += 3;
+            else if (currentLevel.level === 'apprentice') trainingPotential += 2;
+            else if (currentLevel.level === 'journeyman') trainingPotential += 1;
+            // Experts and masters have low training value (already skilled)
+        });
+
+        return trainingPotential;
+    }
+
+    /**
+     * Set training mode preference
+     * @param {string} mode - 'training', 'resources', or 'balanced'
+     */
+    setTrainingMode(mode) {
+        if (['training', 'resources', 'balanced'].includes(mode)) {
+            this.trainingMode = mode;
+            console.log(`[PopulationManager] Training mode set to: ${mode}`);
+
+            // Re-optimize with new strategy
+            this.optimizeJobAssignments();
+        }
+    }
+
+    /**
+     * Get village-wide bonuses from elder roles
+     */
+    getElderBonuses() {
+        const elders = this.population.filter(p => p.age >= 191 && p.age <= 197);
+        const bonuses = {
+            wisdomBonus: 0,      // XP bonus for all villagers
+            productivityBonus: 0,  // Productivity bonus
+            happinessBonus: 0     // Happiness bonus
+        };
+
+        elders.forEach(elder => {
+            const bestSkill = this.getBestSkill(elder);
+
+            // Elders with master-level skills provide village bonuses
+            if (bestSkill.level === 'master') {
+                bonuses.wisdomBonus += 0.05;      // +5% XP gain
+                bonuses.productivityBonus += 0.03; // +3% productivity
+                bonuses.happinessBonus += 0.02;   // +2% happiness
+            } else if (bestSkill.level === 'expert') {
+                bonuses.wisdomBonus += 0.03;      // +3% XP gain
+                bonuses.productivityBonus += 0.02; // +2% productivity
+                bonuses.happinessBonus += 0.01;   // +1% happiness
+            }
+        });
+
+        // Cap bonuses at reasonable levels
+        bonuses.wisdomBonus = Math.min(bonuses.wisdomBonus, 0.25);      // Max 25%
+        bonuses.productivityBonus = Math.min(bonuses.productivityBonus, 0.15); // Max 15%
+        bonuses.happinessBonus = Math.min(bonuses.happinessBonus, 0.10);    // Max 10%
+
+        return bonuses;
+    }
+
+    /**
+     * Knowledge preservation system (monarch upgrade feature)
+     * When enabled, preserves some knowledge when skilled villagers die
+     */
+    preserveKnowledgeOnDeath(deceasedVillager) {
+        // This feature requires monarch upgrade "Royal Archives" or similar
+        if (typeof window === 'undefined' || !window.gameState.monarchUpgrades) return;
+        if (!window.gameState.monarchUpgrades.hasUpgrade('knowledgePreservation')) return;
+
+        const skills = deceasedVillager.skills || {};
+        const experience = deceasedVillager.experience || {};
+
+        // Preserve 25% of experience in village knowledge bank
+        Object.keys(experience).forEach(skillName => {
+            const preservedXp = Math.floor(experience[skillName] * 0.25);
+            if (preservedXp > 0) {
+                // Add to village knowledge bank (to be distributed to apprentices)
+                if (!window.gameState.villageKnowledge) window.gameState.villageKnowledge = {};
+                window.gameState.villageKnowledge[skillName] =
+                    (window.gameState.villageKnowledge[skillName] || 0) + preservedXp;
+
+                console.log(`[PopulationManager] Preserved ${preservedXp} XP in ${skillName} from ${deceasedVillager.name}`);
+            }
+        });
+    }
+
+    /**
+     * Distribute preserved knowledge to apprentices (daily process)
+     */
+    distributePreservedKnowledge() {
+        if (typeof window === 'undefined' || !window.gameState.villageKnowledge) return;
+        if (!window.gameState.monarchUpgrades?.hasUpgrade('knowledgePreservation')) return;
+
+        const knowledgeBank = window.gameState.villageKnowledge;
+
+        Object.keys(knowledgeBank).forEach(skillName => {
+            const availableXp = knowledgeBank[skillName];
+            if (availableXp <= 0) return;
+
+            // Find apprentices in this skill (novice/apprentice level)
+            const apprentices = this.population.filter(villager => {
+                const skillLevel = this.getSkillLevel(villager, skillName);
+                return skillLevel.level === 'novice' || skillLevel.level === 'apprentice';
+            });
+
+            if (apprentices.length > 0) {
+                // Distribute XP among apprentices
+                const xpPerApprentice = Math.floor(availableXp / apprentices.length);
+                if (xpPerApprentice > 0) {
+                    apprentices.forEach(apprentice => {
+                        this.awardExperience(apprentice.id, skillName, xpPerApprentice);
+                    });
+
+                    // Reduce knowledge bank
+                    knowledgeBank[skillName] -= (xpPerApprentice * apprentices.length);
+                    console.log(`[PopulationManager] Distributed preserved ${skillName} knowledge to ${apprentices.length} apprentices`);
+                }
+            }
+        });
     }
 
     moveInhabitant(id, newLocation) {
@@ -369,41 +1068,41 @@ class PopulationManager {
             'Benjamin', 'Abigail', 'Theodore', 'Emily', 'Henry', 'Elizabeth', 'Alexander', 'Sofia', 'Sebastian', 'Madison',
             'Jack', 'Scarlett', 'Owen', 'Victoria', 'Luke', 'Aria', 'Wyatt', 'Grace', 'Grayson', 'Chloe'
         ];
-        
+
         for (let i = 0; i < count; i++) {
-            // Age distribution with focus on breeding age (46-150)
+            // Age distribution with focus on working age (16-190)
             let age;
             const ageRoll = Math.random();
-            if (ageRoll < 0.5) {
-                // 50% chance: Adults and middle-aged (46-150) - prime breeding age
-                age = 46 + Math.floor(Math.random() * 105);
-            } else if (ageRoll < 0.7) {
-                // 20% chance: Young adults (28-45)
-                age = 28 + Math.floor(Math.random() * 18);
-            } else if (ageRoll < 0.85) {
-                // 15% chance: Children (3-27)
-                age = 3 + Math.floor(Math.random() * 25);
+            if (ageRoll < 0.6) {
+                // 60% chance: Working age (16-190) - main productive population
+                age = 16 + Math.floor(Math.random() * 175);
+            } else if (ageRoll < 0.8) {
+                // 20% chance: Young workers (16-60)
+                age = 16 + Math.floor(Math.random() * 45);
+            } else if (ageRoll < 0.9) {
+                // 10% chance: Children (3-15)
+                age = 3 + Math.floor(Math.random() * 13);
             } else {
-                // 15% chance: Elderly (151-190)
-                age = 151 + Math.floor(Math.random() * 40);
+                // 10% chance: Elderly (180-195)
+                age = 180 + Math.floor(Math.random() * 16);
             }
-            
+
             // Ensure roughly even gender split
             const gender = (i % 2 === 0) ? 'male' : 'female';
-            
+
             // Random name
             const name = names[Math.floor(Math.random() * names.length)] + ' ' + (Math.floor(Math.random() * 999) + 1);
-            
+
             // Role based on age
             let role = 'peasant';
-            if (age <= 27) {
+            if (age <= 15) {
                 role = 'child';
-            } else if (Math.random() < 0.2) {
-                // 20% chance for specialized roles for adults
-                const specialRoles = ['farmer', 'builder', 'guard', 'scout', 'crafter'];
+            } else if (Math.random() < 0.3) {
+                // 30% chance for specialized roles for working age adults
+                const specialRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter'];
                 role = specialRoles[Math.floor(Math.random() * specialRoles.length)];
             }
-            
+
             const inhabitant = this.addInhabitant({
                 name: name,
                 age: age,
@@ -413,20 +1112,18 @@ class PopulationManager {
                 location: 'village',
                 skills: this.getSkillsForRole(role)
             });
-            
+
             generated.push(inhabitant);
         }
-        
+
         console.log(`[PopulationManager] Generated ${count} inhabitants. Age distribution:`, {
-            children: generated.filter(p => p.age <= 27).length,
-            youngAdults: generated.filter(p => p.age >= 28 && p.age <= 45).length,
-            adults: generated.filter(p => p.age >= 46 && p.age <= 75).length,
-            middleAged: generated.filter(p => p.age >= 76 && p.age <= 150).length,
-            elderly: generated.filter(p => p.age >= 151).length,
+            children: generated.filter(p => p.age <= 15).length,
+            workingAge: generated.filter(p => p.age >= 16 && p.age <= 190).length,
+            elderly: generated.filter(p => p.age >= 191).length,
             males: generated.filter(p => p.gender === 'male').length,
             females: generated.filter(p => p.gender === 'female').length
         });
-        
+
         return generated;
     }
 
@@ -437,11 +1134,11 @@ class PopulationManager {
      */
     generateDistributedPopulation(targetSize = 10, focusOnAdults = true) {
         console.log(`[PopulationManager] Generating distributed population of ${targetSize} villagers...`);
-        
+
         // Clear existing population
         this.population = [];
         this.nextId = 1;
-        
+
         // Age distribution weights (focused on adults as requested)
         const ageDistribution = focusOnAdults ? {
             children: 0.15,     // 15% children (0-27)
@@ -456,14 +1153,14 @@ class PopulationManager {
             middleAged: 0.15,
             elderly: 0.10
         };
-        
-        const roles = ['farmer', 'crafter', 'builder', 'guard', 'trader', 'scholar', 'worker'];
+
+        const roles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'worker'];
         const skills = ['farming', 'crafting', 'building', 'combat', 'leadership', 'scholarship'];
-        
+
         for (let i = 0; i < targetSize; i++) {
             const rand = Math.random();
             let age, ageGroup;
-            
+
             // Determine age based on distribution
             if (rand < ageDistribution.children) {
                 age = Math.floor(Math.random() * 28); // 0-27
@@ -481,16 +1178,16 @@ class PopulationManager {
                 age = 181 + Math.floor(Math.random() * 50); // 181-230
                 ageGroup = 'elderly';
             }
-            
+
             // Generate proper skills for adults using roles
             let villagerSkills = [];
             let role = 'child';
-            
+
             if (age > 27) {
                 role = roles[Math.floor(Math.random() * roles.length)];
                 villagerSkills = this.getSkillsForRole(role);
             }
-            
+
             // Create villager with appropriate traits
             const villager = {
                 age: age,
@@ -503,27 +1200,27 @@ class PopulationManager {
                 productivity: age > 27 ? (0.7 + Math.random() * 0.6) : 0.1, // 0.7-1.3 for adults
                 traits: this.generateRandomTraits(ageGroup)
             };
-            
+
             this.addInhabitant(villager);
         }
-        
+
         console.log(`[PopulationManager] Generated ${this.population.length} villagers`);
         this.logAgeDistribution();
-        
+
         return this.population;
     }
 
     /**
      * Generate specific starting population for dynasty games
-     * Creates royal family member + specific professions
+     * Creates royal family member + 4 basic villagers (no pre-assigned jobs)
      */
     generateStartingDynastyPopulation() {
         console.log('[PopulationManager] Generating starting dynasty population...');
-        
+
         // Clear existing population
         this.population = [];
         this.nextId = 1;
-        
+
         // 1. Create the royal family member (the player character)
         const royalMember = {
             age: 30 + Math.floor(Math.random() * 20), // 30-50 years old
@@ -537,30 +1234,15 @@ class PopulationManager {
             traits: ['noble', 'charismatic', 'educated']
         };
         this.addInhabitant(royalMember);
-        
-        // 2. Add one dedicated builder
-        const builder = {
-            age: 25 + Math.floor(Math.random() * 15), // 25-40 years old
-            name: this.generateRandomName(),
-            role: 'builder',
-            status: 'idle',
-            skills: this.getSkillsForRole('builder'),
-            gender: Math.random() < 0.5 ? 'male' : 'female',
-            happiness: 70,
-            productivity: 1.0,
-            traits: ['hardworking', 'skilled']
-        };
-        this.addInhabitant(builder);
-        
-        // 3. Add 3 more villagers with useful starting roles
-        const startingRoles = ['farmer', 'guard', 'worker'];
-        for (let i = 0; i < 3; i++) {
+
+        // 2. Add 4 basic villagers (jobs will be assigned from buildings later)
+        for (let i = 0; i < 4; i++) {
             const villager = {
                 age: 20 + Math.floor(Math.random() * 25), // 20-45 years old
                 name: this.generateRandomName(),
-                role: startingRoles[i],
+                role: 'villager', // Basic villager role, jobs come from buildings
                 status: 'idle',
-                skills: this.getSkillsForRole(startingRoles[i]),
+                skills: this.getSkillsForRole('villager'),
                 gender: Math.random() < 0.5 ? 'male' : 'female',
                 happiness: 60 + Math.floor(Math.random() * 20),
                 productivity: 0.8 + Math.random() * 0.4,
@@ -568,12 +1250,12 @@ class PopulationManager {
             };
             this.addInhabitant(villager);
         }
-        
+
         console.log('[PopulationManager] Generated starting dynasty population:');
         this.population.forEach(p => {
             console.log(`  - ${p.name}: ${p.role} (age ${p.age})`);
         });
-        
+
         return this.population;
     }
 
@@ -584,7 +1266,7 @@ class PopulationManager {
         // Use SkillSystem to generate proper skill structures with XP values
         if (typeof window !== 'undefined' && window.SkillSystem && window.skillSystemReady) {
             const skillSystem = new window.SkillSystem();
-            
+
             // Map role to SkillSystem types
             const roleToSkillType = {
                 'farmer': 'experienced',       // Experienced in agriculture
@@ -596,20 +1278,21 @@ class PopulationManager {
                 'trader': 'trader',            // Trading/leadership skills
                 'royal': 'master'              // High-level skills
             };
-            
+
             const skillType = roleToSkillType[role] || 'default';
             const generatedSkills = skillSystem.generateImmigrantSkills(skillType);
-            
+
             console.log(`[PopulationManager] Generated skills for ${role}:`, generatedSkills);
             return generatedSkills;
         }
-        
+
         // Fallback to simple skill arrays if SkillSystem not available
         const roleSkills = {
             'farmer': ['farming'],
-            'builder': ['building', 'crafting'], 
+            'builder': ['building', 'crafting'],
             'guard': ['combat'],
             'worker': ['crafting'],
+            'villager': ['crafting'], // Basic villager skills
             'crafter': ['crafting'],
             'scholar': ['scholarship'],
             'trader': ['leadership'],
@@ -627,7 +1310,7 @@ class PopulationManager {
     generatePopulationWithPreferences(count, preferredProfessions = []) {
         const generated = [];
         console.log(`[PopulationManager] Generating ${count} people with preferred professions:`, preferredProfessions);
-        
+
         for (let i = 0; i < count; i++) {
             // Determine role - prefer specified professions for first few
             let role = 'worker'; // default
@@ -635,13 +1318,13 @@ class PopulationManager {
                 role = preferredProfessions[i];
             } else {
                 // Random role for extras
-                const allRoles = ['farmer', 'builder', 'guard', 'crafter', 'worker', 'trader'];
+                const allRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'worker'];
                 role = allRoles[Math.floor(Math.random() * allRoles.length)];
             }
-            
+
             // Generate age (focus on working adults)
             const age = 20 + Math.floor(Math.random() * 40); // 20-60 years old
-            
+
             const villager = {
                 age: age,
                 name: this.generateRandomName(),
@@ -653,12 +1336,12 @@ class PopulationManager {
                 productivity: 0.7 + Math.random() * 0.6,
                 traits: this.generateRandomTraits('adult')
             };
-            
+
             const inhabitant = this.addInhabitant(villager);
             generated.push(inhabitant);
         }
-        
-        console.log(`[PopulationManager] Generated ${count} inhabitants with roles:`, 
+
+        console.log(`[PopulationManager] Generated ${count} inhabitants with roles:`,
             generated.map(p => p.role));
         return generated;
     }
@@ -692,7 +1375,7 @@ class PopulationManager {
             middleAged: 0,
             elderly: 0
         };
-        
+
         this.population.forEach(villager => {
             if (villager.age <= 27) distribution.children++;
             else if (villager.age <= 60) distribution.youngAdults++;
@@ -700,8 +1383,57 @@ class PopulationManager {
             else if (villager.age <= 180) distribution.middleAged++;
             else distribution.elderly++;
         });
-        
+
         console.log('[PopulationManager] Age Distribution:', distribution);
+    }
+
+    /**
+     * Debug function to manually test aging system
+     */
+    debugAging() {
+        console.log('[PopulationManager] Debug: Testing aging system...');
+        console.log('Current population ages:', this.population.map(v => ({ name: v.name, age: v.age })));
+
+        // Test aging process
+        const result = this.processAging();
+        console.log('Aging result:', result);
+
+        console.log('Population after aging:', this.population.map(v => ({ name: v.name, age: v.age })));
+        return result;
+    }
+
+    /**
+     * Debug function to manually test birth system
+     */
+    debugBirths(options = {}) {
+        console.log('[PopulationManager] Debug: Testing birth system...');
+
+        const eligibleMales = this.population.filter(p => p.age >= 16 && p.age <= 190 && p.gender === 'male').length;
+        const eligibleFemales = this.population.filter(p => p.age >= 16 && p.age <= 190 && p.gender === 'female').length;
+
+        console.log(`Eligible for reproduction: ${eligibleMales} males, ${eligibleFemales} females`);
+
+        const birthResult = this.calculateDailyGrowth(options);
+        console.log('Birth calculation result:', birthResult);
+
+        return birthResult;
+    }
+
+    /**
+     * Debug function to set realistic ages for testing
+     */
+    debugSetAges() {
+        console.log('[PopulationManager] Debug: Setting realistic ages...');
+
+        this.population.forEach((villager, index) => {
+            if (villager.age > 250 || villager.age < 0) {
+                // Set to random working age
+                villager.age = Math.floor(Math.random() * 100) + 20; // 20-120 days
+                console.log(`Reset ${villager.name} age to ${villager.age}`);
+            }
+        });
+
+        console.log('Current ages after reset:', this.population.map(v => ({ name: v.name, age: v.age })));
     }
 
     toJSON() {
@@ -720,17 +1452,15 @@ class PopulationManager {
                 productivity: { average: 0 },
                 ageGroups: {},
                 jobGroups: {},
-                skills: { available: false }
+                skills: { available: false, overview: {}, topSkilled: [] }
             };
         }
 
-        // Calculate age groups with proper structure for UI
+        // Calculate age groups with updated age brackets
         const ageGroupData = {
-            children: { name: '👶 Children', age: '0-27 days', count: this.population.filter(p => p.age <= 27).length },
-            youngAdults: { name: '💪 Young Adults', age: '28-60 days', count: this.population.filter(p => p.age >= 28 && p.age <= 60).length },
-            adults: { name: '👨 Adults', age: '61-120 days', count: this.population.filter(p => p.age >= 61 && p.age <= 120).length },
-            middleAged: { name: '👨‍💼 Middle-Aged', age: '121-180 days', count: this.population.filter(p => p.age >= 121 && p.age <= 180).length },
-            elderly: { name: '👴 Elderly', age: '181+ days', count: this.population.filter(p => p.age >= 181).length }
+            children: { name: '👶 Children', age: '0-15 days', count: this.population.filter(p => p.age <= 15).length },
+            workingAge: { name: '� Working Age', age: '16-190 days', count: this.population.filter(p => p.age >= 16 && p.age <= 190).length },
+            elderly: { name: '👴 Elderly', age: '191+ days', count: this.population.filter(p => p.age >= 191).length }
         };
 
         // Calculate job groups with proper structure for UI
@@ -744,76 +1474,105 @@ class PopulationManager {
         Object.entries(roleDistribution).forEach(([role, count]) => {
             const roleNames = {
                 'farmer': '🌾 Farmers',
-                'crafter': '🔨 Crafters', 
+                'crafter': '🔨 Crafters',
                 'builder': '🏗️ Builders',
                 'guard': '⚔️ Guards',
-                'trader': '💰 Traders',
-                'scholar': '📚 Scholars',
+                'merchant': '💰 Merchants',
+                'woodcutter': '🪓 Woodcutters',
+                'miner': '⛏️ Miners',
+                'stonecutter': '🪨 Stonecutters',
+                'sawyer': '🪚 Sawyers',
+                'gatherer': '🧺 Gatherers',
                 'worker': '👷 Workers',
                 'child': '👶 Children',
                 'elder': '👴 Elders',
                 'player': '👑 Monarch',
-                'unemployed': '🆔 Unemployed'
+                'unemployed': '🆔 Unemployed',
+                'peasant': '🆔 Unemployed'
             };
-            
+
             jobGroupData[role] = {
-                name: roleNames[role] || `❓ ${role}`,
+                name: roleNames[role] || `${role.charAt(0).toUpperCase()}${role.slice(1)}`,
                 count: count,
-                description: `Workers in ${role} role`
+                percentage: Math.round((count / this.population.length) * 100)
             };
         });
 
-        // Calculate happiness distribution
-        const happinessDistribution = {};
-        const happinessTotal = this.population.length;
-        this.population.forEach(person => {
-            const happiness = person.happiness || 50;
-            let level;
-            if (happiness >= 90) level = 'veryHappy';
-            else if (happiness >= 75) level = 'happy';
-            else if (happiness >= 50) level = 'neutral';
-            else if (happiness >= 25) level = 'unhappy';
-            else level = 'veryUnhappy';
-            
-            happinessDistribution[level] = (happinessDistribution[level] || 0) + 1;
-        });
+        // Calculate skill statistics
+        const skillOverview = {};
+        const allSkills = new Set();
+        let totalSkillLevels = 0;
+        let skilledVillagers = 0;
 
-        // Calculate skills data
-        let totalSkills = 0;
-        let skillLevelCounts = {};
-        this.population.forEach(person => {
-            if (person.skills) {
-                if (Array.isArray(person.skills)) {
-                    totalSkills += person.skills.length;
-                } else if (typeof person.skills === 'object') {
-                    Object.values(person.skills).forEach(level => {
-                        totalSkills++;
-                        const levelKey = `Level ${level || 1}`;
-                        skillLevelCounts[levelKey] = (skillLevelCounts[levelKey] || 0) + 1;
-                    });
-                }
+        this.population.forEach(villager => {
+            if (villager.experience) {
+                let hasSkills = false;
+                Object.entries(villager.experience).forEach(([skillName, xp]) => {
+                    if (xp > 0) {
+                        allSkills.add(skillName);
+                        hasSkills = true;
+
+                        if (!skillOverview[skillName]) {
+                            skillOverview[skillName] = {
+                                total: 0,
+                                novice: 0,
+                                apprentice: 0,
+                                journeyman: 0,
+                                expert: 0,
+                                master: 0
+                            };
+                        }
+
+                        const skillLevel = this.getSkillLevel(villager, skillName);
+                        skillOverview[skillName].total++;
+                        skillOverview[skillName][skillLevel.level]++;
+                        totalSkillLevels++;
+                    }
+                });
+                if (hasSkills) skilledVillagers++;
             }
         });
 
-        // Calculate averages
-        const averageAge = this.population.reduce((sum, p) => sum + (p.age || 0), 0) / this.population.length;
-        const averageHappiness = this.population.reduce((sum, p) => sum + (p.happiness || 50), 0) / this.population.length;
-        const averageProductivity = this.population.reduce((sum, p) => sum + (p.productivity || 1.0), 0) / this.population.length;
-        
-        const workingAge = ageGroupData.youngAdults.count + ageGroupData.adults.count + ageGroupData.middleAged.count;
-        const employed = this.population.filter(p => p.role && p.role !== 'unemployed' && p.role !== 'child').length;
+        // Find top skilled villagers
+        const topSkilled = this.population
+            .map(villager => {
+                const bestSkill = this.getBestSkill(villager);
+                return {
+                    name: villager.name,
+                    age: villager.age,
+                    role: villager.role,
+                    bestSkill: bestSkill.skillName,
+                    skillLevel: bestSkill.title,
+                    xp: bestSkill.xp,
+                    efficiency: bestSkill.efficiency
+                };
+            })
+            .filter(v => v.xp > 0)
+            .sort((a, b) => b.xp - a.xp)
+            .slice(0, 10);
 
-        // Return structure that matches what the UI expects
+        // Calculate happiness statistics
+        const happinessTotal = this.population.reduce((sum, v) => sum + (v.happiness || 70), 0);
+        const averageHappiness = Math.round(happinessTotal / this.population.length);
+
+        const happinessDistribution = {
+            high: this.population.filter(v => (v.happiness || 70) >= 80).length,
+            medium: this.population.filter(v => (v.happiness || 70) >= 50 && (v.happiness || 70) < 80).length,
+            low: this.population.filter(v => (v.happiness || 70) < 50).length
+        };
+
+        // Calculate productivity statistics
+        const totalProductivity = this.population.reduce((sum, v) => sum + (v.productivity || 0.8), 0);
+        const averageProductivity = (totalProductivity / this.population.length).toFixed(2);
+
         return {
             total: this.population.length,
             demographics: {
-                averageAge: Math.round(averageAge),
-                workingAge: workingAge,
-                employed: employed,
-                children: ageGroupData.children.count,
-                elderly: ageGroupData.elderly.count,
-                averageHappiness: Math.round(averageHappiness),
-                totalSkills: totalSkills
+                averageAge: Math.round(this.population.reduce((sum, v) => sum + v.age, 0) / this.population.length),
+                workingAge: ageGroupData.workingAge.count,
+                employed: this.population.filter(v => v.status === 'working').length,
+                maleCount: this.population.filter(v => v.gender === 'male').length,
+                femaleCount: this.population.filter(v => v.gender === 'female').length
             },
             happiness: {
                 average: averageHappiness,
@@ -826,21 +1585,33 @@ class PopulationManager {
             ageGroups: ageGroupData,
             jobGroups: jobGroupData,
             skills: {
-                available: totalSkills > 0,
-                totalSkills: totalSkills,
-                averageSkillsPerVillager: totalSkills / this.population.length,
-                levelCounts: skillLevelCounts
+                available: totalSkillLevels > 0,
+                totalSkills: totalSkillLevels,
+                averageSkillsPerVillager: totalSkillLevels / this.population.length,
+                skilledVillagers: skilledVillagers,
+                skillTypes: Array.from(allSkills).length,
+                overview: skillOverview,
+                topSkilled: topSkilled
             },
             training: {
-                mentors: this.population.filter(p => p.role === 'elder' || p.role === 'scholar').length,
-                total: this.population.filter(p => p.age >= 28).length // Adults who can train
+                mode: this.trainingMode,
+                mentors: this.population.filter(p => {
+                    const bestSkill = this.getBestSkill(p);
+                    return bestSkill.level === 'expert' || bestSkill.level === 'master';
+                }).length,
+                total: ageGroupData.workingAge.count
             },
             genderDistribution: {
                 male: this.population.filter(p => p.gender === 'male').length,
                 female: this.population.filter(p => p.gender === 'female').length
             },
-            roleDistribution: roleDistribution,
-            statusDistribution: {}
+            workforceAnalysis: {
+                employed: this.population.filter(v => v.status === 'working').length,
+                unemployed: this.population.filter(v => v.status === 'idle').length,
+                drafted: this.population.filter(v => v.status === 'drafted').length,
+                children: ageGroupData.children.count,
+                elderly: ageGroupData.elderly.count
+            }
         };
     }
 
@@ -862,6 +1633,151 @@ class PopulationManager {
             location: person.location || 'village'
         }));
     }
+
+    /**
+     * Initialize health for existing population members that don't have it
+     */
+    initializeHealth() {
+        let updated = 0;
+        this.population.forEach(villager => {
+            if (villager.health === undefined || villager.health === null) {
+                // Base health on age - younger villagers tend to be healthier
+                let baseHealth = 100;
+                if (villager.age > 60) {
+                    baseHealth = Math.max(70, 100 - (villager.age - 60) * 0.5);
+                } else if (villager.age < 16) {
+                    baseHealth = Math.max(80, 90 + Math.random() * 10);
+                }
+                villager.health = Math.round(baseHealth);
+                updated++;
+            }
+        });
+
+        if (updated > 0) {
+            console.log(`[PopulationManager] Initialized health for ${updated} existing villagers`);
+        }
+    }
+
+    /**
+     * Fix legacy roles that don't match current job system
+     */
+    fixLegacyRoles() {
+        const validJobRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'sawyer', 'foreman'];
+        const roleMapping = {
+            'guard': 'worker', // Guards become general workers
+            'trader': 'worker', // Traders become general workers  
+            'merchant': 'worker', // Merchants become general workers
+            'scholar': 'worker', // Scholars become general workers
+            'miner': 'worker', // Miners become general workers (no miner jobs exist)
+            'stonecutter': 'worker' // Stonecutters become general workers (no stonecutter jobs exist)
+        };
+
+        let fixed = 0;
+        this.population.forEach(villager => {
+            if (roleMapping[villager.role]) {
+                console.log(`[PopulationManager] Converting ${villager.name} from ${villager.role} to ${roleMapping[villager.role]}`);
+                villager.role = roleMapping[villager.role];
+                fixed++;
+            }
+        });
+
+        if (fixed > 0) {
+            console.log(`[PopulationManager] Fixed ${fixed} legacy roles to match current job system`);
+        }
+    }
+
+    /**
+     * Clear invalid job assignments from legacy save data
+     */
+    clearInvalidJobAssignments() {
+        let cleared = 0;
+        this.population.forEach(villager => {
+            // Clear job assignments - these should be managed by JobManager, not stored in population
+            if (villager.jobAssignment) {
+                console.log(`[PopulationManager] Clearing job assignment for ${villager.name}:`, villager.jobAssignment);
+                delete villager.jobAssignment;
+                cleared++;
+            }
+            // Also clear any legacy job-related properties that shouldn't exist
+            if (villager.hasJob !== undefined) {
+                delete villager.hasJob;
+            }
+            if (villager.workLocation !== undefined) {
+                delete villager.workLocation;
+            }
+        });
+
+        if (cleared > 0) {
+            console.log(`[PopulationManager] Cleared ${cleared} invalid job assignments from population data`);
+        }
+    }
+
+    /**
+     * Reset ages to reasonable values for dynasty games (one-time fix)
+     */
+    resetAgesForDynastyGame() {
+        let reset = 0;
+        this.population.forEach(villager => {
+            // If age is over reasonable working limit, reset to a working age
+            if (villager.age > 120) {
+                // Reset to a random working age between 25-80
+                villager.age = Math.floor(Math.random() * 55) + 25;
+                reset++;
+            }
+        });
+
+        if (reset > 0) {
+            console.log(`[PopulationManager] Reset ${reset} villager ages to reasonable values for dynasty gameplay`);
+        }
+    }
+
+    /**
+     * Generate new young workers to replenish aging population
+     */
+    generateNewWorkers(count = 5) {
+        const newWorkers = [];
+        const roles = ['farmer', 'gatherer', 'crafter', 'builder'];
+
+        for (let i = 0; i < count; i++) {
+            const newWorker = {
+                id: this.nextId++,
+                name: this.generateName(),
+                age: Math.floor(Math.random() * 15) + 18, // Age 18-32
+                role: roles[Math.floor(Math.random() * roles.length)],
+                health: Math.floor(Math.random() * 20) + 80, // Health 80-100
+                happiness: Math.floor(Math.random() * 30) + 70, // Happiness 70-100
+                status: 'idle',
+                location: 'village',
+                skills: this.generateStartingSkills(),
+                experience: {},
+                socialConnections: [],
+                preferences: this.generatePreferences()
+            };
+
+            this.population.push(newWorker);
+            newWorkers.push(newWorker);
+        }
+
+        console.log(`[PopulationManager] Generated ${count} new workers (ages 18-32)`);
+        return newWorkers;
+    }
+
+    /**
+     * Check population demographics and generate workers if needed
+     */
+    maintainWorkforce() {
+        const workingAge = this.population.filter(p => p.age >= 16 && p.age <= 80).length;
+        const totalPopulation = this.population.length;
+
+        // If less than 30% of population is working age, generate new workers
+        if (workingAge < totalPopulation * 0.3 || workingAge < 5) {
+            const needed = Math.max(5, Math.ceil(totalPopulation * 0.3) - workingAge);
+            console.log(`[PopulationManager] Workforce maintenance: ${workingAge}/${totalPopulation} working age, generating ${needed} new workers`);
+            return this.generateNewWorkers(needed);
+        }
+
+        return [];
+    }
 }
 
 console.log('[PopulationManager] Class definition completed');
@@ -874,10 +1790,55 @@ if (typeof module !== 'undefined' && module.exports) {
     console.log('[PopulationManager] Exporting to window object');
     window.PopulationManager = PopulationManager;
     console.log('[PopulationManager] window.PopulationManager set to:', window.PopulationManager);
-    
+
     // Signal that PopulationManager is ready
     window.populationManagerReady = true;
-    
+
+    // Add debug functions to global scope
+    window.debugPopulation = function () {
+        if (window.gameState?.populationManager) {
+            const pm = window.gameState.populationManager;
+            console.log('=== POPULATION DEBUG ===');
+            console.log('Total population:', pm.getAll().length);
+            console.log('Population ages:', pm.getAll().map(v => ({ name: v.name, age: v.age, gender: v.gender })));
+            console.log('Demographics:', pm.getPopulationGroups());
+            return pm;
+        } else {
+            console.log('PopulationManager not available');
+            return null;
+        }
+    };
+
+    window.testPopulationAging = function () {
+        if (window.gameState?.populationManager) {
+            return window.gameState.populationManager.debugAging();
+        }
+        console.log('PopulationManager not available');
+    };
+
+    window.testPopulationBirths = function (options = {}) {
+        if (window.gameState?.populationManager) {
+            return window.gameState.populationManager.debugBirths(options);
+        }
+        console.log('PopulationManager not available');
+    };
+
+    window.fixPopulationAges = function () {
+        if (window.gameState?.populationManager) {
+            return window.gameState.populationManager.debugSetAges();
+        }
+        console.log('PopulationManager not available');
+    };
+
+    window.forceEndDay = function () {
+        if (window.gameState?.endDay) {
+            console.log('Forcing end of day...');
+            window.gameState.endDay();
+            console.log('Day ended. New day:', window.gameState.day);
+        }
+        console.log('GameState.endDay not available');
+    };
+
     // Trigger event if event bus is available
     if (window.eventBus && typeof window.eventBus.emit === 'function') {
         window.eventBus.emit('populationManagerReady');

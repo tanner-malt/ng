@@ -134,20 +134,10 @@ class ModalSystem {
             priority = 0  // Add priority support: 0 = normal, 1 = high (settings), 2 = critical
         } = options;
 
-        console.log(`🔥 [MODAL TRACKER] _showModalInternal called`);
-        console.log(`🔥 [MODAL TRACKER] Modal ID: ${id}`);
-        console.log(`🔥 [MODAL TRACKER] Modal type: ${modalType}`);
-        console.log(`🔥 [MODAL TRACKER] Title: ${title}`);
-        console.log(`🔥 [MODAL TRACKER] Content length: ${content.length}`);
-        console.log(`🔥 [MODAL TRACKER] Active modals count: ${this.activeModals.size}`);
-        console.log(`🔥 [MODAL TRACKER] Modal stack length: ${this.modalStack.length}`);
-
         console.log(`[ModalSystem] Creating modal: "${title}" (type: ${modalType}, id: ${id})`);
-        console.log(`[ModalSystem] Modal options:`, options);
 
         // Prevent multiple instances of the same modal type
         if (modalType && this.activeModals.has(modalType)) {
-            console.log(`🔥 [MODAL TRACKER] DUPLICATE MODAL REJECTED: ${modalType}`);
             console.log(`[ModalSystem] Modal type '${modalType}' already active, rejecting duplicate`);
             resolve(null);
             return;
@@ -155,10 +145,6 @@ class ModalSystem {
         
         // Special handling for tutorial modals - only prevent exact same modal type duplicates
         if (modalType && modalType.includes('tutorial') || className.includes('tutorial')) {
-            console.log(`🔥 [MODAL TRACKER] Checking for existing tutorial modals...`);
-            console.log(`🔥 [MODAL TRACKER] Current activeModals:`, Array.from(this.activeModals));
-            console.log(`🔥 [MODAL TRACKER] Looking for modalType: ${modalType}`);
-            
             // Only block if the EXACT same tutorial modal type is already active
             const existingTutorial = Array.from(this.activeModals).find(activeId => 
                 activeId === modalType
@@ -168,17 +154,11 @@ class ModalSystem {
                 resolve(null);
                 return;
             }
-            console.log(`🔥 [MODAL TRACKER] No exact duplicate found, proceeding...`);
         }
 
         // Use the provided ID, fallback to modalType for activeModals tracking
         const actualModalId = id;  // Use the actual provided ID for the DOM element
         const trackingId = modalType || id;  // Use modalType for duplicate prevention
-
-        console.log(`🔥 [MODAL TRACKER] Using actual modal ID: ${actualModalId}`);
-        console.log(`🔥 [MODAL TRACKER] Using tracking ID: ${trackingId}`);
-        console.log(`🔥 [MODAL TRACKER] Original id parameter: ${id}`);
-        console.log(`🔥 [MODAL TRACKER] Modal type: ${modalType}`);
 
         // Create modal element
         const modal = document.createElement('div');
@@ -186,8 +166,6 @@ class ModalSystem {
         modal.className = `modal-content ${className}`;
         modal.style.width = width;
         modal.style.height = height;
-
-        console.log(`🔥 [MODAL TRACKER] Modal element created with ID: ${modal.id}`);
 
         // Store resolve/reject for this modal
         modal._resolve = resolve;
@@ -226,30 +204,13 @@ class ModalSystem {
 
         // Show overlay and modal
         const overlay = document.getElementById('modal-overlay');
-        console.log(`🔥 [MODAL TRACKER] Overlay element found:`, !!overlay);
-        console.log(`🔥 [MODAL TRACKER] Overlay current display:`, overlay ? overlay.style.display : 'N/A');
-        console.log(`🔥 [MODAL TRACKER] Overlay children count before:`, overlay ? overlay.children.length : 'N/A');
         
         overlay.appendChild(modal);
-        console.log(`🔥 [MODAL TRACKER] Modal appended to overlay`);
-        console.log(`🔥 [MODAL TRACKER] Overlay children count after:`, overlay.children.length);
         
         overlay.style.display = 'flex';
         overlay.style.zIndex = finalZIndex;  // Set calculated z-index
         overlay.classList.add('show'); // Add show class for animations and selectors
         
-        console.log(`🔥 [MODAL TRACKER] Overlay display set to: ${overlay.style.display}`);
-        console.log(`🔥 [MODAL TRACKER] Overlay z-index set to: ${finalZIndex}`);
-        console.log(`🔥 [MODAL TRACKER] Overlay classes:`, overlay.className);
-        
-        // Check if modal is actually visible
-        setTimeout(() => {
-            const rect = overlay.getBoundingClientRect();
-            console.log(`🔥 [MODAL TRACKER] Overlay computed display:`, window.getComputedStyle(overlay).display);
-            console.log(`🔥 [MODAL TRACKER] Overlay position:`, rect);
-            console.log(`🔥 [MODAL TRACKER] Modal in DOM:`, !!document.getElementById(actualModalId));
-        }, 50);
-
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
 
@@ -878,13 +839,8 @@ class ModalSystem {
 
     // Show wiki menu
     showWikiMenu() {
-        console.log('🔥 [MODAL TRACKER] showWikiMenu() called');
-        console.log('🔥 [MODAL TRACKER] Generating wiki content...');
-        
         const wikiContent = this.generateWikiContent();
-        console.log('🔥 [MODAL TRACKER] Wiki content generated, length:', wikiContent.length);
         
-        console.log('🔥 [MODAL TRACKER] Calling showModal with wiki parameters...');
         const modalPromise = this.showModal({
             id: 'wiki-modal',
             title: '📖 Game Wiki & Documentation',
@@ -894,21 +850,15 @@ class ModalSystem {
             className: 'wiki-modal',
             modalType: 'wiki',
             onClose: () => {
-                console.log('🔥 [MODAL TRACKER] Wiki modal onClose callback triggered');
                 // Clean up any wiki-specific listeners
             }
         });
 
-        console.log('🔥 [MODAL TRACKER] showModal returned:', modalPromise);
-        
         // Setup wiki interactions after modal is created
         modalPromise.then(actualModalId => {
-            console.log('🔥 [MODAL TRACKER] Modal promise resolved with ID:', actualModalId);
-            console.log('🔥 [MODAL TRACKER] Setting up wiki handlers...');
             this.setupWikiHandlers(actualModalId);
         });
         
-        console.log('🔥 [MODAL TRACKER] showWikiMenu complete, returning promise');
         return modalPromise;
     }
 
@@ -1126,46 +1076,52 @@ class ModalSystem {
         return modalPromise;
     }
 
+    // Async method to load version without blocking
+    async loadVersionAsync() {
+        const possiblePaths = [
+            'public/version.json',
+            './version.json',
+            '../version.json',
+            'version.json'
+        ];
+        
+        for (const path of possiblePaths) {
+            try {
+                const response = await fetch(path);
+                if (response.ok) {
+                    const data = await response.json();
+                    const version = data.version || '0.0.1';
+                    window.GAME_VERSION = version;
+                    // Update the version display if modal is still open
+                    const versionElement = document.getElementById('current-version');
+                    if (versionElement) {
+                        versionElement.textContent = `v${version}`;
+                    }
+                    return version;
+                }
+            } catch (error) {
+                // Continue to next path
+            }
+        }
+        return '0.0.1'; // fallback
+    }
+
     generateSettingsContent() {
         const settings = this.loadSettings();
         
-        // Load current version
+        // Load current version safely
         let currentVersion = '0.0.1'; // fallback
         try {
             // Try to get version from window global (set by version.json)
             if (window.GAME_VERSION) {
                 currentVersion = window.GAME_VERSION;
+            } else if (window.gameState?.version) {
+                currentVersion = window.gameState.version;
             } else {
-                // Try to fetch from version.json if not already loaded
-                const possiblePaths = [
-                    'public/version.json',
-                    './version.json',
-                    '../version.json',
-                    'version.json'
-                ];
-                
-                async function tryLoadVersion(paths) {
-                    for (const path of paths) {
-                        try {
-                            const response = await fetch(path);
-                            if (response.ok) {
-                                const data = await response.json();
-                                currentVersion = data.version || '0.0.1';
-                                window.GAME_VERSION = currentVersion;
-                                // Update the version display if modal is still open
-                                const versionElement = document.getElementById('current-version');
-                                if (versionElement) {
-                                    versionElement.textContent = `v${currentVersion}`;
-                                }
-                                return;
-                            }
-                        } catch (error) {
-                            // Continue to next path
-                        }
-                    }
-                }
-                
-                tryLoadVersion(possiblePaths);
+                // Try to load version asynchronously without blocking
+                this.loadVersionAsync().catch(error => {
+                    console.log('[Settings] Could not load version:', error);
+                });
             }
         } catch (error) {
             console.log('[Settings] Error loading version:', error);

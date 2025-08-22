@@ -183,21 +183,27 @@ class BuildingEffectsManager {
         console.log('[BuildingEffects] Mine constructed - resource extraction improved');
     }
 
-    // Lumber Mill effects - Wood processing and forestry
+    // Lumber Mill effects - Advanced wood processing and construction efficiency
     applyLumberMillEffects(position) {
         const bonus = {
             type: 'lumberMill',
             position: position,
             effects: {
-                woodProcessing: 0.35, // 35% bonus to wood processing
-                lumberQuality: 20, // +20% lumber quality
+                woodProcessing: 0.50, // 50% bonus to wood processing efficiency
+                lumberQuality: 30, // +30% lumber quality for construction
+                constructionSpeed: 0.25, // 25% faster construction with refined materials
                 forestryManagement: true, // Sustainable logging practices
-                woodcuttingSkillGain: 0.25 // 25% faster woodcutting skill growth
+                woodcuttingSkillGain: 0.35, // 35% faster woodcutting skill growth
+                enablesAdvancedBuildings: true, // Unlocks buildings requiring refined lumber
+                planksProduction: 0.40 // 40% bonus to planks production in radius
             }
         };
         
         this.activeBonuses.set(`lumberMill_${position}`, bonus);
-        console.log('[BuildingEffects] Lumber Mill constructed - wood processing enhanced');
+        console.log('[BuildingEffects] Lumber Mill constructed - advanced wood processing and construction efficiency enabled');
+        
+        // Apply construction speed bonus to nearby buildings under construction
+        this.applyConstructionSpeedBonus(position, 0.25);
     }
 
     // Magical Tower effects - Magic research and arcane studies
@@ -431,6 +437,49 @@ class BuildingEffectsManager {
                 }
             }
         });
+    }
+
+    // Apply construction speed bonus to buildings in construction near lumber mills
+    applyConstructionSpeedBonus(position, speedBonus) {
+        if (!this.gameState.constructionManager) return;
+        
+        // Parse position coordinates
+        const [x, y] = position.split(',').map(Number);
+        const radius = 3; // Buildings within 3 tiles get the bonus
+        
+        // Find buildings under construction within radius
+        this.gameState.buildings.forEach(building => {
+            if (!building.built && building.constructionProgress !== undefined) {
+                const distance = Math.sqrt(
+                    Math.pow(building.x - x, 2) + Math.pow(building.y - y, 2)
+                );
+                
+                if (distance <= radius) {
+                    // Apply construction speed bonus
+                    const currentBonus = building.constructionSpeedBonus || 0;
+                    building.constructionSpeedBonus = Math.max(currentBonus, speedBonus);
+                    console.log(`[BuildingEffects] Applied ${speedBonus * 100}% construction speed bonus to ${building.type} at ${building.x},${building.y}`);
+                }
+            }
+        });
+    }
+
+    // Get total construction speed bonus for a building position
+    getConstructionSpeedBonus(x, y) {
+        let totalBonus = 0;
+        
+        this.activeBonuses.forEach(bonus => {
+            if (bonus.effects.constructionSpeed) {
+                const [bx, by] = bonus.position.split(',').map(Number);
+                const distance = Math.sqrt(Math.pow(x - bx, 2) + Math.pow(y - by, 2));
+                
+                if (distance <= 3) { // 3 tile radius
+                    totalBonus += bonus.effects.constructionSpeed;
+                }
+            }
+        });
+        
+        return Math.min(totalBonus, 0.75); // Cap at 75% bonus
     }
 }
 

@@ -105,7 +105,7 @@
 
 ## 🏛️ Legacy Buildings
 
-### 🪚 Sawmill
+### 🪚 Woodcutter Lodge
 - **Function:** Processes wood from nearby forests
 - **Priority:** Early resource building for wood production
 

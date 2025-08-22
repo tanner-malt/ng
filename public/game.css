@@ -744,6 +744,28 @@ body {
     gap: 10px;
 }
 
+.building-effects-description {
+    margin-bottom: 15px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--surface-elevated), var(--primary-medium));
+    border-radius: 8px;
+    border: 1px solid var(--accent-primary);
+    border-left: 4px solid var(--accent-primary);
+}
+
+.effects-text {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.95em;
+    line-height: 1.4;
+}
+
+.dynamic-effects-title {
+    margin: 15px 0 10px 0;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
 .effect-item {
     display: flex;
     justify-content: space-between;
@@ -763,6 +785,14 @@ body {
     color: var(--accent-success);
     font-weight: bold;
     font-size: 0.9em;
+}
+
+.no-effects {
+    margin: 0;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
 }
 
 .no-effects {
@@ -5822,6 +5852,74 @@ html {
     font-weight: 600;
 }
 
+/* Effects Section Styles */
+.effects-group {
+    margin-bottom: 1rem;
+}
+
+.effects-group h5 {
+    color: var(--accent-primary);
+    font-size: 0.9rem;
+    margin: 0 0 0.5rem 0;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.effects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.effect-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem;
+    background: var(--surface-secondary);
+    border-radius: var(--radius-small);
+    border: 1px solid var(--border-primary);
+}
+
+.effect-icon {
+    font-size: 1.2rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.effect-details {
+    flex: 1;
+}
+
+.effect-name {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.effect-description {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+.effect-duration {
+    color: var(--accent-warning);
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-top: 0.2rem;
+}
+
+.no-effects {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 1rem;
+    background: var(--surface-primary);
+    border-radius: var(--radius-small);
+    border: 1px dashed var(--border-primary);
+}
+
 /* Production Table Styles */
 .production-table {
     width: 100%;
@@ -8894,4 +8992,86 @@ html {
         max-width: none;
         margin-left: 0;
     }
+}
+
+/* Building Tab Layout - Row Layout */
+.building-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.building-category {
+    margin-bottom: var(--space-sm);
+}
+
+.building-category h4 {
+    margin: 0 0 var(--space-sm) 0;
+    color: var(--accent-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.building-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    justify-content: flex-start;
+}
+
+.build-btn {
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-medium);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition-medium);
+    color: var(--text-primary);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.build-btn:hover {
+    background: var(--surface-secondary);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-small);
+}
+
+.build-btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.build-btn.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--surface-disabled);
+    color: var(--text-disabled);
+}
+
+.build-btn.locked:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--border-primary);
+}
+
+/* Production Sources Display */
+.production-sources {
+    background: var(--surface-secondary);
+    border-radius: var(--radius-small);
+    padding: var(--space-xs) var(--space-sm);
+    margin: var(--space-xs) 0 var(--space-md) 0;
+    font-size: 0.85rem;
+}
+
+.sources-detail {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.sources-list {
+    color: var(--text-primary);
+    font-weight: 500;
 }

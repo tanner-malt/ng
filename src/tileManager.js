@@ -60,13 +60,13 @@ class TileManager {
     
     // Setup initial town (only called for new games)
     setupInitialTown() {
-        // Place initial town center at center
+        // Place initial tent at center - humble beginnings!
         const centerX = Math.floor(this.width / 2);
         const centerY = Math.floor(this.height / 2);
         
-        this.placeBuildingAtInternal(centerX, centerY, 'townCenter');
+        this.placeBuildingAtInternal(centerX, centerY, 'tent');
         
-        console.log('[TileManager] Initial town center placed at', centerX, centerY);
+        console.log('[TileManager] Initial tent placed at', centerX, centerY, '- humble beginnings!');
     }
     
     // Get tile at coordinates

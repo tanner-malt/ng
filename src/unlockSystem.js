@@ -16,9 +16,11 @@ class UnlockSystem {
         this.unlockCallbacks = new Map();
         
         // Start with basic content unlocked
-        // Basic starting content
-        this.unlockedContent.add('foundersWagon');
-        this.unlockedContent.add('townCenter');
+        // Tent, town center, founder's wagon, and village view available at start
+        this.unlockedContent.add('tent');
+        this.unlockedContent.add('townCenter'); // Town center unlocked from start
+        this.unlockedContent.add('foundersWagon'); // Founder's wagon unlocked from start
+        this.unlockedContent.add('village_view'); // Village view always available
         
         this.initializeUnlockConditions();
         this.loadFromStorage();
@@ -33,7 +35,7 @@ class UnlockSystem {
             name: 'House',
             description: 'Basic housing for your citizens',
             conditions: [
-                { type: 'achievement', achievement: 'first_settlement' }
+                { type: 'achievement', achievement: 'town_center_built' }
             ],
             autoUnlock: true
         });
@@ -48,13 +50,27 @@ class UnlockSystem {
             autoUnlock: true
         });
 
-        this.registerUnlock('sawmill', {
+        // Founder's Wagon is unlocked by default - no registration needed
+
+        // Town Center is unlocked by default - no registration needed
+
+        this.registerUnlock('buildersHut', {
             type: 'building',
-            name: 'Sawmill',
-            description: 'Produces wood for construction',
+            name: 'Builder\'s Hut',
+            description: 'Professional construction facility for advanced buildings',
             conditions: [
-                { type: 'achievement', achievement: 'feeding_people' },
-                { type: 'resource', resource: 'population', amount: 5 }
+                { type: 'building_count', building: 'townCenter', count: 1 },
+                { type: 'resource', resource: 'population', amount: 12 }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('woodcutterLodge', {
+            type: 'building',
+            name: 'Woodcutter Lodge',
+            description: 'Advanced wood processing facility for larger settlements',
+            conditions: [
+                { type: 'achievement', achievement: 'feeding_people' } // Need to build first farm
             ],
             autoUnlock: true
         });
@@ -62,10 +78,24 @@ class UnlockSystem {
         this.registerUnlock('quarry', {
             type: 'building',
             name: 'Quarry',
-            description: 'Extracts stone from the earth',
+            description: 'Stone extraction site for advanced construction',
             conditions: [
-                { type: 'building_count', building: 'sawmill', count: 1 },
-                { type: 'resource', resource: 'wood', amount: 50 }
+                { type: 'achievement', achievement: 'prosperous_kingdom' }, // Need 500 gold, 200 food, 50 pop
+                { type: 'building_count', building: 'house', count: 8 }, // Need large settlement
+                { type: 'resource', resource: 'stone', amount: 50 } // Need stone stockpile from gathering
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('lumberMill', {
+            type: 'building',
+            name: 'Lumber Mill',
+            description: 'Industrial lumber processing facility for refined planks',
+            conditions: [
+                { type: 'building_count', building: 'woodcutterLodge', count: 2 }, // Need multiple woodcutter lodges first
+                { type: 'resource', resource: 'wood', amount: 300 }, // Need substantial wood reserves
+                { type: 'resource', resource: 'stone', amount: 100 }, // Need stone for construction
+                { type: 'resource', resource: 'population', amount: 75 } // Need large workforce
             ],
             autoUnlock: true
         });
@@ -73,10 +103,11 @@ class UnlockSystem {
         this.registerUnlock('market', {
             type: 'building',
             name: 'Market',
-            description: 'Generates gold through trade',
+            description: 'Trade center for economic growth',
             conditions: [
-                { type: 'building_count', building: 'quarry', count: 1 },
-                { type: 'resource', resource: 'population', amount: 10 }
+                { type: 'achievement', achievement: 'wealthy_ruler' }, // Need 1000 gold
+                { type: 'building_count', building: 'house', count: 6 }, // Need established settlement
+                { type: 'resource', resource: 'population', amount: 25 } // Need trading population
             ],
             autoUnlock: true
         });
@@ -84,10 +115,11 @@ class UnlockSystem {
         this.registerUnlock('barracks', {
             type: 'building',
             name: 'Barracks',
-            description: 'Trains military units',
+            description: 'Military training facility requiring refined materials',
             conditions: [
-                { type: 'achievement', achievement: 'military_establishment' },
-                { type: 'resource', resource: 'population', amount: 15 }
+                { type: 'building_count', building: 'woodcutterLodge', count: 1 }, // Need woodcutter lodge for refined lumber
+                { type: 'resource', resource: 'population', amount: 10 }, // Need recruits (reduced from 30)
+                { type: 'resource', resource: 'gold', amount: 200 } // Need funding for military
             ],
             autoUnlock: true
         });
@@ -116,6 +148,14 @@ class UnlockSystem {
         });
 
         // View Unlocks - Achievement Based
+        this.registerUnlock('village_view', {
+            type: 'view',
+            name: 'Village',
+            description: 'Your main settlement view - always available',
+            conditions: [], // No conditions - always unlocked
+            autoUnlock: true
+        });
+
         this.registerUnlock('world_view', {
             type: 'view',
             name: 'World Map',
@@ -248,15 +288,15 @@ class UnlockSystem {
 
                 case 'building_count':
                     const buildingCount = this.gameState.buildings.filter(
-                        b => b.type === condition.building
+                        b => b.type === condition.building && b.level >= 1 && b.built
                     ).length;
                     const hasEnoughBuildings = buildingCount >= condition.count;
-                    // console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
+                    console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
                     return hasEnoughBuildings;
 
                 case 'resource':
                     const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
-                    // console.log(`[UnlockSystem] Checking resource ${condition.resource}: ${this.gameState[condition.resource]}/${condition.amount} = ${hasEnoughResource}`);
+                    console.log(`[UnlockSystem] Checking resource ${condition.resource}: ${this.gameState[condition.resource]}/${condition.amount} = ${hasEnoughResource}`);
                     return hasEnoughResource;
 
                 case 'tutorial_step':
@@ -464,13 +504,65 @@ class UnlockSystem {
         });
     }
 
+    getUnlockRequirementsText(unlockId) {
+        const config = this.unlockConditions.get(unlockId);
+        if (!config || this.isUnlocked(unlockId)) {
+            return '';
+        }
+
+        const requirements = this.getUnlockRequirements(unlockId);
+        const requirementTexts = requirements.map(req => {
+            const status = req.completed ? '✅' : '❌';
+            let description = req.description;
+            
+            // Improve building name formatting
+            if (req.type === 'building') {
+                // Extract building type and count from description like "1 woodcutter lodge(s)"
+                const match = description.match(/(\d+)\s+(\w+)\(s\)/);
+                if (match) {
+                    const count = match[1];
+                    const buildingType = match[2];
+                    const properName = window.GameData ? 
+                        window.GameData.getBuildingName(buildingType) : 
+                        buildingType.charAt(0).toUpperCase() + buildingType.slice(1);
+                    description = `${count} ${properName}${count > 1 ? 's' : ''}`;
+                }
+            }
+            
+            // Improve resource name formatting
+            if (req.type === 'resource') {
+                description = description.replace(/(\d+)\s+(\w+)/, (match, amount, resource) => {
+                    const properResource = resource === 'population' ? 'Population' :
+                                         resource === 'wood' ? 'Wood' :
+                                         resource === 'stone' ? 'Stone' :
+                                         resource === 'food' ? 'Food' :
+                                         resource === 'gold' ? 'Gold' :
+                                         resource === 'metal' ? 'Metal' :
+                                         resource.charAt(0).toUpperCase() + resource.slice(1);
+                    return `${amount} ${properResource}`;
+                });
+            }
+            
+            let text = `${status} ${description}`;
+            
+            if (req.progress && !req.completed) {
+                text += ` (${req.progress})`;
+            }
+            
+            return text;
+        });
+
+        // Use | separator instead of newlines for better HTML tooltip display
+        return `Locked - Requirements: ${requirementTexts.join(' | ')}`;
+    }
+
     getBuildingIcon(buildingType) {
         const icons = {
             foundersWagon: '🚛',
             townCenter: '🏛️',
             house: '🏠',
             farm: '🌾',
-            sawmill: '🪚',
+            woodcutterLodge: '🪚',
             quarry: '⛏️',
             market: '🏪',
             barracks: '⚔️',
@@ -567,11 +659,11 @@ class UnlockSystem {
             const saveData = localStorage.getItem('unlockSystem');
             if (saveData) {
                 const parsed = JSON.parse(saveData);
-                this.unlockedContent = new Set(parsed.unlockedContent || ['foundersWagon', 'townCenter']);
+                this.unlockedContent = new Set(parsed.unlockedContent || ['tent', 'village_view']);
             }
         } catch (error) {
             console.warn('[UnlockSystem] Error loading from storage:', error);
-            this.unlockedContent = new Set(['foundersWagon', 'townCenter']);
+            this.unlockedContent = new Set(['tent', 'village_view']);
         }
     }
 
@@ -581,10 +673,10 @@ class UnlockSystem {
     }
 
     resetUnlocks() {
-        this.unlockedContent = new Set(['foundersWagon', 'townCenter']);
+        this.unlockedContent = new Set(['tent', 'village_view']);
         this.saveToStorage();
         this.updateBuildingButtons();
-        console.log('[UnlockSystem] All unlocks reset (except foundersWagon and townCenter)');
+        console.log('[UnlockSystem] All unlocks reset (except tent and village_view)');
     }
 
     // Debug methods

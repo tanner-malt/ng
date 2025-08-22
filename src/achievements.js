@@ -58,10 +58,19 @@ class AchievementSystem {
 
         this.defineAchievement('first_settlement', {
             title: 'Settlement Founder',
+            description: 'Built 2 Houses - establishing your settlement',
+            icon: '🏠',
+            type: 'building',
+            requirement: { houses_built: 2 }, // Requires 2 houses built
+            reward: { wood: 75, stone: 50}
+        });
+
+        this.defineAchievement('town_center_built', {
+            title: 'Administrative Center',
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            reward: { wood: 75, stone: 500}
+            reward: { wood: 100, stone: 200}
         });
 
         this.defineAchievement('sheltering_citizens', {
@@ -70,7 +79,7 @@ class AchievementSystem {
             icon: '🏠',
             type: 'building',
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { population: 10, wood: 500 }
+            reward: { population: 3, wood: 20 }
         });
 
         this.defineAchievement('feeding_people', {
@@ -176,8 +185,8 @@ class AchievementSystem {
         });
 
         // Additional population achievements
-        this.defineAchievement('first_settlement', {
-            title: 'First Settlement',
+        this.defineAchievement('growing_settlement', {
+            title: 'Growing Settlement',
             description: 'Reached 10 population - your dynasty takes root',
             icon: '🏡',
             type: 'population',
@@ -428,9 +437,9 @@ class AchievementSystem {
         this.unlock('dynasty_founder');
     }
 
-    // Trigger achievement for building placement
+    // Trigger achievement for building placement (no longer awards achievements - just tracking)
     triggerBuildingPlaced(buildingType) {
-        // Track total buildings built
+        // Track total buildings built (placed)
         this.stats.buildings_built++;
 
         // Track specific building types
@@ -452,8 +461,14 @@ class AchievementSystem {
                 break;
         }
 
+        // Note: Achievements are now triggered on building completion, not placement
+        console.log(`[Achievements] Building placed: ${buildingType} (total built: ${this.stats.buildings_built})`);
+    }
+
+    // Trigger achievement for building completion (level 1+)
+    triggerBuildingCompleted(buildingType) {
         const achievementMap = {
-            'townCenter': 'first_settlement',
+            'townCenter': 'town_center_built',
             'farm': 'feeding_people',
             'barracks': 'military_establishment',
             'buildersHut': 'build_and_they_will_come'
@@ -479,6 +494,7 @@ class AchievementSystem {
             window.eventBus.emit('building_completed', { buildingType });
         }
 
+        console.log(`[Achievements] Building completed: ${buildingType}`);
         this.saveToStorage();
     }
 
@@ -665,8 +681,8 @@ class AchievementSystem {
         Object.entries(rewards).forEach(([resource, amount]) => {
             if (resource === 'population' && amount > 0) {
                 // Use generateMassPopulation for proper distribution
-                if (window.gameState.generateMassPopulation) {
-                    const generated = window.gameState.generateMassPopulation(amount);
+                if (window.gameState?.populationManager?.generateMassPopulation) {
+                    const generated = window.gameState.populationManager.generateMassPopulation(amount);
                     if (generated && generated.length) {
                         populationGained += generated.length;
                         console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
@@ -676,7 +692,7 @@ class AchievementSystem {
                         populationGained += amount;
                     }
                 } else {
-                    console.warn(`[Achievements] generateMassPopulation not available, incrementing population counter`);
+                    console.warn(`[Achievements] PopulationManager.generateMassPopulation not available, incrementing population counter`);
                     window.gameState.population = (window.gameState.population || 0) + amount;
                     populationGained += amount;
                 }

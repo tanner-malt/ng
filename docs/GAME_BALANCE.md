@@ -1,5 +1,19 @@
 # Game Balance Documentation
 
+## 🎯 Starting Conditions
+
+### New Game Initial State
+- **Population**: 1 royal + 4 basic villagers = 5 total
+- **Buildings**: None (empty village)
+- **Population Capacity**: 0 (base case, only increased by buildings/technology)
+- **Job Assignment**: Villagers have no specific jobs until buildings are constructed
+- **Resources**: Starting resource amounts (defined in gameData.js)
+
+### Design Philosophy
+- Players must earn population capacity through building construction
+- Job specialization comes from building infrastructure, not pre-assigned roles
+- Creates immediate resource pressure and strategic building decisions
+
 ## 🧮 Resource Economy
 
 ### Base Resource Generation Rates
@@ -9,7 +23,7 @@
 | Town Center | 1 | +0 | +0 | +0 | +0 | +0 | +0 | N/A (logistics hub) |
 | House | 1 | -1/day | +0 | +0 | +0 | +0 | +5 | 5 days |
 | Farm | 1 | +8/day | -1/day | +0 | +0 | +0 | -1 | 4 days |
-| Sawmill | 1 | -1/day | +8/day | +0 | +0 | +1 | -1 | 4 days |
+| Woodcutter Lodge | 1 | -1/day | +8/day | +0 | +0 | +1 | -1 | 4 days |
 | Quarry | 1 | -2/day | -1/day | +6/day | +0 | +1 | -2 | 6 days |
 | Lumber Mill | 1 | -1/day | +4/day | +0 | +0 | +0 | -1 | 5 days |
 | Mine | 1 | -2/day | -1/day | +8/day | +0 | +0 | -2 | 7 days |
@@ -47,8 +61,8 @@
 | House | 2 | 100 | 50 | 25 | 2 days | 1.8x capacity |
 | Farm | 1 | 75 | 50 | 0 | 1 day | N/A |
 | Farm | 2 | 150 | 100 | 25 | 2 days | 1.7x output |
-| Sawmill | 1 | 75 | 25 | 25 | 1 day | N/A |
-| Sawmill | 2 | 150 | 50 | 50 | 2 days | 1.7x output |
+| Woodcutter Lodge | 1 | 75 | 25 | 25 | 1 day | N/A |
+| Woodcutter Lodge | 2 | 150 | 50 | 50 | 2 days | 1.7x output |
 | Quarry | 1 | 100 | 50 | 25 | 2 days | N/A |
 | Quarry | 2 | 200 | 100 | 50 | 3 days | 1.6x output |
 | Market | 1 | 150 | 75 | 50 | 2 days | N/A |
@@ -109,7 +123,7 @@ PopulationGrowth = BaseGrowthRate × (HouseCapacity - CurrentPopulation) / House
 |----------|----------------|-------------------|
 | Workshop | 3 | +10% efficiency to nearby buildings |
 | Blacksmith | 4 | +15% efficiency to all production |
-| Sawmill | 1 | Primary wood producer |
+| Woodcutter Lodge | 1 | Primary wood producer |
 | Quarry | 1 | Primary stone producer |
 
 **Crafting Costs:**

@@ -49,6 +49,7 @@
     <script src="../src/skillSystem.js"></script>
     <script src="../src/populationManager.js"></script>
     <script src="../src/gameState.js"></script>
+    <script src="../src/effectsManager.js"></script>
     <script src="../src/utils/errorRecovery.js"></script>
     <script src="../src/modalSystem.js"></script>
     <script src="../src/messageHistory.js"></script>
@@ -122,6 +123,7 @@
                         <span id="auto-play-icon-nav">▶️</span>
                         <span id="auto-play-text-nav">Play</span>
                     </button>
+                    <button id="speed-1x-btn-nav" class="time-btn selected">1x</button>
                     <button id="speed-2x-btn-nav" class="time-btn">2x</button>
                     <button id="speed-4x-btn-nav" class="time-btn">4x</button>
                 </div>
@@ -212,7 +214,8 @@
                         <span>💰 Gold: <span id="gold-count"></span></span>
                         <span>🌾 Food: <span id="food-count"></span></span>
                         <span>🌲 Wood: <span id="wood-count"></span></span>
-                        <span>🪨 Stone: <span id="stone-count"></span></span>
+                        <span>� Planks: <span id="planks-count"></span></span>
+                        <span>�🪨 Stone: <span id="stone-count"></span></span>
                         <span>🪙 Metal: <span id="metal-count"></span></span>
                         <span>⚙️ Production: <span id="production-count"></span></span>
                         <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
@@ -272,6 +275,49 @@
                                     <button id="jobs-btn" class="population-view-button" style="margin-left: 10px;">🔨 Manage Jobs</button>
                                 </div>
                             </div>
+
+                            <!-- Effects Section -->
+                            <div class="manager-section">
+                                <h4>✨ Active Effects</h4>
+                                
+                                <!-- Weather Effects -->
+                                <div class="effects-group">
+                                    <h5>🌤️ Weather</h5>
+                                    <div id="weather-effects-list" class="effects-list">
+                                        <div class="effect-item">
+                                            <span class="effect-icon">☀️</span>
+                                            <div class="effect-details">
+                                                <div class="effect-name">Clear Skies</div>
+                                                <div class="effect-description">+10% outdoor work efficiency</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Building Effects -->
+                                <div class="effects-group">
+                                    <h5>🏗️ Building Bonuses</h5>
+                                    <div id="building-effects-list" class="effects-list">
+                                        <div class="no-effects">No active building effects</div>
+                                    </div>
+                                </div>
+
+                                <!-- Magical Effects -->
+                                <div class="effects-group">
+                                    <h5>⚡ Magical Effects</h5>
+                                    <div id="magical-effects-list" class="effects-list">
+                                        <div class="no-effects">No active magical effects</div>
+                                    </div>
+                                </div>
+
+                                <!-- Temporary Bonuses -->
+                                <div class="effects-group">
+                                    <h5>⏱️ Temporary Bonuses</h5>
+                                    <div id="temporary-effects-list" class="effects-list">
+                                        <div class="no-effects">No temporary bonuses active</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <!-- Buildings Tab -->
@@ -279,43 +325,78 @@
                             <div class="building-grid">
                                 <div class="building-category">
                                     <h4>🏛️ Essential Buildings</h4>
-                                    <div class="building-row" id="essential-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="essential-buildings">
                                         <!-- Basic buildings needed to start -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>🏭 Production Buildings</h4>
-                                    <div class="building-row" id="production-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="production-buildings">
                                         <!-- Resource gathering and processing -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>🔧 Craft & Trade Buildings</h4>
-                                    <div class="building-row" id="craft-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="craft-buildings">
                                         <!-- Workshops, blacksmiths, markets -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>⚔️ Military Buildings</h4>
-                                    <div class="building-row" id="military-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="military-buildings">
                                         <!-- Defense and training -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>👑 Royal Buildings</h4>
-                                    <div class="building-row" id="royal-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="royal-buildings">
                                         <!-- Dynasty and prestige -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>📚 Knowledge Buildings</h4>
-                                    <div class="building-row" id="knowledge-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="knowledge-buildings">
                                         <!-- Research and learning -->
                                     </div>
                                 </div>
                                 <div class="building-category">
                                     <h4>🔮 Advanced Buildings</h4>
-                                    <div class="building-row" id="advanced-buildings">
+                                    <div class="building-row-header">
+                                        <div>Building Name</div>
+                                        <div>Resources</div>
+                                        <div>Work Points</div>
+                                    </div>
+                                    <div class="building-container" id="advanced-buildings">
                                         <!-- Late game and special -->
                                     </div>
                                 </div>
@@ -342,6 +423,9 @@
                                         <div class="loss-cell">-<span id="daily-food-consumption">0</span></div>
                                         <div class="net-cell"><span id="daily-food-net">0</span></div>
                                     </div>
+                                    <div class="production-sources" id="food-sources">
+                                        <div class="sources-detail">Sources: <span class="sources-list"></span></div>
+                                    </div>
                                     <div class="production-row">
                                         <div class="resource-cell">
                                             <span class="production-icon">🪵</span>
@@ -350,6 +434,9 @@
                                         <div class="gain-cell">+<span id="daily-wood-production">0</span></div>
                                         <div class="loss-cell">-<span id="daily-wood-consumption">0</span></div>
                                         <div class="net-cell"><span id="daily-wood-net">0</span></div>
+                                    </div>
+                                    <div class="production-sources" id="wood-sources">
+                                        <div class="sources-detail">Sources: <span class="sources-list"></span></div>
                                     </div>
                                     <div class="production-row">
                                         <div class="resource-cell">
@@ -360,6 +447,9 @@
                                         <div class="loss-cell">-<span id="daily-stone-consumption">0</span></div>
                                         <div class="net-cell"><span id="daily-stone-net">0</span></div>
                                     </div>
+                                    <div class="production-sources" id="stone-sources">
+                                        <div class="sources-detail">Sources: <span class="sources-list"></span></div>
+                                    </div>
                                     <div class="production-row">
                                         <div class="resource-cell">
                                             <span class="production-icon">⚒️</span>
@@ -369,6 +459,9 @@
                                         <div class="loss-cell">-<span id="daily-metal-consumption">0</span></div>
                                         <div class="net-cell"><span id="daily-metal-net">0</span></div>
                                     </div>
+                                    <div class="production-sources" id="metal-sources">
+                                        <div class="sources-detail">Sources: <span class="sources-list"></span></div>
+                                    </div>
                                     <div class="production-row">
                                         <div class="resource-cell">
                                             <span class="production-icon">⚙️</span>
@@ -377,6 +470,9 @@
                                         <div class="gain-cell">+<span id="daily-production-gain">0</span></div>
                                         <div class="loss-cell">-<span id="daily-production-consumption">0</span></div>
                                         <div class="net-cell"><span id="daily-production-net">0</span></div>
+                                    </div>
+                                    <div class="production-sources" id="production-sources">
+                                        <div class="sources-detail">Sources: <span class="sources-list"></span></div>
                                     </div>
                                 </div>
                             </div>
@@ -877,10 +973,65 @@
             padding-bottom: 4px;
         }
 
+        .building-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            padding: 4px;
+        }
+        
         .building-row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: 2fr 1fr 1fr; /* Building Name, Resources, Work Points */
             gap: 8px;
+            padding: 8px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #333;
+            align-items: center;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .building-row:hover {
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        .building-row.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .building-row.locked:hover {
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .building-row-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 8px;
+            padding: 8px;
+            font-weight: bold;
+            color: #3498db;
+            border-bottom: 2px solid #3498db;
+            margin-bottom: 8px;
+        }
+        
+        .building-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+        }
+        
+        .building-resources {
+            font-size: 12px;
+            color: #f39c12;
+        }
+        
+        .building-work-points {
+            font-size: 12px;
+            color: #27ae60;
+            text-align: center;
         }
 
         /* Building Buttons */
@@ -1021,28 +1172,53 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Navigation time controls (new location)
     const autoPlayBtnNav = document.getElementById('auto-play-btn-nav');
+    const speed1xBtnNav = document.getElementById('speed-1x-btn-nav');
     const speed2xBtnNav = document.getElementById('speed-2x-btn-nav');
     const speed4xBtnNav = document.getElementById('speed-4x-btn-nav');
     const endDayBtnNav = document.getElementById('end-day-btn-nav');
     
-    // Initialize autoPlaySpeed if not set
-    if (window.gameState && !window.gameState.autoPlaySpeed) {
-        window.gameState.autoPlaySpeed = 20000; // Default 20 seconds
+    // Initialize autoPlaySpeed if not set - wait for gameState
+    function initializeTimeControls() {
+        if (!window.gameState) {
+            setTimeout(initializeTimeControls, 100);
+            return;
+        }
+        
+        if (!window.gameState.autoPlaySpeed) {
+            window.gameState.autoPlaySpeed = 20000; // Default 20 seconds
+        }
+        
+        // Set initial state
+        if (speed1xBtnNav) speed1xBtnNav.classList.add('selected');
     }
     
     let lastSpeed = 20000;
     function setSpeed(ms, btn) {
-        if (window.gameState) {
-            window.gameState.autoPlaySpeed = ms;
-            if (window.gameState.autoPlayActive) {
-                window.gameState.stopAutoPlay();
-                window.gameState.startAutoPlay();
-            }
+        if (!window.gameState) {
+            console.warn('[TimeControls] GameState not available');
+            return;
         }
+        
+        console.log(`[TimeControls] Setting speed to ${ms}ms`);
+        window.gameState.autoPlaySpeed = ms;
+        
+        if (window.gameState.autoPlayActive) {
+            window.gameState.stopAutoPlay();
+            window.gameState.startAutoPlay();
+        }
+        
         // Visual feedback
-        [autoPlayBtnNav, speed2xBtnNav, speed4xBtnNav].forEach(b => b && b.classList.remove('selected'));
-        if (btn) btn.classList.add('selected');
+        [speed1xBtnNav, speed2xBtnNav, speed4xBtnNav].forEach(b => {
+            if (b) b.classList.remove('selected');
+        });
+        if (btn) {
+            btn.classList.add('selected');
+            console.log(`[TimeControls] Button ${btn.textContent} selected`);
+        }
     }
+    
+    // Initialize time controls
+    initializeTimeControls();
     
     // End day button
     if (endDayBtnNav) {
@@ -1068,15 +1244,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Speed buttons
+    if (speed1xBtnNav) {
+        speed1xBtnNav.addEventListener('click', function() {
+            console.log('[TimeControls] 1x button clicked');
+            setSpeed(20000, speed1xBtnNav); // 1x speed (default)
+        });
+        console.log('[TimeControls] 1x button listener attached');
+    } else {
+        console.warn('[TimeControls] 1x button not found');
+    }
+    
     if (speed2xBtnNav) {
         speed2xBtnNav.addEventListener('click', function() {
+            console.log('[TimeControls] 2x button clicked');
             setSpeed(10000, speed2xBtnNav); // 2x speed
         });
+        console.log('[TimeControls] 2x button listener attached');
+    } else {
+        console.warn('[TimeControls] 2x button not found');
     }
+    
     if (speed4xBtnNav) {
         speed4xBtnNav.addEventListener('click', function() {
+            console.log('[TimeControls] 4x button clicked');
             setSpeed(5000, speed4xBtnNav); // 4x speed
         });
+        console.log('[TimeControls] 4x button listener attached');
+    } else {
+        console.warn('[TimeControls] 4x button not found');
     }
     
     // Update navigation time controls when gameState is ready
@@ -2424,6 +2619,7 @@ function updateResourcePanel() {
     document.getElementById('gold-count').textContent = resources.gold ?? 0;
     document.getElementById('food-count').textContent = resources.food ?? 0;
     document.getElementById('wood-count').textContent = resources.wood ?? 0;
+    document.getElementById('planks-count').textContent = resources.planks ?? 0;
     document.getElementById('stone-count').textContent = resources.stone ?? 0;
     document.getElementById('metal-count').textContent = resources.metal ?? 0;
     document.getElementById('population-count').textContent = window.gameState.population ?? 0;

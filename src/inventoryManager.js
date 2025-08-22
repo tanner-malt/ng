@@ -526,8 +526,8 @@ class InventoryManager {
                     subcategory: 'shelter',
                     icon: '🏕️',
                     rarity: 'common',
-                    description: 'A portable shelter that can be placed to provide housing and worker jobs',
-                    effects: { housing: 5, builderJobs: 2 },
+                    description: 'A portable shelter that provides 4 housing and worker jobs',
+                    effects: { housing: 4, builderJobs: 2 },
                     consumable: true, // Used when placed
                     stackable: true,
                     maxStack: 50,
@@ -538,12 +538,12 @@ class InventoryManager {
                 },
                 foundersWagon: {
                     id: 'foundersWagon',
-                    name: 'Founders Wagon',
+                    name: 'Founder Wagon',
                     category: 'building',
                     subcategory: 'administration',
                     icon: '🚛',
                     rarity: 'rare',
-                    description: 'Mobile storage and administrative center that provides housing, jobs, and storage',
+                    description: 'Mobile command center and storage facility for new settlements',
                     effects: { housing: 3, gathererJobs: 2, crafterJobs: 1, storage: 300 },
                     consumable: true, // Used when placed
                     stackable: true,
@@ -659,6 +659,15 @@ class InventoryManager {
             return false;
         }
 
+        // Auto-determine slot if not provided
+        if (!slot) {
+            slot = this.getItemSlot(item.item);
+            if (!slot) {
+                console.warn('[Inventory] Cannot determine slot for item:', itemId);
+                return false;
+            }
+        }
+
         // Check requirements
         if (!this.meetsRequirements(item.item)) {
             console.warn('[Inventory] Does not meet requirements to equip:', itemId);
@@ -679,6 +688,32 @@ class InventoryManager {
         this.applyItemEffects(item.item, true);
         
         return true;
+    }
+
+    // Determine which slot an item should go in
+    getItemSlot(item) {
+        // Haste runes should not be equipped - they target buildings
+        if (item.subcategory === 'rune' && item.effects && item.effects.productivityMultiplier) {
+            return null; // Cannot be equipped to slots
+        }
+
+        switch(item.category) {
+            case 'weapon':
+                return 'weapon';
+            case 'armor':
+                return 'armor';
+            case 'shield':
+                return 'shield';
+            case 'tool':
+                return 'tool';
+            case 'magical':
+                if (item.subcategory === 'accessory') {
+                    return 'accessory';
+                }
+                return 'magical';
+            default:
+                return null;
+        }
     }
 
     // Unequip item from slot
