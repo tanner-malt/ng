@@ -17,10 +17,10 @@ class ErrorRecovery {
         this.recoveryAttempts = new Map();
         this.maxRecoveryAttempts = 3;
         this.isEnabled = true;
-        
+
         this.initializeDefaultStrategies();
         this.setupErrorHandlers();
-        
+
         console.log('[ErrorRecovery] Error recovery system initialized');
     }
 
@@ -34,7 +34,7 @@ class ErrorRecovery {
             autoRecover: options.autoRecover !== false,
             description: options.description || `Recovery for ${errorType}`
         });
-        
+
         console.log(`[ErrorRecovery] Registered strategy for: ${errorType}`);
     }
 
@@ -66,17 +66,17 @@ class ErrorRecovery {
 
         try {
             console.log(`[ErrorRecovery] Attempting recovery for: ${errorType} (attempt ${currentAttempts + 1})`);
-            
+
             const result = await strategy.recover(error, context);
-            
+
             if (result.success) {
                 console.log(`[ErrorRecovery] Successfully recovered from: ${errorType}`);
                 this.recoveryAttempts.delete(errorType);
-                
+
                 if (result.message) {
                     this.notifyUser('Auto-Recovery', result.message);
                 }
-                
+
                 return true;
             } else {
                 console.warn(`[ErrorRecovery] Recovery failed for: ${errorType} - ${result.message}`);
@@ -100,13 +100,13 @@ class ErrorRecovery {
                     const backupState = JSON.parse(backup);
                     Object.assign(window.gameState, backupState);
                     window.gameState.save();
-                    
+
                     return {
                         success: true,
                         message: 'Game state restored from backup'
                     };
                 }
-                
+
                 // Fall back to default state
                 window.gameState.reset();
                 return {
@@ -126,20 +126,20 @@ class ErrorRecovery {
             try {
                 if (window.simpleTutorial) {
                     window.simpleTutorial.reset();
-                    
+
                     // If tutorial was active, restart it
                     if (context.wasActive) {
                         setTimeout(() => {
                             window.simpleTutorial.start();
                         }, 1000);
                     }
-                    
+
                     return {
                         success: true,
                         message: 'Tutorial system reset'
                     };
                 }
-                
+
                 return {
                     success: false,
                     message: 'Tutorial system not available'
@@ -158,18 +158,18 @@ class ErrorRecovery {
                 if (window.eventBus) {
                     // Clear potentially corrupted event listeners
                     window.eventBus.clearAll();
-                    
+
                     // Trigger system reinitialization
                     if (window.eventBus.emit) {
                         window.eventBus.emit('systemRestart', { reason: 'error_recovery' });
                     }
-                    
+
                     return {
                         success: true,
                         message: 'Event system cleared and restarted'
                     };
                 }
-                
+
                 return {
                     success: false,
                     message: 'EventBus not available'
@@ -189,18 +189,18 @@ class ErrorRecovery {
                 if (window.simpleModal && window.simpleModal.hide) {
                     window.simpleModal.hide();
                 }
-                
+
                 // Clear any stuck tutorial highlights
                 document.querySelectorAll('.tutorial-highlight').forEach(el => {
                     el.classList.remove('tutorial-highlight');
                 });
-                
+
                 // Hide tutorial pointer
                 const pointer = document.getElementById('tutorial-pointer');
                 const overlay = document.getElementById('tutorial-highlight-overlay');
                 if (pointer) pointer.style.display = 'none';
                 if (overlay) overlay.style.display = 'none';
-                
+
                 return {
                     success: true,
                     message: 'UI elements reset'
@@ -219,39 +219,41 @@ class ErrorRecovery {
                 if (window.gameState && window.gameState.resources) {
                     const resources = window.gameState.resources;
                     let corrected = false;
-                    
+
                     // Ensure all resources are valid numbers
                     ['gold', 'food', 'wood', 'stone', 'metal'].forEach(resource => {
-                        if (typeof resources[resource] !== 'number' || 
-                            isNaN(resources[resource]) || 
+                        if (typeof resources[resource] !== 'number' ||
+                            isNaN(resources[resource]) ||
                             resources[resource] < 0) {
                             resources[resource] = 0;
                             corrected = true;
                         }
                     });
-                    
+
                     // Ensure population is valid
-                    if (typeof window.gameState.population !== 'number' || 
-                        window.gameState.population < 1) {
-                        window.gameState.population = 1;
+                    const minPop = (window.GameData && window.GameData.startingPopulationCount) ? window.GameData.startingPopulationCount : 5;
+                    if (typeof window.gameState.population !== 'number' ||
+                        window.gameState.population < minPop) {
+                        // PopulationManager is the source of truth for starting population
+                        window.gameState.population = minPop;
                         corrected = true;
                     }
-                    
+
                     if (corrected) {
                         window.gameState.save();
-                        
+
                         // Update UI
                         if (window.eventBus) {
                             window.eventBus.emit('resourcesChanged', resources);
                         }
-                        
+
                         return {
                             success: true,
                             message: 'Resource values corrected'
                         };
                     }
                 }
-                
+
                 return {
                     success: false,
                     message: 'No resource corrections needed'
@@ -298,10 +300,10 @@ class ErrorRecovery {
      */
     async handleError(errorType, error, context = {}) {
         console.error(`[ErrorRecovery] Handling error: ${errorType}`, error);
-        
+
         // Attempt recovery based on error type
         const recovered = await this.attemptRecovery(errorType, error, context);
-        
+
         if (!recovered) {
             // If specific recovery failed, try generic recovery
             await this.attemptRecovery('generic_error', error, { originalType: errorType, ...context });
@@ -316,7 +318,7 @@ class ErrorRecovery {
             try {
                 // Try to stabilize the game state
                 const stabilized = await this.stabilizeGameState();
-                
+
                 return {
                     success: stabilized,
                     message: stabilized ? 'Game state stabilized' : 'Unable to stabilize'
@@ -337,15 +339,15 @@ class ErrorRecovery {
         try {
             // Validate and fix game state
             await this.attemptRecovery('resource_error', new Error('Validation check'), {});
-            
+
             // Clear UI issues
             await this.attemptRecovery('ui_error', new Error('UI cleanup'), {});
-            
+
             // Ensure event system is working
             if (window.eventBus && typeof window.eventBus.emit === 'function') {
                 window.eventBus.emit('systemStabilized', { timestamp: Date.now() });
             }
-            
+
             return true;
         } catch (error) {
             console.error('[ErrorRecovery] Failed to stabilize game state', error);

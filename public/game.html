@@ -1,89 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Idle: Dynasty Builder</title>
     <link rel="stylesheet" href="game.css">
     <link rel="stylesheet" href="progress-icons.css">
-    
+
     <!-- Game Scripts -->
-    <script src="../src/gameData.js"></script>
+    <script src="../src/config/gameData.js"></script>
     <script>
-        // Try to load wikiData.js from multiple possible locations
-        function loadWikiData() {
-            const possiblePaths = [
-                '../src/wikiData.js',  // Original path
-                './wikiData.js',       // Same directory as game.html
-                'src/wikiData.js',     // From root
-                'wikiData.js'          // Current directory
-            ];
-            
-            let loadIndex = 0;
-            
-            function tryLoadScript() {
-                if (loadIndex >= possiblePaths.length) {
-                    console.error('[WikiData] Could not load wikiData.js from any location');
-                    return;
-                }
-                
-                const script = document.createElement('script');
-                script.src = possiblePaths[loadIndex];
-                script.onload = function() {
-                    console.log('[WikiData] Successfully loaded from:', possiblePaths[loadIndex]);
-                };
-                script.onerror = function() {
-                    console.log('[WikiData] Failed to load from:', possiblePaths[loadIndex]);
-                    loadIndex++;
-                    tryLoadScript();
-                };
-                document.head.appendChild(script);
-            }
-            
-            tryLoadScript();
-        }
-        
-        loadWikiData();
+        // Load the generated wikiData from public folder (built by scripts/build-wiki.js)
+        (function loadWikiData() {
+            const script = document.createElement('script');
+            script.src = './wikiData.js';
+            script.onload = function () {
+                console.log('[WikiData] Loaded ./wikiData.js');
+            };
+            script.onerror = function () {
+                console.error('[WikiData] Failed to load ./wikiData.js');
+            };
+            document.head.appendChild(script);
+        })();
     </script>
     <script src="../src/systems/core/eventBus.js"></script>
-    <script src="../src/skillSystem.js"></script>
-    <script src="../src/populationManager.js"></script>
-    <script src="../src/gameState.js"></script>
-    <script src="../src/effectsManager.js"></script>
+    <script src="../src/systems/core/skillSystem.js"></script>
+    <script src="../src/systems/management/populationManager.js"></script>
+    <script src="../src/systems/core/gameState.js"></script>
+    <script src="../src/systems/management/effectsManager.js"></script>
     <script src="../src/utils/errorRecovery.js"></script>
-    <script src="../src/modalSystem.js"></script>
-    <script src="../src/messageHistory.js"></script>
-    <script src="../src/achievements.js"></script>
-    <script src="../src/unlockSystem.js"></script>
-    <script src="../src/tutorial.js"></script>
-    <script src="../src/royalFamily.js"></script>
-    <script src="../src/buildingEffects.js"></script>
-    <script src="../src/buildingTutorial.js"></script>
-    <script src="../src/constructionManager.js"></script>
-    <script src="../src/jobManager.js"></script>
-    <script src="../src/tileManager.js"></script>
-    <script src="../src/inventoryManager.js"></script>
-    <script src="../src/expeditionInventory.js"></script>
-    <script src="../src/village.js"></script>
-    <script src="../src/throne.js"></script>
-    <script src="../src/battle.js"></script>
-    <script src="../src/quest.js"></script>
-    <script src="../src/quests.js"></script>
-    <script src="../src/monarch.js"></script>
-    <script src="../src/uiPopups.js"></script>
-    <script src="../src/eventBusIntegrations.js"></script>
-    <script src="../src/worldManager.js"></script>
-    <script src="../src/statsIntegration.js"></script>
+    <script src="../src/systems/ui/modalSystem.js"></script>
+    <script src="../src/systems/ui/messageHistory.js"></script>
+    <script src="../src/systems/features/achievements.js"></script>
+    <script src="../src/systems/features/unlockSystem.js"></script>
+    <script src="../src/systems/features/tutorial.js"></script>
+    <script src="../src/systems/management/royalFamily.js"></script>
+    <script src="../src/systems/management/buildingEffects.js"></script>
+    <script src="../src/systems/features/buildingTutorial.js"></script>
+    <script src="../src/systems/management/constructionManager.js"></script>
+    <script src="../src/systems/management/jobManager.js"></script>
+    <script src="../src/systems/management/tileManager.js"></script>
+    <script src="../src/systems/management/inventoryManager.js"></script>
+    <script src="../src/systems/management/expeditionInventory.js"></script>
+    <script src="../src/systems/gameplay/village.js"></script>
+    <script src="../src/systems/gameplay/throne.js"></script>
+    <script src="../src/systems/gameplay/battle.js"></script>
+    <script src="../src/systems/gameplay/quest.js"></script>
+    <script src="../src/systems/gameplay/quests.js"></script>
+    <script src="../src/systems/gameplay/monarch.js"></script>
+    <script src="../src/systems/ui/uiPopups.js"></script>
+    <script src="../src/systems/core/eventBusIntegrations.js"></script>
+    <script src="../src/systems/gameplay/worldManager.js"></script>
+    <script src="../src/systems/core/statsIntegration.js"></script>
     <script src="../src/app.js"></script>
     <script src="../src/main.js"></script>
 </head>
+
 <body>
+    <!-- Read-only save banner -->
+    <div id="readonly-banner" style="display:none" aria-live="polite" role="status">
+        ⚠️ Read-only mode: This save was created by a newer version. Progress won’t be saved on this client.
+    </div>
     <!-- Popup panels for top-right buttons -->
 
 
     <!-- Tutorial Highlight Overlay -->
-    <div id="tutorial-highlight-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
-        <div id="tutorial-pointer" style="display: none; position: absolute; color: #f39c12; font-size: 30px; animation: bounce 1s infinite;">
+    <div id="tutorial-highlight-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
+        <div id="tutorial-pointer"
+            style="display: none; position: absolute; color: #f39c12; font-size: 30px; animation: bounce 1s infinite;">
             👆
         </div>
     </div>
@@ -105,9 +91,9 @@
                     <button class="nav-btn locked" data-view="monarch">Monarch</button>
                     <button class="nav-btn locked" data-view="throne">Throne</button>
                 </div>
-                
+
                 <!-- Time controls -->
-                <div class="nav-section nav-center" id="global-time-controls">
+                <div class="nav-section nav-center time-controls-nav" id="global-time-controls">
                     <div class="current-day-nav">
                         <div class="season-info">
                             <span id="current-season-nav">Spring</span>
@@ -127,17 +113,18 @@
                     <button id="speed-2x-btn-nav" class="time-btn">2x</button>
                     <button id="speed-4x-btn-nav" class="time-btn">4x</button>
                 </div>
-                
+
                 <!-- Icon buttons -->
                 <div class="nav-section nav-right" id="top-right-icons">
                     <button id="sound-btn" class="icon-btn" title="Sound">
                         <span>🔊</span>
                     </button>
-                    <button id="message-history-btn" class="icon-btn" title="Message History" style="position: relative;">
+                    <button id="message-history-btn" class="icon-btn" title="Message History"
+                        style="position: relative;">
                         <span>📜<span style="position: absolute; top: -5px; right: -5px; 
                             background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; 
                             font-size: 10px; display: flex; align-items: center; justify-content: center;">
-                            9+</span></span>
+                                9+</span></span>
                     </button>
                     <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
                         <span>🗺️</span>
@@ -203,22 +190,22 @@
             </div>
         </nav>
 
-        <!-- Game Content -->
-        <div id="game-content">
-            <!-- Village View -->
-                        <!-- Village View -->
-            <div id="village-view" class="game-view active">
-                                <div class="village-header">
+        <!-- Village View -->
+        <div id="village-view" class="game-view active">
+            <!-- Game Content -->
+            <div id="game-content">
+                <div class="village-header">
                     <h2>🏘️ Your Village</h2>
                     <div class="resource-panel">
                         <span>💰 Gold: <span id="gold-count"></span></span>
                         <span>🌾 Food: <span id="food-count"></span></span>
                         <span>🌲 Wood: <span id="wood-count"></span></span>
-                        <span>� Planks: <span id="planks-count"></span></span>
-                        <span>�🪨 Stone: <span id="stone-count"></span></span>
+                        <span>🪵 Planks: <span id="planks-count"></span></span>
+                        <span>🪨 Stone: <span id="stone-count"></span></span>
                         <span>🪙 Metal: <span id="metal-count"></span></span>
                         <span>⚙️ Production: <span id="production-count"></span></span>
-                        <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
+                        <span>👥 Population: <span id="population-count"></span>/<span
+                                id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
                 </div>
@@ -239,7 +226,7 @@
                             <!-- Generated by village.js -->
                         </div>
                     </div>
-                    
+
                     <!-- Management Panel (Right Panel) -->
                     <div class="management-panel">
                         <!-- Panel Navigation -->
@@ -248,7 +235,7 @@
                             <button class="panel-nav-btn" data-panel="buildings">🏗️ Buildings</button>
                             <button class="panel-nav-btn" data-panel="production">📊 Production</button>
                         </div>
-                        
+
                         <!-- Village Manager Tab (Default) -->
                         <div class="panel-tab active" id="manager-tab">
                             <div class="manager-section">
@@ -271,15 +258,17 @@
                                     </div>
                                 </div>
                                 <div class="population-actions">
-                                    <button id="population-view-btn" class="population-view-button">👥 View Population</button>
-                                    <button id="jobs-btn" class="population-view-button" style="margin-left: 10px;">🔨 Manage Jobs</button>
+                                    <button id="population-view-btn" class="population-view-button">👥 View
+                                        Population</button>
+                                    <button id="jobs-btn" class="population-view-button" style="margin-left: 10px;">🔨
+                                        Manage Jobs</button>
                                 </div>
                             </div>
 
                             <!-- Effects Section -->
                             <div class="manager-section">
                                 <h4>✨ Active Effects</h4>
-                                
+
                                 <!-- Weather Effects -->
                                 <div class="effects-group">
                                     <h5>🌤️ Weather</h5>
@@ -319,7 +308,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Buildings Tab -->
                         <div class="panel-tab" id="buildings-tab">
                             <div class="building-grid">
@@ -402,7 +391,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Production Tab -->
                         <div class="panel-tab" id="production-tab">
                             <div class="manager-section">
@@ -476,7 +465,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="manager-section">
                                 <h4>⚔️ Crafting Queue</h4>
                                 <div class="crafting-options">
@@ -503,1324 +492,1038 @@
                         </div>
                     </div>
 
-    <style>
-        .time-controls .time-btn {
-            background: #222;
-            color: #e0e0e0;
-            border: 1px solid #333;
-            border-radius: 5px;
-            font-weight: 500;
-            margin: 0;
-            box-shadow: none;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s, border 0.15s;
-            outline: none;
-            letter-spacing: 0.2px;
-            position: relative;
-            min-width: 36px;
-            padding: 6px 8px;
-            font-size: 0.95em;
-        }
-        .time-controls .time-btn.selected, .time-controls .time-btn:active {
-            background: #292f36;
-            color: #fff;
-            border-color: #444;
-        }
-        .time-controls .time-btn:hover {
-            background: #292f36;
-            color: #fff;
-            border-color: #444;
-        }
-
-        /* Navigation Layout */
-        #view-navigation {
-            width: 100%;
-            padding: 0 1rem 1rem 1rem;
-        }
-
-        .nav-container {
-            display: flex;
-            align-items: center;
-            width: 100%;
-            min-height: 40px;
-            gap: 1rem;
-            position: relative;
-        }
-
-        .nav-section {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-left {
-            /* View buttons stay on left */
-            flex: 0 0 auto;
-            order: 1;
-        }
-
-        .nav-center {
-            /* Time controls absolutely centered */
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            z-index: 1;
-        }
-
-        .nav-right {
-            /* Icons on right */
-            flex: 0 0 auto;
-            order: 3;
-            margin-left: auto;
-        }
-
-        /* Responsive behavior to prevent overlaps */
-        @media (max-width: 1200px) {
-            .nav-container {
-                gap: 0.5rem;
-            }
-            .nav-section {
-                gap: 4px;
-            }
-            
-            /* On smaller screens, fall back to flex layout */
-            .nav-center {
-                position: static;
-                transform: none;
-                flex: 1 1 auto;
-                justify-content: center;
-                order: 2;
-            }
-            
-            .nav-container {
-                justify-content: space-between;
-            }
-        }
-
-        @media (max-width: 900px) {
-            .nav-container {
-                gap: 0.25rem;
-            }
-            .nav-section {
-                gap: 2px;
-            }
-            
-            /* Even smaller buttons on very small screens */
-            .time-controls-nav .time-btn {
-                padding: 4px 8px;
-                min-width: 35px;
-                height: 28px;
-                font-size: 0.8em;
-            }
-            
-            #view-navigation .icon-btn {
-                width: 32px;
-                height: 28px;
-                padding: 4px 6px;
-            }
-        }
-
-        /* Navigation Time Controls Styling */
-        .time-controls-nav {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Top Right Icons in Navigation */
-        #view-navigation #top-right-icons {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        #view-navigation .icon-btn {
-            background: #34495e;
-            color: #ecf0f1;
-            border: 1px solid #2c3e50;
-            border-radius: 4px;
-            padding: 6px 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 16px;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #view-navigation .icon-btn:hover {
-            background: #1abc9c;
-            color: #fff;
-            border-color: #16a085;
-            transform: translateY(-1px);
-        }
-
-        #view-navigation .icon-btn.achievements-incomplete {
-            background: #e74c3c;
-            border-color: #c0392b;
-        }
-
-        #view-navigation .icon-btn.achievements-incomplete:hover {
-            background: #c0392b;
-            border-color: #a93226;
-        }
-
-        .current-day-nav {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 0.75em;
-            color: #e2e8f0;
-            margin-right: 16px;
-            min-width: 100px;
-            background: linear-gradient(145deg, #2d3748 0%, #1a202c 100%);
-            border: 2px solid #4a5568;
-            border-radius: 6px;
-            padding: 6px 10px;
-            box-shadow: 
-                0 2px 4px rgba(0,0,0,0.3),
-                inset 0 1px 0 rgba(255,255,255,0.1),
-                inset 0 -1px 0 rgba(0,0,0,0.2);
-            position: relative;
-            overflow: hidden;
-            gap: 2px;
-            height: 36px;
-            justify-content: center;
-        }
-
-        .current-day-nav::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-        }
-
-        .season-info, .total-day-info {
-            display: flex;
-            align-items: center;
-            line-height: 1;
-            gap: 4px;
-        }
-
-        .season-info span:first-child {
-            color: #f7fafc;
-            font-weight: 700;
-            font-size: 1.1em;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-        }
-
-        .season-info span:last-child {
-            color: #38b2ac;
-            font-weight: 600;
-            font-size: 1em;
-            text-shadow: 0 0 4px rgba(56, 178, 172, 0.4);
-        }
-
-        .total-day-info span:first-child {
-            color: #a0aec0;
-            font-weight: 600;
-            font-size: 0.9em;
-        }
-
-        .total-day-info span:last-child {
-            color: #edf2f7;
-            font-weight: 700;
-            font-size: 1em;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-        }
-
-        .time-controls-nav .time-btn {
-            background: linear-gradient(145deg, #4a5568 0%, #2d3748 50%, #1a202c 100%);
-            color: #e2e8f0;
-            border: 2px solid #4a5568;
-            border-radius: 6px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            outline: none;
-            font-size: 0.8em;
-            padding: 8px 12px;
-            min-width: 50px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 
-                0 2px 4px rgba(0,0,0,0.3),
-                inset 0 1px 0 rgba(255,255,255,0.1),
-                inset 0 -1px 0 rgba(0,0,0,0.2);
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .time-controls-nav .time-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .time-controls-nav .time-btn:hover {
-            background: linear-gradient(145deg, #38b2ac 0%, #319795 50%, #2c7a7b 100%);
-            color: #fff;
-            border-color: #38b2ac;
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 
-                0 4px 8px rgba(0,0,0,0.4),
-                0 0 12px rgba(56, 178, 172, 0.3),
-                inset 0 1px 0 rgba(255,255,255,0.2),
-                inset 0 -1px 0 rgba(0,0,0,0.1);
-        }
-
-        .time-controls-nav .time-btn:hover::before {
-            left: 100%;
-        }
-
-        .time-controls-nav .time-btn.selected,
-        .time-controls-nav .time-btn:active {
-            background: linear-gradient(145deg, #e53e3e 0%, #c53030 50%, #9c2626 100%);
-            color: #fff;
-            border-color: #e53e3e;
-            transform: translateY(-1px) scale(0.98);
-            box-shadow: 
-                0 2px 4px rgba(0,0,0,0.4),
-                0 0 15px rgba(229, 62, 62, 0.4),
-                inset 0 1px 0 rgba(255,255,255,0.1),
-                inset 0 -1px 0 rgba(0,0,0,0.3);
-        }
-
-        .time-controls-nav .auto-play-button {
-            min-width: 75px;
-            gap: 5px;
-        }
-
-        .time-controls-nav .end-day-button {
-            min-width: 80px;
-        }
-
-        /* Add pulsing animation for active auto-play */
-        .time-controls-nav .auto-play-button.auto-play-active {
-            animation: pulse-glow 2s infinite;
-        }
-
-        @keyframes pulse-glow {
-            0%, 100% {
-                box-shadow: 
-                    0 4px 6px rgba(0,0,0,0.3),
-                    0 0 15px rgba(56, 178, 172, 0.3),
-                    inset 0 1px 0 rgba(255,255,255,0.1),
-                    inset 0 -1px 0 rgba(0,0,0,0.2);
-            }
-            50% {
-                box-shadow: 
-                    0 6px 12px rgba(0,0,0,0.4),
-                    0 0 25px rgba(56, 178, 172, 0.6),
-                    inset 0 1px 0 rgba(255,255,255,0.2),
-                    inset 0 -1px 0 rgba(0,0,0,0.1);
-            }
-        }
-    </style>
-
-    <!-- New 2-Panel Layout CSS -->
-    <style>
-        /* Village Content Layout - 2 Panel System */
-        .village-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1rem;
-            width: 100%;
-            height: calc(100vh - 120px);
-            overflow: hidden;
-        }
-
-        /* Village Grid Panel (Left) */
-        .village-grid-panel {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 1rem;
-            overflow: auto;
-        }
-
-        .village-grid {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Management Panel (Right) */
-        .management-panel {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Panel Navigation */
-        .panel-nav {
-            display: flex;
-            background: #222;
-            border-bottom: 1px solid #333;
-            border-radius: 8px 8px 0 0;
-        }
-
-        .panel-nav-btn {
-            flex: 1;
-            background: #222;
-            color: #e0e0e0;
-            border: none;
-            padding: 12px 8px;
-            cursor: pointer;
-            font-size: 0.9em;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            border-bottom: 3px solid transparent;
-        }
-
-        .panel-nav-btn:hover {
-            background: #2a2a2a;
-            color: #fff;
-        }
-
-        .panel-nav-btn.active {
-            background: #2a2a2a;
-            color: #fff;
-            border-bottom-color: #4CAF50;
-        }
-
-        .panel-nav-btn:first-child {
-            border-radius: 8px 0 0 0;
-        }
-
-        .panel-nav-btn:last-child {
-            border-radius: 0 8px 0 0;
-        }
-
-        /* Panel Tabs */
-        .panel-tab {
-            display: none;
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-        }
-
-        .panel-tab.active {
-            display: block;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .stat-item {
-            background: #222;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #333;
-        }
-
-        .stat-label {
-            display: block;
-            font-size: 0.8em;
-            color: #bbb;
-            margin-bottom: 2px;
-        }
-
-        .stat-value {
-            display: block;
-            font-size: 1.1em;
-            font-weight: bold;
-            color: #4CAF50;
-        }
-
-        /* Building Grid */
-        .building-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .building-category {
-            background: #222;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 12px;
-        }
-
-        .building-category h4 {
-            margin: 0 0 8px 0;
-            color: #e0e0e0;
-            font-size: 0.9em;
-            border-bottom: 1px solid #333;
-            padding-bottom: 4px;
-        }
-
-        .building-container {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            padding: 4px;
-        }
-        
-        .building-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr; /* Building Name, Resources, Work Points */
-            gap: 8px;
-            padding: 8px;
-            margin-bottom: 4px;
-            border-bottom: 1px solid #333;
-            align-items: center;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: background-color 0.2s ease;
-        }
-        
-        .building-row:hover {
-            background-color: rgba(52, 152, 219, 0.1);
-        }
-        
-        .building-row.locked {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .building-row.locked:hover {
-            background-color: rgba(231, 76, 60, 0.1);
-        }
-        
-        .building-row-header {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 8px;
-            padding: 8px;
-            font-weight: bold;
-            color: #3498db;
-            border-bottom: 2px solid #3498db;
-            margin-bottom: 8px;
-        }
-        
-        .building-name {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: bold;
-        }
-        
-        .building-resources {
-            font-size: 12px;
-            color: #f39c12;
-        }
-        
-        .building-work-points {
-            font-size: 12px;
-            color: #27ae60;
-            text-align: center;
-        }
-
-        /* Building Buttons */
-        .building-btn {
-            background: #1a1a1a;
-            border: 2px solid #333;
-            border-radius: 6px;
-            padding: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #e0e0e0;
-            text-align: center;
-        }
-
-        .building-btn:hover {
-            background: #2a2a2a;
-            border-color: #4CAF50;
-            transform: translateY(-1px);
-        }
-
-        .building-icon {
-            font-size: 1.5em;
-            margin-bottom: 4px;
-        }
-
-        .building-name {
-            font-size: 0.8em;
-            font-weight: 600;
-            margin-bottom: 2px;
-            color: #fff;
-        }
-
-        .building-cost {
-            font-size: 0.7em;
-            color: #bbb;
-        }
-
-        /* Enhanced Speed Controls */
-        .time-controls .time-btn {
-            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
-            border: 2px solid #333 !important;
-            color: #e0e0e0 !important;
-            border-radius: 8px !important;
-            padding: 8px 12px !important;
-            font-weight: 600 !important;
-            cursor: pointer;
-            transition: all 0.3s ease !important;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
-        }
-
-        .time-controls .time-btn:hover {
-            background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
-            border-color: #4CAF50 !important;
-            color: #fff !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4) !important;
-        }
-
-        .time-controls .time-btn.selected,
-        .time-controls .time-btn:active {
-            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
-            border-color: #4CAF50 !important;
-            color: #fff !important;
-            transform: translateY(0) !important;
-            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
-        }
-
-        .time-controls .time-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .time-controls .time-btn:hover::before {
-            left: 100%;
-        }
-
-        /* Modal Stats Styling */
-        .stats-grid-modal {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 12px;
-        }
-
-        .stat-item-modal {
-            background: #333;
-            padding: 12px;
-            border-radius: 6px;
-            border: 1px solid #444;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .stat-label-modal {
-            font-size: 0.85em;
-            color: #bbb;
-            margin-bottom: 4px;
-            font-weight: 500;
-        }
-
-        .stat-value-modal {
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #4CAF50;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .village-content {
-                grid-template-columns: 1.5fr 1fr;
-            }
-        }
-
-        @media (max-width: 900px) {
-            .village-content {
-                grid-template-columns: 1fr;
-                grid-template-rows: 1fr auto;
-                height: auto;
-            }
-            
-            .management-panel {
-                max-height: 400px;
-            }
-        }
-    </style>
-<script>
-// Time control speed buttons logic
-document.addEventListener('DOMContentLoaded', function() {
-    // Navigation time controls (new location)
-    const autoPlayBtnNav = document.getElementById('auto-play-btn-nav');
-    const speed1xBtnNav = document.getElementById('speed-1x-btn-nav');
-    const speed2xBtnNav = document.getElementById('speed-2x-btn-nav');
-    const speed4xBtnNav = document.getElementById('speed-4x-btn-nav');
-    const endDayBtnNav = document.getElementById('end-day-btn-nav');
-    
-    // Initialize autoPlaySpeed if not set - wait for gameState
-    function initializeTimeControls() {
-        if (!window.gameState) {
-            setTimeout(initializeTimeControls, 100);
-            return;
-        }
-        
-        if (!window.gameState.autoPlaySpeed) {
-            window.gameState.autoPlaySpeed = 20000; // Default 20 seconds
-        }
-        
-        // Set initial state
-        if (speed1xBtnNav) speed1xBtnNav.classList.add('selected');
-    }
-    
-    let lastSpeed = 20000;
-    function setSpeed(ms, btn) {
-        if (!window.gameState) {
-            console.warn('[TimeControls] GameState not available');
-            return;
-        }
-        
-        console.log(`[TimeControls] Setting speed to ${ms}ms`);
-        window.gameState.autoPlaySpeed = ms;
-        
-        if (window.gameState.autoPlayActive) {
-            window.gameState.stopAutoPlay();
-            window.gameState.startAutoPlay();
-        }
-        
-        // Visual feedback
-        [speed1xBtnNav, speed2xBtnNav, speed4xBtnNav].forEach(b => {
-            if (b) b.classList.remove('selected');
-        });
-        if (btn) {
-            btn.classList.add('selected');
-            console.log(`[TimeControls] Button ${btn.textContent} selected`);
-        }
-    }
-    
-    // Initialize time controls
-    initializeTimeControls();
-    
-    // End day button
-    if (endDayBtnNav) {
-        endDayBtnNav.addEventListener('click', function() {
-            if (window.gameState) {
-                window.gameState.endDay();
-            }
-            // Button animation
-            endDayBtnNav.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                endDayBtnNav.style.transform = '';
-            }, 100);
-        });
-    }
-    
-    // Auto-play toggle button
-    if (autoPlayBtnNav) {
-        autoPlayBtnNav.addEventListener('click', function() {
-            if (window.gameState) {
-                window.gameState.toggleAutoPlay();
-            }
-        });
-    }
-    
-    // Speed buttons
-    if (speed1xBtnNav) {
-        speed1xBtnNav.addEventListener('click', function() {
-            console.log('[TimeControls] 1x button clicked');
-            setSpeed(20000, speed1xBtnNav); // 1x speed (default)
-        });
-        console.log('[TimeControls] 1x button listener attached');
-    } else {
-        console.warn('[TimeControls] 1x button not found');
-    }
-    
-    if (speed2xBtnNav) {
-        speed2xBtnNav.addEventListener('click', function() {
-            console.log('[TimeControls] 2x button clicked');
-            setSpeed(10000, speed2xBtnNav); // 2x speed
-        });
-        console.log('[TimeControls] 2x button listener attached');
-    } else {
-        console.warn('[TimeControls] 2x button not found');
-    }
-    
-    if (speed4xBtnNav) {
-        speed4xBtnNav.addEventListener('click', function() {
-            console.log('[TimeControls] 4x button clicked');
-            setSpeed(5000, speed4xBtnNav); // 4x speed
-        });
-        console.log('[TimeControls] 4x button listener attached');
-    } else {
-        console.warn('[TimeControls] 4x button not found');
-    }
-    
-    // Update navigation time controls when gameState is ready
-    function updateNavigationTimeControls() {
-        if (window.gameState) {
-            // Update day/season display
-            const seasonNavElement = document.getElementById('current-season-nav');
-            const dayNavElement = document.getElementById('current-day-number-nav');
-            const seasonDayElement = document.getElementById('current-season-day');
-            
-            if (seasonNavElement && window.gameState.season) {
-                seasonNavElement.textContent = window.gameState.season;
-            }
-            
-            // Calculate total days played across all seasons
-            if (dayNavElement && window.gameState.currentDay && window.gameState.currentSeasonIndex !== undefined && window.gameState.daysInSeason) {
-                const totalDays = (window.gameState.currentSeasonIndex * window.gameState.daysInSeason) + window.gameState.currentDay;
-                dayNavElement.textContent = `Day ${totalDays}`;
-            }
-            
-            // Show current day within the season
-            if (seasonDayElement && window.gameState.currentDay) {
-                seasonDayElement.textContent = `Day ${window.gameState.currentDay}`;
-            }
-            
-            // Update auto-play button state
-            if (window.gameState.updateAutoPlayUI) {
-                window.gameState.updateAutoPlayUI();
-            }
-        } else {
-            // Retry if gameState not ready yet
-            setTimeout(updateNavigationTimeControls, 200);
-        }
-    }
-    
-    // Call update function after a short delay to ensure gameState is loaded
-    setTimeout(updateNavigationTimeControls, 500);
-    
-    // Set up periodic updates to keep navigation in sync
-    setInterval(updateNavigationTimeControls, 1000);
-    
-    // Listen for day change events if eventBus is available
-    if (window.eventBus) {
-        window.eventBus.on && window.eventBus.on('day-ended', updateNavigationTimeControls);
-        window.eventBus.on && window.eventBus.on('resources-updated', updateNavigationTimeControls);
-    }
-});
-</script>
-
-<!-- Panel Switching JavaScript -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Panel switching functionality
-    const panelNavBtns = document.querySelectorAll('.panel-nav-btn');
-    const panelTabs = document.querySelectorAll('.panel-tab');
-    
-    panelNavBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const targetPanel = this.dataset.panel;
-            
-            // Remove active class from all buttons and tabs
-            panelNavBtns.forEach(b => b.classList.remove('active'));
-            panelTabs.forEach(t => t.classList.remove('active'));
-            
-            // Add active class to clicked button and corresponding tab
-            this.classList.add('active');
-            const targetTab = document.getElementById(targetPanel + '-tab');
-            if (targetTab) {
-                targetTab.classList.add('active');
-            }
-            
-            // Update building tabs when buildings panel is opened
-            if (targetPanel === 'buildings') {
-                updateBuildingGrid();
-            }
-        });
-    });
-    
-    // Update stats display
-    function updateStatsDisplay() {
-        if (window.gameState && window.gameState.stats) {
-            const stats = window.gameState.stats;
-            
-            // Update stat values if elements exist
-            const totalDaysEl = document.getElementById('stat-total-days');
-            if (totalDaysEl) totalDaysEl.textContent = stats.totalDaysElapsed || 1;
-            
-            const peakPopEl = document.getElementById('stat-peak-population');
-            if (peakPopEl) peakPopEl.textContent = stats.peakPopulation || 1;
-            
-            const buildingsEl = document.getElementById('stat-buildings-built');
-            if (buildingsEl) buildingsEl.textContent = stats.buildingsBuilt || 0;
-            
-            const seasonsEl = document.getElementById('stat-seasons-passed');
-            if (seasonsEl) seasonsEl.textContent = Math.floor((stats.totalDaysElapsed || 1) / 28) || 0;
-        }
-    }
-    
-    // Update building grid in buildings tab
-    function updateBuildingGrid() {
-        const essentialContainer = document.getElementById('essential-buildings');
-        const housingContainer = document.getElementById('housing-buildings');
-        const militaryContainer = document.getElementById('military-buildings');
-        
-        if (!essentialContainer || !housingContainer || !militaryContainer) return;
-        
-        // Clear existing content
-        essentialContainer.innerHTML = '';
-        housingContainer.innerHTML = '';
-        militaryContainer.innerHTML = '';
-        
-        // Get building data from global scope
-        if (typeof buildingData !== 'undefined') {
-            // Essential buildings
-            const essentialBuildings = ['farm', 'house', 'well'];
-            essentialBuildings.forEach(buildingId => {
-                if (buildingData[buildingId]) {
-                    essentialContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
-                }
-            });
-            
-            // Housing & Production buildings
-            const housingBuildings = ['mill', 'workshop', 'market', 'inn'];
-            housingBuildings.forEach(buildingId => {
-                if (buildingData[buildingId]) {
-                    housingContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
-                }
-            });
-            
-            // Military & Advanced buildings
-            const militaryBuildings = ['barracks', 'blacksmith', 'tower', 'temple'];
-            militaryBuildings.forEach(buildingId => {
-                if (buildingData[buildingId]) {
-                    militaryContainer.appendChild(createBuildingButton(buildingId, buildingData[buildingId]));
-                }
-            });
-        }
-    }
-    
-    // Create building button element
-    function createBuildingButton(buildingId, buildingInfo) {
-        const button = document.createElement('button');
-        button.className = 'building-btn';
-        button.innerHTML = `
-            <div class="building-icon">${buildingInfo.icon || '🏠'}</div>
-            <div class="building-name">${buildingInfo.name || buildingId}</div>
-            <div class="building-cost">${formatCost(buildingInfo.cost)}</div>
-        `;
-        
-        button.addEventListener('click', function() {
-            if (window.village && typeof window.village.buildBuilding === 'function') {
-                window.village.buildBuilding(buildingId);
-            }
-        });
-        
-        return button;
-    }
-    
-    // Format cost display
-    function formatCost(cost) {
-        if (!cost) return '';
-        const costParts = [];
-        if (cost.food) costParts.push(`${cost.food}🌾`);
-        if (cost.wood) costParts.push(`${cost.wood}🪵`);
-        if (cost.stone) costParts.push(`${cost.stone}🗿`);
-        if (cost.metal) costParts.push(`${cost.metal}⚒️`);
-        if (cost.production) costParts.push(`${cost.production}⚙️`);
-        return costParts.join(' ');
-    }
-    
-    // Update display on game events
-    if (window.eventBus) {
-        window.eventBus.on('day-ended', updateStatsDisplay);
-        window.eventBus.on('resources-updated', updateStatsDisplay);
-        window.eventBus.on('building-built', updateBuildingGrid);
-    }
-    
-    // Initial update
-    setTimeout(() => {
-        updateStatsDisplay();
-        updateBuildingGrid();
-    }, 500);
-});
-</script>
-                    </div>
+                    <style>
+                        .time-controls .time-btn {
+                            background: #222;
+                            color: #e0e0e0;
+                            border: 1px solid #333;
+                            border-radius: 5px;
+                            font-weight: 500;
+                            margin: 0;
+                            box-shadow: none;
+                            cursor: pointer;
+                            transition: background 0.15s, color 0.15s, border 0.15s;
+                            outline: none;
+                            letter-spacing: 0.2px;
+                            position: relative;
+                            min-width: 36px;
+                            padding: 6px 8px;
+                            font-size: 0.95em;
+                        }
+
+                        .time-controls .time-btn.selected,
+                        .time-controls .time-btn:active {
+                            background: #292f36;
+                            color: #fff;
+                            border-color: #444;
+                        }
+
+                        .time-controls .time-btn:hover {
+                            background: #292f36;
+                            color: #fff;
+                            border-color: #444;
+                        }
+
+                        /* Navigation Layout */
+                        #view-navigation {
+                            width: 100%;
+                            padding: 0 1rem 1rem 1rem;
+                        }
+
+                        .nav-container {
+                            display: flex;
+                            align-items: center;
+                            width: 100%;
+                            min-height: 40px;
+                            gap: 1rem;
+                            position: relative;
+                        }
+
+                        .nav-section {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+
+                        .nav-left {
+                            /* View buttons stay on left */
+                            flex: 0 0 auto;
+                            order: 1;
+                        }
+
+                        .nav-center {
+                            /* Time controls absolutely centered */
+                            position: absolute;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            z-index: 1;
+                        }
+
+                        .nav-right {
+                            /* Icons on right */
+                            flex: 0 0 auto;
+                            order: 3;
+                            margin-left: auto;
+                        }
+
+                        /* Responsive behavior to prevent overlaps */
+                        @media (max-width: 1200px) {
+                            .nav-container {
+                                gap: 0.5rem;
+                            }
+
+                            .nav-section {
+                                gap: 4px;
+                            }
+
+                            /* On smaller screens, fall back to flex layout */
+                            .nav-center {
+                                position: static;
+                                transform: none;
+                                flex: 1 1 auto;
+                                justify-content: center;
+                                order: 2;
+                            }
+
+                            .nav-container {
+                                justify-content: space-between;
+                            }
+                        }
+
+                        @media (max-width: 900px) {
+                            .nav-container {
+                                gap: 0.25rem;
+                            }
+
+                            .nav-section {
+                                gap: 2px;
+                            }
+
+                            /* Even smaller buttons on very small screens */
+                            .time-controls-nav .time-btn {
+                                padding: 4px 8px;
+                                min-width: 35px;
+                                height: 28px;
+                                font-size: 0.8em;
+                            }
+
+                            #view-navigation .icon-btn {
+                                width: 32px;
+                                height: 28px;
+                                padding: 4px 6px;
+                            }
+                        }
+
+                        /* Navigation Time Controls Styling */
+                        .time-controls-nav {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+
+                        /* Top Right Icons in Navigation */
+                        #view-navigation #top-right-icons {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        }
+
+                        #view-navigation .icon-btn {
+                            background: #34495e;
+                            color: #ecf0f1;
+                            border: 1px solid #2c3e50;
+                            border-radius: 4px;
+                            padding: 6px 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            font-size: 16px;
+                            width: 36px;
+                            height: 36px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
+
+                        #view-navigation .icon-btn:hover {
+                            background: #1abc9c;
+                            color: #fff;
+                            border-color: #16a085;
+                            transform: translateY(-1px);
+                        }
+
+                        #view-navigation .icon-btn.achievements-incomplete {
+                            background: #e74c3c;
+                            border-color: #c0392b;
+                        }
+
+                        #view-navigation .icon-btn.achievements-incomplete:hover {
+                            background: #c0392b;
+                            border-color: #a93226;
+                        }
+
+                        .current-day-nav {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            font-size: 0.75em;
+                            color: #e2e8f0;
+                            margin-right: 16px;
+                            min-width: 100px;
+                            background: linear-gradient(145deg, #2d3748 0%, #1a202c 100%);
+                            border: 2px solid #4a5568;
+                            border-radius: 6px;
+                            padding: 6px 10px;
+                            box-shadow:
+                                0 2px 4px rgba(0, 0, 0, 0.3),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                                inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+                            position: relative;
+                            overflow: hidden;
+                            gap: 2px;
+                            height: 36px;
+                            justify-content: center;
+                        }
+
+                        .current-day-nav::before {
+                            content: '';
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            height: 1px;
+                            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                        }
+
+                        .season-info,
+                        .total-day-info {
+                            display: flex;
+                            align-items: center;
+                            line-height: 1;
+                            gap: 4px;
+                        }
+
+                        .season-info span:first-child {
+                            color: #f7fafc;
+                            font-weight: 700;
+                            font-size: 1.1em;
+                            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+                        }
+
+                        .season-info span:last-child {
+                            color: #38b2ac;
+                            font-weight: 600;
+                            font-size: 1em;
+                            text-shadow: 0 0 4px rgba(56, 178, 172, 0.4);
+                        }
+
+                        .total-day-info span:first-child {
+                            color: #a0aec0;
+                            font-weight: 600;
+                            font-size: 0.9em;
+                        }
+
+                        .total-day-info span:last-child {
+                            color: #edf2f7;
+                            font-weight: 700;
+                            font-size: 1em;
+                            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+                        }
+
+                        .time-controls-nav .time-btn {
+                            background: linear-gradient(145deg, #4a5568 0%, #2d3748 50%, #1a202c 100%);
+                            color: #e2e8f0;
+                            border: 2px solid #4a5568;
+                            border-radius: 6px;
+                            font-weight: 700;
+                            cursor: pointer;
+                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                            outline: none;
+                            font-size: 0.8em;
+                            padding: 8px 12px;
+                            min-width: 50px;
+                            height: 36px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow:
+                                0 2px 4px rgba(0, 0, 0, 0.3),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                                inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+                            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+                            position: relative;
+                            overflow: hidden;
+                        }
+
+                        .time-controls-nav .time-btn::before {
+                            content: '';
+                            position: absolute;
+                            top: 0;
+                            left: -100%;
+                            width: 100%;
+                            height: 100%;
+                            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                            transition: left 0.5s;
+                        }
+
+                        .time-controls-nav .time-btn:hover {
+                            background: linear-gradient(145deg, #38b2ac 0%, #319795 50%, #2c7a7b 100%);
+                            color: #fff;
+                            border-color: #38b2ac;
+                            transform: translateY(-2px) scale(1.02);
+                            box-shadow:
+                                0 4px 8px rgba(0, 0, 0, 0.4),
+                                0 0 12px rgba(56, 178, 172, 0.3),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+                        }
+
+                        .time-controls-nav .time-btn:hover::before {
+                            left: 100%;
+                        }
+
+                        .time-controls-nav .time-btn.selected,
+                        .time-controls-nav .time-btn:active {
+                            background: linear-gradient(145deg, #e53e3e 0%, #c53030 50%, #9c2626 100%);
+                            color: #fff;
+                            border-color: #e53e3e;
+                            transform: translateY(-1px) scale(0.98);
+                            box-shadow:
+                                0 2px 4px rgba(0, 0, 0, 0.4),
+                                0 0 15px rgba(229, 62, 62, 0.4),
+                                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                                inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+                        }
+
+                        .time-controls-nav .auto-play-button {
+                            min-width: 75px;
+                            gap: 5px;
+                        }
+
+                        .time-controls-nav .end-day-button {
+                            min-width: 80px;
+                        }
+
+                        /* Add pulsing animation for active auto-play */
+                        .time-controls-nav .auto-play-button.auto-play-active {
+                            animation: pulse-glow 2s infinite;
+                        }
+
+                        @keyframes pulse-glow {
+
+                            0%,
+                            100% {
+                                box-shadow:
+                                    0 4px 6px rgba(0, 0, 0, 0.3),
+                                    0 0 15px rgba(56, 178, 172, 0.3),
+                                    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                                    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+                            }
+
+                            50% {
+                                box-shadow:
+                                    0 6px 12px rgba(0, 0, 0, 0.4),
+                                    0 0 25px rgba(56, 178, 172, 0.6),
+                                    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                                    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+                            }
+                        }
+                    </style>
+
+                    <!-- New 2-Panel Layout CSS -->
+                    <style>
+                        /* Village Content Layout - 2 Panel System */
+                        .village-content {
+                            display: grid;
+                            grid-template-columns: 2fr 1fr;
+                            gap: 1rem;
+                            width: 100%;
+                            height: calc(100vh - 120px);
+                            overflow: hidden;
+                        }
+
+                        /* Village Grid Panel (Left) */
+                        .village-grid-panel {
+                            background: #1a1a1a;
+                            border: 1px solid #333;
+                            border-radius: 8px;
+                            padding: 1rem;
+                            overflow: auto;
+                        }
+
+                        .village-grid {
+                            width: 100%;
+                            height: 100%;
+                        }
+
+                        /* Management Panel (Right) */
+                        .management-panel {
+                            background: #1a1a1a;
+                            border: 1px solid #333;
+                            border-radius: 8px;
+                            display: flex;
+                            flex-direction: column;
+                            overflow: hidden;
+                        }
+
+                        /* Panel Navigation */
+                        .panel-nav {
+                            display: flex;
+                            background: #222;
+                            border-bottom: 1px solid #333;
+                            border-radius: 8px 8px 0 0;
+                        }
+
+                        .panel-nav-btn {
+                            flex: 1;
+                            background: #222;
+                            color: #e0e0e0;
+                            border: none;
+                            padding: 12px 8px;
+                            cursor: pointer;
+                            font-size: 0.9em;
+                            font-weight: 500;
+                            transition: all 0.2s ease;
+                            border-bottom: 3px solid transparent;
+                        }
+
+                        .panel-nav-btn:hover {
+                            background: #2a2a2a;
+                            color: #fff;
+                        }
+
+                        .panel-nav-btn.active {
+                            background: #2a2a2a;
+                            color: #fff;
+                            border-bottom-color: #4CAF50;
+                        }
+
+                        .panel-nav-btn:first-child {
+                            border-radius: 8px 0 0 0;
+                        }
+
+                        .panel-nav-btn:last-child {
+                            border-radius: 0 8px 0 0;
+                        }
+
+                        /* Panel Tabs */
+                        .panel-tab {
+                            display: none;
+                            flex: 1;
+                            overflow-y: auto;
+                            padding: 1rem;
+                        }
+
+                        .panel-tab.active {
+                            display: block;
+                        }
+
+                        /* Stats Grid */
+                        .stats-grid {
+                            display: grid;
+                            grid-template-columns: 1fr 1fr;
+                            gap: 8px;
+                            margin-top: 8px;
+                        }
+
+                        .stat-item {
+                            background: #222;
+                            padding: 8px;
+                            border-radius: 4px;
+                            border: 1px solid #333;
+                        }
+
+                        .stat-label {
+                            display: block;
+                            font-size: 0.8em;
+                            color: #bbb;
+                            margin-bottom: 2px;
+                        }
+
+                        .stat-value {
+                            display: block;
+                            font-size: 1.1em;
+                            font-weight: bold;
+                            color: #4CAF50;
+                        }
+
+                        /* Building Grid */
+                        .building-grid {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 1rem;
+                        }
+
+                        .building-category {
+                            background: #222;
+                            border: 1px solid #333;
+                            border-radius: 6px;
+                            padding: 12px;
+                        }
+
+                        .building-category h4 {
+                            margin: 0 0 8px 0;
+                            color: #e0e0e0;
+                            font-size: 0.9em;
+                            border-bottom: 1px solid #333;
+                            padding-bottom: 4px;
+                        }
+
+                        .building-container {
+                            background: rgba(0, 0, 0, 0.2);
+                            border-radius: 4px;
+                            padding: 4px;
+                        }
+
+                        .building-row {
+                            display: grid;
+                            grid-template-columns: 2fr 1fr 1fr;
+                            /* Building Name, Resources, Work Points */
+                            gap: 8px;
+                            padding: 8px;
+                            margin-bottom: 4px;
+                            border-bottom: 1px solid #333;
+                            align-items: center;
+                            cursor: pointer;
+                            border-radius: 4px;
+                            transition: background-color 0.2s ease;
+                        }
+
+                        .building-row:hover {
+                            background-color: rgba(52, 152, 219, 0.1);
+                        }
+
+                        .building-row.locked {
+                            opacity: 0.5;
+                            cursor: not-allowed;
+                        }
+
+                        .building-row.locked:hover {
+                            background-color: rgba(231, 76, 60, 0.1);
+                        }
+
+                        .building-row-header {
+                            display: grid;
+                            grid-template-columns: 2fr 1fr 1fr;
+                            gap: 8px;
+                            padding: 8px;
+                            font-weight: bold;
+                            color: #3498db;
+                            border-bottom: 2px solid #3498db;
+                            margin-bottom: 8px;
+                        }
+
+                        .building-name {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            font-weight: bold;
+                        }
+
+                        .building-resources {
+                            font-size: 12px;
+                            color: #f39c12;
+                        }
+
+                        .building-work-points {
+                            font-size: 12px;
+                            color: #27ae60;
+                            text-align: center;
+                        }
+
+                        /* Building Buttons */
+                        .building-btn {
+                            background: #1a1a1a;
+                            border: 2px solid #333;
+                            border-radius: 6px;
+                            padding: 8px;
+                            cursor: pointer;
+                            transition: all 0.2s ease;
+                            color: #e0e0e0;
+                            text-align: center;
+                        }
+
+                        .building-btn:hover {
+                            background: #2a2a2a;
+                            border-color: #4CAF50;
+                            transform: translateY(-1px);
+                        }
+
+                        .building-icon {
+                            font-size: 1.5em;
+                            margin-bottom: 4px;
+                        }
+
+                        .building-name {
+                            font-size: 0.8em;
+                            font-weight: 600;
+                            margin-bottom: 2px;
+                            color: #fff;
+                        }
+
+                        .building-cost {
+                            font-size: 0.7em;
+                            color: #bbb;
+                        }
+
+                        /* Enhanced Speed Controls */
+                        .time-controls .time-btn {
+                            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
+                            border: 2px solid #333 !important;
+                            color: #e0e0e0 !important;
+                            border-radius: 8px !important;
+                            padding: 8px 12px !important;
+                            font-weight: 600 !important;
+                            cursor: pointer;
+                            transition: all 0.3s ease !important;
+                            position: relative;
+                            overflow: hidden;
+                            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+                        }
+
+                        .time-controls .time-btn:hover {
+                            background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%) !important;
+                            border-color: #4CAF50 !important;
+                            color: #fff !important;
+                            transform: translateY(-1px) !important;
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4) !important;
+                        }
+
+                        .time-controls .time-btn.selected,
+                        .time-controls .time-btn:active {
+                            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%) !important;
+                            border-color: #4CAF50 !important;
+                            color: #fff !important;
+                            transform: translateY(0) !important;
+                            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
+                        }
+
+                        .time-controls .time-btn::before {
+                            content: '';
+                            position: absolute;
+                            top: 0;
+                            left: -100%;
+                            width: 100%;
+                            height: 100%;
+                            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                            transition: left 0.5s;
+                        }
+
+                        .time-controls .time-btn:hover::before {
+                            left: 100%;
+                        }
+
+                        /* Modal Stats Styling */
+                        .stats-grid-modal {
+                            display: grid;
+                            grid-template-columns: 1fr 1fr;
+                            gap: 12px;
+                            margin-top: 12px;
+                        }
+
+                        .stat-item-modal {
+                            background: #333;
+                            padding: 12px;
+                            border-radius: 6px;
+                            border: 1px solid #444;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            text-align: center;
+                        }
+
+                        .stat-label-modal {
+                            font-size: 0.85em;
+                            color: #bbb;
+                            margin-bottom: 4px;
+                            font-weight: 500;
+                        }
+
+                        .stat-value-modal {
+                            font-size: 1.3em;
+                            font-weight: bold;
+                            color: #4CAF50;
+                        }
+
+                        /* Responsive Design */
+                        @media (max-width: 1200px) {
+                            .village-content {
+                                grid-template-columns: 1.5fr 1fr;
+                            }
+                        }
+
+                        @media (max-width: 900px) {
+                            .village-content {
+                                grid-template-columns: 1fr;
+                                grid-template-rows: 1fr auto;
+                                height: auto;
+                            }
+
+                            .management-panel {
+                                max-height: 400px;
+                            }
+                        }
+                    </style>
+                    <script>
+                        // Time control speed buttons logic
+                        document.addEventListener('DOMContentLoaded', function () {
+                            // Navigation time controls (new location)
+                            const autoPlayBtnNav = document.getElementById('auto-play-btn-nav');
+                            const speed1xBtnNav = document.getElementById('speed-1x-btn-nav');
+                            const speed2xBtnNav = document.getElementById('speed-2x-btn-nav');
+                            const speed4xBtnNav = document.getElementById('speed-4x-btn-nav');
+                            const endDayBtnNav = document.getElementById('end-day-btn-nav');
+
+                            // Initialize autoPlaySpeed if not set - wait for gameState
+                            function initializeTimeControls() {
+                                if (!window.gameState) {
+                                    setTimeout(initializeTimeControls, 100);
+                                    return;
+                                }
+
+                                if (!window.gameState.autoPlaySpeed) {
+                                    window.gameState.autoPlaySpeed = 20000; // Default 20 seconds
+                                }
+
+                                // Set initial state
+                                if (speed1xBtnNav) speed1xBtnNav.classList.add('selected');
+                            }
+
+                            let lastSpeed = 20000;
+                            function setSpeed(ms, btn) {
+                                if (!window.gameState) {
+                                    console.warn('[TimeControls] GameState not available');
+                                    return;
+                                }
+
+                                console.log(`[TimeControls] Setting speed to ${ms}ms`);
+                                window.gameState.autoPlaySpeed = ms;
+
+                                if (window.gameState.autoPlayActive) {
+                                    window.gameState.stopAutoPlay();
+                                    window.gameState.startAutoPlay();
+                                }
+
+                                // Visual feedback
+                                [speed1xBtnNav, speed2xBtnNav, speed4xBtnNav].forEach(b => {
+                                    if (b) b.classList.remove('selected');
+                                });
+                                if (btn) {
+                                    btn.classList.add('selected');
+                                    console.log(`[TimeControls] Button ${btn.textContent} selected`);
+                                }
+                            }
+
+                            // Initialize time controls
+                            initializeTimeControls();
+
+                            // End day button
+                            if (endDayBtnNav) {
+                                endDayBtnNav.addEventListener('click', function () {
+                                    if (window.gameState) {
+                                        window.gameState.endDay();
+                                    }
+                                    // Button animation
+                                    endDayBtnNav.style.transform = 'scale(0.95)';
+                                    setTimeout(() => {
+                                        endDayBtnNav.style.transform = '';
+                                    }, 100);
+                                });
+                            }
+
+                            // Auto-play toggle button
+                            if (autoPlayBtnNav) {
+                                autoPlayBtnNav.addEventListener('click', function () {
+                                    if (window.gameState) {
+                                        window.gameState.toggleAutoPlay();
+                                    }
+                                });
+                            }
+
+                            // Speed buttons
+                            if (speed1xBtnNav) {
+                                speed1xBtnNav.addEventListener('click', function () {
+                                    console.log('[TimeControls] 1x button clicked');
+                                    setSpeed(20000, speed1xBtnNav); // 1x speed (default)
+                                });
+                                console.log('[TimeControls] 1x button listener attached');
+                            } else {
+                                console.warn('[TimeControls] 1x button not found');
+                            }
+
+                            if (speed2xBtnNav) {
+                                speed2xBtnNav.addEventListener('click', function () {
+                                    console.log('[TimeControls] 2x button clicked');
+                                    setSpeed(10000, speed2xBtnNav); // 2x speed
+                                });
+                                console.log('[TimeControls] 2x button listener attached');
+                            } else {
+                                console.warn('[TimeControls] 2x button not found');
+                            }
+
+                            if (speed4xBtnNav) {
+                                speed4xBtnNav.addEventListener('click', function () {
+                                    console.log('[TimeControls] 4x button clicked');
+                                    setSpeed(5000, speed4xBtnNav); // 4x speed
+                                });
+                                console.log('[TimeControls] 4x button listener attached');
+                            } else {
+                                console.warn('[TimeControls] 4x button not found');
+                            }
+
+                            // Update navigation time controls when gameState is ready
+                            function updateNavigationTimeControls() {
+                                if (window.gameState) {
+                                    // Update day/season display
+                                    const seasonNavElement = document.getElementById('current-season-nav');
+                                    const dayNavElement = document.getElementById('current-day-number-nav');
+                                    const seasonDayElement = document.getElementById('current-season-day');
+
+                                    if (seasonNavElement && window.gameState.season) {
+                                        seasonNavElement.textContent = window.gameState.season;
+                                    }
+
+                                    // Calculate total days played across all seasons
+                                    if (dayNavElement && window.gameState.currentDay && window.gameState.currentSeasonIndex !== undefined && window.gameState.daysInSeason) {
+                                        const totalDays = (window.gameState.currentSeasonIndex * window.gameState.daysInSeason) + window.gameState.currentDay;
+                                        dayNavElement.textContent = `Day ${totalDays}`;
+                                    }
+
+                                    // Show current day within the season
+                                    if (seasonDayElement && window.gameState.currentDay) {
+                                        seasonDayElement.textContent = `Day ${window.gameState.currentDay}`;
+                                    }
+
+                                    // Update auto-play button state
+                                    if (window.gameState.updateAutoPlayUI) {
+                                        window.gameState.updateAutoPlayUI();
+                                    }
+                                } else {
+                                    // Retry if gameState not ready yet
+                                    setTimeout(updateNavigationTimeControls, 200);
+                                }
+                            }
+
+                            // Call update function after a short delay to ensure gameState is loaded
+                            setTimeout(updateNavigationTimeControls, 500);
+
+                            // Set up periodic updates to keep navigation in sync
+                            setInterval(updateNavigationTimeControls, 1000);
+
+                            // Listen for day change events if eventBus is available
+                            if (window.eventBus) {
+                                window.eventBus.on && window.eventBus.on('day-ended', updateNavigationTimeControls);
+                                window.eventBus.on && window.eventBus.on('resources-updated', updateNavigationTimeControls);
+                            }
+                        });
+                    </script>
+
+                    <!-- Panel Switching JavaScript -->
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            // Panel switching functionality
+                            const panelNavBtns = document.querySelectorAll('.panel-nav-btn');
+                            const panelTabs = document.querySelectorAll('.panel-tab');
+
+                            panelNavBtns.forEach(btn => {
+                                btn.addEventListener('click', function () {
+                                    const targetPanel = this.dataset.panel;
+
+                                    // Remove active class from all buttons and tabs
+                                    panelNavBtns.forEach(b => b.classList.remove('active'));
+                                    panelTabs.forEach(t => t.classList.remove('active'));
+
+                                    // Add active class to clicked button and corresponding tab
+                                    this.classList.add('active');
+                                    const targetTab = document.getElementById(targetPanel + '-tab');
+                                    if (targetTab) {
+                                        targetTab.classList.add('active');
+                                    }
+
+                                    // Update building tabs when buildings panel is opened
+                                    if (targetPanel === 'buildings') {
+                                        updateBuildingGrid();
+                                    }
+                                });
+                            });
+
+                            // Update stats display
+                            function updateStatsDisplay() {
+                                if (window.gameState && window.gameState.stats) {
+                                    const stats = window.gameState.stats;
+
+                                    // Update stat values if elements exist
+                                    const totalDaysEl = document.getElementById('stat-total-days');
+                                    if (totalDaysEl) totalDaysEl.textContent = stats.totalDaysElapsed || 1;
+
+                                    const peakPopEl = document.getElementById('stat-peak-population');
+                                    if (peakPopEl) peakPopEl.textContent = stats.peakPopulation || 1;
+
+                                    const buildingsEl = document.getElementById('stat-buildings-built');
+                                    if (buildingsEl) buildingsEl.textContent = stats.buildingsBuilt || 0;
+
+                                    const seasonsEl = document.getElementById('stat-seasons-passed');
+                                    if (seasonsEl) seasonsEl.textContent = Math.floor((stats.totalDaysElapsed || 1) / 28) || 0;
+                                }
+                            }
+
+                                // Update building grid in buildings tab
+                                function updateBuildingGrid() {
+                                    const containers = {
+                                        essential: document.getElementById('essential-buildings'),
+                                        production: document.getElementById('production-buildings'),
+                                        craft: document.getElementById('craft-buildings'),
+                                        military: document.getElementById('military-buildings'),
+                                        royal: document.getElementById('royal-buildings'),
+                                        knowledge: document.getElementById('knowledge-buildings'),
+                                        advanced: document.getElementById('advanced-buildings')
+                                    };
+
+                                    // Ensure required containers exist
+                                    if (!containers.essential || !containers.production || !containers.military) return;
+
+                                    // Clear existing content
+                                    Object.values(containers).forEach(el => el && (el.innerHTML = ''));
+
+                                    if (!window.GameData) return;
+
+                                    // Populate each category from GameData
+                                    Object.entries(containers).forEach(([category, el]) => {
+                                        if (!el) return;
+                                        const buildings = window.GameData.getBuildingsByCategory
+                                            ? window.GameData.getBuildingsByCategory(category)
+                                            : (window.GameData.buildingCategories?.[category] || []);
+                                        buildings.forEach(type => {
+                                            el.appendChild(createBuildingButton(type));
+                                        });
+                                    });
+                                }
+
+                                // Create building button element using GameData
+                                function createBuildingButton(buildingType) {
+                                    const button = document.createElement('button');
+                                    button.className = 'building-btn';
+
+                                    const icon = window.GameData?.getBuildingIcon
+                                        ? window.GameData.getBuildingIcon(buildingType)
+                                        : (window.GameData?.buildingInfo?.[buildingType]?.icon || '🏠');
+                                    const name = window.GameData?.getBuildingName
+                                        ? window.GameData.getBuildingName(buildingType)
+                                        : (window.GameData?.buildingInfo?.[buildingType]?.name || buildingType);
+                                    const cost = window.GameData?.formatCost
+                                        ? window.GameData.formatCost(buildingType)
+                                        : '';
+
+                                    button.innerHTML = `
+                <div class="building-icon">${icon}</div>
+                <div class="building-name">${name}</div>
+                <div class="building-cost">${cost}</div>
+            `;
+
+                                    button.addEventListener('click', function () {
+                                        if (window.village && typeof window.village.buildBuilding === 'function') {
+                                            window.village.buildBuilding(buildingType);
+                                        }
+                                    });
+
+                                    return button;
+                                }
+
+                                // Format cost display (fallback only)
+                                function formatCost(cost) {
+                                    if (window.GameData?.formatCost && typeof cost === 'string') return cost;
+                                    if (!cost) return '';
+                                    const costParts = [];
+                                    if (cost.food) costParts.push(`${cost.food}🌾`);
+                                    if (cost.wood) costParts.push(`${cost.wood}🪵`);
+                                    if (cost.stone) costParts.push(`${cost.stone}🗿`);
+                                    if (cost.metal) costParts.push(`${cost.metal}⚒️`);
+                                    if (cost.production) costParts.push(`${cost.production}⚙️`);
+                                    if (cost.gold) costParts.push(`${cost.gold}💰`);
+                                    if (cost.planks) costParts.push(`${cost.planks}🪵`);
+                                    return costParts.join(' ');
+                                }
+
+                            // Update display on game events
+                            if (window.eventBus) {
+                                window.eventBus.on('day-ended', updateStatsDisplay);
+                                window.eventBus.on('resources-updated', updateStatsDisplay);
+                                window.eventBus.on('building-built', updateBuildingGrid);
+                            }
+
+                            // Initial update
+                            setTimeout(() => {
+                                updateStatsDisplay();
+                                updateBuildingGrid();
+                            }, 500);
+                        });
+                    </script>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- World View -->
-            <div id="world-view" class="game-view">
-                <!-- WorldManager will populate this dynamically -->
-                
-                <!-- Battle Modal (hidden by default) -->
-                <div id="battle-modal" class="battle-modal" style="display: none;">
-                    <div class="battle-modal-content">
-                        <div class="battle-header">
-                            <h2>⚔️ Battle: <span id="battle-location">Northern Plains</span></h2>
-                            <button id="close-battle-modal" class="close-btn">×</button>
-                            <div class="weather-terrain-display">
-                                <span id="weather-display">🌤️ Clear</span>
-                                <span id="terrain-display">🌾 Plains</span>
-                            </div>
-                        </div>
-                        
-                        <div class="battle-content">
-                            <!-- Battle Viewing Options -->
-                            <div class="battle-options">
-                                <button id="watch-battle-btn" class="btn primary">�️ Watch Battle</button>
-                                <button id="auto-resolve-btn" class="btn">⚡ Auto-Resolve</button>
-                                <button id="pause-battle-btn" class="btn" style="display: none;">⏸️ Pause</button>
-                            </div>
-                            
-                            <!-- Battle Field -->
-                            <div class="battle-field-container">
-                                <div id="battle-field" class="battle-field">
-                                    <!-- Battle visualization will be rendered here -->
-                                </div>
-                                
-                                <!-- Battle Controls -->
-                                <div class="battle-controls">
-                                    <div class="battle-speed-controls">
-                                        <button id="speed-1x" class="speed-btn active">1x</button>
-                                        <button id="speed-2x" class="speed-btn">2x</button>
-                                        <button id="speed-4x" class="speed-btn">4x</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Battle Progress -->
-                            <div class="battle-progress">
-                                <div class="army-status">
-                                    <div class="player-army">
-                                        <h4>🛡️ Your Army</h4>
-                                        <div id="player-army-units"></div>
-                                    </div>
-                                    <div class="enemy-army">
-                                        <h4>⚔️ Enemy Army</h4>
-                                        <div id="enemy-army-units"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Battle Log -->
-                            <div class="battle-log-panel">
-                                <h3>📜 Battle Log</h3>
-                                <div id="battle-log" class="battle-log">
-                                    <div class="log-entry">Battle ready to begin...</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- World View -->
+    <div id="world-view" class="game-view">
+        <!-- WorldManager will populate this dynamically -->
 
-            <!-- Monarch View -->
-            <div id="monarch-view" class="game-view">
-                <div class="locked-view">
-                    <h2>👑 Monarch's Court</h2>
-                    <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
-                </div>
-                
-                <!-- Unlocked Monarch Content -->
-                <div id="monarch-content" class="monarch-content" style="display: none;">
-                    <div class="monarch-header">
-                        <h2>👑 Royal Court & Dynasty Management</h2>
-                        <p>Manage your royal investments, advisors, and dynasty legacy</p>
-                    </div>
-                    
-                    <!-- Royal Investment System -->
-                    <div class="monarch-section">
-                        <h3>💰 Royal Investments</h3>
-                        <div class="investment-categories">
-                            <!-- Village Investments -->
-                            <div class="investment-category">
-                                <h4>🏘️ Village Development</h4>
-                                <div class="investment-grid">
-                                    <div class="investment-item">
-                                        <div class="investment-icon">⚡</div>
-                                        <div class="investment-details">
-                                            <h5>Production Boost</h5>
-                                            <p>+10% efficiency to all buildings</p>
-                                            <div class="investment-cost">Cost: 100 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="100" data-type="productionBoost">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🏗️</div>
-                                        <div class="investment-details">
-                                            <h5>New Building Types</h5>
-                                            <p>Unlock advanced buildings</p>
-                                            <div class="investment-cost">Cost: 250 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="250" data-type="buildingTypes">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🤖</div>
-                                        <div class="investment-details">
-                                            <h5>Automation Level Up</h5>
-                                            <p>Improve citizen automation</p>
-                                            <div class="investment-cost">Cost: 500 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="500" data-type="automationLevel">Invest</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Military Investments -->
-                            <div class="investment-category">
-                                <h4>⚔️ Military Excellence</h4>
-                                <div class="investment-grid">
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🔍</div>
-                                        <div class="investment-details">
-                                            <h5>Army Scouts</h5>
-                                            <p>Improve AI battle decision-making</p>
-                                            <div class="investment-cost">Cost: 200 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="200" data-type="armyScouts">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">⭐</div>
-                                        <div class="investment-details">
-                                            <h5>Elite Generals</h5>
-                                            <p>Hire better commanders</p>
-                                            <div class="investment-cost">Cost: 400 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="400" data-type="eliteGenerals">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🎓</div>
-                                        <div class="investment-details">
-                                            <h5>Tactical Academy</h5>
-                                            <p>Commanders learn faster</p>
-                                            <div class="investment-cost">Cost: 800 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="800" data-type="tacticalAcademy">Invest</button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Legacy Investments -->
-                            <div class="investment-category">
-                                <h4>🏰 Dynasty Legacy</h4>
-                                <div class="investment-grid">
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🏘️</div>
-                                        <div class="investment-details">
-                                            <h5>Parallel Villages</h5>
-                                            <p>Run multiple villages simultaneously</p>
-                                            <div class="investment-cost">Cost: 1000 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="1000" data-type="parallelVillages">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">🔄</div>
-                                        <div class="investment-details">
-                                            <h5>Prestige Automation</h5>
-                                            <p>Remember placement orders</p>
-                                            <div class="investment-cost">Cost: 2000 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="2000" data-type="prestigeAutomation">Invest</button>
-                                    </div>
-                                    
-                                    <div class="investment-item">
-                                        <div class="investment-icon">👑</div>
-                                        <div class="investment-details">
-                                            <h5>Dynasty Progression</h5>
-                                            <p>Multi-generational upgrades</p>
-                                            <div class="investment-cost">Cost: 5000 💰</div>
-                                        </div>
-                                        <button class="investment-btn" data-cost="5000" data-type="dynastyProgression">Invest</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Royal Advisors Section -->
-                    <div class="monarch-section">
-                        <h3>🎭 Royal Advisors</h3>
-                        <div id="advisor-panel" class="advisor-panel">
-                            <!-- Advisor content will be populated by monarch.js -->
-                        </div>
-                    </div>
-                    
-                    <!-- Dynasty Reset Tools -->
-                    <div class="monarch-section">
-                        <h3>⚰️ Dynasty Management</h3>
-                        <div class="dynasty-tools">
-                            <div class="dynasty-info">
-                                <h4>📊 Current Dynasty Status</h4>
-                                <div id="dynasty-stats" class="dynasty-stats">
-                                    <!-- Will be populated by monarch.js -->
-                                </div>
-                            </div>
-                            
-                            <div class="prestige-actions">
-                                <h4>🔄 Dynasty Actions</h4>
-                                <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
-                                <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige Reset)</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Investment Status Display -->
-                    <div class="monarch-section">
-                        <h3>📈 Active Investments</h3>
-                        <div id="investment-status" class="investment-status">
-                            <!-- Will be populated by monarch.js -->
-                        </div>
+        <!-- Battle Modal (hidden by default) -->
+        <div id="battle-modal" class="battle-modal" style="display: none;">
+            <div class="battle-modal-content">
+                <div class="battle-header">
+                    <h2>⚔️ Battle: <span id="battle-location">Northern Plains</span></h2>
+                    <button id="close-battle-modal" class="close-btn">×</button>
+                    <div class="weather-terrain-display">
+                        <span id="weather-display">🌤️ Clear</span>
+                        <span id="terrain-display">🌾 Plains</span>
                     </div>
                 </div>
-            </div>
 
-            <!-- Throne View -->
-            <div id="throne-view" class="game-view">
-                <div class="locked-view">
-                    <h2>🏰 The Throne</h2>
-                    <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
-                </div>
-                
-                <!-- Unlocked Throne Content -->
-                <div id="throne-content" class="throne-content" style="display: none;">
-                    <div class="throne-header">
-                        <h2>🏰 The Royal Throne</h2>
-                        <p>Manage your dynasty, royal family, and ceremonial artifacts</p>
+                <div class="battle-content">
+                    <!-- Battle Viewing Options -->
+                    <div class="battle-options">
+                        <button id="watch-battle-btn" class="btn primary">▶️ Watch Battle</button>
+                        <button id="auto-resolve-btn" class="btn">⚡ Auto-Resolve</button>
+                        <button id="pause-battle-btn" class="btn" style="display: none;">⏸️ Pause</button>
                     </div>
-                    
-                    <!-- Throne Navigation Tabs -->
-                    <div class="throne-tabs">
-                        <button class="throne-tab-btn active" data-tab="dynasty">👑 Dynasty</button>
-                        <button class="throne-tab-btn" data-tab="equipment">⚔️ Equipment</button>
-                        <button class="throne-tab-btn" data-tab="merge">✨ Artifacts</button>
-                        <button class="throne-tab-btn" data-tab="court">🏛️ Court</button>
-                    </div>
-                    
-                    <!-- Dynasty Tab -->
-                    <div id="dynasty-tab" class="throne-tab active">
-                        <div class="dynasty-content">
-                            <!-- Current Monarch Section -->
-                            <div class="dynasty-section">
-                                <h3>👑 Current Monarch</h3>
-                                <div id="current-monarch" class="monarch-card">
-                                    <!-- Will be populated by JS -->
-                                </div>
-                            </div>
-                            
-                            <!-- Royal Family Tree -->
-                            <div class="dynasty-section">
-                                <h3>🌳 Royal Family</h3>
-                                <div id="royal-family-tree" class="family-tree">
-                                    <!-- Will be populated by JS -->
-                                </div>
-                            </div>
-                            
-                            <!-- Marriage & Heirs -->
-                            <div class="dynasty-section">
-                                <h3>💒 Marriage & Succession</h3>
-                                <div class="dynasty-actions">
-                                    <button id="arrange-marriage-btn" class="dynasty-btn">💒 Arrange Marriage</button>
-                                    <button id="hire-tutor-btn" class="dynasty-btn">🎓 Hire Tutors</button>
-                                    <button id="succession-plan-btn" class="dynasty-btn">📜 Succession Plan</button>
-                                </div>
-                                <div id="succession-order" class="succession-list">
-                                    <!-- Will be populated by JS -->
-                                </div>
-                            </div>
-                            
-                            <!-- Dynasty Stats -->
-                            <div class="dynasty-section">
-                                <h3>📊 Dynasty Legacy</h3>
-                                <div id="dynasty-stats" class="dynasty-stats">
-                                    <!-- Will be populated by JS -->
-                                </div>
+
+                    <!-- Battle Field -->
+                    <div class="battle-field-container">
+                        <div id="battle-field" class="battle-field">
+                            <!-- Battle visualization will be rendered here -->
+                        </div>
+
+                        <!-- Battle Controls -->
+                        <div class="battle-controls">
+                            <div class="battle-speed-controls">
+                                <button id="speed-1x" class="speed-btn active">1x</button>
+                                <button id="speed-2x" class="speed-btn">2x</button>
+                                <button id="speed-4x" class="speed-btn">4x</button>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Equipment Tab -->
-                    <div id="equipment-tab" class="throne-tab">
-                        <div class="equipment-content">
-                            <div class="equipment-header">
-                                <h3>⚔️ Royal Armory</h3>
-                                <p>Manage weapons, armor, and equipment for your armies and royal guard</p>
+
+                    <!-- Battle Progress -->
+                    <div class="battle-progress">
+                        <div class="army-status">
+                            <div class="player-army">
+                                <h4>🛡️ Your Army</h4>
+                                <div id="player-army-units"></div>
                             </div>
-                            
-                            <div class="equipment-sections">
-                                <!-- Current Equipment -->
-                                <div class="equipment-section">
-                                    <h4>👑 Royal Equipment</h4>
-                                    <div id="royal-equipment" class="equipped-items">
-                                        <!-- Will be populated by JS -->
-                                    </div>
-                                </div>
-                                
-                                <!-- Equipment Categories -->
-                                <div class="equipment-section">
-                                    <h4>🗡️ Available Equipment</h4>
-                                    <div class="equipment-tabs">
-                                        <button class="equipment-category-btn active" data-category="weapons">⚔️ Weapons</button>
-                                        <button class="equipment-category-btn" data-category="armor">🛡️ Armor</button>
-                                        <button class="equipment-category-btn" data-category="tools">🔨 Tools</button>
-                                        <button class="equipment-category-btn" data-category="magical">✨ Magical</button>
-                                    </div>
-                                    <div id="equipment-list" class="equipment-inventory">
-                                        <!-- Will be populated by JS -->
-                                    </div>
-                                </div>
+                            <div class="enemy-army">
+                                <h4>⚔️ Enemy Army</h4>
+                                <div id="enemy-army-units"></div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Artifacts Tab -->
-                    <div id="merge-tab" class="throne-tab">
-                        <div class="throne-merge-content">
-                            <div class="merge-header">
-                                <h3>✨ Royal Artifacts</h3>
-                                <p>Merge ceremonial items to create powerful artifacts</p>
-                            </div>
-                            
-                            <div class="merge-container">
-                                <div id="merge-grid" class="merge-grid">
-                                    <!-- Throne merge system will populate this -->
-                                </div>
-                                
-                                <div class="merge-info">
-                                    <h4>🎁 Active Bonuses</h4>
-                                    <div id="active-bonuses">
-                                        <p>No bonuses yet - start merging!</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Court Tab -->
-                    <div id="court-tab" class="throne-tab">
-                        <div class="court-content">
-                            <h3>🏛️ Royal Court</h3>
-                            <p>Manage advisors, nobles, and court affairs</p>
-                            <div id="court-affairs" class="court-panel">
-                                <!-- Will be populated by JS -->
-                                <p style="color: #888; font-style: italic;">Court management coming in future updates...</p>
-                            </div>
+
+                    <!-- Battle Log -->
+                    <div class="battle-log-panel">
+                        <h3>📜 Battle Log</h3>
+                        <div id="battle-log" class="battle-log">
+                            <div class="log-entry">Battle ready to begin...</div>
                         </div>
                     </div>
                 </div>
@@ -1828,9 +1531,320 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 
+    <!-- Monarch View -->
+    <div id="monarch-view" class="game-view">
+        <div class="locked-view">
+            <h2>👑 Monarch's Court</h2>
+            <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
+        </div>
+
+        <!-- Unlocked Monarch Content -->
+        <div id="monarch-content" class="monarch-content" style="display: none;">
+            <div class="monarch-header">
+                <h2>👑 Royal Court & Dynasty Management</h2>
+                <p>Manage your royal investments, advisors, and dynasty legacy</p>
+            </div>
+
+            <!-- Royal Investment System -->
+            <div class="monarch-section">
+                <h3>💰 Royal Investments</h3>
+                <div class="investment-categories">
+                    <!-- Village Investments -->
+                    <div class="investment-category">
+                        <h4>🏘️ Village Development</h4>
+                        <div class="investment-grid">
+                            <div class="investment-item">
+                                <div class="investment-icon">⚡</div>
+                                <div class="investment-details">
+                                    <h5>Production Boost</h5>
+                                    <p>+10% efficiency to all buildings</p>
+                                    <div class="investment-cost">Cost: 100 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="100"
+                                    data-type="productionBoost">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">🏗️</div>
+                                <div class="investment-details">
+                                    <h5>New Building Types</h5>
+                                    <p>Unlock advanced buildings</p>
+                                    <div class="investment-cost">Cost: 250 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="250" data-type="buildingTypes">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">🤖</div>
+                                <div class="investment-details">
+                                    <h5>Automation Level Up</h5>
+                                    <p>Improve citizen automation</p>
+                                    <div class="investment-cost">Cost: 500 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="500"
+                                    data-type="automationLevel">Invest</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Military Investments -->
+                    <div class="investment-category">
+                        <h4>⚔️ Military Excellence</h4>
+                        <div class="investment-grid">
+                            <div class="investment-item">
+                                <div class="investment-icon">🔍</div>
+                                <div class="investment-details">
+                                    <h5>Army Scouts</h5>
+                                    <p>Improve AI battle decision-making</p>
+                                    <div class="investment-cost">Cost: 200 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="200" data-type="armyScouts">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">⭐</div>
+                                <div class="investment-details">
+                                    <h5>Elite Generals</h5>
+                                    <p>Hire better commanders</p>
+                                    <div class="investment-cost">Cost: 400 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="400" data-type="eliteGenerals">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">🎓</div>
+                                <div class="investment-details">
+                                    <h5>Tactical Academy</h5>
+                                    <p>Commanders learn faster</p>
+                                    <div class="investment-cost">Cost: 800 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="800"
+                                    data-type="tacticalAcademy">Invest</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Legacy Investments -->
+                    <div class="investment-category">
+                        <h4>🏰 Dynasty Legacy</h4>
+                        <div class="investment-grid">
+                            <div class="investment-item">
+                                <div class="investment-icon">🏘️</div>
+                                <div class="investment-details">
+                                    <h5>Parallel Villages</h5>
+                                    <p>Run multiple villages simultaneously</p>
+                                    <div class="investment-cost">Cost: 1000 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="1000"
+                                    data-type="parallelVillages">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">🔄</div>
+                                <div class="investment-details">
+                                    <h5>Prestige Automation</h5>
+                                    <p>Remember placement orders</p>
+                                    <div class="investment-cost">Cost: 2000 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="2000"
+                                    data-type="prestigeAutomation">Invest</button>
+                            </div>
+
+                            <div class="investment-item">
+                                <div class="investment-icon">👑</div>
+                                <div class="investment-details">
+                                    <h5>Dynasty Progression</h5>
+                                    <p>Multi-generational upgrades</p>
+                                    <div class="investment-cost">Cost: 5000 💰</div>
+                                </div>
+                                <button class="investment-btn" data-cost="5000"
+                                    data-type="dynastyProgression">Invest</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Royal Advisors Section -->
+            <div class="monarch-section">
+                <h3>🎭 Royal Advisors</h3>
+                <div id="advisor-panel" class="advisor-panel">
+                    <!-- Advisor content will be populated by monarch.js -->
+                </div>
+            </div>
+
+            <!-- Dynasty Reset Tools -->
+            <div class="monarch-section">
+                <h3>⚰️ Dynasty Management</h3>
+                <div class="dynasty-tools">
+                    <div class="dynasty-info">
+                        <h4>📊 Current Dynasty Status</h4>
+                        <div id="dynasty-stats" class="dynasty-stats">
+                            <!-- Will be populated by monarch.js -->
+                        </div>
+                    </div>
+
+                    <div class="prestige-actions">
+                        <h4>🔄 Dynasty Actions</h4>
+                        <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
+                        <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige
+                            Reset)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Investment Status Display -->
+            <div class="monarch-section">
+                <h3>📈 Active Investments</h3>
+                <div id="investment-status" class="investment-status">
+                    <!-- Will be populated by monarch.js -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Throne View -->
+    <div id="throne-view" class="game-view">
+        <div class="locked-view">
+            <h2>🏰 The Throne</h2>
+            <p class="lock-message">This feature will be unlocked as you progress through the game.</p>
+        </div>
+
+        <!-- Unlocked Throne Content -->
+        <div id="throne-content" class="throne-content" style="display: none;">
+            <div class="throne-header">
+                <h2>🏰 The Royal Throne</h2>
+                <p>Manage your dynasty, royal family, and ceremonial artifacts</p>
+            </div>
+
+            <!-- Throne Navigation Tabs -->
+            <div class="throne-tabs">
+                <button class="throne-tab-btn active" data-tab="dynasty">👑 Dynasty</button>
+                <button class="throne-tab-btn" data-tab="equipment">⚔️ Equipment</button>
+                <button class="throne-tab-btn" data-tab="merge">✨ Artifacts</button>
+                <button class="throne-tab-btn" data-tab="court">🏛️ Court</button>
+            </div>
+
+            <!-- Dynasty Tab -->
+            <div id="dynasty-tab" class="throne-tab active">
+                <div class="dynasty-content">
+                    <!-- Current Monarch Section -->
+                    <div class="dynasty-section">
+                        <h3>👑 Current Monarch</h3>
+                        <div id="current-monarch" class="monarch-card">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Royal Family Tree -->
+                    <div class="dynasty-section">
+                        <h3>🌳 Royal Family</h3>
+                        <div id="royal-family-tree" class="family-tree">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Marriage & Heirs -->
+                    <div class="dynasty-section">
+                        <h3>💒 Marriage & Succession</h3>
+                        <div class="dynasty-actions">
+                            <button id="arrange-marriage-btn" class="dynasty-btn">💒 Arrange Marriage</button>
+                            <button id="hire-tutor-btn" class="dynasty-btn">🎓 Hire Tutors</button>
+                            <button id="succession-plan-btn" class="dynasty-btn">📜 Succession Plan</button>
+                        </div>
+                        <div id="succession-order" class="succession-list">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Dynasty Stats -->
+                    <div class="dynasty-section">
+                        <h3>📊 Dynasty Legacy</h3>
+                        <div id="dynasty-stats" class="dynasty-stats">
+                            <!-- Will be populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equipment Tab -->
+            <div id="equipment-tab" class="throne-tab">
+                <div class="equipment-content">
+                    <div class="equipment-header">
+                        <h3>⚔️ Royal Armory</h3>
+                        <p>Manage weapons, armor, and equipment for your armies and royal guard</p>
+                    </div>
+
+                    <div class="equipment-sections">
+                        <!-- Current Equipment -->
+                        <div class="equipment-section">
+                            <h4>👑 Royal Equipment</h4>
+                            <div id="royal-equipment" class="equipped-items">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Equipment Categories -->
+                        <div class="equipment-section">
+                            <h4>🗡️ Available Equipment</h4>
+                            <div class="equipment-tabs">
+                                <button class="equipment-category-btn active" data-category="weapons">⚔️
+                                    Weapons</button>
+                                <button class="equipment-category-btn" data-category="armor">🛡️ Armor</button>
+                                <button class="equipment-category-btn" data-category="tools">🔨 Tools</button>
+                                <button class="equipment-category-btn" data-category="magical">✨ Magical</button>
+                            </div>
+                            <div id="equipment-list" class="equipment-inventory">
+                                <!-- Will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Artifacts Tab -->
+            <div id="merge-tab" class="throne-tab">
+                <div class="throne-merge-content">
+                    <div class="merge-header">
+                        <h3>✨ Royal Artifacts</h3>
+                        <p>Merge ceremonial items to create powerful artifacts</p>
+                    </div>
+
+                    <div class="merge-container">
+                        <div id="merge-grid" class="merge-grid">
+                            <!-- Throne merge system will populate this -->
+                        </div>
+
+                        <div class="merge-info">
+                            <h4>🎁 Active Bonuses</h4>
+                            <div id="active-bonuses">
+                                <p>No bonuses yet - start merging!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Court Tab -->
+            <div id="court-tab" class="throne-tab">
+                <div class="court-content">
+                    <h3>🏛️ Royal Court</h3>
+                    <p>Manage advisors, nobles, and court affairs</p>
+                    <div id="court-affairs" class="court-panel">
+                        <!-- Will be populated by JS -->
+                        <p style="color: #888; font-style: italic;">Court management coming in future updates...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+
     <style>
         /* Enhanced Day Control Buttons */
-        .day-controls button.end-day-button, .day-controls button.auto-play-button {
+        .day-controls button.end-day-button,
+        .day-controls button.auto-play-button {
             background: #222;
             color: #e0e0e0;
             border: 1px solid #333;
@@ -1846,38 +1860,50 @@ document.addEventListener('DOMContentLoaded', function() {
             letter-spacing: 0.2px;
             position: relative;
         }
+
         .day-controls button.end-day-button,
         .day-controls button.auto-play-button {
             margin-right: 6px;
         }
+
         .day-controls button.end-day-button:last-child,
         .day-controls button.auto-play-button:last-child {
             margin-right: 0;
         }
+
         .day-controls button.end-day-button:hover,
         .day-controls button.auto-play-button:hover {
             background: #292f36;
             color: #fff;
             border-color: #444;
         }
+
         .day-controls button.end-day-button:active,
         .day-controls button.auto-play-button:active {
             background: #181c20;
             color: #b0b0b0;
             border-color: #222;
         }
+
         @keyframes bounce {
-            0%, 20%, 50%, 80%, 100% {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
                 transform: translateY(0);
             }
+
             40% {
                 transform: translateY(-10px);
             }
+
             60% {
                 transform: translateY(-5px);
             }
         }
-        
+
         .tutorial-highlight {
             position: relative;
             box-shadow: 0 0 20px #f39c12 !important;
@@ -1885,7 +1911,7 @@ document.addEventListener('DOMContentLoaded', function() {
             background: rgba(243, 156, 18, 0.1) !important;
             z-index: 9998 !important;
         }
-        
+
         .tutorial-highlight::after {
             content: '';
             position: absolute;
@@ -1920,14 +1946,16 @@ document.addEventListener('DOMContentLoaded', function() {
             background: #555 !important;
             transform: none;
         }
-        
+
         @keyframes pulse {
             0% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
+
             100% {
                 opacity: 1;
             }
@@ -2132,7 +2160,8 @@ document.addEventListener('DOMContentLoaded', function() {
             margin: 15px 0;
         }
 
-        .battle-unit, .battle-enemy {
+        .battle-unit,
+        .battle-enemy {
             position: absolute;
             width: 30px;
             height: 30px;
@@ -2142,7 +2171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             justify-content: center;
             font-size: 16px;
             border: 2px solid #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             transition: all 0.3s ease;
         }
 
@@ -2233,7 +2262,7 @@ document.addEventListener('DOMContentLoaded', function() {
             margin: 0 0 0.5rem 0;
             color: #f1c40f;
             font-size: 2rem;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .monarch-header p {
@@ -2374,14 +2403,16 @@ document.addEventListener('DOMContentLoaded', function() {
             gap: 2rem;
         }
 
-        .dynasty-info, .prestige-actions {
+        .dynasty-info,
+        .prestige-actions {
             background: #2a2a2a;
             border: 1px solid #444;
             border-radius: 8px;
             padding: 1.5rem;
         }
 
-        .dynasty-info h4, .prestige-actions h4 {
+        .dynasty-info h4,
+        .prestige-actions h4 {
             color: #e74c3c;
             margin: 0 0 1rem 0;
             font-size: 1.1rem;
@@ -2454,7 +2485,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .dynasty-tools {
                 grid-template-columns: 1fr;
             }
-            
+
             .investment-grid {
                 grid-template-columns: 1fr;
             }
@@ -2464,15 +2495,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .monarch-content {
                 padding: 1rem;
             }
-            
+
             .monarch-header {
                 padding: 1rem;
             }
-            
+
             .monarch-header h2 {
                 font-size: 1.5rem;
             }
-            
+
             .investment-item {
                 flex-direction: column;
                 text-align: center;
@@ -2535,182 +2566,201 @@ document.addEventListener('DOMContentLoaded', function() {
             .battle-content {
                 grid-template-columns: 1fr;
             }
-            
+
             .commander-panel,
             .army-panel {
                 grid-column: 1;
             }
-            
+
             .battle-field-container,
             .battle-log-panel {
                 grid-column: 1;
             }
         }
     </style>
-</style>
-<script>
-// --- View Switching System ---
-let worldManager = null;
-let currentView = 'village';
+    <script>
+        // --- View Switching System (delegates to Game) ---
+        let worldManager = null;
 
-function switchView(view) {
-    // Hide all game views
-    document.querySelectorAll('.game-view').forEach(el => el.classList.remove('active'));
-    // Show selected view
-    const viewEl = document.getElementById(view + '-view');
-    if (viewEl) viewEl.classList.add('active');
-    currentView = view;
-
-    // Initialize WorldManager if switching to world view
-    if (view === 'world') {
-        if (!window.worldManager) {
-            if (window.WorldManager && window.gameState && window) {
-                window.worldManager = new window.WorldManager(window.gameState, window);
+        // Primary: delegate to Game.switchView; Fallback: minimal DOM toggle
+        function switchView(view) {
+            const app = window.app || window.game;
+            if (app && typeof app.switchView === 'function') {
+                app.switchView(view);
+                return;
             }
+            // Fallback if app not ready
+            const viewEl = document.getElementById(view + '-view');
+            if (!viewEl) {
+                console.warn('[ViewSystem] Invalid view requested (fallback):', view);
+                return;
+            }
+            document.querySelectorAll('.game-view').forEach(el => el.classList.remove('active'));
+            viewEl.classList.add('active');
+            document.querySelectorAll('#view-navigation .nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.view === view);
+            });
         }
-        if (window.worldManager && typeof window.worldManager.init === 'function') {
-            window.worldManager.init();
-        }
-    }
-}
 
-// Navigation button event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('#view-navigation .nav-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            if (btn.classList.contains('locked')) return;
-            const view = btn.getAttribute('data-view');
-            switchView(view);
-            // Update nav button active state
-            document.querySelectorAll('#view-navigation .nav-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
-});
-</script>
-</body>
-</html>
-</script>
-<script>
-// On hover, check if locked nav button can be unlocked and unlock if requirements are met
-document.addEventListener('DOMContentLoaded', function() {
-    const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
-    navBtns.forEach(btn => {
-        btn.addEventListener('mouseenter', function() {
-            if (btn.classList.contains('locked')) {
-                const view = btn.getAttribute('data-view');
-                if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
-                    // Check if requirements are now met
-                    const unlockId = view + '_view';
-                    if (window.unlockSystem.checkUnlockConditions && window.unlockSystem.checkUnlockConditions(unlockId)) {
-                        // Unlock it
-                        window.unlockSystem.unlock(unlockId);
-                        // UI will update via eventBus or polling
+        // Restore uses same delegation
+        function restoreView(view) {
+            const app = window.app || window.game;
+            if (app && typeof app.switchView === 'function') {
+                app.switchView(view);
+                return;
+            }
+            // Fallback to ensure something is visible
+            switchView(view || 'village');
+        }
+
+        // Expose globally for existing callers (e.g., worldManager, gameState)
+        window.switchView = switchView;
+        window.restoreView = restoreView;
+
+        // Note: Navigation click handlers are set up by Game.setupNavigation().
+        // We intentionally avoid binding duplicate listeners here to prevent race conditions.
+    </script>
+    <!-- Moved trailing scripts before closing body to ensure valid HTML structure -->
+    <script>
+        // Ensure all views live under #game-container for correct sizing/layout
+        document.addEventListener('DOMContentLoaded', function () {
+            const root = document.getElementById('game-container');
+            if (!root) return;
+            ['world-view', 'monarch-view', 'throne-view'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && !root.contains(el)) {
+                    try {
+                        root.appendChild(el);
+                        console.log('[ViewStructure] Moved #' + id + ' under #game-container');
+                    } catch (e) {
+                        console.warn('[ViewStructure] Could not relocate #' + id, e);
                     }
                 }
-            }
+            });
         });
-    });
-});
-// Dynamically update resource and season values from gameState and gameData
-function updateResourcePanel() {
-    if (!window.gameState || !window.GameData) return;
-    const resources = window.gameState.resources || {};
-    document.getElementById('gold-count').textContent = resources.gold ?? 0;
-    document.getElementById('food-count').textContent = resources.food ?? 0;
-    document.getElementById('wood-count').textContent = resources.wood ?? 0;
-    document.getElementById('planks-count').textContent = resources.planks ?? 0;
-    document.getElementById('stone-count').textContent = resources.stone ?? 0;
-    document.getElementById('metal-count').textContent = resources.metal ?? 0;
-    document.getElementById('population-count').textContent = window.gameState.population ?? 0;
-    // Use cap from GameData if available, else fallback to gameState
-    let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);
-    document.getElementById('population-cap').textContent = popCap;
-    // Season
-    let season = window.gameState.season || (window.GameData.seasons ? window.GameData.seasons[0] : 'Spring');
-    document.getElementById('season-count').textContent = season;
-}
-
-// Update on load and when resources change
-document.addEventListener('DOMContentLoaded', function() {
-    function tryUpdatePanel() {
-        if (window.gameState && window.GameData) {
-            updateResourcePanel();
-        } else {
-            setTimeout(tryUpdatePanel, 200);
-        }
-    }
-    tryUpdatePanel();
-    if (window.eventBus) {
-        window.eventBus.on && window.eventBus.on('resources-updated', updateResourcePanel);
-    }
-});
-</script>
-<script>
-// Ensure navigation buttons reflect unlock state on load and after unlocks
-function updateNavButtonLocks() {
-    if (!window.unlockSystem) return;
-    const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
-    navBtns.forEach(btn => {
-        const view = btn.getAttribute('data-view');
-        if (view === 'village') return; // Always unlocked
-        if (window.unlockSystem.isViewUnlocked(view)) {
-            btn.classList.remove('locked');
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-        } else {
-            btn.classList.add('locked');
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        }
-    });
-}
-
-// Listen for unlock events and update nav buttons
-document.addEventListener('DOMContentLoaded', function() {
-    // Initial update after unlockSystem is ready
-    function tryUpdateNav() {
-        if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
-            updateNavButtonLocks();
-        } else {
-            setTimeout(tryUpdateNav, 200);
-        }
-    }
-    tryUpdateNav();
-
-    // Listen for unlock events
-    if (window.eventBus) {
-        window.eventBus.on && window.eventBus.on('content_unlocked', updateNavButtonLocks);
-    } else {
-        // Fallback: poll every 2s if eventBus is not available
-        setInterval(updateNavButtonLocks, 2000);
-    }
-});
-
-// Global crafting function
-function craftItem(itemType) {
-    if (window.gameState) {
-        return window.gameState.craftItem(itemType);
-    }
-    console.log('GameState not available for crafting');
-    return false;
-}
-
-// Ensure dynasty features are properly initialized
-document.addEventListener('DOMContentLoaded', function() {
-    // Listen for throne view unlock events
-    if (window.eventBus) {
-        window.eventBus.on('content_unlocked', function(data) {
-            if (data.contentId === 'throne_view' && window.game && window.game.throneManager) {
-                console.log('[Dynasty] Throne view unlocked - reinitializing dynasty features');
-                // Re-initialize throne manager to show dynasty content
-                setTimeout(() => {
-                    if (window.game.throneManager.init) {
-                        window.game.throneManager.init();
+        // On hover, check if locked nav button can be unlocked and unlock if requirements are met
+        document.addEventListener('DOMContentLoaded', function () {
+            const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
+            navBtns.forEach(btn => {
+                btn.addEventListener('mouseenter', function () {
+                    if (btn.classList.contains('locked')) {
+                        const view = btn.getAttribute('data-view');
+                        if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
+                            // Check if requirements are now met
+                            const unlockId = view + '_view';
+                            if (window.unlockSystem.checkUnlockConditions && window.unlockSystem.checkUnlockConditions(unlockId)) {
+                                // Unlock it
+                                window.unlockSystem.unlock(unlockId);
+                                // UI will update via eventBus or polling
+                            }
+                        }
                     }
-                }, 100);
+                });
+            });
+        });
+        // Dynamically update resource and season values from gameState and gameData
+        function updateResourcePanel() {
+            if (!window.gameState || !window.GameData) return;
+            const resources = window.gameState.resources || {};
+            document.getElementById('gold-count').textContent = resources.gold ?? 0;
+            document.getElementById('food-count').textContent = resources.food ?? 0;
+            document.getElementById('wood-count').textContent = resources.wood ?? 0;
+            document.getElementById('planks-count').textContent = resources.planks ?? 0;
+            document.getElementById('stone-count').textContent = resources.stone ?? 0;
+            document.getElementById('metal-count').textContent = resources.metal ?? 0;
+            document.getElementById('population-count').textContent = window.gameState.population ?? 0;
+            // Use cap from GameData if available, else fallback to gameState
+            let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);
+            document.getElementById('population-cap').textContent = popCap;
+            // Season
+            let season = window.gameState.season || (window.GameData.seasons ? window.GameData.seasons[0] : 'Spring');
+            document.getElementById('season-count').textContent = season;
+        }
+
+        // Update on load and when resources change
+        document.addEventListener('DOMContentLoaded', function () {
+            function tryUpdatePanel() {
+                if (window.gameState && window.GameData) {
+                    updateResourcePanel();
+                } else {
+                    setTimeout(tryUpdatePanel, 200);
+                }
+            }
+            tryUpdatePanel();
+            if (window.eventBus) {
+                window.eventBus.on && window.eventBus.on('resources-updated', updateResourcePanel);
             }
         });
-    }
-});
-</script>
+    </script>
+    <script>
+        // Ensure navigation buttons reflect unlock state on load and after unlocks
+        function updateNavButtonLocks() {
+            if (!window.unlockSystem) return;
+            const navBtns = document.querySelectorAll('#view-navigation .nav-btn');
+            navBtns.forEach(btn => {
+                const view = btn.getAttribute('data-view');
+                if (view === 'village') return; // Always unlocked
+                if (window.unlockSystem.isViewUnlocked(view)) {
+                    btn.classList.remove('locked');
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                } else {
+                    btn.classList.add('locked');
+                    btn.style.opacity = '0.5';
+                    btn.style.pointerEvents = 'none';
+                }
+            });
+        }
+
+        // Listen for unlock events and update nav buttons
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initial update after unlockSystem is ready
+            function tryUpdateNav() {
+                if (window.unlockSystem && typeof window.unlockSystem.isViewUnlocked === 'function') {
+                    updateNavButtonLocks();
+                } else {
+                    setTimeout(tryUpdateNav, 200);
+                }
+            }
+            tryUpdateNav();
+
+            // Listen for unlock events
+            if (window.eventBus) {
+                window.eventBus.on && window.eventBus.on('content_unlocked', updateNavButtonLocks);
+            } else {
+                // Fallback: poll every 2s if eventBus is not available
+                setInterval(updateNavButtonLocks, 2000);
+            }
+        });
+
+        // Global crafting function
+        function craftItem(itemType) {
+            if (window.gameState) {
+                return window.gameState.craftItem(itemType);
+            }
+            console.log('GameState not available for crafting');
+            return false;
+        }
+    </script>
+    <script>
+        // Ensure dynasty features are properly initialized
+        document.addEventListener('DOMContentLoaded', function () {
+            // Listen for throne view unlock events
+            if (window.eventBus) {
+                window.eventBus.on('content_unlocked', function (data) {
+                    if (data.contentId === 'throne_view' && window.game && window.game.throneManager) {
+                        console.log('[Dynasty] Throne view unlocked - reinitializing dynasty features');
+                        // Re-initialize throne manager to show dynasty content
+                        setTimeout(() => {
+                            if (window.game.throneManager.init) {
+                                window.game.throneManager.init();
+                            }
+                        }, 100);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

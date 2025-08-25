@@ -9,6 +9,8 @@
     "watch:wiki": "nodemon --watch docs/wiki --ext md --exec \"npm run build:wiki\"",
     "prebuild": "npm run build:wiki",
     "build": "npm run build:wiki && node scripts/update-version-json.js",
+    "test": "vitest",
+    "test:run": "vitest --run",
     "predeploy": "npm run build",
     "deploy": "npm run build && npx serve . -l 8000 --single"
   },
@@ -26,6 +28,8 @@
   "devDependencies": {
     "serve": "^14.2.0",
     "marked": "^4.3.0",
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "vitest": "^2.0.5",
+    "jsdom": "^24.1.0"
   }
 }

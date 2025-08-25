@@ -7,27 +7,27 @@ class InventoryManager {
         this.inventory = new Map(); // item_id -> { item, quantity, metadata }
         this.equippedItems = new Map(); // slot -> item_id
         this.itemDefinitions = this.initializeItemDefinitions();
-        
+
         // Add default items if inventory is empty and not skipping defaults
         if (!skipDefaults && this.inventory.size === 0) {
             this.addDefaultItems();
         }
     }
 
-        // Add default starter items
+    // Add default starter items
     addDefaultItems() {
         console.log('[Inventory] Adding default starter items');
-        
-                // Initialize default items
+
+        // Initialize default items
         this.addItem('tent', 2); // For building placement - reduced from 5
         this.addItem('foundersWagon', 1); // Mobile administrative center
         this.addItem('haste_rune_iii', 2); // For productivity acceleration
-        
+
         // Add some basic starter gear
         this.addItem('iron_sword', 1);
         this.addItem('leather_armor', 1);
         this.addItem('wooden_shield', 1);
-        
+
         console.log('[Inventory] Default items added successfully');
     }
 
@@ -115,7 +115,7 @@ class InventoryManager {
                     craftCost: { wood: 25, metal: 15, string: 3 }
                 }
             },
-            
+
             armor: {
                 leather_armor: {
                     id: 'leather_armor',
@@ -565,15 +565,15 @@ class InventoryManager {
         }
 
         const existingItem = this.inventory.get(itemId);
-        
+
         if (existingItem && itemDef.stackable) {
             // Stack with existing item
             const maxStack = itemDef.maxStack || 99;
             const canStack = Math.min(quantity, maxStack - existingItem.quantity);
             existingItem.quantity += canStack;
-            
+
             console.log(`[Inventory] Added ${canStack} ${itemDef.name} (now ${existingItem.quantity})`);
-            
+
             // Return remaining quantity that couldn't be stacked
             return quantity - canStack;
         } else {
@@ -587,7 +587,7 @@ class InventoryManager {
                     durability: itemDef.stats?.durability || null
                 }
             });
-            
+
             console.log(`[Inventory] Added ${quantity} ${itemDef.name}`);
             return 0;
         }
@@ -683,10 +683,10 @@ class InventoryManager {
         // Equip new item
         this.equippedItems.set(slot, itemId);
         console.log(`[Inventory] Equipped ${item.item.name} to ${slot}`);
-        
+
         // Apply item effects
         this.applyItemEffects(item.item, true);
-        
+
         return true;
     }
 
@@ -697,7 +697,7 @@ class InventoryManager {
             return null; // Cannot be equipped to slots
         }
 
-        switch(item.category) {
+        switch (item.category) {
             case 'weapon':
                 return 'weapon';
             case 'armor':
@@ -792,7 +792,7 @@ class InventoryManager {
 
         // Remove one from inventory
         this.removeItem(itemId, 1);
-        
+
         console.log(`[Inventory] Used ${item.item.name}`);
         return true;
     }
@@ -801,7 +801,7 @@ class InventoryManager {
     applyConsumableEffect(effect, value) {
         const player = this.gameState.player || {};
 
-        switch(effect) {
+        switch (effect) {
             case 'healHealth':
                 player.health = Math.min((player.maxHealth || 100), (player.health || 100) + value);
                 break;
@@ -819,7 +819,7 @@ class InventoryManager {
     // Get all items in inventory format expected by UI
     getInventory() {
         const inventoryArray = [];
-        
+
         for (const [itemId, data] of this.inventory) {
             inventoryArray.push({
                 id: itemId,
@@ -833,14 +833,14 @@ class InventoryManager {
                 craftingCost: data.item.craftCost || data.item.craftingCost
             });
         }
-        
+
         return inventoryArray;
     }
 
     // Get currently equipped items
     getEquippedItems() {
         const equipped = {};
-        
+
         for (const [slot, itemId] of this.equippedItems) {
             const itemData = this.inventory.get(itemId);
             if (itemData) {
@@ -854,7 +854,7 @@ class InventoryManager {
                 };
             }
         }
-        
+
         return equipped;
     }
 
@@ -886,7 +886,7 @@ class InventoryManager {
         this.inventory.forEach((data, itemId) => {
             totalItems += data.quantity;
             categoryCount[data.item.category] = (categoryCount[data.item.category] || 0) + data.quantity;
-            
+
             // Calculate value based on crafting cost or rarity
             const itemValue = this.calculateItemValue(data.item);
             totalValue += itemValue * data.quantity;
@@ -905,7 +905,7 @@ class InventoryManager {
         if (itemDef.craftCost) {
             return Object.values(itemDef.craftCost).reduce((sum, cost) => sum + cost, 0);
         }
-        
+
         // Base value by rarity
         const rarityValues = {
             common: 10,
@@ -913,7 +913,7 @@ class InventoryManager {
             rare: 50,
             legendary: 100
         };
-        
+
         return rarityValues[itemDef.rarity] || 10;
     }
 
@@ -941,10 +941,10 @@ class InventoryManager {
                 x: x,
                 y: y
             };
-            
+
             this.gameState.buildings.push(building);
             this.removeItem(itemId, 1);
-            
+
             console.log('[Inventory] Building added to gameState:', building);
             return true;
         }
@@ -978,7 +978,7 @@ class InventoryManager {
         try {
             // Restore inventory
             this.inventory = new Map(data.inventory);
-            
+
             // Migration: Rename cityWagon to foundersWagon if it exists
             if (this.inventory.has('cityWagon')) {
                 const cityWagonData = this.inventory.get('cityWagon');
@@ -986,12 +986,12 @@ class InventoryManager {
                 this.inventory.delete('cityWagon');
                 console.log('[InventoryManager] Migrated cityWagon to foundersWagon');
             }
-            
+
             // Restore equipped items
             if (data.equippedItems) {
                 this.equippedItems = new Map(data.equippedItems);
             }
-            
+
             console.log('[InventoryManager] Data deserialized successfully');
             return true;
         } catch (error) {

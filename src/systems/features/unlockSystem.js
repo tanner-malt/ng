@@ -14,17 +14,17 @@ class UnlockSystem {
         this.unlockedContent = new Set();
         this.unlockConditions = new Map();
         this.unlockCallbacks = new Map();
-        
+
         // Start with basic content unlocked
         // Tent, town center, founder's wagon, and village view available at start
         this.unlockedContent.add('tent');
         this.unlockedContent.add('townCenter'); // Town center unlocked from start
         this.unlockedContent.add('foundersWagon'); // Founder's wagon unlocked from start
         this.unlockedContent.add('village_view'); // Village view always available
-        
+
         this.initializeUnlockConditions();
         this.loadFromStorage();
-        
+
         console.log('[UnlockSystem] Achievement-based unlock system initialized');
     }
 
@@ -261,11 +261,11 @@ class UnlockSystem {
 
     registerUnlock(unlockId, config) {
         this.unlockConditions.set(unlockId, config);
-        
+
         if (config.callback) {
             this.unlockCallbacks.set(unlockId, config.callback);
         }
-        
+
         console.log(`[UnlockSystem] Registered unlock: ${unlockId}`);
     }
 
@@ -280,15 +280,15 @@ class UnlockSystem {
         return config.conditions.every(condition => {
             switch (condition.type) {
                 case 'achievement':
-                    const hasAchievement = window.achievementSystem && 
-                                         typeof window.achievementSystem.isUnlocked === 'function' &&
-                                         window.achievementSystem.isUnlocked(condition.achievement);
+                    const hasAchievement = window.achievementSystem &&
+                        typeof window.achievementSystem.isUnlocked === 'function' &&
+                        window.achievementSystem.isUnlocked(condition.achievement);
                     // console.log(`[UnlockSystem] Checking achievement ${condition.achievement}: ${hasAchievement}`);
                     return hasAchievement;
 
                 case 'building_count':
                     const buildingCount = this.gameState.buildings.filter(
-                        b => b.type === condition.building && b.level >= 1 && b.built
+                        b => b.type === condition.building && (b.level >= 1 || (b.built && !b.level)) && b.built
                     ).length;
                     const hasEnoughBuildings = buildingCount >= condition.count;
                     console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
@@ -300,8 +300,8 @@ class UnlockSystem {
                     return hasEnoughResource;
 
                 case 'tutorial_step':
-                    return window.tutorialManager && 
-                           window.tutorialManager.isStepCompleted(condition.step);
+                    return window.tutorialManager &&
+                        window.tutorialManager.isStepCompleted(condition.step);
 
                 case 'day':
                     return this.gameState.day >= condition.day;
@@ -351,7 +351,7 @@ class UnlockSystem {
 
         // Add to unlocked content
         this.unlockedContent.add(unlockId);
-        
+
         // Execute callback if provided
         const callback = this.unlockCallbacks.get(unlockId);
         if (callback) {
@@ -437,9 +437,9 @@ class UnlockSystem {
         const completedConditions = config.conditions.filter(condition => {
             switch (condition.type) {
                 case 'achievement':
-                    return window.achievementSystem && 
-                           typeof window.achievementSystem.isUnlocked === 'function' &&
-                           window.achievementSystem.isUnlocked(condition.achievement);
+                    return window.achievementSystem &&
+                        typeof window.achievementSystem.isUnlocked === 'function' &&
+                        window.achievementSystem.isUnlocked(condition.achievement);
                 case 'building_count':
                     const buildingCount = this.gameState.buildings.filter(
                         b => b.type === condition.building
@@ -462,11 +462,11 @@ class UnlockSystem {
         return config.conditions.map(condition => {
             switch (condition.type) {
                 case 'achievement':
-                    const hasAchievement = window.achievementSystem && 
-                                         typeof window.achievementSystem.isUnlocked === 'function' &&
-                                         window.achievementSystem.isUnlocked(condition.achievement);
-                    const achievementConfig = window.achievementSystem ? 
-                                            window.achievementSystem.achievements[condition.achievement] : null;
+                    const hasAchievement = window.achievementSystem &&
+                        typeof window.achievementSystem.isUnlocked === 'function' &&
+                        window.achievementSystem.isUnlocked(condition.achievement);
+                    const achievementConfig = window.achievementSystem ?
+                        window.achievementSystem.achievements[condition.achievement] : null;
                     return {
                         type: 'achievement',
                         description: achievementConfig ? achievementConfig.title : condition.achievement,
@@ -514,7 +514,7 @@ class UnlockSystem {
         const requirementTexts = requirements.map(req => {
             const status = req.completed ? '✅' : '❌';
             let description = req.description;
-            
+
             // Improve building name formatting
             if (req.type === 'building') {
                 // Extract building type and count from description like "1 woodcutter lodge(s)"
@@ -522,33 +522,33 @@ class UnlockSystem {
                 if (match) {
                     const count = match[1];
                     const buildingType = match[2];
-                    const properName = window.GameData ? 
-                        window.GameData.getBuildingName(buildingType) : 
+                    const properName = window.GameData ?
+                        window.GameData.getBuildingName(buildingType) :
                         buildingType.charAt(0).toUpperCase() + buildingType.slice(1);
                     description = `${count} ${properName}${count > 1 ? 's' : ''}`;
                 }
             }
-            
+
             // Improve resource name formatting
             if (req.type === 'resource') {
                 description = description.replace(/(\d+)\s+(\w+)/, (match, amount, resource) => {
                     const properResource = resource === 'population' ? 'Population' :
-                                         resource === 'wood' ? 'Wood' :
-                                         resource === 'stone' ? 'Stone' :
-                                         resource === 'food' ? 'Food' :
-                                         resource === 'gold' ? 'Gold' :
-                                         resource === 'metal' ? 'Metal' :
-                                         resource.charAt(0).toUpperCase() + resource.slice(1);
+                        resource === 'wood' ? 'Wood' :
+                            resource === 'stone' ? 'Stone' :
+                                resource === 'food' ? 'Food' :
+                                    resource === 'gold' ? 'Gold' :
+                                        resource === 'metal' ? 'Metal' :
+                                            resource.charAt(0).toUpperCase() + resource.slice(1);
                     return `${amount} ${properResource}`;
                 });
             }
-            
+
             let text = `${status} ${description}`;
-            
+
             if (req.progress && !req.completed) {
                 text += ` (${req.progress})`;
             }
-            
+
             return text;
         });
 
@@ -594,7 +594,7 @@ class UnlockSystem {
             navBtn.style.pointerEvents = 'auto';
             console.log(`[UnlockSystem] View unlocked: ${viewName}`);
         }
-        
+
         // Call the game's unlockView method if available
         if (window.game && window.game.unlockView) {
             window.game.unlockView(viewName);
@@ -711,7 +711,7 @@ class UnlockSystem {
     // Show unlock progress modal
     showUnlockProgress() {
         const nextUnlocks = this.getNextUnlocks().slice(0, 5); // Show top 5
-        
+
         let contentHTML = `
             <div style="margin-bottom: 15px;">
                 <h4 style="color: #3498db; margin: 0 0 10px 0;">🔓 Coming Up Next</h4>
@@ -730,7 +730,7 @@ class UnlockSystem {
                     <div style="font-size: 11px; color: #ecf0f1; margin-bottom: 6px;">${unlock.description}</div>
                     <div style="font-size: 10px;">
             `;
-            
+
             unlock.requirements.forEach(req => {
                 const checkmark = req.completed ? '✅' : '❌';
                 contentHTML += `
@@ -740,7 +740,7 @@ class UnlockSystem {
                     </div>
                 `;
             });
-            
+
             contentHTML += `</div></div>`;
         });
 
@@ -759,14 +759,14 @@ class UnlockSystem {
 document.addEventListener('DOMContentLoaded', () => {
     // Wait for gameState to be available
     const initUnlockSystem = () => {
-        if (window.gameState && window.achievementSystem && 
+        if (window.gameState && window.achievementSystem &&
             typeof window.achievementSystem.isUnlocked === 'function') {
             window.unlockSystem = new UnlockSystem(window.gameState);
-            
+
             // Check for unlocks periodically, but with error handling
             const unlockCheckInterval = setInterval(() => {
                 try {
-                    if (window.unlockSystem && window.achievementSystem && 
+                    if (window.unlockSystem && window.achievementSystem &&
                         typeof window.achievementSystem.isUnlocked === 'function') {
                         window.unlockSystem.checkAllUnlocks();
                     } else {
@@ -778,16 +778,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(unlockCheckInterval);
                 }
             }, 3000); // Increased interval to 3 seconds
-            
+
             // Setup debug commands
             UnlockSystem.setupDebugCommands();
-            
+
             console.log('[UnlockSystem] System ready and monitoring for unlocks');
         } else {
             setTimeout(initUnlockSystem, 200); // Increased delay
         }
     };
-    
+
     // Wait a bit longer before starting
     setTimeout(initUnlockSystem, 500);
 });

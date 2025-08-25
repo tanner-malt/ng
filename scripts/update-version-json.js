@@ -4,7 +4,7 @@ const path = require('path');
 
 const pkgPath = path.join(__dirname, '../package.json');
 const versionPath = path.join(__dirname, '../public/version.json');
-const wikiDataSrcPath = path.join(__dirname, '../src/wikiData.js');
+const wikiDataSrcPath = path.join(__dirname, '../src/config/wikiData.js');
 const wikiDataPublicPath = path.join(__dirname, '../public/wikiData.js');
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));

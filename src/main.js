@@ -11,15 +11,15 @@ function loadGameVersion() {
     if (!window.GAME_VERSION) {
         window.GAME_VERSION = '0.0.1';
     }
-    
+
     // Try multiple possible paths for version.json
     const possiblePaths = [
-        'public/version.json',  // From root
-        './version.json',       // From current directory
-        '../version.json',      // One level up
-        'version.json'          // Same directory
+        './version.json',       // From current directory (public/)
+        'version.json',         // Same directory
+        '../public/version.json', // From parent directory
+        'public/version.json'   // From root
     ];
-    
+
     async function tryLoadVersion(paths) {
         for (const path of paths) {
             try {
@@ -36,7 +36,7 @@ function loadGameVersion() {
         }
         console.log('[Main] Could not load version.json from any path, using fallback version:', window.GAME_VERSION);
     }
-    
+
     tryLoadVersion(possiblePaths);
 }
 
@@ -51,7 +51,7 @@ function initializeGame() {
         // Check if essential systems are available
         const requiredSystems = [
             'eventBus',
-            'gameState', 
+            'gameState',
             'modalSystem',
             'showModal'
         ];

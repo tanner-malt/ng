@@ -38,6 +38,7 @@
     <button onclick="clearStorageAndReload()">Clear Storage & Test Fresh Game</button>
     <button onclick="testCurrentGame()">Test Current Game State</button>
     <button onclick="resetAndTest()">Reset Game & Test</button>
+    <button onclick="seedOldSaveAndLaunch()">Seed Old Save (v0) & Launch Game</button>
 
     <div id="results"></div>
 
@@ -54,7 +55,7 @@
             localStorage.clear();
             sessionStorage.clear();
             setTimeout(() => {
-                window.location.href = '/public/game.html';
+                window.location.href = '../public/game.html';
             }, 1000);
         }
 
@@ -63,7 +64,7 @@
 
             // Navigate to game and test after a delay
             const iframe = document.createElement('iframe');
-            iframe.src = '/public/game.html';
+            iframe.src = '../public/game.html';
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
 
@@ -105,7 +106,7 @@
         function resetAndTest() {
             log('Testing reset game functionality...');
             const iframe = document.createElement('iframe');
-            iframe.src = '/public/game.html';
+            iframe.src = '../public/game.html';
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
 
@@ -130,6 +131,41 @@
                     }
                 }, 3000);
             };
+        }
+
+        // Seeds a pre-migration (v0) save payload to exercise migration code paths
+        function seedOldSaveAndLaunch() {
+            log('Seeding an old-format (v0) save and launching game...');
+            try {
+                // Minimal v0 schema (no schemaVersion, some legacy fields, sparse shapes)
+                const legacySave = {
+                    // No schemaVersion => treated as 0
+                    day: 12,
+                    season: 'Summer',
+                    gold: 77,
+                    resources: { food: 150, wood: 80 }, // missing stone/metal/production
+                    buildings: [
+                        // Legacy: built true but missing level (migration should normalize to level=1)
+                        { id: Date.now(), type: 'townCenter', built: true },
+                        // Legacy construction site
+                        { id: Date.now() + 1, type: 'house', built: false, level: 0 }
+                    ],
+                    unlockedBuildings: ['tent', 'townCenter'],
+                    currentView: 'village'
+                };
+
+                const serialized = JSON.stringify(legacySave);
+                localStorage.setItem('dynastyBuilder_save', serialized);
+                // Also mirror to legacy key for completeness
+                try { localStorage.setItem('idleDynastyBuilder', serialized); } catch (e) { /* ignore */ }
+
+                log('Old save written. Opening game to trigger migration...', 'success');
+                setTimeout(() => {
+                    window.location.href = '../public/game.html';
+                }, 500);
+            } catch (e) {
+                log('ERROR seeding legacy save: ' + e.message, 'error');
+            }
         }
     </script>
 </body>

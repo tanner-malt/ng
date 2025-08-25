@@ -24,10 +24,10 @@ class AchievementSystem {
         this.isCheckingRequirements = false; // Prevent recursive checking
         this.loadFromStorage();
         this.initializeAchievements();
-        
+
         // After initializing, verify the unlocked achievements array is consistent
         this.verifyUnlockedAchievements();
-        
+
         console.log('[Achievements] Achievement system initialized');
     }
 
@@ -39,10 +39,10 @@ class AchievementSystem {
                 actualUnlocked.push(achievement.id);
             }
         });
-        
+
         // Update the unlocked array to match reality
         this.unlockedAchievements = actualUnlocked;
-        
+
         console.log('[Achievements] Verified unlocked achievements:', this.unlockedAchievements.length);
     }
 
@@ -62,7 +62,7 @@ class AchievementSystem {
             icon: '🏠',
             type: 'building',
             requirement: { houses_built: 2 }, // Requires 2 houses built
-            reward: { wood: 75, stone: 50}
+            reward: { wood: 75, stone: 50 }
         });
 
         this.defineAchievement('town_center_built', {
@@ -70,7 +70,7 @@ class AchievementSystem {
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            reward: { wood: 100, stone: 200}
+            reward: { wood: 100, stone: 200 }
         });
 
         this.defineAchievement('sheltering_citizens', {
@@ -95,7 +95,7 @@ class AchievementSystem {
             description: 'Built your first Barracks',
             icon: '⚔️',
             type: 'building',
-            reward: { soldiers: 1 }
+            reward: { refugee_families: 2 }
         });
 
         this.defineAchievement('tutorial_complete', {
@@ -149,10 +149,10 @@ class AchievementSystem {
             description: 'Have 500 gold, 200 food, and 50 population',
             icon: '🏰',
             type: 'resource',
-            requirement: { 
-                gold: 500, 
-                food: 200, 
-                population: 50 
+            requirement: {
+                gold: 500,
+                food: 200,
+                population: 50
             },
             reward: { prestige: 50, influence: 25 }
         });
@@ -596,7 +596,7 @@ class AchievementSystem {
     defineAchievement(id, config) {
         // Check if this achievement already exists (from loaded save data)
         const existing = this.achievements[id];
-        
+
         this.achievements[id] = {
             id: id,
             title: config.title,
@@ -672,11 +672,11 @@ class AchievementSystem {
     applyRewards(rewards) {
         if (!window.gameState) return;
         let populationGained = 0;
-        
+
         // Temporarily disable requirement checking while applying rewards
         const wasChecking = this.isCheckingRequirements;
         this.isCheckingRequirements = true;
-        
+
         // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
             if (resource === 'population' && amount > 0) {
@@ -696,6 +696,46 @@ class AchievementSystem {
                     window.gameState.population = (window.gameState.population || 0) + amount;
                     populationGained += amount;
                 }
+            } else if (resource === 'refugee_families' && amount > 0) {
+                // Handle refugee families: 2 adults + 2 children per family
+                if (window.gameState?.populationManager) {
+                    for (let i = 0; i < amount; i++) {
+                        // Add 2 adults per family (working age)
+                        const adult1 = window.gameState.populationManager.addInhabitant({
+                            name: `Refugee Adult ${Math.floor(Math.random() * 1000)}`,
+                            age: 20 + Math.floor(Math.random() * 25), // Age 20-45
+                            role: 'peasant',
+                            status: 'idle',
+                            gender: Math.random() < 0.5 ? 'male' : 'female'
+                        });
+                        const adult2 = window.gameState.populationManager.addInhabitant({
+                            name: `Refugee Adult ${Math.floor(Math.random() * 1000)}`,
+                            age: 20 + Math.floor(Math.random() * 25), // Age 20-45
+                            role: 'peasant',
+                            status: 'idle',
+                            gender: Math.random() < 0.5 ? 'male' : 'female'
+                        });
+                        // Add 2 children per family
+                        const child1 = window.gameState.populationManager.addInhabitant({
+                            name: `Refugee Child ${Math.floor(Math.random() * 1000)}`,
+                            age: 5 + Math.floor(Math.random() * 10), // Age 5-15
+                            role: 'child',
+                            status: 'idle',
+                            gender: Math.random() < 0.5 ? 'male' : 'female'
+                        });
+                        const child2 = window.gameState.populationManager.addInhabitant({
+                            name: `Refugee Child ${Math.floor(Math.random() * 1000)}`,
+                            age: 5 + Math.floor(Math.random() * 10), // Age 5-15
+                            role: 'child',
+                            status: 'idle',
+                            gender: Math.random() < 0.5 ? 'male' : 'female'
+                        });
+                        populationGained += 4;
+                    }
+                    console.log(`[Achievements] Added ${amount} refugee families (${amount * 4} total people) as achievement reward`);
+                } else {
+                    console.warn(`[Achievements] PopulationManager not available for refugee families`);
+                }
             } else if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
                 window.gameState.resources[resource] += amount;
                 // Cap resource if defined in GameData
@@ -708,17 +748,17 @@ class AchievementSystem {
                 window.gameState.militaryExperience = (window.gameState.militaryExperience || 0) + amount;
             }
         });
-        
+
         // Restore checking state
         this.isCheckingRequirements = wasChecking;
-        
+
         // Emit events for population gains, but avoid immediate requirement checking
         if (populationGained > 0) {
             // Show notification for population gains
             if (window.showNotification) {
                 window.showNotification(`🎉 ${populationGained} new villagers joined your dynasty!`, 'success');
             }
-            
+
             // Emit event for other systems, but delay it to avoid immediate recursive checking
             if (window.eventBus) {
                 setTimeout(() => {
@@ -726,7 +766,7 @@ class AchievementSystem {
                 }, 200);
             }
         }
-        
+
         // Trigger UI update
         if (window.eventBus) {
             window.eventBus.emit('resources-updated');
@@ -804,8 +844,8 @@ class AchievementSystem {
                 icon: '🏆',
                 closable: true,
                 confirmText: 'OK',
-                style: { 
-                    background: '#232946', 
+                style: {
+                    background: '#232946',
                     boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
                     width: '320px',
                     maxWidth: '90vw'
@@ -825,13 +865,13 @@ class AchievementSystem {
 
     checkRequirements() {
         if (!window.gameState || this.isCheckingRequirements) return;
-        
+
         // Don't check requirements if we're still initializing the game
         if (!window.gameState.buildings || window.gameState.buildings.length === 0) {
             console.log('[Achievements] Skipping requirement check - game still initializing');
             return;
         }
-        
+
         this.isCheckingRequirements = true;
 
         Object.values(this.achievements).forEach(achievement => {
@@ -911,8 +951,8 @@ class AchievementSystem {
                             // Check if all basic resources are >= 1000
                             if (window.gameState.resources) {
                                 const resources = window.gameState.resources;
-                                current = (resources.gold >= 1000 && resources.food >= 1000 && 
-                                          resources.wood >= 1000 && resources.stone >= 1000) ? 1 : 0;
+                                current = (resources.gold >= 1000 && resources.food >= 1000 &&
+                                    resources.wood >= 1000 && resources.stone >= 1000) ? 1 : 0;
                                 // For balanced_resources, required should be true (1)
                                 required = 1;
                             }
@@ -933,10 +973,10 @@ class AchievementSystem {
                 }
             }
         });
-        
+
         // Check for "All Things End" ultimate achievement
         this.checkUltimateAchievement();
-        
+
         this.isCheckingRequirements = false;
     }
 
@@ -954,7 +994,7 @@ class AchievementSystem {
         ];
 
         const unlockedMajorAchievements = majorAchievements.filter(id => this.isUnlocked(id));
-        
+
         // Trigger "All Things End" if player has 4+ major achievements and become_king
         if (unlockedMajorAchievements.length >= 4 && this.isUnlocked('become_king')) {
             console.log('[Achievements] Ultimate achievement conditions met:', unlockedMajorAchievements);
@@ -1017,7 +1057,7 @@ class AchievementSystem {
     showAchievements() {
         const unlockedCount = this.unlockedAchievements.length;
         const totalCount = Object.keys(this.achievements).length;
-        
+
         let content = `
             <div style="margin-bottom: 20px; text-align: center;">
                 <h3 style="color: #f39c12;">🏆 Achievements (${unlockedCount}/${totalCount})</h3>
@@ -1123,10 +1163,10 @@ class AchievementSystem {
         if (isUnlocked && achievement.unlockedAt) {
             date = `<small style='color:#27ae60;'>Unlocked: ${new Date(achievement.unlockedAt).toLocaleDateString()}</small>`;
         }
-        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;opacity:${isUnlocked?1:0.6};">
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;opacity:${isUnlocked ? 1 : 0.6};">
             <div style="font-size:22px;">${icon}</div>
             <div style="flex:1;">
-                <div style="font-weight:bold;color:${isUnlocked?'#f39c12':'#95a5a6'};">${title}</div>
+                <div style="font-weight:bold;color:${isUnlocked ? '#f39c12' : '#95a5a6'};">${title}</div>
                 <div style="font-size:12px;color:#bbb;">${description}</div>
                 ${progressBar}
                 ${date}
@@ -1159,22 +1199,22 @@ class AchievementSystem {
                 const data = JSON.parse(saved);
                 this.achievements = data.achievements || {};
                 this.unlockedAchievements = data.unlockedAchievements || [];
-                this.stats = data.stats || { 
-                    buildings_built: 0, 
+                this.stats = data.stats || {
+                    buildings_built: 0,
                     battles_won: 0,
                     houses_built: 0,
                     farms_built: 0,
                     barracks_built: 0,
                     towncenters_built: 0
                 };
-                
+
                 // Convert unlockedAt strings back to Date objects
                 Object.values(this.achievements).forEach(achievement => {
                     if (achievement.unlockedAt && typeof achievement.unlockedAt === 'string') {
                         achievement.unlockedAt = new Date(achievement.unlockedAt);
                     }
                 });
-                
+
                 console.log('[Achievements] Loaded from storage:', {
                     achievementsCount: Object.keys(this.achievements).length,
                     unlockedCount: this.unlockedAchievements.length,
@@ -1196,7 +1236,7 @@ class AchievementSystem {
             this.checkRequirements();
         }, 5000); // Check every 5 seconds
     }
-    
+
     // Debug function to see current achievement states
     debugAchievements() {
         console.log('=== ACHIEVEMENT DEBUG ===');
@@ -1204,7 +1244,7 @@ class AchievementSystem {
         console.log('Unlocked count:', this.unlockedAchievements.length);
         console.log('Currently checking:', this.isCheckingRequirements);
         console.log('Unlocked array contents:', this.unlockedAchievements);
-        
+
         Object.values(this.achievements).forEach(achievement => {
             if (achievement.unlocked) {
                 console.log(`✅ ${achievement.id}: ${achievement.title} (unlocked at ${achievement.unlockedAt})`);
@@ -1220,11 +1260,11 @@ class AchievementSystem {
 }
 
 
-    // Create global instance
+// Create global instance
 if (!window.achievementSystem) {
     window.achievementSystem = new AchievementSystem();
     console.log('[Achievements] Achievement system ready');
-    
+
     // Add debug function globally
     window.debugAchievements = () => {
         if (window.achievementSystem) {
@@ -1233,7 +1273,7 @@ if (!window.achievementSystem) {
             console.log('Achievement system not available');
         }
     };
-    
+
     // Add fix function globally
     window.fixAchievements = () => {
         if (window.achievementSystem) {
@@ -1242,19 +1282,19 @@ if (!window.achievementSystem) {
             console.log('Achievement system not available');
         }
     };
-    
+
     // Add building stats sync function
     window.syncAchievementStats = () => {
         if (window.achievementSystem && window.gameState && window.gameState.buildings) {
             const stats = window.achievementSystem.stats;
-            
+
             // Count buildings from gameState
             stats.buildings_built = window.gameState.buildings.length;
             stats.houses_built = window.gameState.buildings.filter(b => b.type === 'house').length;
             stats.farms_built = window.gameState.buildings.filter(b => b.type === 'farm').length;
             stats.barracks_built = window.gameState.buildings.filter(b => b.type === 'barracks').length;
             stats.towncenters_built = window.gameState.buildings.filter(b => b.type === 'townCenter').length;
-            
+
             console.log('[Achievements] Stats synced:', stats);
             window.achievementSystem.saveToStorage();
             return stats;
@@ -1262,7 +1302,7 @@ if (!window.achievementSystem) {
             console.log('Achievement system or game state not available');
         }
     };
-    
+
     console.log('[Achievements] Debug commands available: debugAchievements(), fixAchievements(), syncAchievementStats()');
 } else {
     console.log('[Achievements] Achievement system already exists');

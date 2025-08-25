@@ -177,7 +177,5 @@ class WikiData {
     }
 }
 
-// Make WikiData available globally in browser
-if (typeof window !== 'undefined') {
-    window.WikiData = WikiData;
-}
+export default WikiData;
+export { WikiData };

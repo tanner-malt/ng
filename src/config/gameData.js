@@ -3,12 +3,15 @@
 // All costs, production rates, building stats, etc. are defined here
 
 const GameData = {
+    // Global constants
+    startingPopulationCount: 5, // Canonical starting population (1 royal + 4 villagers)
+
     // Resource icons for UI display
     resourceIcons: {
         food: '🌾',
         wood: '🌲',
-        stone: 'S',
-        metal: 'M',
+        stone: '🪨',
+        metal: 'ME',
         planks: '🪵',
         production: '⚙️',
         gold: '💰',
@@ -18,7 +21,7 @@ const GameData = {
     // Building costs - what resources are required to build each building
     buildingCosts: {
         // Starter Buildings
-        tent: { wood: 5 }, // Very cheap starter building
+        tent: {}, // Placed from inventory; no construction cost
         foundersWagon: {}, // Free to place from inventory
 
         // Essential Buildings
@@ -26,10 +29,11 @@ const GameData = {
         house: { wood: 25 },
         farm: { wood: 20 },
         buildersHut: { wood: 30, stone: 15 }, // Professional building for builders
+        storehouse: { wood: 40, stone: 20 },
 
         // Production Buildings  
-        woodcutterLodge: { wood: 20, stone: 40, gold: 50 }, // Reduced wood cost
-        quarry: { wood: 60, stone: 80, gold: 40 }, // Also more expensive
+        woodcutterLodge: { wood: 20, stone: 40, gold: 0 }, // Gold cost removed
+        quarry: { wood: 60, stone: 80, gold: 0 }, // Gold cost removed
         lumberMill: { wood: 100, stone: 60, gold: 80, planks: 20 }, // Industrial facility
         mine: { wood: 60, stone: 40 },
 
@@ -39,7 +43,6 @@ const GameData = {
 
         // Trade & Culture Buildings
         market: { wood: 80, stone: 40, planks: 20 },
-        temple: { wood: 100, stone: 60, planks: 30 },
         academy: { wood: 120, stone: 80, planks: 40 },
 
         // Royal Buildings
@@ -58,7 +61,7 @@ const GameData = {
         university: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 }
     },
 
-    // Building production - what resources buildings generate per day/cycle
+    // Building production - capabilities per building (no direct resource outputs)
     buildingProduction: {
         // Starter Buildings
         tent: {
@@ -72,25 +75,25 @@ const GameData = {
         // Essential Buildings
         foundersWagon: {
             populationCapacity: 3, // Provides housing for 3 people
+            // Storage contribution for all resources
+            storage: { all: 100 },
             jobs: {
                 gatherer: 2, // Provides 2 gatherer jobs
                 crafter: 1 // Provides 1 crafter job
             }
         },
         townCenter: {
+            // Storage contribution for all resources
+            storage: { all: 200 },
             jobs: {
-                gatherer: 3, // Provides 3 gatherer jobs
-                crafter: 2 // Provides 2 crafter jobs
+                gatherer: 1, // Reduced to 1 gatherer job
+                crafter: 1 // Reduced to 1 crafter job
             }
         },
         house: {
-            populationCapacity: 6, // Each house provides capacity for 6 population
-            jobs: {
-                crafter: 1 // Houses provide basic crafting jobs
-            }
+            populationCapacity: 6 // Each house provides capacity for 6 population; 0 jobs
         },
         farm: {
-            food: 10, // Legacy resource production (to be phased out)
             jobs: {
                 farmer: 2 // Provides 2 farmer jobs
             }
@@ -101,99 +104,104 @@ const GameData = {
                 foreman: 1 // Provides 1 foreman job for construction management
             }
         },
+        storehouse: {
+            // Central storage building with basic logistics
+            storage: { all: 300 },
+            jobs: { gatherer: 1 }
+        },
 
         // Production Buildings
         woodcutterLodge: {
-            wood: 5, // Basic wood production from woodcutter lodge
             jobs: {
-                woodcutter: 2, // Basic wood cutting jobs
-                sawyer: 1 // Basic wood processing job
+                woodcutter: 3 // 3 woodcutters only
             }
         },
         quarry: {
-            stone: 6, // Legacy resource production (to be phased out)
             jobs: {
-                miner: 2, // Provides 2 miner jobs
-                stonecutter: 1 // Provides 1 stonecutter job
+                rockcutter: 3 // 3 rockcutters (cutting rocks only)
             }
         },
         lumberMill: {
-            wood: 2, // Some basic wood production
-            planks: 8, // Primary focus: refined planks production
             jobs: {
-                lumber_worker: 3, // Advanced lumber processing specialists
-                woodcutter: 1 // Some basic cutting still needed
+                sawyer: 3 // 3 sawyers
             }
         },
         mine: {
-            stone: 8,
-            metal: 3 // Also produces metal
+            jobs: {
+                miner: 3 // 3 miners
+            }
         },
         workshop: {
-            efficiency: 1.1, // 10% boost to nearby production
-            tools: 2 // Produces tools/equipment
+            // No passive bonus; engineers only
+            jobs: {
+                engineer: 3
+            }
         },
         blacksmith: {
-            metal: 4,
-            weapons: 2
+            jobs: {
+                blacksmith: 2
+            }
         },
 
         // Trade & Culture Buildings
         market: {
-            gold: 5,
-            trade: 3
-        },
-        temple: {
-            influence: 3,
-            happiness: 4
+            // No storage; traders only
+            jobs: {
+                trader: 3
+            }
         },
         academy: {
-            research: 2,
-            efficiency: 1.15 // 15% boost to all production
+            // No bonus for now
+            jobs: {
+                scholar: 1
+            }
         },
         university: {
-            research: 8,
-            efficiency: 1.5 // 50% boost to all production
+            // No bonus for now
+            jobs: {
+                professor: 1
+            }
         },
 
         // Royal Buildings
         keep: {
-            dynastyBonus: 1.1, // 10% bonus to dynasty-related activities
-            royalCapacity: 3 // Can house 3 royal family members
+            // Unlocks Throne View
+            royalCapacity: 2 // +2 to Royal Population
         },
         monument: {
-            prestige: 5, // Cultural/legacy points
-            happiness: 2 // Population happiness bonus
+            happiness: 10 // +10 happiness
         },
 
         // Military Buildings
         barracks: {
-            soldiers: 1,
-            defense: 2,
-            skillTraining: 'military' // Provides military skill training
+            // Allows forming an army
+            jobs: {
+                drillInstructor: 1
+            }
         },
         fortifications: {
-            defense: 5,
-            territoryControl: 1 // Expands controlled territory
+            defense: 1 // Bonus to defending during battles
         },
         militaryAcademy: {
-            commanderTraining: 2, // Trains commanders and heirs
-            tacticalBonus: 1.15 // 15% bonus to military effectiveness
+            jobs: {
+                militaryTheorist: 1
+            }
         },
         castle: {
-            defense: 10,
-            soldiers: 2,
-            influence: 15
+            civilLeaders: 1 // +1 to civil leaders
         },
 
         // Advanced Buildings
         magicalTower: {
-            magicResearch: 3, // Magical ability development
-            dynastyMagic: 1.2 // 20% bonus to magical bloodline abilities
+            // Future key structure for magic systems
+            jobs: {
+                wizard: 1
+            }
         },
         grandLibrary: {
-            research: 5, // Technology research points
-            knowledgePreservation: 1.3 // 30% bonus to knowledge retention across dynasties
+            jobs: {
+                scholar: 10
+            }
         }
     },
 
@@ -206,6 +214,7 @@ const GameData = {
         townCenter: 50,
         house: 25,
         farm: 35,
+        storehouse: 40,
 
         // Production Buildings
         woodcutterLodge: 45,
@@ -217,7 +226,6 @@ const GameData = {
 
         // Trade & Culture Buildings  
         market: 70,
-        temple: 85,
         academy: 100,
         university: 180,
 
@@ -261,19 +269,19 @@ const GameData = {
             icon: '🏛️',
             name: 'Town Center',
             description: 'Central building that serves as the heart of your settlement',
-            effects: '3 Gatherer jobs • 2 Crafter jobs • Settlement coordination'
+            effects: '1 Gatherer job • 1 Crafter job • Settlement coordination'
         },
         house: {
             icon: '🏠',
             name: 'House',
             description: 'Comfortable housing for families and workers',
-            effects: 'Provides housing for 6 people • 1 Crafter job'
+            effects: 'Provides housing for 6 people'
         },
         farm: {
             icon: '🌾',
             name: 'Farm',
             description: 'Agricultural facility for growing crops and livestock',
-            effects: 'Produces +10 food daily • 2 Farmer jobs'
+            effects: '2 Farmer jobs • Food via workers (seasonal multipliers apply)'
         },
         buildersHut: {
             icon: '🔨',
@@ -281,43 +289,49 @@ const GameData = {
             description: 'Professional construction facility with skilled workers',
             effects: '4 Builder jobs • 1 Foreman job • Enhanced construction efficiency'
         },
+        storehouse: {
+            icon: '📦',
+            name: 'Storehouse',
+            description: 'Central storage building increasing resource caps and basic logistics',
+            effects: '1 Gatherer job • +300 storage to all resources'
+        },
 
         // Production Buildings
         woodcutterLodge: {
             icon: '🪚',
             name: 'Woodcutter Lodge',
             description: 'Traditional wood processing facility for established settlements',
-            effects: 'Produces +5 wood daily • 2 Woodcutter jobs • 1 Sawyer job • Enables advanced construction'
+            effects: '3 Woodcutter jobs • Wood via workers'
         },
         quarry: {
             icon: '⛏️',
             name: 'Quarry',
             description: 'Large-scale stone extraction operation for major construction projects',
-            effects: 'Produces +6 stone daily • 2 Miner jobs • 1 Stonecutter job • Enables monumental architecture'
+            effects: '3 Rockcutter jobs • Stone via workers'
         },
         lumberMill: {
             icon: '🪓',
             name: 'Lumber Mill',
             description: 'Advanced industrial facility processing raw lumber into refined construction materials',
-            effects: 'Produces +2 wood and +8 planks daily • 3 Lumber Worker jobs • 1 Woodcutter job • +25% construction speed nearby'
+            effects: '3 Sawyer jobs • Converts wood to planks via workers'
         },
         mine: {
             icon: '⛏️',
             name: 'Mine',
             description: 'Deep excavation site for stone and metal extraction',
-            effects: 'Produces +8 stone and +3 metal daily • Valuable resource extraction'
+            effects: '3 Miner jobs • Extracts stone/metal via workers'
         },
         workshop: {
             icon: '🔧',
             name: 'Workshop',
-            description: 'General crafting facility with production bonuses',
-            effects: '+10% production efficiency bonus • Produces +2 tools daily'
+            description: 'Engineering facility for construction and machinery',
+            effects: '3 Engineer jobs'
         },
         blacksmith: {
             icon: '⚒️',
             name: 'Blacksmith',
             description: 'Metalworking facility for tools and weapons',
-            effects: 'Produces +4 metal and +2 weapons daily • Enhanced production efficiency'
+            effects: '2 Blacksmith jobs • Crafts tools/weapons via workers'
         },
 
         // Trade & Culture Buildings
@@ -325,39 +339,33 @@ const GameData = {
             icon: '🏪',
             name: 'Market',
             description: 'Trading hub for commerce and gold generation',
-            effects: 'Generates +5 gold and +3 trade value daily • Improves trade efficiency'
-        },
-        temple: {
-            icon: '⛪',
-            name: 'Temple',
-            description: 'Spiritual center providing guidance and happiness',
-            effects: 'Generates +3 influence and +4 happiness • Population morale boost'
+            effects: '3 Trader jobs • Generates gold via workers'
         },
         academy: {
             icon: '🎓',
             name: 'Academy',
             description: 'Educational institution for research and learning',
-            effects: '+2 research daily • +15% production efficiency bonus • Knowledge advancement'
+            effects: '1 Scholar job'
         },
         university: {
             icon: '🏛️',
             name: 'University',
             description: 'Advanced center of learning and innovation',
-            effects: '+8 research daily • +50% production efficiency bonus • Major knowledge boost'
+            effects: '1 Professor job'
         },
 
         // Royal Buildings
         keep: {
             icon: '🏰',
             name: 'The Keep',
-            description: 'Royal stronghold for dynasty management and succession',
-            effects: '+10% dynasty bonus • Houses 3 royal family members • Royal authority'
+            description: 'Unlocks Throne View and houses members of the royal family',
+            effects: 'Unlocks Throne View • +2 Royal Capacity'
         },
         monument: {
             icon: '🗿',
             name: 'Monument',
             description: 'Grand structure celebrating your dynasty\'s achievements',
-            effects: '+5 prestige and +2 happiness • Multi-generational legacy bonuses'
+            effects: '+10 happiness'
         },
 
         // Military Buildings
@@ -365,25 +373,25 @@ const GameData = {
             icon: '⚔️',
             name: 'Barracks',
             description: 'Military training facility for soldiers and defense',
-            effects: 'Trains +1 soldier • +2 defense • Military skill training • Unit recruitment'
+            effects: '1 Drill Instructor job • Allows forming an army'
         },
         fortifications: {
             icon: '🛡️',
             name: 'Fortifications',
             description: 'Defensive structures protecting your settlement',
-            effects: '+5 defense • +1 territory control • Expands controlled area'
+            effects: 'Bonus to defending during battles'
         },
         militaryAcademy: {
             icon: '🎓',
             name: 'Military Academy',
             description: 'Elite training facility for commanders and heirs',
-            effects: 'Trains 2 commanders • +15% military effectiveness • Advanced tactical training'
+            effects: '1 Military Theorist job'
         },
         castle: {
             icon: '🏰',
             name: 'Castle',
             description: 'Ultimate fortress and seat of power',
-            effects: '+10 defense • +2 soldiers • +15 influence • Ultimate defensive structure'
+            effects: '+1 Civil Leader'
         },
 
         // Advanced Buildings
@@ -391,24 +399,24 @@ const GameData = {
             icon: '🔮',
             name: 'Magical Tower',
             description: 'Mystical research facility for supernatural abilities',
-            effects: '+3 magic research • +20% dynasty magic bonus • Supernatural enhancement'
+            effects: '1 Wizard job • Key structure (future)'
         },
         grandLibrary: {
             icon: '📚',
             name: 'Grand Library',
             description: 'Repository of knowledge preserving civilization\'s wisdom',
-            effects: '+30% knowledge preservation • Technological research • Dynasty knowledge bonus'
+            effects: '10 Scholar jobs'
         }
     },
 
     // Building categories for organized UI display
     buildingCategories: {
-        essential: ['townCenter', 'house', 'farm'],
+        essential: ['townCenter', 'house', 'farm', 'storehouse'],
         production: ['woodcutterLodge', 'quarry', 'lumberMill', 'mine'],
         craft: ['workshop', 'blacksmith', 'market'],
         military: ['barracks', 'fortifications', 'militaryAcademy', 'castle'],
         royal: ['keep', 'monument'],
-        knowledge: ['temple', 'academy', 'university'],
+        knowledge: ['academy', 'university'],
         advanced: ['magicalTower', 'grandLibrary']
     },
 
@@ -424,15 +432,15 @@ const GameData = {
     },
 
     // Starting resources for new games - minimal start with just one tent
+    // Note: Starting population is handled by PopulationManager (1 royal + 4 villagers = 5)
     startingResources: {
         food: 10, // Small food supply to survive first few days
-        wood: 20, // Enough wood for early construction
+        wood: 25, // Enough wood for early construction
         stone: 5, // Minimal stone for basic needs
         metal: 0,  // Metal will be given through tutorial achievement
         planks: 0, // Planks produced by lumber mill from wood
         production: 0,
-        gold: 0,
-        population: 1  // Start with 1 population (the player)
+        gold: 0
     },
 
     // Resource caps (base storage capacity)
@@ -446,20 +454,6 @@ const GameData = {
         gold: 100    // Slightly higher base for gold
     },
 
-    // Storage capacity modifiers by season (for strategic planning)
-    seasonalStorageModifiers: {
-        // Major Seasons - stable storage
-        'Spring': { food: 1.0, wood: 1.0, stone: 1.0 },
-        'Summer': { food: 1.2, wood: 0.9, stone: 1.1 }, // More food storage needed
-        'Autumn': { food: 1.1, wood: 1.2, stone: 1.0 }, // Wood harvest season
-        'Winter': { food: 0.9, wood: 1.0, stone: 0.9 }, // Harsh conditions reduce storage
-
-        // Transitional Seasons - storage challenges
-        'Sprummer': { food: 1.1, wood: 0.95, stone: 1.0 },
-        'Sumtumn': { food: 1.0, wood: 1.1, stone: 1.0 },
-        'Autinter': { food: 0.95, wood: 1.0, stone: 0.95 },
-        'Winting': { food: 0.9, wood: 1.0, stone: 0.9 }
-    },
 
     // Season multipliers for resource production - 8 seasonal periods (200 days total)
     seasonMultipliers: {
@@ -573,23 +567,23 @@ const GameData = {
         return totalCap; // Base case is 0, only buildings/tech provide capacity
     },
 
-    // Calculate seasonal storage capacity for a resource
+    // Calculate storage capacity for a resource (data-driven, season-invariant)
     calculateSeasonalStorageCap: function (resource, season, buildings) {
         const baseCap = this.resourceCaps[resource] || 999;
-        const seasonalMod = this.seasonalStorageModifiers[season]?.[resource] || 1.0;
+        // Storage is NOT affected by seasons; seasonal modifiers apply to production only
+        const seasonalMod = 1.0;
 
-        // Add storage building bonuses (future enhancement)
         let buildingBonus = 0;
         buildings.forEach(building => {
-            // Granaries, warehouses, etc. could add storage here
-            if (building.type === 'market' && building.level > 0) {
-                buildingBonus += 200; // Markets provide general storage
+            if (building.level < 1 || !building.built) return;
+            const def = this.buildingProduction[building.type];
+            const storage = def && def.storage;
+            if (!storage) return;
+            if (typeof storage.all === 'number') {
+                buildingBonus += storage.all;
             }
-            if (building.type === 'foundersWagon' && building.level > 0) {
-                buildingBonus += 100; // Founders wagon provides 100 storage for each resource
-            }
-            if (building.type === 'townCenter' && building.level > 0) {
-                buildingBonus += 200; // Town center provides 200 additional storage
+            if (typeof storage[resource] === 'number') {
+                buildingBonus += storage[resource];
             }
         });
 
@@ -624,40 +618,35 @@ const GameData = {
             buildingType: 'woodcutterLodge',
             description: 'Produces wood at woodcutter lodges.'
         },
-        lumberjack: {
-            label: 'Lumberjack',
+        sawyer: {
+            label: 'Sawyer',
             buildingType: 'lumberMill',
             description: 'Processes wood into planks at lumber mills.'
         },
-        quarryWorker: {
-            label: 'Quarry Worker',
+        rockcutter: {
+            label: 'Rockcutter',
             buildingType: 'quarry',
-            description: 'Extracts stone at quarries.'
+            description: 'Cuts and moves rock at the quarry.'
         },
         miner: {
             label: 'Miner',
             buildingType: 'mine',
             description: 'Extracts stone and metal from mines.'
         },
-        craftsman: {
-            label: 'Craftsman',
+        engineer: {
+            label: 'Engineer',
             buildingType: 'workshop',
-            description: 'Creates tools and equipment at workshops.'
+            description: 'Builds and maintains machinery at workshops.'
         },
         blacksmith: {
             label: 'Blacksmith',
             buildingType: 'blacksmith',
             description: 'Forges metal tools and weapons.'
         },
-        marketTrader: {
-            label: 'Market Trader',
+        trader: {
+            label: 'Trader',
             buildingType: 'market',
             description: 'Generates gold at markets.'
-        },
-        priest: {
-            label: 'Priest',
-            buildingType: 'temple',
-            description: 'Provides influence and happiness at temples.'
         },
         scholar: {
             label: 'Scholar',
@@ -669,35 +658,20 @@ const GameData = {
             buildingType: 'university',
             description: 'Conducts advanced research at universities.'
         },
-        soldier: {
-            label: 'Soldier',
+        drillInstructor: {
+            label: 'Drill Instructor',
             buildingType: 'barracks',
-            description: 'Trains and defends at barracks.'
+            description: 'Trains recruits and organizes drills.'
         },
-        guard: {
-            label: 'Guard',
-            buildingType: 'fortifications',
-            description: 'Defends from fortifications.'
-        },
-        officer: {
-            label: 'Officer',
+        militaryTheorist: {
+            label: 'Military Theorist',
             buildingType: 'militaryAcademy',
-            description: 'Trains advanced military tactics.'
-        },
-        noble: {
-            label: 'Noble',
-            buildingType: 'keep',
-            description: 'Manages royal affairs at the keep.'
+            description: 'Develops strategies and doctrine.'
         },
         wizard: {
             label: 'Wizard',
             buildingType: 'magicalTower',
             description: 'Studies magic at the magical tower.'
-        },
-        librarian: {
-            label: 'Librarian',
-            buildingType: 'grandLibrary',
-            description: 'Preserves knowledge at the grand library.'
         },
         peasant: {
             label: 'Peasant',

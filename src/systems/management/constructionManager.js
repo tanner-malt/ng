@@ -11,7 +11,7 @@ class ConstructionManager {
         this.constructionSites = new Map(); // Track active construction sites
         this.seasonalEffects = this.initializeSeasonalEffects();
         this.technologyBonuses = new Map(); // Technology research effects
-        
+
         // Initialize with current season
         this.updateSeasonalEffects();
     }
@@ -23,7 +23,7 @@ class ConstructionManager {
             summer: { food: 1.5, wood: 0.8, stone: 1.2, construction: 1.2 }, // +20% construction progress
             autumn: { food: 1.0, wood: 1.3, stone: 1.0, construction: 1.0 }, // Normal construction
             winter: { food: 0.7, wood: 1.5, stone: 0.8, construction: 0.8 }, // -20% construction progress
-            
+
             // Transitional Seasons (10 days each)
             sprummer: { food: 1.35, wood: 0.9, stone: 1.1, construction: 1.15 },
             sumtumn: { food: 1.25, wood: 1.15, stone: 1.0, construction: 1.1 },
@@ -41,7 +41,7 @@ class ConstructionManager {
     getCurrentSeason() {
         // Get current day from gameState (assuming 200-day year cycle)
         const dayOfYear = (this.gameState.currentDay || 0) % 200;
-        
+
         if (dayOfYear < 30) return 'spring';
         else if (dayOfYear < 40) return 'sprummer'; // 30-39
         else if (dayOfYear < 70) return 'summer'; // 40-69
@@ -63,13 +63,13 @@ class ConstructionManager {
 
         const basePointRequirement = GameData?.constructionPoints?.[building.type] || 25;
         const buildingLevel = building.level || 1;
-        
+
         // Calculate actual construction points using work-point formula:
         // BuildingPoints = BasePoints × (1 + (BuildingLevel × 0.3)) × (1 - (ConstructionTech × 0.05))
         const levelMultiplier = 1 + ((buildingLevel - 1) * 0.3);
         const techBonus = this.technologyBonuses.get('construction') || 0;
         const techMultiplier = 1 - (techBonus * 0.05);
-        
+
         const calculatedPointRequirement = Math.ceil(basePointRequirement * levelMultiplier * techMultiplier);
 
         const constructionSite = {
@@ -77,26 +77,26 @@ class ConstructionManager {
             buildingType: building.type,
             buildingLevel: buildingLevel,
             position: { x: building.x, y: building.y },
-            
+
             // Work-point progress system
             totalPoints: calculatedPointRequirement,
             currentPoints: 0,
             pointsRemaining: calculatedPointRequirement,
-            
+
             // Builder integration
             assignedBuilders: [], // Track builder job assignments from JobManager
             dailyProgress: 0,
-            
+
             // Efficiency modifiers for point generation
             skillEfficiency: 1.0,
             seasonalEfficiency: 1.0,
             technologyEfficiency: 1.0,
             teamworkBonus: 1.0,
-            
+
             // Construction materials and quality
             materialQuality: 1.0,
             constructionQuality: 1.0,
-            
+
             // Status tracking
             startedDay: this.gameState.currentDay || 0,
             estimatedCompletion: 0,
@@ -105,7 +105,7 @@ class ConstructionManager {
 
         this.constructionSites.set(building.id, constructionSite);
         console.log(`[Construction] Initialized ${building.type} (Level ${buildingLevel}) - ${calculatedPointRequirement} points required`);
-        
+
         return constructionSite;
     }
 
@@ -118,7 +118,7 @@ class ConstructionManager {
 
         // Find all buildings that provide builder jobs and check if their builders are assigned to this site
         const builders = [];
-        
+
         // Get all available jobs from job manager
         this.gameState.jobManager.jobAssignments.forEach((jobTypes, assignmentBuildingId) => {
             if (jobTypes.builder) {
@@ -147,10 +147,10 @@ class ConstructionManager {
         // Skills that affect building (from original system but simplified)
         const skills = worker.skills || {};
         const relevantSkills = ['Carpentry', 'Masonry', 'Engineering'];
-        
+
         let skillBonus = 0;
         let skillCount = 0;
-        
+
         relevantSkills.forEach(skillName => {
             const skillLevel = skills[skillName] || 0;
             if (skillLevel > 0) {
@@ -160,11 +160,11 @@ class ConstructionManager {
                 else if (skillLevel >= 300) skillBonus += 0.2; // Journeyman: +0.2 points
                 else if (skillLevel >= 100) skillBonus += 0.1; // Apprentice: +0.1 points
                 else skillBonus += 0.05; // Novice: +0.05 points
-                
+
                 skillCount++;
             }
         });
-        
+
         if (skillCount > 0) {
             efficiency += skillBonus / skillCount; // Average skill bonus
         }
@@ -192,7 +192,7 @@ class ConstructionManager {
         // Get builders working on this site via JobManager
         const builders = this.getBuildersForSite(site.buildingId);
         site.assignedBuilders = builders;
-        
+
         if (builders.length === 0) {
             site.skillEfficiency = 1.0;
             site.teamworkBonus = 1.0;
@@ -201,7 +201,7 @@ class ConstructionManager {
             // Calculate total daily points from all builders
             const totalPoints = builders.reduce((sum, builder) => sum + builder.efficiency, 0);
             site.skillEfficiency = totalPoints / builders.length; // Average efficiency per builder
-            
+
             // Teamwork bonus for multiple builders
             const builderCount = builders.length;
             if (builderCount === 1) site.teamworkBonus = 1.0;
@@ -209,9 +209,9 @@ class ConstructionManager {
             else if (builderCount === 3) site.teamworkBonus = 1.1; // +10% for small team
             else if (builderCount <= 5) site.teamworkBonus = 1.15; // +15% for optimal team
             else site.teamworkBonus = 1.15 + (builderCount - 5) * 0.01; // Diminishing returns
-            
+
             site.dailyProgress = totalPoints;
-            
+
             // Apply lumber mill construction speed bonus
             if (this.gameState.villageManager?.buildingEffectsManager) {
                 const building = this.gameState.buildings.find(b => b.id === buildingId);
@@ -228,7 +228,7 @@ class ConstructionManager {
         // Update seasonal efficiency
         this.updateSeasonalEffects();
         site.seasonalEfficiency = this.currentSeasonalEffects?.construction || 1.0;
-        
+
         // Technology efficiency (from research)
         site.technologyEfficiency = 1 + (this.technologyBonuses.get('construction') || 0) * 0.02; // Reduced for work-point system
 
@@ -252,23 +252,23 @@ class ConstructionManager {
     // Set technology bonus for construction efficiency
     setTechnologyBonus(technologyName, level) {
         this.technologyBonuses.set(technologyName, level);
-        
+
         // Update all active construction sites with new technology efficiency
         this.constructionSites.forEach(site => {
             this.recalculateSiteEfficiency(site);
         });
-        
+
         console.log(`[Construction] Technology ${technologyName} set to level ${level}`);
     }
 
     // Process daily construction progress (work-point system) - FOCUS ON ONE BUILDING AT A TIME
     processDailyConstruction() {
         if (this.constructionSites.size === 0) return;
-        
+
         // Find the highest priority construction site (first in queue)
         let prioritySite = null;
         let priorityBuildingId = null;
-        
+
         for (const [buildingId, site] of this.constructionSites) {
             if (site.pointsRemaining > 0) {
                 prioritySite = site;
@@ -276,12 +276,12 @@ class ConstructionManager {
                 break; // Take the first available construction site
             }
         }
-        
+
         // If we have a priority site, focus all builders on it
         if (prioritySite) {
             // Recalculate efficiency and builders for this site
             this.recalculateSiteEfficiency(prioritySite);
-            
+
             // Skip if no builders assigned
             if (prioritySite.assignedBuilders.length === 0) {
                 prioritySite.dailyProgress = 0;
@@ -291,7 +291,7 @@ class ConstructionManager {
 
             // Calculate points gained this day
             const pointsGained = Math.min(prioritySite.dailyProgress, prioritySite.pointsRemaining);
-            
+
             // Handle near-completion to avoid floating point issues
             if (prioritySite.pointsRemaining <= 0.1 || prioritySite.currentPoints + pointsGained >= prioritySite.totalPoints - 0.1) {
                 // Force completion when very close
@@ -303,7 +303,7 @@ class ConstructionManager {
                 prioritySite.pointsRemaining -= pointsGained;
                 console.log(`[Construction] ${prioritySite.buildingType}: +${pointsGained.toFixed(1)} points (${prioritySite.currentPoints}/${prioritySite.totalPoints})`);
             }
-            
+
             // Award experience to builders
             prioritySite.assignedBuilders.forEach(builderInfo => {
                 const worker = this.gameState.jobManager?.getWorkerById(builderInfo.id);
@@ -313,21 +313,21 @@ class ConstructionManager {
                     Object.keys(relevantSkills).forEach(skillName => {
                         worker.skills = worker.skills || {};
                         const currentLevel = worker.skills[skillName] || 0;
-                        
+
                         // Experience gain: 1-2 XP per day based on task difficulty
                         const baseXP = 1 + Math.random();
                         const difficultyMultiplier = this.getBuildingDifficulty(prioritySite.buildingType);
                         const xpGained = Math.round(baseXP * difficultyMultiplier);
-                        
+
                         worker.skills[skillName] = currentLevel + xpGained;
-                        
+
                         // Skill level progression check
                         const newSkillLevel = this.getSkillLevel(worker.skills[skillName]);
                         const oldSkillLevel = this.getSkillLevel(currentLevel);
-                        
+
                         if (newSkillLevel > oldSkillLevel) {
                             console.log(`[Construction] ${worker.name} advanced to ${this.getSkillLevelName(newSkillLevel)} in ${skillName}!`);
-                            
+
                             // Show notification if available
                             if (window.showNotification) {
                                 window.showNotification(
@@ -338,7 +338,7 @@ class ConstructionManager {
                             }
                         }
                     });
-                    
+
                     // Award general construction experience
                     worker.experience = worker.experience || {};
                     worker.experience.construction = (worker.experience.construction || 0) + 0.1;
@@ -367,7 +367,7 @@ class ConstructionManager {
 
     getRelevantSkills(worker, buildingType) {
         const skills = worker.skills || {};
-        
+
         // Determine which skills are relevant for each building type
         const skillMappings = {
             // Wood-heavy buildings
@@ -376,27 +376,27 @@ class ConstructionManager {
             woodcutterLodge: ['Forestry', 'Carpentry', 'Engineering'],
             lumberMill: ['Forestry', 'Carpentry'],
             tent: ['Carpentry'],
-            
+
             // Stone-heavy buildings
             townCenter: ['Masonry', 'Engineering', 'Administration'],
             quarry: ['Quarrying', 'Mining', 'Engineering'],
-            
+
             // Mixed construction
             workshop: ['Carpentry', 'Masonry', 'Engineering'],
             blacksmith: ['Blacksmithing', 'Engineering', 'Masonry'],
             market: ['Carpentry', 'Masonry', 'Trade'],
             buildersHut: ['Carpentry', 'Masonry', 'Engineering'],
-            
+
             // Military buildings
             barracks: ['Masonry', 'Carpentry', 'Military Engineering'],
             fortifications: ['Masonry', 'Military Engineering', 'Engineering'],
             castle: ['Masonry', 'Engineering', 'Military Engineering'],
-            
+
             // Advanced buildings
             temple: ['Masonry', 'Carpentry', 'Scholarship'],
             academy: ['Masonry', 'Carpentry', 'Scholarship', 'Engineering'],
             magicalTower: ['Masonry', 'Magic', 'Engineering', 'Scholarship'],
-            
+
             // Royal buildings
             keep: ['Masonry', 'Carpentry', 'Engineering', 'Administration'],
             monument: ['Masonry', 'Engineering', 'Scholarship']
@@ -404,7 +404,7 @@ class ConstructionManager {
 
         const relevantSkillNames = skillMappings[buildingType] || ['Carpentry', 'Masonry'];
         const relevantSkills = {};
-        
+
         relevantSkillNames.forEach(skillName => {
             relevantSkills[skillName] = skills[skillName] || 0;
         });
@@ -418,27 +418,27 @@ class ConstructionManager {
             // Simple buildings
             house: 1.0,
             farm: 1.0,
-            
+
             // Medium complexity
             woodcutterLodge: 1.2,
             workshop: 1.3,
             quarry: 1.4,
             blacksmith: 1.4,
-            
+
             // Complex buildings
             townCenter: 1.5,
             barracks: 1.5,
             market: 1.6,
             temple: 1.7,
             academy: 1.8,
-            
+
             // Advanced buildings
             keep: 2.0,
             castle: 2.5,
             magicalTower: 2.2,
             monument: 2.8
         };
-        
+
         return difficulties[buildingType] || 1.0;
     }
 
@@ -458,7 +458,7 @@ class ConstructionManager {
     // Complete construction of a building
     completeConstruction(buildingId) {
         console.log(`[Construction] completeConstruction() called for building ${buildingId}`);
-        
+
         const site = this.constructionSites.get(buildingId);
         if (!site) {
             console.error(`[Construction] No construction site found for building ${buildingId}`);
@@ -480,7 +480,7 @@ class ConstructionManager {
         building.constructionProgress = undefined;
         building.constructionPointsRemaining = undefined;
         delete building.startedAt;
-        
+
         // Award completion experience to builders (via JobManager)
         site.assignedBuilders.forEach(builderInfo => {
             const worker = this.gameState.jobManager?.getWorkerById(builderInfo.id);
@@ -488,11 +488,11 @@ class ConstructionManager {
                 // Award substantial completion experience
                 worker.experience = worker.experience || {};
                 worker.experience.construction = (worker.experience.construction || 0) + 1;
-                
+
                 // Award skill bonuses based on building complexity
                 const skillBonus = this.getBuildingDifficulty(site.buildingType);
                 const relevantSkills = this.getRelevantSkills(worker, site.buildingType);
-                
+
                 Object.keys(relevantSkills).forEach(skillName => {
                     worker.skills = worker.skills || {};
                     worker.skills[skillName] = (worker.skills[skillName] || 0) + Math.round(skillBonus * 10);
@@ -502,13 +502,13 @@ class ConstructionManager {
 
         // Remove construction site
         this.constructionSites.delete(buildingId);
-        
+
         console.log(`[Construction] Completed construction of ${site.buildingType} (Level ${site.buildingLevel}) with ${site.totalPoints} work points`);
-        
+
         // Trigger building effects if available
         if (window.villageManager?.buildingEffectsManager) {
             window.villageManager.buildingEffectsManager.applyBuildingEffects(
-                building.type, 
+                building.type,
                 `${building.x},${building.y}`
             );
         }
@@ -578,13 +578,13 @@ class ConstructionManager {
             assignedBuilders: site.assignedBuilders.length,
             dailyProgress: site.dailyProgress,
             estimatedCompletion: site.estimatedCompletion,
-            
+
             // Efficiency breakdown
             skillEfficiency: site.skillEfficiency,
             seasonalEfficiency: site.seasonalEfficiency,
             technologyEfficiency: site.technologyEfficiency,
             teamworkBonus: site.teamworkBonus,
-            
+
             // Status
             status: site.status,
             currentSeason: this.getCurrentSeason()
@@ -605,22 +605,22 @@ class ConstructionManager {
         // Construction workers are now managed through the JobManager
         // This method is deprecated but kept for compatibility
         console.warn('[Construction] Worker assignment is now handled through JobManager');
-        
+
         if (this.gameState.jobManager) {
             return this.gameState.jobManager.getAvailableWorkers();
         }
-        
+
         return [];
     }
 
     // Auto-assign builders is now handled by JobManager
     autoAssignWorkers() {
         console.warn('[Construction] Auto-assignment is now handled through JobManager');
-        
+
         if (this.gameState.jobManager) {
             return this.gameState.jobManager.autoAssignWorkers();
         }
-        
+
         return 0;
     }
 
@@ -641,7 +641,7 @@ class ConstructionManager {
     // Serialize construction manager state for saving
     serialize() {
         const constructionSitesData = [];
-        
+
         this.constructionSites.forEach((site, buildingId) => {
             constructionSitesData.push({
                 buildingId: buildingId,
@@ -718,7 +718,7 @@ class ConstructionManager {
         }
 
         console.log(`[ConstructionManager] Restored ${this.constructionSites.size} construction sites from save data`);
-        
+
         // Sync with legacy gameState.constructionSites array for compatibility
         if (this.gameState) {
             this.gameState.constructionSites = Array.from(this.constructionSites.values()).map(site => ({

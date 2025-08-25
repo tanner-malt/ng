@@ -116,7 +116,40 @@ const dailyProgress = assignedBuilders.length * BUILDER_WORK_POINTS_PER_DAY;
 - [ ] Effects system compatibility? (Haste runes, efficiency bonuses)
 - [ ] Save/load compatibility? (Serialize/deserialize methods)
 
-## 📁 **File-Specific Rules**
+## � Save Compatibility & Migrations
+
+We guarantee forward-compatibility of saves across releases. The save system is versioned and supports forward-only migrations.
+
+Key rules:
+- Each save includes `schemaVersion` (current is 1) and `savedAt` timestamp.
+- On load, older saves are migrated step-by-step to the current version via a migration registry.
+- If a save is from a future version, we load in read-only mode and prevent saving to avoid data loss/downgrades.
+- Unknown fields must be preserved where possible; migrations should be additive and non-destructive.
+- We maintain a legacy mirror key `idleDynastyBuilder` for compatibility until fully removed.
+
+Implementation details (see `src/systems/core/gameState.js`):
+- `SAVE_SCHEMA_VERSION`: bump when the persisted structure changes.
+- `SAVE_MIGRATIONS`: object mapping version N -> function that returns data at version N+1. Migrations are forward-only.
+- `migrateSaveData(data)`: runs migrations on load and sets a `__futureVersion` flag when the client is older than the save.
+- `GameState.readOnlySave`: prevents overwriting newer saves; `save()` is a no-op while true.
+
+How to add a migration:
+1. Identify the current version `SAVE_SCHEMA_VERSION` (e.g., 1) and the new target (e.g., 2).
+2. Implement `SAVE_MIGRATIONS[1] = (data) => { /* mutate defensively */ data.schemaVersion = 2; return data; }`.
+3. Bump `SAVE_SCHEMA_VERSION` to 2.
+4. Keep migrations idempotent and tolerant of partial data. Don’t drop unknown fields; normalize shapes/aliases.
+5. Add a short note to `docs/BUILDING_FIXES_SUMMARY.md` or a new migration log if the change is player-visible.
+
+QA checklist for migrations:
+- Seed an old save, load the game, and confirm a successful migration with no errors.
+- Verify critical fields are set (e.g., built buildings missing `level` get `level = 1`).
+- Ensure no data is unintentionally lost (compare before/after snapshots if feasible).
+- Confirm saving works after migration (unless it was a future-version read-only save).
+
+Testing tool:
+- Use `debug/test-new-game.html` → “Seed Old Save (v0) & Launch Game” to write a v0-format save and open the game to exercise migrations end-to-end.
+
+## �📁 **File-Specific Rules**
 
 ### `gameData.js`
 - Contains ALL game constants and calculations

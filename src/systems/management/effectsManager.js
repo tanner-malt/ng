@@ -12,7 +12,7 @@ class EffectsManager {
         this.gameState = gameState;
         this.activeEffects = new Map(); // effectId -> effect data
         this.effectTypes = this.initializeEffectTypes();
-        
+
         console.log('[EffectsManager] Effects management system initialized');
     }
 
@@ -75,7 +75,7 @@ class EffectsManager {
 
         const effectConfig = this.effectTypes[effectType];
         const effectId = `${effectType}_${Date.now()}`;
-        
+
         // Check if effect type already exists and handle stacking
         const existingEffect = this.getActiveEffectByType(effectType);
         if (existingEffect && effectConfig.maxStacks === 1) {
@@ -98,9 +98,9 @@ class EffectsManager {
         };
 
         this.activeEffects.set(effectId, effect);
-        
+
         console.log(`[EffectsManager] Applied effect: ${effect.name} (Duration: ${duration} days)`);
-        
+
         // Emit event for UI updates
         if (window.eventBus) {
             window.eventBus.emit('effect_applied', effect);
@@ -108,7 +108,7 @@ class EffectsManager {
 
         // Update building efficiency if this effect affects it
         this.updateBuildingEfficiency();
-        
+
         return effectId;
     }
 
@@ -117,16 +117,16 @@ class EffectsManager {
         if (!effect.id) {
             effect.id = `${effect.type}_${Date.now()}`;
         }
-        
+
         // Add current day if not specified
         if (!effect.startDay && this.gameState) {
             effect.startDay = this.gameState.currentDay || 1;
         }
-        
+
         this.activeEffects.set(effect.id, effect);
-        
+
         console.log(`[EffectsManager] Added custom effect: ${effect.name}`);
-        
+
         // Emit event for UI updates
         if (window.eventBus) {
             window.eventBus.emit('effect_applied', effect);
@@ -134,7 +134,7 @@ class EffectsManager {
 
         // Update building efficiency if this effect affects it
         this.updateBuildingEfficiency();
-        
+
         return effect.id;
     }
 
@@ -144,9 +144,9 @@ class EffectsManager {
         if (!effect) return false;
 
         this.activeEffects.delete(effectId);
-        
+
         console.log(`[EffectsManager] Removed effect: ${effect.name}`);
-        
+
         // Emit event for UI updates
         if (window.eventBus) {
             window.eventBus.emit('effect_removed', effect);
@@ -154,7 +154,7 @@ class EffectsManager {
 
         // Update building efficiency after removal
         this.updateBuildingEfficiency();
-        
+
         return true;
     }
 
@@ -233,7 +233,7 @@ class EffectsManager {
         // Notify buildings of efficiency changes
         this.gameState.buildings.forEach(building => {
             const multiplier = this.getBuildingEfficiencyMultiplier(building.type);
-            
+
             // Store the efficiency multiplier on the building
             building.efficiencyMultiplier = multiplier;
         });
@@ -307,7 +307,7 @@ class EffectsManager {
         if (!Array.isArray(data)) return;
 
         this.activeEffects.clear();
-        
+
         data.forEach(savedEffect => {
             if (this.effectTypes[savedEffect.type]) {
                 const effectConfig = this.effectTypes[savedEffect.type];
@@ -330,7 +330,7 @@ class EffectsManager {
 
         // Update building efficiency after loading
         this.updateBuildingEfficiency();
-        
+
         console.log(`[EffectsManager] Loaded ${this.activeEffects.size} effects from save data`);
     }
 

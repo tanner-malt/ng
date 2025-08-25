@@ -1235,8 +1235,10 @@ class PopulationManager {
         };
         this.addInhabitant(royalMember);
 
-        // 2. Add 4 basic villagers (jobs will be assigned from buildings later)
-        for (let i = 0; i < 4; i++) {
+        // 2. Add basic villagers (jobs will be assigned from buildings later)
+        const startingCount = (typeof window !== 'undefined' && window.GameData && window.GameData.startingPopulationCount) ? window.GameData.startingPopulationCount : 5;
+        const additionalVillagers = Math.max(0, startingCount - 1);
+        for (let i = 0; i < additionalVillagers; i++) {
             const villager = {
                 age: 20 + Math.floor(Math.random() * 25), // 20-45 years old
                 name: this.generateRandomName(),

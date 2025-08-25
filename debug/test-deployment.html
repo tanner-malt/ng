@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +14,7 @@
             background: #1a1a1a;
             color: #e0e0e0;
         }
+
         .test-section {
             background: #2a2a2a;
             padding: 20px;
@@ -20,14 +22,22 @@
             border-radius: 8px;
             border: 1px solid #333;
         }
-        .success { color: #4CAF50; }
-        .error { color: #f44336; }
+
+        .success {
+            color: #4CAF50;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
         .test-item {
             margin: 10px 0;
             padding: 10px;
             background: #333;
             border-radius: 4px;
         }
+
         button {
             background: #4CAF50;
             color: white;
@@ -37,11 +47,13 @@
             cursor: pointer;
             margin: 5px;
         }
+
         button:hover {
             background: #45a049;
         }
     </style>
 </head>
+
 <body>
     <h1>🎮 Idle Dynasty - Deployment Test</h1>
     <p>This page tests the resource loading fixes for deployment issues.</p>
@@ -63,8 +75,8 @@
     <div class="test-section">
         <h2>🔧 Actions</h2>
         <button onclick="runTests()">🔄 Re-run Tests</button>
-        <button onclick="window.open('public/game.html', '_blank')">🎮 Open Game</button>
-        <button onclick="window.open('/', '_blank')">🏠 Open Main Page</button>
+        <button onclick="window.open('../public/game.html', '_blank')">🎮 Open Game</button>
+        <button onclick="window.open('../', '_blank')">🏠 Open Main Page</button>
     </div>
 
     <div class="test-section">
@@ -84,7 +96,7 @@
 
             const statusEl = document.getElementById('version-status');
             const detailsEl = document.getElementById('version-details');
-            
+
             statusEl.innerHTML = '<span class="error">Testing...</span>';
             detailsEl.innerHTML = '';
 
@@ -111,7 +123,7 @@
         async function testWikiData() {
             const statusEl = document.getElementById('wikidata-status');
             const detailsEl = document.getElementById('wikidata-details');
-            
+
             statusEl.innerHTML = '<span class="error">Testing...</span>';
             detailsEl.innerHTML = '';
 
@@ -124,10 +136,11 @@
 
             // Try loading from different paths
             const paths = [
-                '../src/wikiData.js',
+                '../src/config/wikiData.js',  // New organized location
+                '../public/wikiData.js',      // Build output location
                 './wikiData.js',
                 'public/wikiData.js',
-                'src/wikiData.js',
+                'src/config/wikiData.js',
                 'wikiData.js'
             ];
 
@@ -152,7 +165,7 @@
         // Run all tests
         async function runTests() {
             console.log('Starting deployment tests...');
-            
+
             const results = {
                 version: await testVersionJson(),
                 wikiData: await testWikiData()
@@ -175,4 +188,5 @@
         document.addEventListener('DOMContentLoaded', runTests);
     </script>
 </body>
+
 </html>

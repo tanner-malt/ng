@@ -177,7 +177,14 @@ class WikiData {
     }
 }
 
-// Make WikiData available globally in browser
-if (typeof window !== 'undefined') {
-    window.WikiData = WikiData;
-}
+(function(root, factory){
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = factory();
+    } else if (typeof define === 'function' && define.amd) {
+        define([], factory);
+    } else {
+        root.WikiData = factory();
+    }
+})(typeof self !== 'undefined' ? self : typeof window !== 'undefined' ? window : globalThis, function(){
+    return WikiData;
+});
