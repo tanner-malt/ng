@@ -23,8 +23,10 @@ class TileManager {
         // Central inventory for all items in the city
         this.cityInventory = new Map(); // itemId -> { quantity, locations: [{ x, y, quantity }] }
         
-        // Initialize with basic items only if not skipping defaults
-        if (!skipDefaults) {
+        // Initialize with basic items only if not skipping defaults AND no existing save
+        // This ensures starter items are only granted for truly new games
+        const hasExistingSave = (typeof localStorage !== 'undefined') && !!localStorage.getItem('dynastyBuilder_save');
+        if (!skipDefaults && !hasExistingSave) {
             this.addItemToInventory('haste_rune', 2);
             this.addItemToInventory('tent', 5);
             this.addItemToInventory('foundersWagon', 1);
@@ -395,8 +397,9 @@ class TileManager {
                 this.deserializeCityInventory(data.cityInventory);
             }
             
-            // Ensure essential starter items exist (compatibility fix)
-            this.ensureStarterItems();
+        // Ensure essential starter items exist (compatibility fix)
+        // Note: do NOT add items if save already has them to avoid duplication
+        this.ensureStarterItems();
             
             console.log('[TileManager] Data deserialized successfully');
             return true;
@@ -408,22 +411,32 @@ class TileManager {
     
     // Ensure starter items exist in city inventory (for save compatibility)
     ensureStarterItems() {
+        const hasExistingSave = (typeof localStorage !== 'undefined') && !!localStorage.getItem('dynastyBuilder_save');
+        // If we have an existing save and inventory already contains quantities, do not top-up
+        // This avoids duplicating starter items when loading saves created before cityInventory existed
+        const safeAdd = (id, qty) => {
+            const entry = this.cityInventory.get(id);
+            if (!entry || (typeof entry.quantity !== 'number') || entry.quantity < 1) {
+                this.addItemToInventory(id, qty);
+            }
+        };
+
         // Check if foundersWagon exists, if not add it
         if (!this.cityInventory.has('foundersWagon')) {
             console.log('[TileManager] Adding missing foundersWagon to existing save');
-            this.addItemToInventory('foundersWagon', 1);
+            safeAdd('foundersWagon', 1);
         }
         
         // Check if tents exist, if not add some
         if (!this.cityInventory.has('tent')) {
             console.log('[TileManager] Adding missing tents to existing save');
-            this.addItemToInventory('tent', 5);
+            safeAdd('tent', 5);
         }
         
         // Check if haste runes exist, if not add some
         if (!this.cityInventory.has('haste_rune')) {
             console.log('[TileManager] Adding missing haste runes to existing save');
-            this.addItemToInventory('haste_rune', 2);
+            safeAdd('haste_rune', 2);
         }
     }
 

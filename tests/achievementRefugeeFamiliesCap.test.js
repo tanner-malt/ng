@@ -15,7 +15,7 @@ describe('Achievements refugee_families respects population cap', () => {
     window.gameState = {
       population: { total: people.length },
       getPopulationCap: () => cap,
-      updatePopulationCount: () => {},
+      updatePopulationCount: () => { },
       populationManager: {
         addInhabitant: ({ role }) => {
           if (people.length >= cap) return null;

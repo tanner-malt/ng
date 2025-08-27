@@ -14,30 +14,30 @@ class JobManager {
     initializeJobEfficiency() {
         // Base efficiency rates for different job types
         // Each worker in these jobs produces these amounts per day
-    // Farmers now produce less baseline food
-    this.jobEfficiency.set('farmer', { food: 3 }); // From farms
+        // Farmers baseline food per day
+        this.jobEfficiency.set('farmer', { food: 3.5 }); // From farms (was 3)
         this.jobEfficiency.set('woodcutter', { wood: 3 }); // From woodcutter lodges
         this.jobEfficiency.set('builder', { construction: 1 }); // From tents, builder huts
-    // Gatherers now produce a random basic resource each day (food OR wood OR stone)
-    // We leave efficiency blank and handle via RNG in calculateDailyProduction
-    this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
+        // Gatherers now produce a random basic resource each day (food OR wood OR stone)
+        // We leave efficiency blank and handle via RNG in calculateDailyProduction
+        this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
         this.jobEfficiency.set('crafter', { production: 1 }); // Kept for town center legacy
-    // Sawyer consumes wood to produce planks
-    this.jobEfficiency.set('sawyer', { wood: -3, planks: 3 }); // From lumber mills - processing
-    // Foreman no longer contributes direct construction points; boosts builders instead
-    this.jobEfficiency.set('foreman', {}); // Boost applied in ConstructionManager
+        // Sawyer consumes wood to produce planks
+        this.jobEfficiency.set('sawyer', { wood: -3, planks: 3 }); // From lumber mills - processing
+        // Foreman no longer contributes direct construction points; boosts builders instead
+        this.jobEfficiency.set('foreman', {}); // Boost applied in ConstructionManager
         this.jobEfficiency.set('miner', { stone: 2, metal: 1 }); // From mines
         this.jobEfficiency.set('rockcutter', { stone: 3 }); // From quarries
-    // Engineers now produce more production
-    this.jobEfficiency.set('engineer', { production: 3 }); // From workshops
+        // Engineers now produce more production
+        this.jobEfficiency.set('engineer', { production: 3 }); // From workshops
         this.jobEfficiency.set('trader', { gold: 2 }); // From markets
-    // Blacksmith no longer consumes metal
-    this.jobEfficiency.set('blacksmith', { production: 2 });
-    // Removed production from military/academic support roles
-    this.jobEfficiency.set('drillInstructor', { }); // Organizational value (no direct resource)
-    this.jobEfficiency.set('militaryTheorist', { }); // Planning value (no direct resource)
-    this.jobEfficiency.set('professor', { }); // Research value (no direct resource)
-    this.jobEfficiency.set('scholar', { }); // Research value (no direct resource)
+        // Blacksmith no longer consumes metal
+        this.jobEfficiency.set('blacksmith', { production: 2 });
+        // Removed production from military/academic support roles
+        this.jobEfficiency.set('drillInstructor', {}); // Organizational value (no direct resource)
+        this.jobEfficiency.set('militaryTheorist', {}); // Planning value (no direct resource)
+        this.jobEfficiency.set('professor', {}); // Research value (no direct resource)
+        this.jobEfficiency.set('scholar', {}); // Research value (no direct resource)
         this.jobEfficiency.set('wizard', { production: 0 }); // Placeholder until magic systems
     }
 
@@ -311,7 +311,7 @@ class JobManager {
         return arr[idx];
     }
 
-    // Calculate detailed daily production with sources breakdown
+    // Calculate detailed daily production with per-source income/expense breakdown
     calculateDetailedDailyProduction() {
         console.log('[JobManager] calculateDetailedDailyProduction() called');
 
@@ -335,6 +335,20 @@ class JobManager {
             planks: [],
             production: []
         };
+
+        // New structured breakdown: for each resource, track income and expense lines
+        const breakdown = {
+            food: { income: [], expense: [] },
+            wood: { income: [], expense: [] },
+            stone: { income: [], expense: [] },
+            metal: { income: [], expense: [] },
+            planks: { income: [], expense: [] },
+            production: { income: [], expense: [] }
+        };
+
+        // Aggregate production/consumption by job type across all buildings
+        // Structure: { [jobType]: { workers: totalWorkers, resources: { food|wood|...: totalAmount } } }
+        const jobAggregates = {};
 
         // Track worker counts for each resource type
         const workerCounts = {
@@ -381,6 +395,20 @@ class JobManager {
 
                 let jobTotal = { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, production: 0 };
 
+                // Building-level efficiency multiplier (effects, haste rune, weather, etc.)
+                let buildingMult = 1.0;
+                try {
+                    const b = building;
+                    if (b) {
+                        // Prefer the cached multiplier set by EffectsManager; fallback to on-demand calculation
+                        if (typeof b.efficiencyMultiplier === 'number') {
+                            buildingMult = b.efficiencyMultiplier;
+                        } else if (window.effectsManager && typeof window.effectsManager.getBuildingEfficiencyMultiplier === 'function') {
+                            buildingMult = window.effectsManager.getBuildingEfficiencyMultiplier(b.type, b.id);
+                        }
+                    }
+                } catch (_) { /* safe fallback to 1.0 */ }
+
                 workerIds.forEach(workerId => {
                     const worker = this.getWorkerById(workerId);
                     if (!worker) return;
@@ -389,10 +417,21 @@ class JobManager {
 
                     Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
                         if (production.hasOwnProperty(resourceType)) {
-                            const resourceGenerated = baseAmount * workerEfficiency;
+                            // Apply seasonal multipliers consistently with calculateDailyProduction()
+                            let seasonMult = 1.0;
+                            try {
+                                const season = this.gameState?.season || 'Spring';
+                                const mults = window.GameData?.seasonMultipliers?.[season];
+                                if (mults && typeof mults[resourceType] === 'number') {
+                                    seasonMult = mults[resourceType];
+                                }
+                            } catch (_) { }
+
+                            // Include building-level multiplier last so it scales all prior factors
+                            const resourceGenerated = baseAmount * workerEfficiency * seasonMult * buildingMult;
                             production[resourceType] += resourceGenerated;
                             jobTotal[resourceType] += resourceGenerated;
-                            // Count workers contributing to each resource type
+                            // Count workers contributing to each resource type (only for positive generation)
                             if (resourceGenerated > 0) {
                                 workerCounts[resourceType]++;
                             }
@@ -400,17 +439,43 @@ class JobManager {
                     });
                 });
 
-                // Add sources for each resource this job type produces
+                // Accumulate totals by job type across all buildings
+                if (!jobAggregates[jobType]) {
+                    jobAggregates[jobType] = { workers: 0, resources: { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, production: 0 } };
+                }
+                jobAggregates[jobType].workers += Array.isArray(workerIds) ? workerIds.length : 0;
                 Object.entries(jobTotal).forEach(([resourceType, amount]) => {
-                    if (amount > 0) {
-                        sources[resourceType].push(`${buildingName} (${workerIds.length} ${jobType}): +${amount.toFixed(1)}`);
+                    if (resourceType in jobAggregates[jobType].resources) {
+                        jobAggregates[jobType].resources[resourceType] += amount;
                     }
                 });
             });
         });
 
-        console.log('[JobManager] Total daily production with sources and worker counts:', { production, sources, workerCounts });
-        return { production, sources, workerCounts };
+        // Helper to format job type for labels
+        const formatJobLabel = (jobType) => jobType ? (jobType.charAt(0).toUpperCase() + jobType.slice(1)) : 'Job';
+
+        // Fill breakdown with one line per job type per resource, city-wide
+        Object.entries(jobAggregates).forEach(([jobType, data]) => {
+            const labelBase = `${formatJobLabel(jobType)} (${data.workers} worker${data.workers === 1 ? '' : 's'})`;
+            Object.entries(data.resources).forEach(([resourceType, total]) => {
+                if (!total || !breakdown[resourceType]) return;
+                const line = { label: labelBase, workers: data.workers, amount: Number(total.toFixed(2)) };
+                if (total >= 0) breakdown[resourceType].income.push(line);
+                else breakdown[resourceType].expense.push(line);
+            });
+        });
+
+        // Add population upkeep as food expenditure (1 per person per day)
+        try {
+            const pop = this.gameState?.population ?? (this.gameState?.populationManager?.population?.length || 0);
+            if (pop > 0) {
+                breakdown.food.expense.push({ label: 'Population Upkeep', workers: pop, amount: -pop });
+            }
+        } catch (_) { }
+
+        console.log('[JobManager] Total daily production with breakdown:', { production, sources, workerCounts });
+        return { production, sources, workerCounts, breakdown };
     }
 
     calculateWorkerEfficiency(worker, jobType) {

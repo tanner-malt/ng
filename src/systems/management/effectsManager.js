@@ -24,9 +24,8 @@ class EffectsManager {
                 icon: '⚡',
                 category: 'magical',
                 maxStacks: 1,
-                effects: {
-                    buildingEfficiency: 1.5 // 50% efficiency boost
-                }
+                // Default effect is neutral; per-building custom effects provide actual multiplier
+                effects: { buildingEfficiency: 1.0 }
             },
             weather_sunny: {
                 name: 'Sunny Weather',
@@ -206,20 +205,29 @@ class EffectsManager {
         }
     }
 
-    // Calculate total efficiency multiplier for a building type
-    getBuildingEfficiencyMultiplier(buildingType) {
+    // Calculate total efficiency multiplier for a building (type + optional specific buildingId)
+    getBuildingEfficiencyMultiplier(buildingType, buildingId = null) {
         let multiplier = 1.0;
 
         for (const effect of this.getActiveEffects()) {
-            // General building efficiency
-            if (effect.effects.buildingEfficiency) {
-                multiplier *= effect.effects.buildingEfficiency;
+            const efx = effect.effects || {};
+
+            // 1) Global building efficiency (e.g., generic hasteRune)
+            if (efx.buildingEfficiency) {
+                multiplier *= efx.buildingEfficiency;
             }
 
-            // Specific building type efficiency
-            const specificEfficiency = effect.effects[`${buildingType}Efficiency`];
+            // 2) Specific building type efficiency (e.g., farmEfficiency)
+            const specificEfficiency = efx[`${buildingType}Efficiency`];
             if (specificEfficiency) {
                 multiplier *= specificEfficiency;
+            }
+
+            // 3) Per-building haste rune applied via inventory (custom object)
+            // Village adds effects with type 'haste_rune' and fields: { buildingId, multiplier }
+            if (effect.type === 'haste_rune' && buildingId != null && effect.buildingId === buildingId) {
+                const m = typeof effect.multiplier === 'number' ? effect.multiplier : 1.0;
+                multiplier *= m;
             }
         }
 
@@ -232,7 +240,7 @@ class EffectsManager {
 
         // Notify buildings of efficiency changes
         this.gameState.buildings.forEach(building => {
-            const multiplier = this.getBuildingEfficiencyMultiplier(building.type);
+            const multiplier = this.getBuildingEfficiencyMultiplier(building.type, building.id);
 
             // Store the efficiency multiplier on the building
             building.efficiencyMultiplier = multiplier;

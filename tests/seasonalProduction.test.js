@@ -51,9 +51,9 @@ describe('Seasonal production multipliers (job-driven)', () => {
         const ok = jm.assignWorkerToJob(worker.id, farm.id, 'farmer');
         expect(ok).toBe(true);
 
-    const production = jm.calculateDailyProduction();
-    // farmer base: food 3 per worker; Summer food multiplier: 1.5
-    expect(production.food).toBeCloseTo(3 * 1.5, 5);
+        const production = jm.calculateDailyProduction();
+        // farmer base: food 3.5 per worker; Summer food multiplier: 1.5
+        expect(production.food).toBeCloseTo(3.5 * 1.5, 5);
     });
 
     it('applies Autumn multiplier to woodcutter job (wood)', () => {
@@ -81,8 +81,8 @@ describe('Seasonal production multipliers (job-driven)', () => {
         const ok = jm.assignWorkerToJob(worker.id, farm.id, 'farmer');
         expect(ok).toBe(true);
 
-    const production = jm.calculateDailyProduction();
-    // Winter food multiplier: 0.7 with base 3
-    expect(production.food).toBeCloseTo(3 * 0.7, 5);
+        const production = jm.calculateDailyProduction();
+        // Winter food multiplier: 0.7 with base 3.5
+        expect(production.food).toBeCloseTo(3.5 * 0.7, 5);
     });
 });

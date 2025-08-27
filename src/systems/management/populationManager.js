@@ -273,8 +273,8 @@ class PopulationManager {
         const eligibleCouples = Math.min(males.length, females.length);
         if (eligibleCouples === 0) return { births: 0, twins: 0, bonus: 0, eligibleCouples: 0 };
 
-        // Base: Each couple has a 2.5/100 chance per day (~2.5% daily chance for faster growth)
-        let baseChance = 2.5 / 100;
+    // Base: Each couple has a 2.25/100 chance per day (~2.25% daily chance)
+    let baseChance = 2.25 / 100;
         let bonus = 0;
         if (options.foodAbundant) bonus += 0.75; // Increased food bonus
         if (options.foodScarce) bonus -= 0.5;
@@ -1455,11 +1455,46 @@ class PopulationManager {
             };
         }
 
-        // Calculate age groups with updated age brackets
+        // Calculate granular age groups for richer UI bars
+        // Keep a separate working-age count for analytics without rendering an aggregate bar
+        const workingAgeCount = this.population.filter(p => p.age >= 16 && p.age <= 190).length;
+
         const ageGroupData = {
-            children: { name: '👶 Children', age: '0-15 days', count: this.population.filter(p => p.age <= 15).length },
-            workingAge: { name: '� Working Age', age: '16-190 days', count: this.population.filter(p => p.age >= 16 && p.age <= 190).length },
-            elderly: { name: '👴 Elderly', age: '191+ days', count: this.population.filter(p => p.age >= 191).length }
+            infants: {
+                name: '🍼 Infants',
+                age: '0-3 days',
+                count: this.population.filter(p => p.age >= 0 && p.age <= 3).length
+            },
+            children: {
+                name: '👶 Children',
+                age: '4-15 days',
+                count: this.population.filter(p => p.age >= 4 && p.age <= 15).length
+            },
+            youngAdults: {
+                name: '🧑 Young Adults',
+                age: '16-40 days',
+                count: this.population.filter(p => p.age >= 16 && p.age <= 40).length
+            },
+            adults: {
+                name: '🧑‍🌾 Adults',
+                age: '41-90 days',
+                count: this.population.filter(p => p.age >= 41 && p.age <= 90).length
+            },
+            middleAged: {
+                name: '🧔 Middle-Aged',
+                age: '91-150 days',
+                count: this.population.filter(p => p.age >= 91 && p.age <= 150).length
+            },
+            seniors: {
+                name: '👵 Seniors',
+                age: '151-190 days',
+                count: this.population.filter(p => p.age >= 151 && p.age <= 190).length
+            },
+            elderly: {
+                name: '👴 Elderly',
+                age: '191+ days',
+                count: this.population.filter(p => p.age >= 191).length
+            }
         };
 
         // Calculate job groups with proper structure for UI
@@ -1551,13 +1586,18 @@ class PopulationManager {
             .slice(0, 10);
 
         // Calculate happiness statistics
-        const happinessTotal = this.population.reduce((sum, v) => sum + (v.happiness || 70), 0);
+        const happinessValues = this.population.map(v => (v.happiness ?? 70));
+        const happinessTotal = happinessValues.reduce((sum, h) => sum + h, 0);
         const averageHappiness = Math.round(happinessTotal / this.population.length);
 
+        // Map happiness distribution to UI-expected buckets
+        // veryUnhappy: 0-19, unhappy: 20-39, neutral: 40-59, happy: 60-79, veryHappy: 80-100
         const happinessDistribution = {
-            high: this.population.filter(v => (v.happiness || 70) >= 80).length,
-            medium: this.population.filter(v => (v.happiness || 70) >= 50 && (v.happiness || 70) < 80).length,
-            low: this.population.filter(v => (v.happiness || 70) < 50).length
+            veryUnhappy: happinessValues.filter(h => h < 20).length,
+            unhappy: happinessValues.filter(h => h >= 20 && h < 40).length,
+            neutral: happinessValues.filter(h => h >= 40 && h < 60).length,
+            happy: happinessValues.filter(h => h >= 60 && h < 80).length,
+            veryHappy: happinessValues.filter(h => h >= 80).length
         };
 
         // Calculate productivity statistics
@@ -1568,7 +1608,7 @@ class PopulationManager {
             total: this.population.length,
             demographics: {
                 averageAge: Math.round(this.population.reduce((sum, v) => sum + v.age, 0) / this.population.length),
-                workingAge: ageGroupData.workingAge.count,
+                workingAge: workingAgeCount,
                 employed: this.population.filter(v => v.status === 'working').length,
                 maleCount: this.population.filter(v => v.gender === 'male').length,
                 femaleCount: this.population.filter(v => v.gender === 'female').length
@@ -1576,7 +1616,8 @@ class PopulationManager {
             happiness: {
                 average: averageHappiness,
                 distribution: happinessDistribution,
-                total: happinessTotal
+                // UI expects total to be the number of villagers when computing distribution percentages
+                total: this.population.length
             },
             productivity: {
                 average: averageProductivity
@@ -1598,7 +1639,7 @@ class PopulationManager {
                     const bestSkill = this.getBestSkill(p);
                     return bestSkill.level === 'expert' || bestSkill.level === 'master';
                 }).length,
-                total: ageGroupData.workingAge.count
+                total: workingAgeCount
             },
             genderDistribution: {
                 male: this.population.filter(p => p.gender === 'male').length,

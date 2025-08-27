@@ -7358,6 +7358,13 @@ html {
 .age-elderly {
     background: linear-gradient(90deg, #8D6E63, #6D4C41);
 }
+/* New granular age groups */
+.age-infants {
+    background: linear-gradient(90deg, #A78BFA, #8B5CF6);
+}
+.age-seniors {
+    background: linear-gradient(90deg, #FB923C, #F97316);
+}
 
 /* Job group colors */
 .job-unemployed {
@@ -8809,6 +8816,10 @@ html {
 
 .skill-level-grandmaster {
     background: #b9f2ff;
+}
+/* Match UI level key */
+.skill-level-master {
+    background: #22c55e;
 }
 
 /* Happiness Overview */

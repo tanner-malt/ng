@@ -12,7 +12,7 @@ class QuestManager {
         this.pursuitChance = 0; // Chance of being pursued during retreat
         this.outposts = []; // Player established outposts
         this.knownLocations = new Set(); // Discovered but not yet explored locations
-        
+
         // Initialize royal family expedition tracking
         this.royalExpeditionHistory = new Map(); // Track which royals have led expeditions
     }
@@ -58,7 +58,7 @@ class QuestManager {
                 discovered: true,
                 specialFeatures: ['fertile_land', 'potential_settlement_site']
             },
-            
+
             // Medium difficulty locations
             {
                 id: 'bandit_stronghold',
@@ -121,7 +121,7 @@ class QuestManager {
                 unlockRequirement: 'build_3_buildings',
                 specialFeatures: ['rich_ore_veins', 'mining_equipment', 'potential_outpost_site']
             },
-            
+
             // Hard difficulty locations
             {
                 id: 'orc_fortress',
@@ -164,7 +164,7 @@ class QuestManager {
                 unlockRequirement: 'population_50',
                 specialFeatures: ['magical_properties', 'renewable_resources', 'diplomatic_opportunity']
             },
-            
+
             // Extreme difficulty locations
             {
                 id: 'dragon_lair',
@@ -225,16 +225,16 @@ class QuestManager {
     // Check if expeditions are unlocked (requires Military Establishment achievement)
     areExpeditionsUnlocked() {
         if (!this.gameState.achievements) return false;
-        return this.gameState.achievements.isUnlocked('military_establishment') && 
-               this.gameState.buildings.some(b => b.type === 'barracks');
+        return this.gameState.achievements.isUnlocked('military_establishment') &&
+            this.gameState.buildings.some(b => b.type === 'barracks');
     }
 
     // Get available royal family members for expedition leadership
     getAvailableRoyalLeaders() {
         if (!this.gameState.populationManager) return [];
-        
+
         const royals = [];
-        
+
         // Add monarch if available
         if (this.gameState.monarch && !this.gameState.monarch.onExpedition) {
             royals.push({
@@ -344,10 +344,10 @@ class QuestManager {
                         <div class="army-info">
                             <p>Available Army Size: ${armySize} soldiers</p>
                             <p>Recommended for ${location.difficulty} difficulty: ${this.getRecommendedArmySize(location.difficulty)} soldiers</p>
-                            ${armySize < this.getRecommendedArmySize(location.difficulty) ? 
-                                '<p class="warning">⚠️ Army size below recommended - high risk of failure!</p>' : 
-                                '<p class="success">✅ Army size adequate for mission</p>'
-                            }
+                            ${armySize < this.getRecommendedArmySize(location.difficulty) ?
+                '<p class="warning">⚠️ Army size below recommended - high risk of failure!</p>' :
+                '<p class="success">✅ Army size adequate for mission</p>'
+            }
                         </div>
                     </div>
 
@@ -370,9 +370,9 @@ class QuestManager {
                         <h4>🎁 Potential Rewards</h4>
                         <div class="rewards-preview">
                             ${Object.keys(location.rewards).map(resource => {
-                                if (resource === 'special') return `<div>✨ Special: ${location.rewards[resource]}</div>`;
-                                return `<div>${this.getSupplyIcon(resource)} ${resource}: ${location.rewards[resource].min}-${location.rewards[resource].max}</div>`;
-                            }).join('')}
+                if (resource === 'special') return `<div>✨ Special: ${location.rewards[resource]}</div>`;
+                return `<div>${this.getSupplyIcon(resource)} ${resource}: ${location.rewards[resource].min}-${location.rewards[resource].max}</div>`;
+            }).join('')}
                         </div>
                     </div>
                 </div>
@@ -418,7 +418,7 @@ class QuestManager {
     calculateRequiredSupplies(location) {
         const armySize = Math.max(this.gameState.army?.length || 0, 5); // Minimum 5 for expedition
         const totalDays = location.travelDays * 2 + 2; // Round trip + buffer
-        
+
         return {
             food: armySize * totalDays * 2,
             medicine: Math.max(10, Math.floor(armySize / 3)),
@@ -439,7 +439,7 @@ class QuestManager {
 
     // Check if expedition can be started with current resources
     canStartExpedition(location, availableSupplies, requiredSupplies) {
-        return Object.keys(requiredSupplies).every(supply => 
+        return Object.keys(requiredSupplies).every(supply =>
             availableSupplies[supply] >= requiredSupplies[supply]
         ) && (this.gameState.army?.length || 0) >= this.getRecommendedArmySize(location.difficulty) / 2;
     }
@@ -502,7 +502,7 @@ class QuestManager {
         // Calculate and consume supplies
         const requiredSupplies = this.calculateRequiredSupplies(location);
         const availableSupplies = this.getAvailableSupplies();
-        
+
         // Check if we have enough supplies
         if (!this.canStartExpedition(location, availableSupplies, requiredSupplies)) {
             window.showNotification('Insufficient supplies for expedition!', { timeout: 3000, icon: '📦' });
@@ -563,10 +563,10 @@ class QuestManager {
     consumeExpeditionSupplies(requiredSupplies) {
         // Consume food from resources
         this.gameState.resources.food = Math.max(0, this.gameState.resources.food - requiredSupplies.food);
-        
+
         // Consume gold
         this.gameState.gold = Math.max(0, this.gameState.gold - requiredSupplies.gold);
-        
+
         // Consume medicine and equipment from inventory if available
         if (this.gameState.inventory) {
             this.gameState.inventory.consumeMedicine(requiredSupplies.medicine);
@@ -604,7 +604,7 @@ class QuestManager {
             { type: 'hot', name: 'Extreme Heat', modifier: 0.85, description: 'Scorching heat drains energy' },
             { type: 'cold', name: 'Bitter Cold', modifier: 0.75, description: 'Freezing temperatures slow march' }
         ];
-        
+
         return weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
     }
 
@@ -621,16 +621,16 @@ class QuestManager {
             'enchanted_forest': ['Magic disrupts navigation', 'Illusions lead astray', 'Supernatural guardians watch'],
             'volcanic': ['Toxic gases poison the air', 'Lava flows block passages', 'Unstable ground shifts underfoot']
         };
-        
+
         return challenges[terrain] || ['Unknown terrain presents unexpected challenges'];
     }
 
     // Get items brought on expedition from inventory
     getExpeditionInventory() {
         if (!this.gameState.inventory) return [];
-        
+
         const expeditionItems = [];
-        
+
         // Add special items that help with expeditions
         const items = this.gameState.inventory.getAllItems();
         items.forEach(item => {
@@ -641,7 +641,7 @@ class QuestManager {
                 });
             }
         });
-        
+
         return expeditionItems;
     }
 
@@ -650,7 +650,7 @@ class QuestManager {
         if (!this.gameState.stats) {
             this.gameState.stats = {};
         }
-        
+
         this.gameState.stats.totalExpeditionsSent = (this.gameState.stats.totalExpeditionsSent || 0) + 1;
         this.gameState.stats.currentExpeditionDay = 0;
     }
@@ -664,11 +664,11 @@ class QuestManager {
     updateLocationAvailability() {
         this.availableLocations.forEach(location => {
             if (location.unlocked) return; // Already unlocked
-            
+
             // Check unlock requirements
             if (location.unlockRequirement) {
                 const requirement = location.unlockRequirement;
-                
+
                 if (requirement === 'defeat_goblin_outpost') {
                     location.unlocked = this.hasCompletedLocation('goblin_outpost');
                 } else if (requirement === 'defeat_bandit_stronghold') {
@@ -733,12 +733,12 @@ class QuestManager {
                 <div class="travel-events">
                     <h3>Journey Log</h3>
                     <div class="event-log" id="travel-event-log">
-                        ${this.currentExpedition.events.map(event => 
-                            `<div class="travel-event ${event.type}">
+                        ${this.currentExpedition.events.map(event =>
+            `<div class="travel-event ${event.type}">
                                 <span class="event-time">${event.time}</span>
                                 <span class="event-text">${event.text}</span>
                             </div>`
-                        ).join('')}
+        ).join('')}
                     </div>
                 </div>
 
@@ -791,7 +791,7 @@ class QuestManager {
         const terrain = location.terrain;
         const morale = this.currentExpedition.armyMorale;
         const isReturnJourney = this.expeditionState === 'traveling_back';
-        
+
         // Different event pools based on context
         const baseEvents = [
             {
@@ -863,7 +863,7 @@ class QuestManager {
                 effect: () => {
                     const medicineUsed = Math.min(4, this.currentExpedition.supplies.medicine);
                     this.currentExpedition.supplies.medicine = Math.max(0, this.currentExpedition.supplies.medicine - medicineUsed);
-                    
+
                     if (medicineUsed < 2) {
                         this.currentExpedition.armyMorale -= 20;
                         this.currentExpedition.casualties += 1;
@@ -951,7 +951,7 @@ class QuestManager {
                     const desertions = Math.floor(Math.random() * 3) + 1;
                     this.currentExpedition.desertions += desertions;
                     this.currentExpedition.armyMorale = Math.max(0, this.currentExpedition.armyMorale - 10);
-                    
+
                     this.currentExpedition.events.push({
                         type: 'negative',
                         text: `${desertions} soldiers have abandoned the expedition.`,
@@ -975,24 +975,24 @@ class QuestManager {
 
         // Combine all possible events
         let eventPool = [...baseEvents];
-        
+
         // Add positive events more frequently if morale is high
         if (morale > 60) {
             eventPool.push(...positiveEvents);
         }
-        
+
         // Add negative events more frequently if morale is low
         if (morale < 50) {
             eventPool.push(...negativeEvents);
         }
-        
+
         // Always include some challenges and expedition-specific events
         eventPool.push(...challengeEvents.slice(0, 2));
         eventPool.push(...expeditionSpecificEvents);
 
         const event = eventPool[Math.floor(Math.random() * eventPool.length)];
         const eventTime = new Date().toLocaleTimeString();
-        
+
         this.currentExpedition.events.push({
             ...event,
             time: eventTime
@@ -1022,8 +1022,8 @@ class QuestManager {
             'neutral': '📰'
         };
 
-        window.showNotification(event.text, { 
-            timeout: urgency === 'high' ? 6000 : 4000, 
+        window.showNotification(event.text, {
+            timeout: urgency === 'high' ? 6000 : 4000,
             icon: iconMap[event.type]
         });
     }
@@ -1031,7 +1031,7 @@ class QuestManager {
     // Handle expedition collapse due to low morale
     handleExpeditionCollapse() {
         const location = this.currentExpedition.location;
-        
+
         this.currentExpedition.events.push({
             type: 'negative',
             text: 'Army morale has collapsed! The expedition dissolves in chaos...',
@@ -1051,7 +1051,7 @@ class QuestManager {
     // Present player with tactical choices during travel
     presentTravelChoice(choiceType, terrain) {
         const choices = this.getTravelChoices(choiceType, terrain);
-        
+
         if (window.modalSystem) {
             const choiceHTML = `
                 <div class="travel-choice">
@@ -1238,10 +1238,10 @@ class QuestManager {
             text: 'Expedition engages pursuing enemies in battle!',
             time: new Date().toLocaleTimeString()
         });
-        
+
         // Simplified battle resolution for now
         const battleOutcome = Math.random() < (0.6 + this.currentExpedition.loyaltyBonus * 0.2);
-        
+
         if (battleOutcome) {
             this.currentExpedition.armyMorale += 20;
             this.currentExpedition.pursuitRisk = 0;
@@ -1267,15 +1267,15 @@ class QuestManager {
             'Hidden Valley', 'Ancient Watchtower', 'Mysterious Cave', 'Abandoned Mine',
             'Forgotten Temple', 'Natural Hot Springs', 'Secret Grove', 'Old Battlefield'
         ];
-        
+
         const discoveredName = newLocationNames[Math.floor(Math.random() * newLocationNames.length)];
-        
+
         this.currentExpedition.discoveredLocations.push({
             name: discoveredName,
             discovered: true,
             requiresExploration: true
         });
-        
+
         this.currentExpedition.events.push({
             type: 'positive',
             text: `Scouts have discovered ${discoveredName}! This location can be explored in future expeditions.`,
@@ -1286,7 +1286,7 @@ class QuestManager {
     calculateInitialSupplies(location) {
         const armySize = Math.max(this.gameState.army?.length || 0, 5);
         const totalDays = (location?.travelDays || 2) * 2 + 2; // Round trip + buffer
-        
+
         return {
             food: Math.max(20, armySize * totalDays * 1.5),
             medicine: Math.max(10, Math.floor(armySize / 2)),
@@ -1299,13 +1299,13 @@ class QuestManager {
         if (this.currentExpedition.supplies.food >= 5) {
             this.currentExpedition.supplies.food -= 5;
             this.currentExpedition.armyMorale = Math.min(100, this.currentExpedition.armyMorale + 20);
-            
+
             this.currentExpedition.events.push({
                 type: 'positive',
                 text: 'Army rests and shares a meal. Morale improves!',
                 time: new Date().toLocaleTimeString()
             });
-            
+
             this.renderTravelView();
             window.showNotification('Army morale improved!', { timeout: 3000, icon: '😊' });
         } else {
@@ -1316,30 +1316,30 @@ class QuestManager {
     forceMarch() {
         this.currentExpedition.armyMorale = Math.max(0, this.currentExpedition.armyMorale - 15);
         this.currentExpedition.travelBonus = (this.currentExpedition.travelBonus || 0) + 0.15;
-        
+
         this.currentExpedition.events.push({
             type: 'negative',
             text: 'Forced march increases pace but exhausts the troops.',
             time: new Date().toLocaleTimeString()
         });
-        
+
         this.renderTravelView();
         window.showNotification('March pace increased!', { timeout: 3000, icon: '⚡' });
     }
 
     huntForFood() {
         const huntSuccess = Math.random() < 0.6; // 60% success rate
-        
+
         if (huntSuccess) {
             const foodGained = 3 + Math.floor(Math.random() * 5);
             this.currentExpedition.supplies.food += foodGained;
-            
+
             this.currentExpedition.events.push({
                 type: 'positive',
                 text: `Successful hunt! Gained ${foodGained} food supplies.`,
                 time: new Date().toLocaleTimeString()
             });
-            
+
             window.showNotification(`Hunt successful! +${foodGained} food`, { timeout: 3000, icon: '🏹' });
         } else {
             this.currentExpedition.events.push({
@@ -1347,10 +1347,10 @@ class QuestManager {
                 text: 'Hunt was unsuccessful. No game found in this area.',
                 time: new Date().toLocaleTimeString()
             });
-            
+
             window.showNotification('Hunt failed - no game found', { timeout: 3000, icon: '🚫' });
         }
-        
+
         this.renderTravelView();
     }
 
@@ -1360,9 +1360,9 @@ class QuestManager {
         const totalTravelTime = this.currentExpedition.location.travelDays * 24 * 60 * 1000; // ms
         const travelBonus = this.currentExpedition.travelBonus || 0;
         const adjustedTravelTime = totalTravelTime * (1 - travelBonus);
-        
+
         const elapsed = Date.now() - this.expeditionStartTime;
-        
+
         if (this.expeditionState === 'traveling_out' && elapsed >= adjustedTravelTime) {
             this.arriveAtBattleLocation();
         } else if (this.expeditionState === 'traveling_back' && elapsed >= adjustedTravelTime * 2) {
@@ -1372,7 +1372,7 @@ class QuestManager {
 
     arriveAtBattleLocation() {
         this.expeditionState = 'battling';
-        
+
         window.showNotification(
             `⚔️ Army arrives at ${this.currentExpedition.location.name}! Battle begins!`,
             { timeout: 5000, icon: '🏰' }
@@ -1386,7 +1386,7 @@ class QuestManager {
     startReturnJourney(defeated = false) {
         this.expeditionState = 'traveling_back';
         this.expeditionStartTime = Date.now(); // Reset timer for return journey
-        
+
         if (defeated) {
             window.showNotification(
                 `🏠 Army retreats from ${this.currentExpedition.location.name}, returning home with what they can carry...`,
@@ -1437,14 +1437,14 @@ class QuestManager {
         const location = this.currentExpedition.location;
         const leader = this.currentExpedition.leader;
         const isSuccessful = this.currentExpedition.armyMorale > 20 && this.currentExpedition.casualties < (this.gameState.army?.length || 10) * 0.8;
-        
+
         let rewards = {};
         let expeditionResult = 'failure';
-        
+
         if (isSuccessful) {
             rewards = this.calculateExpeditionRewards(location);
             expeditionResult = 'success';
-            
+
             // Apply rewards to game state with enhancements (no retroactive trimming at cap)
             Object.keys(rewards).forEach(resource => {
                 if (this.gameState.resources[resource] !== undefined) {
@@ -1452,7 +1452,7 @@ class QuestManager {
                     const attempted = rewards[resource];
                     let cap = GameData?.resourceCaps?.[resource];
                     if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
-                        try { cap = window.GameData.calculateSeasonalStorageCap(resource, this.gameState.season, this.gameState.buildings); } catch (_) {}
+                        try { cap = window.GameData.calculateSeasonalStorageCap(resource, this.gameState.season, this.gameState.buildings); } catch (_) { }
                     }
                     if (typeof attempted === 'number' && attempted > 0 && typeof cap === 'number') {
                         const effective = Math.max(0, Math.min(attempted, Math.max(0, cap - before)));
@@ -1499,7 +1499,7 @@ class QuestManager {
 
             // Update expedition statistics
             this.gameState.stats.successfulExpeditions = (this.gameState.stats.successfulExpeditions || 0) + 1;
-            
+
             // Check for achievements
             if (this.gameState.achievements) {
                 this.gameState.achievements.triggerExpeditionMaster();
@@ -1508,7 +1508,7 @@ class QuestManager {
             // Failed expedition - reduced or no rewards
             rewards = this.calculateFailureRewards(location);
             expeditionResult = 'failure';
-            
+
             // Apply minimal rewards if any
             Object.keys(rewards).forEach(resource => {
                 if (this.gameState.resources[resource] !== undefined) {
@@ -1523,7 +1523,7 @@ class QuestManager {
 
         // Apply expedition consequences
         this.applyExpeditionConsequences(expeditionResult);
-        
+
         // Update royal leader experience and status
         if (leader) {
             this.updateRoyalLeaderExperience(leader, expeditionResult);
@@ -1545,7 +1545,7 @@ class QuestManager {
         // Show completion notification and summary
         const resultIcon = isSuccessful ? '🎉' : '💀';
         const resultText = isSuccessful ? 'successful' : 'failed';
-        
+
         window.showNotification(
             `${resultIcon} Expedition to ${location.name} ${resultText}! ${leader ? leader.name : 'Army'} returns ${isSuccessful ? 'victorious' : 'defeated'}.`,
             { timeout: 6000, icon: resultIcon }
@@ -1558,7 +1558,7 @@ class QuestManager {
 
         // Return to village view
         this.game.switchView('village');
-        
+
         // Show detailed results summary
         this.showExpeditionSummary(location, rewards, expeditionResult);
     }
@@ -1567,15 +1567,15 @@ class QuestManager {
     calculateFailureRewards(location) {
         const baseRewards = this.calculateExpeditionRewards(location);
         const failureRewards = {};
-        
+
         // Reduce rewards by 70-90% for failures
         Object.keys(baseRewards).forEach(resource => {
             if (resource === 'special') return; // No special rewards for failures
-            
+
             const reductionFactor = 0.1 + Math.random() * 0.2; // 10-30% of original
             failureRewards[resource] = Math.floor(baseRewards[resource] * reductionFactor);
         });
-        
+
         return failureRewards;
     }
 
@@ -1583,29 +1583,29 @@ class QuestManager {
     applyExpeditionConsequences(result) {
         const location = this.currentExpedition.location;
         const leader = this.currentExpedition.leader;
-        
+
         if (result === 'success') {
             // Positive consequences
             this.gameState.populationManager?.increaseMorale(10);
-            
+
             // Reputation boost
             this.gameState.reputation = (this.gameState.reputation || 50) + 5;
-            
+
             // Special location benefits
             if (location.specialFeatures) {
                 this.applySpecialLocationBenefits(location.specialFeatures);
             }
-            
+
         } else {
             // Negative consequences
             this.gameState.populationManager?.increaseMorale(-15);
-            
+
             // Reputation loss
             this.gameState.reputation = Math.max(0, (this.gameState.reputation || 50) - 10);
-            
+
             // Economic impact from lost resources
             this.gameState.gold = Math.max(0, this.gameState.gold - Math.floor(this.gameState.gold * 0.1));
-            
+
             // Leader injury risk
             if (leader && Math.random() < 0.3) {
                 this.injureRoyalLeader(leader);
@@ -1638,19 +1638,19 @@ class QuestManager {
 
     // Update royal leader experience and handle injuries
     updateRoyalLeaderExperience(leader, result) {
-        const experienceGain = result === 'success' ? 
-            (10 + Math.floor(Math.random() * 10)) : 
+        const experienceGain = result === 'success' ?
+            (10 + Math.floor(Math.random() * 10)) :
             (2 + Math.floor(Math.random() * 5));
-        
+
         if (leader.id === 'monarch' && this.gameState.monarch) {
             this.gameState.monarch.expeditionExperience = (this.gameState.monarch.expeditionExperience || 0) + experienceGain;
-            
+
             // Level up leadership if enough experience
             if (this.gameState.monarch.expeditionExperience >= 50) {
                 this.gameState.monarch.stats = this.gameState.monarch.stats || {};
                 this.gameState.monarch.stats.leadership = Math.min(100, (this.gameState.monarch.stats.leadership || 70) + 5);
                 this.gameState.monarch.expeditionExperience = 0;
-                
+
                 window.showNotification(
                     `👑 ${this.gameState.monarch.name}'s leadership has improved through expedition experience!`,
                     { timeout: 4000, icon: '📈' }
@@ -1660,12 +1660,12 @@ class QuestManager {
             const heir = this.gameState.populationManager.royalFamily.find(h => h.id === leader.id);
             if (heir) {
                 heir.expeditionExperience = (heir.expeditionExperience || 0) + experienceGain;
-                
+
                 if (heir.expeditionExperience >= 30) {
                     heir.stats = heir.stats || {};
                     heir.stats.leadership = Math.min(100, (heir.stats.leadership || 50) + 3);
                     heir.expeditionExperience = 0;
-                    
+
                     window.showNotification(
                         `👑 ${heir.name}'s leadership has improved through expedition experience!`,
                         { timeout: 4000, icon: '📈' }
@@ -1695,9 +1695,9 @@ class QuestManager {
             'fell ill during expedition',
             'suffered from exhaustion'
         ];
-        
+
         const injury = injuryTypes[Math.floor(Math.random() * injuryTypes.length)];
-        
+
         if (leader.id === 'monarch' && this.gameState.monarch) {
             this.gameState.monarch.injured = true;
             this.gameState.monarch.injuryDescription = injury;
@@ -1710,7 +1710,7 @@ class QuestManager {
                 heir.recoveryTime = 20; // 20 days to recover
             }
         }
-        
+
         window.showNotification(
             `⚕️ ${leader.name} was ${injury} and requires time to recover.`,
             { timeout: 5000, icon: '🏥' }
@@ -1720,17 +1720,17 @@ class QuestManager {
     // Apply army casualties to game state
     applyArmyCasualties() {
         const totalCasualties = this.currentExpedition.casualties + this.currentExpedition.desertions;
-        
+
         if (totalCasualties > 0 && this.gameState.army) {
             // Remove casualties from army
             const survivingArmy = Math.max(0, this.gameState.army.length - totalCasualties);
             this.gameState.army = this.gameState.army.slice(0, survivingArmy);
-            
+
             // Add deserters back to general population (they abandon military service)
             if (this.currentExpedition.desertions > 0 && this.gameState.populationManager) {
                 this.gameState.populationManager.addDeserters(this.currentExpedition.desertions);
             }
-            
+
             window.showNotification(
                 `⚰️ Expedition losses: ${this.currentExpedition.casualties} casualties, ${this.currentExpedition.desertions} desertions`,
                 { timeout: 4000, icon: '💀' }
@@ -1745,7 +1745,7 @@ class QuestManager {
             // In a full implementation, these would become new expedition targets
             this.currentExpedition.discoveredLocations.forEach(discovery => {
                 console.log(`[QuestManager] Discovered new location: ${discovery.name}`);
-                
+
                 // Could add to a "discovered but unexplored" list for future implementation
                 if (!this.knownLocations.has(discovery.name)) {
                     this.knownLocations.add(discovery.name);
@@ -1760,7 +1760,7 @@ class QuestManager {
         const casualties = this.currentExpedition.casualties;
         const desertions = this.currentExpedition.desertions;
         const discoveries = this.currentExpedition.discoveredLocations;
-        
+
         const summaryHTML = `
             <div class="expedition-summary ${result}">
                 <h3>${result === 'success' ? '🏆' : '💀'} Expedition to ${location.name} Complete!</h3>
@@ -1787,13 +1787,13 @@ class QuestManager {
                     <div class="expedition-rewards">
                         <h4>🎁 Rewards Gained:</h4>
                         <div class="rewards-list">
-                            ${Object.keys(rewards).map(resource => 
-                                `<div class="reward-item">
+                            ${Object.keys(rewards).map(resource =>
+            `<div class="reward-item">
                                     <span class="reward-icon">${this.getSupplyIcon(resource)}</span>
                                     <span class="reward-amount">+${rewards[resource]}</span>
                                     <span class="reward-name">${resource}</span>
                                 </div>`
-                            ).join('')}
+        ).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -1812,9 +1812,9 @@ class QuestManager {
                     <div class="expedition-discoveries">
                         <h4>🗺️ New Discoveries:</h4>
                         <div class="discoveries-list">
-                            ${discoveries.map(discovery => 
-                                `<div class="discovery-item">📍 ${discovery.name}</div>`
-                            ).join('')}
+                            ${discoveries.map(discovery =>
+            `<div class="discovery-item">📍 ${discovery.name}</div>`
+        ).join('')}
                         </div>
                     </div>
                 ` : ''}
@@ -1822,17 +1822,17 @@ class QuestManager {
                 <div class="expedition-events-summary">
                     <h4>📰 Key Events:</h4>
                     <div class="events-summary">
-                        ${this.currentExpedition.events.slice(-5).map(event => 
-                            `<div class="event-summary ${event.type}">
+                        ${this.currentExpedition.events.slice(-5).map(event =>
+            `<div class="event-summary ${event.type}">
                                 <span class="event-time">${event.time}</span>
                                 <span class="event-text">${event.text}</span>
                             </div>`
-                        ).join('')}
+        ).join('')}
                     </div>
                 </div>
             </div>
         `;
-        
+
         if (window.modalSystem) {
             window.modalSystem.showModal({
                 title: 'Expedition Complete',
@@ -1848,10 +1848,10 @@ class QuestManager {
 
     calculateExpeditionRewards(location) {
         const rewards = {};
-        
+
         Object.keys(location.rewards).forEach(resource => {
             if (resource === 'special') return; // Handle special rewards separately
-            
+
             const min = location.rewards[resource].min;
             const max = location.rewards[resource].max;
             rewards[resource] = min + Math.floor(Math.random() * (max - min + 1));
@@ -1866,13 +1866,13 @@ class QuestManager {
                 <h3>🏆 Expedition to ${location.name} Complete!</h3>
                 <div class="rewards-earned">
                     <h4>Rewards Earned:</h4>
-                    ${Object.keys(rewards).map(resource => 
-                        `<div>+${rewards[resource]} ${resource}</div>`
-                    ).join('')}
+                    ${Object.keys(rewards).map(resource =>
+            `<div>+${rewards[resource]} ${resource}</div>`
+        ).join('')}
                 </div>
             </div>
         `;
-        
+
         // Could show this in a modal or notification
         window.showNotification(summaryHTML, { timeout: 8000, icon: '🎁' });
     }
@@ -1886,13 +1886,13 @@ class QuestManager {
 
     calculateExpeditionProgress() {
         if (!this.currentExpedition) return 0;
-        
+
         const totalTravelTime = this.currentExpedition.location.travelDays * 24 * 60 * 1000; // ms
         const travelBonus = this.currentExpedition.travelBonus || 0;
         const adjustedTravelTime = totalTravelTime * (1 - travelBonus);
-        
+
         const elapsed = Date.now() - this.expeditionStartTime;
-        
+
         if (this.expeditionState === 'traveling_out') {
             return Math.min((elapsed / adjustedTravelTime) * 50, 50); // 0-50% for outbound travel
         } else if (this.expeditionState === 'battling') {
@@ -1901,7 +1901,7 @@ class QuestManager {
             const returnProgress = Math.min((elapsed / adjustedTravelTime) * 50, 50);
             return 50 + returnProgress; // 50-100% for return travel
         }
-        
+
         return 0;
     }
 }

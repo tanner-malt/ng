@@ -4,13 +4,17 @@
 class InventoryManager {
     constructor(gameState, skipDefaults = false) {
         this.gameState = gameState;
-        this.inventory = new Map(); // item_id -> { item, quantity, metadata }
+    // Personal inventory is deprecated; inventory is managed per-tile via TileManager.cityInventory
+    // Keep a Map for backward compatibility, but do not use it for storage.
+    this.inventory = new Map(); // legacy; no longer used for gameplay
         this.equippedItems = new Map(); // slot -> item_id
         this.itemDefinitions = this.initializeItemDefinitions();
 
-        // Add default items if inventory is empty and not skipping defaults
-        if (!skipDefaults && this.inventory.size === 0) {
-            this.addDefaultItems();
+        // Starter items are seeded by TileManager (city inventory), not here.
+        // This avoids duplication of tents/foundersWagon between systems.
+        // Leave personal inventory empty by default; placement consumes from city inventory.
+        if (!skipDefaults) {
+            console.log('[Inventory] Personal inventory disabled. TileManager owns all items.');
         }
     }
 
@@ -485,8 +489,8 @@ class InventoryManager {
                     maxStack: 50,
                     craftable: false
                 },
-                rune_of_haste: {
-                    id: 'rune_of_haste',
+                construction_rune: {
+                    id: 'construction_rune',
                     name: 'Rune of Haste',
                     category: 'magical',
                     subcategory: 'rune',
@@ -500,9 +504,9 @@ class InventoryManager {
                     craftable: true,
                     craftCost: { crystal_shard: 3, gold: 20 }
                 },
-                haste_rune: {
-                    id: 'haste_rune',
-                    name: 'Haste Rune',
+                crafting_rune: {
+                    id: 'crafting_rune',
+                    name: 'Crafting Rune',
                     category: 'magical',
                     subcategory: 'rune',
                     icon: '⚡',
@@ -558,66 +562,30 @@ class InventoryManager {
 
     // Add item to inventory
     addItem(itemId, quantity = 1, metadata = {}) {
-        const itemDef = this.getItemDefinition(itemId);
-        if (!itemDef) {
-            console.error('[Inventory] Unknown item:', itemId);
-            return false;
+        // Proxy to TileManager city inventory
+        if (window.tileManager && typeof window.tileManager.addItemToInventory === 'function') {
+            window.tileManager.addItemToInventory(itemId, quantity);
+            return 0; // no remainder
         }
-
-        const existingItem = this.inventory.get(itemId);
-
-        if (existingItem && itemDef.stackable) {
-            // Stack with existing item
-            const maxStack = itemDef.maxStack || 99;
-            const canStack = Math.min(quantity, maxStack - existingItem.quantity);
-            existingItem.quantity += canStack;
-
-            console.log(`[Inventory] Added ${canStack} ${itemDef.name} (now ${existingItem.quantity})`);
-
-            // Return remaining quantity that couldn't be stacked
-            return quantity - canStack;
-        } else {
-            // Add new item
-            this.inventory.set(itemId, {
-                item: itemDef,
-                quantity: quantity,
-                metadata: {
-                    ...metadata,
-                    acquiredDate: this.gameState.currentDay,
-                    durability: itemDef.stats?.durability || null
-                }
-            });
-
-            console.log(`[Inventory] Added ${quantity} ${itemDef.name}`);
-            return 0;
-        }
+        console.warn('[Inventory] TileManager not available, cannot add item to city inventory');
+        return false;
     }
 
     // Remove item from inventory
     removeItem(itemId, quantity = 1) {
-        const existingItem = this.inventory.get(itemId);
-        if (!existingItem) {
-            console.warn('[Inventory] Item not found:', itemId);
-            return false;
+        if (window.tileManager && typeof window.tileManager.removeItemFromInventory === 'function') {
+            return window.tileManager.removeItemFromInventory(itemId, quantity);
         }
-
-        if (existingItem.quantity <= quantity) {
-            // Remove entire stack
-            this.inventory.delete(itemId);
-            console.log(`[Inventory] Removed all ${existingItem.item.name}`);
-        } else {
-            // Reduce quantity
-            existingItem.quantity -= quantity;
-            console.log(`[Inventory] Removed ${quantity} ${existingItem.item.name} (${existingItem.quantity} remaining)`);
-        }
-
-        return true;
+        console.warn('[Inventory] TileManager not available, cannot remove item from city inventory');
+        return false;
     }
 
     // Check if player has item
     hasItem(itemId, quantity = 1) {
-        const existingItem = this.inventory.get(itemId);
-        return existingItem && existingItem.quantity >= quantity;
+        if (window.tileManager && typeof window.tileManager.hasItem === 'function') {
+            return window.tileManager.hasItem(itemId, quantity);
+        }
+        return false;
     }
 
     // Get item definition
@@ -633,19 +601,26 @@ class InventoryManager {
 
     // Get all items in inventory
     getAllItems() {
+        // Return city inventory map-like object for compatibility
+        const city = window.tileManager?.getCityInventory?.();
+        if (!city) return {};
         const items = {};
-        this.inventory.forEach((data, itemId) => {
-            items[itemId] = data;
+        Object.entries(city).forEach(([itemId, data]) => {
+            const def = this.getItemDefinition(itemId) || { id: itemId, name: itemId };
+            items[itemId] = { item: def, quantity: data.quantity, metadata: {} };
         });
         return items;
     }
 
     // Get items by category
     getItemsByCategory(category) {
+        const city = window.tileManager?.getCityInventory?.();
         const items = {};
-        this.inventory.forEach((data, itemId) => {
-            if (data.item.category === category) {
-                items[itemId] = data;
+        if (!city) return items;
+        Object.entries(city).forEach(([itemId, data]) => {
+            const def = this.getItemDefinition(itemId);
+            if (def && def.category === category) {
+                items[itemId] = { item: def, quantity: data.quantity, metadata: {} };
             }
         });
         return items;
@@ -777,23 +752,33 @@ class InventoryManager {
 
     // Use consumable item
     useItem(itemId) {
-        const item = this.inventory.get(itemId);
-        if (!item || !item.item.consumable) {
+        // Use from city inventory only
+        const itemDef = this.getItemDefinition(itemId);
+        if (!itemDef || !itemDef.consumable) {
             console.warn('[Inventory] Item cannot be used:', itemId);
             return false;
         }
 
-        // Apply effects
-        if (item.item.effects) {
-            Object.entries(item.item.effects).forEach(([effect, value]) => {
+        // Apply effects immediately
+        if (itemDef.effects) {
+            Object.entries(itemDef.effects).forEach(([effect, value]) => {
                 this.applyConsumableEffect(effect, value);
             });
         }
 
-        // Remove one from inventory
-        this.removeItem(itemId, 1);
+        // Decrement from city inventory
+        if (window.tileManager && typeof window.tileManager.useItem === 'function') {
+            const ok = window.tileManager.useItem(itemId, 1);
+            if (!ok) {
+                console.warn('[Inventory] Not enough items to use:', itemId);
+                return false;
+            }
+        } else {
+            console.warn('[Inventory] TileManager not available, cannot consume item');
+            return false;
+        }
 
-        console.log(`[Inventory] Used ${item.item.name}`);
+        console.log(`[Inventory] Used ${itemDef.name}`);
         return true;
     }
 
@@ -818,22 +803,30 @@ class InventoryManager {
 
     // Get all items in inventory format expected by UI
     getInventory() {
+        // Build inventory array from city inventory
+        const city = window.tileManager?.getCityInventory?.() || {};
         const inventoryArray = [];
-
-        for (const [itemId, data] of this.inventory) {
+        Object.entries(city).forEach(([itemId, data]) => {
+            const def = this.getItemDefinition(itemId);
+            const name = def?.name || itemId;
+            const category = def?.category || 'misc';
+            const rarity = def?.rarity || 'common';
+            const description = def?.description || '';
+            const effects = def?.effects || def?.stats;
+            const requirements = def?.requirements;
+            const craftingCost = def?.craftCost || def?.craftingCost;
             inventoryArray.push({
                 id: itemId,
-                name: data.item.name,
-                category: data.item.category,
-                rarity: data.item.rarity,
-                description: data.item.description,
+                name,
+                category,
+                rarity,
+                description,
                 quantity: data.quantity,
-                effects: data.item.effects || data.item.stats,
-                requirements: data.item.requirements,
-                craftingCost: data.item.craftCost || data.item.craftingCost
+                effects,
+                requirements,
+                craftingCost
             });
-        }
-
+        });
         return inventoryArray;
     }
 
@@ -955,15 +948,17 @@ class InventoryManager {
 
     // Check if item can be placed as building
     canPlaceBuilding(itemId) {
-        const item = this.inventory.get(itemId);
-        return item && item.item.placeable && item.item.buildingType;
+        const def = this.getItemDefinition(itemId);
+        const has = this.hasItem(itemId, 1);
+        return !!(def && def.placeable && def.buildingType && has);
     }
 
     // Serialize for unified save system
     serialize() {
+        // Personal inventory is deprecated; keep minimal payload for compatibility
         return {
             version: '1.0',
-            inventory: Array.from(this.inventory.entries()),
+            inventory: [],
             equippedItems: Array.from(this.equippedItems.entries())
         };
     }
@@ -976,8 +971,8 @@ class InventoryManager {
         }
 
         try {
-            // Restore inventory
-            this.inventory = new Map(data.inventory);
+            // Ignore legacy personal inventory; items are tile-based now
+            this.inventory = new Map();
 
             // Migration: Rename cityWagon to foundersWagon if it exists
             if (this.inventory.has('cityWagon')) {
