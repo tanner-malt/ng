@@ -678,24 +678,27 @@ class QuestManager {
                 } else if (requirement === 'explore_3_locations') {
                     location.unlocked = this.getCompletedLocationsCount() >= 3;
                 } else if (requirement === 'build_3_buildings') {
-                    location.unlocked = this.gameState.buildings.length >= 3;
+                    location.unlocked = (this.gameState.buildings?.length || 0) >= 3;
                 } else if (requirement === 'population_50') {
-                    location.unlocked = this.gameState.population >= 50;
+                    location.unlocked = (this.gameState.population?.total || this.gameState.population || 0) >= 50;
                 } else if (requirement === 'complete_5_expeditions') {
                     location.unlocked = (this.gameState.stats?.totalExpeditionsSent || 0) >= 5;
                 }
+            } else {
+                // No requirement means it's available
+                location.unlocked = true;
             }
         });
     }
 
-    // Check if a location has been completed
+    // Helper: check if a specific location has been completed
     hasCompletedLocation(locationId) {
-        return this.gameState.completedExpeditions?.includes(locationId) || false;
+        return (this.gameState.completedExpeditions || []).includes(locationId);
     }
 
-    // Get count of completed locations
+    // Helper: count how many locations have been completed
     getCompletedLocationsCount() {
-        return this.gameState.completedExpeditions?.length || 0;
+        return (this.gameState.completedExpeditions || []).length;
     }
 
     renderTravelView() {
@@ -1442,24 +1445,46 @@ class QuestManager {
             rewards = this.calculateExpeditionRewards(location);
             expeditionResult = 'success';
             
-            // Apply rewards to game state with enhancements
+            // Apply rewards to game state with enhancements (no retroactive trimming at cap)
             Object.keys(rewards).forEach(resource => {
                 if (this.gameState.resources[resource] !== undefined) {
-                    this.gameState.resources[resource] += rewards[resource];
-                    // Cap resource if defined in GameData
-                    if (GameData.resourceCaps && GameData.resourceCaps[resource]) {
-                        this.gameState.resources[resource] = Math.min(this.gameState.resources[resource], GameData.resourceCaps[resource]);
+                    const before = this.gameState.resources[resource];
+                    const attempted = rewards[resource];
+                    let cap = GameData?.resourceCaps?.[resource];
+                    if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                        try { cap = window.GameData.calculateSeasonalStorageCap(resource, this.gameState.season, this.gameState.buildings); } catch (_) {}
+                    }
+                    if (typeof attempted === 'number' && attempted > 0 && typeof cap === 'number') {
+                        const effective = Math.max(0, Math.min(attempted, Math.max(0, cap - before)));
+                        this.gameState.resources[resource] = before + effective;
+                    } else if (typeof attempted === 'number') {
+                        this.gameState.resources[resource] = before + attempted;
                     }
                 } else if (resource === 'gold') {
-                    this.gameState.gold += rewards[resource];
-                    if (GameData.resourceCaps && GameData.resourceCaps.gold) {
-                        this.gameState.gold = Math.min(this.gameState.gold, GameData.resourceCaps.gold);
+                    const beforeGold = this.gameState.gold || 0;
+                    const attempted = rewards[resource];
+                    const cap = GameData?.resourceCaps?.gold;
+                    if (typeof attempted === 'number' && attempted > 0 && typeof cap === 'number') {
+                        const effective = Math.max(0, Math.min(attempted, Math.max(0, cap - beforeGold)));
+                        this.gameState.gold = beforeGold + effective;
+                    } else if (typeof attempted === 'number') {
+                        this.gameState.gold = beforeGold + attempted;
                     }
                 } else if (resource === 'population') {
-                    // Add refugees/rescued people to population
-                    this.gameState.population += rewards[resource];
-                    if (this.gameState.populationManager) {
-                        this.gameState.populationManager.addRefugees(rewards[resource]);
+                    // Add refugees/rescued people to population via PopulationManager respecting caps
+                    if (this.gameState.populationManager?.addRefugees) {
+                        const planned = rewards[resource] || 0;
+                        const beforePop = this.gameState.population?.total ?? (this.gameState.population || 0);
+                        this.gameState.populationManager.addRefugees(planned);
+                        const afterPop = this.gameState.population?.total ?? (this.gameState.population || 0);
+                        const added = Math.max(0, afterPop - beforePop);
+                        // Sync legacy counter
+                        this.gameState.updatePopulationCount?.();
+                        if (added < planned && window.showNotification) {
+                            window.showNotification(`🏠 Housing full: accepted ${added}/${planned} refugees`, { timeout: 4000, icon: '⚠️' });
+                        }
+                    } else {
+                        this.gameState.population = (this.gameState.population || 0) + rewards[resource];
                     }
                 }
             });

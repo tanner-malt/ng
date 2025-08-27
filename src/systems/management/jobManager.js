@@ -14,22 +14,30 @@ class JobManager {
     initializeJobEfficiency() {
         // Base efficiency rates for different job types
         // Each worker in these jobs produces these amounts per day
-        this.jobEfficiency.set('farmer', { food: 5 }); // From farms
+    // Farmers now produce less baseline food
+    this.jobEfficiency.set('farmer', { food: 3 }); // From farms
         this.jobEfficiency.set('woodcutter', { wood: 3 }); // From woodcutter lodges
         this.jobEfficiency.set('builder', { construction: 1 }); // From tents, builder huts
-        this.jobEfficiency.set('gatherer', { food: 1, wood: 1, stone: 1, production: 0.5 }); // From tents, founders wagon, town center
+    // Gatherers now produce a random basic resource each day (food OR wood OR stone)
+    // We leave efficiency blank and handle via RNG in calculateDailyProduction
+    this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
         this.jobEfficiency.set('crafter', { production: 1 }); // Kept for town center legacy
-        this.jobEfficiency.set('sawyer', { wood: 1, planks: 3 }); // From lumber mills - processing
-        this.jobEfficiency.set('foreman', { construction: 2 }); // From builder huts - supervises construction
+    // Sawyer consumes wood to produce planks
+    this.jobEfficiency.set('sawyer', { wood: -3, planks: 3 }); // From lumber mills - processing
+    // Foreman no longer contributes direct construction points; boosts builders instead
+    this.jobEfficiency.set('foreman', {}); // Boost applied in ConstructionManager
         this.jobEfficiency.set('miner', { stone: 2, metal: 1 }); // From mines
         this.jobEfficiency.set('rockcutter', { stone: 3 }); // From quarries
-        this.jobEfficiency.set('engineer', { production: 2 }); // From workshops
+    // Engineers now produce more production
+    this.jobEfficiency.set('engineer', { production: 3 }); // From workshops
         this.jobEfficiency.set('trader', { gold: 2 }); // From markets
-        this.jobEfficiency.set('blacksmith', { production: 2, metal: -1 }); // Example: consumes 1 metal for 2 production (if negative allowed)
-        this.jobEfficiency.set('drillInstructor', { production: 0.5 }); // Organizational value
-        this.jobEfficiency.set('militaryTheorist', { production: 0.5 }); // Planning value
-        this.jobEfficiency.set('professor', { production: 1 });
-        this.jobEfficiency.set('scholar', { production: 1 });
+    // Blacksmith no longer consumes metal
+    this.jobEfficiency.set('blacksmith', { production: 2 });
+    // Removed production from military/academic support roles
+    this.jobEfficiency.set('drillInstructor', { }); // Organizational value (no direct resource)
+    this.jobEfficiency.set('militaryTheorist', { }); // Planning value (no direct resource)
+    this.jobEfficiency.set('professor', { }); // Research value (no direct resource)
+    this.jobEfficiency.set('scholar', { }); // Research value (no direct resource)
         this.jobEfficiency.set('wizard', { production: 0 }); // Placeholder until magic systems
     }
 
@@ -236,11 +244,7 @@ class JobManager {
             Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
                 console.log(`[JobManager] Processing ${jobType}: ${workerIds.length} workers`);
 
-                const efficiency = this.jobEfficiency.get(jobType);
-                if (!efficiency) {
-                    console.log(`[JobManager] ⚠️ No efficiency defined for job type: ${jobType}`);
-                    return;
-                }
+                const efficiency = this.jobEfficiency.get(jobType) || {};
 
                 console.log(`[JobManager] Job ${jobType} efficiency:`, efficiency);
 
@@ -255,24 +259,42 @@ class JobManager {
                     const workerEfficiency = this.calculateWorkerEfficiency(worker, jobType);
                     console.log(`[JobManager] Worker ${worker.name} efficiency: ${workerEfficiency.toFixed(2)}`);
 
-                    // Add production for each resource type this job produces
-                    Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
-                        if (production.hasOwnProperty(resourceType)) {
-                            // Apply seasonal production multiplier for applicable resources
-                            let seasonMult = 1.0;
-                            try {
-                                const season = this.gameState?.season || 'Spring';
-                                const mults = window.GameData?.seasonMultipliers?.[season];
-                                if (mults && typeof mults[resourceType] === 'number') {
-                                    seasonMult = mults[resourceType];
+                    if (jobType === 'gatherer') {
+                        // RNG pick: food, wood, or stone (equal chance)
+                        const choice = this.randomChoice(['food', 'wood', 'stone']);
+                        let seasonMult = 1.0;
+                        try {
+                            const season = this.gameState?.season || 'Spring';
+                            const mults = window.GameData?.seasonMultipliers?.[season];
+                            if (mults && typeof mults[choice] === 'number') {
+                                seasonMult = mults[choice];
+                            }
+                        } catch (_) { }
+                        const amount = 1 * workerEfficiency * seasonMult;
+                        production[choice] += amount;
+                        console.log(`[JobManager] ${worker.name} (gatherer) produced ${amount.toFixed(2)} ${choice}`);
+                    } else {
+                        // Add production for each resource type this job produces
+                        Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
+                            if (production.hasOwnProperty(resourceType)) {
+                                // Apply seasonal production multiplier for applicable resources
+                                let seasonMult = 1.0;
+                                if (baseAmount > 0) {
+                                    try {
+                                        const season = this.gameState?.season || 'Spring';
+                                        const mults = window.GameData?.seasonMultipliers?.[season];
+                                        if (mults && typeof mults[resourceType] === 'number') {
+                                            seasonMult = mults[resourceType];
+                                        }
+                                    } catch (_) { }
                                 }
-                            } catch (_) { }
 
-                            const resourceGenerated = baseAmount * workerEfficiency * seasonMult;
-                            production[resourceType] += resourceGenerated;
-                            console.log(`[JobManager] ${worker.name} (${jobType}) produced ${resourceGenerated.toFixed(2)} ${resourceType}`);
-                        }
-                    });
+                                const resourceGenerated = baseAmount * workerEfficiency * seasonMult;
+                                production[resourceType] += resourceGenerated;
+                                console.log(`[JobManager] ${worker.name} (${jobType}) produced ${resourceGenerated.toFixed(2)} ${resourceType}`);
+                            }
+                        });
+                    }
 
                     // Jobs are purely functional - no skill progression
                 });
@@ -281,6 +303,12 @@ class JobManager {
 
         console.log('[JobManager] Total daily production:', production);
         return production;
+    }
+
+    // Simple RNG helper for gatherers and other probabilistic jobs
+    randomChoice(arr) {
+        const idx = Math.floor(Math.random() * arr.length);
+        return arr[idx];
     }
 
     // Calculate detailed daily production with sources breakdown
@@ -388,9 +416,6 @@ class JobManager {
     calculateWorkerEfficiency(worker, jobType) {
         let efficiency = 1.0; // Base efficiency
 
-        // Jobs are purely functional with no skill progression
-        // Efficiency is based only on worker attributes and conditions
-
         // Age factor
         const age = worker.age || 25;
         let ageFactor = 1.0;
@@ -404,7 +429,19 @@ class JobManager {
         const healthFactor = Math.max(0.5, (worker.health || 100) / 100);
         const happinessFactor = Math.max(0.7, (worker.happiness || 75) / 100);
 
-        return Math.max(0.1, efficiency * ageFactor * healthFactor * happinessFactor);
+        // Job-relevant skill factor (use max relevant XP across skills)
+        let skillXP = 0;
+        try {
+            const relevant = this.getRelevantSkillsForJob(jobType) || [];
+            relevant.forEach(skillName => {
+                const xp = (worker.experience && worker.experience[skillName]) || (worker.skills && worker.skills[skillName]) || 0;
+                if (xp > skillXP) skillXP = xp;
+            });
+        } catch (_) { }
+        // Map XP [0..1000+] to multiplier [1.0 .. 1.5] with diminishing return cap
+        const skillFactor = 1.0 + Math.min(0.5, (skillXP / 1000) * 0.5);
+
+        return Math.max(0.1, efficiency * ageFactor * healthFactor * happinessFactor * skillFactor);
     }
 
     getWorkerById(workerId) {
@@ -470,7 +507,7 @@ class JobManager {
 
     // Auto-assign workers to available jobs with optimization
     autoAssignWorkers() {
-        console.log('[JobManager] Auto-assigning workers with optimization...');
+        console.log('[JobManager] Auto-assigning workers with resource-aware optimization...');
 
         // First, redistribute workers if we have better job opportunities
         this.optimizeWorkerAssignments();
@@ -484,53 +521,261 @@ class JobManager {
             return 0;
         }
 
-        let assignedCount = 0;
+        // Build a scoring heuristic per job based on current needs
+        const gs = this.gameState;
+        const resources = gs.resources || {};
+        const needs = this.computeResourceNeeds();
+        const hasActiveConstruction = !!(gs.constructionManager && gs.constructionManager.constructionSites && gs.constructionManager.constructionSites.size > 0);
 
-        // Prioritize builder jobs first (they're always important for construction)
-        const prioritizedJobs = [...availableJobs].sort((a, b) => {
+        // Create scored job list
+        // Farmer staffing floor: ensure a minimal number of farmers based on population
+        const pop = gs.populationManager ? gs.populationManager.getAll().length : (gs.population || 0);
+        const minFarmers = Math.max(0, Math.ceil(pop / 8)); // ~12.5% of pop as floor
+        const currentFarmers = this.countWorkersInJobType('farmer');
+
+        // Desired builders estimate based on active site's remaining points
+        const desiredBuilders = this.computeDesiredBuilders(7); // target complete in ~7 days
+        const currentBuilders = this.countWorkersInJobType('builder');
+        const desiredForemen = desiredBuilders > 0 ? Math.max(1, Math.floor(desiredBuilders / 4)) : 0;
+        const currentForemen = this.countWorkersInJobType('foreman');
+
+        const woodCap = (typeof window.GameData?.calculateSeasonalStorageCap === 'function')
+            ? window.GameData.calculateSeasonalStorageCap('wood', gs.season, gs.buildings)
+            : (window.GameData?.resourceCaps?.wood || 50);
+        const woodPct = woodCap > 0 ? ((resources.wood || 0) / woodCap) : 0;
+
+        const scoredJobs = availableJobs.map(job => {
+            let score = 0;
+            // Avoid starving: prioritize food production if food low vs. upkeep
+            if (job.jobType === 'farmer') score += needs.foodUrgency * 10;
+            if (job.jobType === 'gatherer') score += needs.basicUrgency * 3; // light help
+
+            // Wood and stone based on caps and deficits
+            if (job.jobType === 'woodcutter') score += needs.woodUrgency * 6;
+            if (job.jobType === 'rockcutter' || job.jobType === 'miner') score += needs.stoneUrgency * 4;
+
+            // Planks pipeline only if we have wood buffer
+            if (job.jobType === 'sawyer') {
+                const wood = resources.wood || 0;
+                // Prefer sawyers when wood % of cap is healthy OR near cap to convert
+                if (woodPct >= 0.4) score += 6;
+                score += (wood >= 5 ? 2 : 0);
+                score += needs.planksUrgency * 3;
+                if (wood < 3) score -= 15;
+            }
+
+            // Gold if useful later (keep small weight)
+            if (job.jobType === 'trader') score += needs.goldUrgency * 1.5;
+
+            // Production (engineer/blacksmith/crafter) minor until crafting exists
+            if (job.jobType === 'engineer' || job.jobType === 'blacksmith' || job.jobType === 'crafter') {
+                score += needs.productionUrgency * 1; // small weight
+            }
+
+            // Builders only if there is active construction
+            if (job.jobType === 'builder') score += hasActiveConstruction ? 8 : -20;
+            if (job.jobType === 'foreman') score += hasActiveConstruction ? 6 : -20;
+
+            // Encourage meeting floors/desired counts
+            if (job.jobType === 'farmer' && currentFarmers < minFarmers) score += 15;
+            if (job.jobType === 'builder' && currentBuilders >= desiredBuilders) score -= 30;
+            if (job.jobType === 'foreman' && currentForemen >= desiredForemen) score -= 30;
+
+            // Military/academic none for now
+            if (job.jobType === 'drillInstructor' || job.jobType === 'militaryTheorist' || job.jobType === 'professor' || job.jobType === 'scholar' || job.jobType === 'wizard') {
+                score -= 50;
+            }
+
+            return { ...job, score };
+        });
+
+        // Sort by score desc, then keep builder-first tie-breaker
+        scoredJobs.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
             if (a.jobType === 'builder' && b.jobType !== 'builder') return -1;
             if (b.jobType === 'builder' && a.jobType !== 'builder') return 1;
             return 0;
         });
 
+        let assignedCount = 0;
         let workerIndex = 0;
-        for (const job of prioritizedJobs) {
+
+        for (const job of scoredJobs) {
+            // Resource gating: skip sawyer if insufficient wood to consume
+            if (job.jobType === 'sawyer' && (resources.wood || 0) < 3) continue;
+            // Respect desired caps for builders/foremen
+            if (job.jobType === 'builder' && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
+            if (job.jobType === 'foreman' && this.countWorkersInJobType('foreman') >= desiredForemen) continue;
+
             let slotsToFill = Math.min(job.availableSlots, availableWorkers.length - workerIndex);
-
             for (let i = 0; i < slotsToFill; i++) {
-                if (workerIndex >= availableWorkers.length) break;
-
-                if (this.assignWorkerToJob(availableWorkers[workerIndex].id, job.buildingId, job.jobType)) {
+                if (availableWorkers.length === 0) break;
+                // Pick best-fit worker for this job based on efficiency/skills
+                const bestIndex = this.pickBestWorkerIndexForJob(availableWorkers, job.jobType);
+                const [chosen] = bestIndex >= 0 ? availableWorkers.splice(bestIndex, 1) : [availableWorkers.shift()];
+                if (chosen && this.assignWorkerToJob(chosen.id, job.buildingId, job.jobType)) {
                     assignedCount++;
                 }
-                workerIndex++;
             }
+            if (workerIndex >= availableWorkers.length) break;
         }
 
         if (assignedCount > 0) {
-            console.log(`[JobManager] Auto-assigned ${assignedCount} workers to jobs`);
+            console.log(`[JobManager] Auto-assigned ${assignedCount} workers to jobs (resource-aware)`);
         }
 
         return assignedCount;
     }
 
+    // Estimate desired builders to complete the priority site within targetDays
+    computeDesiredBuilders(targetDays = 7) {
+        const cm = this.gameState.constructionManager;
+        if (!cm || !cm.constructionSites || cm.constructionSites.size === 0) return 0;
+        // Take the first active site (matching processing focus)
+        let targetSite = null;
+        for (const [, site] of cm.constructionSites) { if (site.pointsRemaining > 0) { targetSite = site; break; } }
+        if (!targetSite) return 0;
+        const points = Math.max(0, targetSite.pointsRemaining || 0);
+        if (points === 0) return 0;
+        // Assume ~1 point per builder per day baseline
+        const desired = Math.max(1, Math.ceil(points / targetDays));
+        // Cap by available builder slots
+        const totalBuilderSlots = this.getTotalJobCapacityByType('builder');
+        return Math.min(desired, totalBuilderSlots);
+    }
+
+    getTotalJobCapacityByType(jobType) {
+        let total = 0;
+        this.availableJobs.forEach(jobTypes => { if (jobTypes[jobType]) total += jobTypes[jobType]; });
+        return total;
+    }
+
+    countWorkersInJobType(jobType) {
+        let count = 0;
+        this.jobAssignments.forEach(jobTypes => { if (Array.isArray(jobTypes[jobType])) count += jobTypes[jobType].length; });
+        return count;
+    }
+
+    // Choose the available worker with the best fit for a given job type
+    pickBestWorkerIndexForJob(availableWorkers, jobType) {
+        if (!availableWorkers || availableWorkers.length === 0) return -1;
+        let best = -1;
+        let bestScore = -Infinity;
+        for (let i = 0; i < availableWorkers.length; i++) {
+            const worker = availableWorkers[i];
+            // Build a temporary person-like object for efficiency calc
+            const person = {
+                id: worker.id,
+                name: worker.name,
+                age: worker.age,
+                health: worker.health,
+                happiness: worker.happiness,
+                experience: worker.experience,
+                skills: worker.skills
+            };
+            const eff = this.calculateWorkerEfficiency(person, jobType);
+            // Small bias: prefer younger/healthier slightly via eff already
+            if (eff > bestScore) { bestScore = eff; best = i; }
+        }
+        return best;
+    }
+
+    // Compute urgency for key resources based on current reserves, caps, and upkeep
+    computeResourceNeeds() {
+        const gs = this.gameState;
+        const res = gs.resources || {};
+        const caps = window.GameData?.resourceCaps || {};
+        const pop = gs.populationManager ? gs.populationManager.getAll().length : (gs.population || 0);
+        const dailyFoodUse = pop; // 1 food per pop per day
+
+        const food = res.food || 0;
+        const wood = res.wood || 0;
+        const stone = res.stone || 0;
+        const planks = res.planks || 0;
+        const gold = res.gold || 0;
+
+        // Urgency scales: 0-1+ higher means more urgent
+        const foodDays = dailyFoodUse > 0 ? food / dailyFoodUse : Infinity;
+        const foodUrgency = Math.max(0, 3 - foodDays); // >2 days buffer = low, <1 day = high
+
+        const woodUrgency = this.capUrgency(wood, caps.wood || 50);
+        const stoneUrgency = this.capUrgency(stone, caps.stone || 50);
+        const basicUrgency = Math.max(woodUrgency, stoneUrgency) * 0.5 + foodUrgency * 0.5;
+
+        const planksUrgency = this.capUrgency(planks, caps.planks || 50) * 0.6 + woodUrgency * 0.4; // want planks when wood healthy
+        const goldUrgency = this.capUrgency(gold, caps.gold || 100) * 0.3; // low weight for now
+        const productionUrgency = 0.1; // placeholder until crafting implemented
+
+        return { foodUrgency, woodUrgency, stoneUrgency, basicUrgency, planksUrgency, goldUrgency, productionUrgency };
+    }
+
+    capUrgency(current, cap) {
+        if (cap <= 0) return 0;
+        const ratio = current / cap; // 0..1
+        // More urgent when far from cap
+        return Math.max(0, 1 - ratio);
+    }
+
     // Optimize worker assignments when new jobs become available
     optimizeWorkerAssignments() {
-        console.log('[JobManager] Optimizing worker assignments...');
+        console.log('[JobManager] Optimizing worker assignments (resource-aware)...');
 
-        const allJobs = this.getAllAvailableJobs();
         const totalJobSlots = this.getTotalJobCapacity();
         const assignedWorkers = this.getTotalAssignedWorkers();
-
         console.log(`[JobManager] Total job slots: ${totalJobSlots}, Currently assigned: ${assignedWorkers}`);
 
-        // If we have more job slots than assigned workers, we might want to redistribute
-        if (totalJobSlots > assignedWorkers) {
-            console.log('[JobManager] New job opportunities detected, checking for redistribution...');
+        const needs = this.computeResourceNeeds();
+        const gs = this.gameState;
+        const res = gs.resources || {};
+        const hasActiveConstruction = !!(gs.constructionManager && gs.constructionManager.constructionSites && gs.constructionManager.constructionSites.size > 0);
 
-            // Check if we can release some workers from overstaffed jobs
-            this.releaseExcessWorkers();
+        // 1) Release builders/foremen when no construction is active
+        if (!hasActiveConstruction) {
+            this.releaseWorkersFromJobType('builder', Infinity);
+            this.releaseWorkersFromJobType('foreman', Infinity);
         }
+
+        // 2) If wood is scarce, release sawyers (they consume wood)
+        if ((res.wood || 0) < 3) {
+            this.releaseWorkersFromJobType('sawyer', Infinity);
+        }
+
+        // 3) If food urgency is high, free workers from lower priority jobs
+        if (needs.foodUrgency > 1.0) {
+            ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer', 'crafter'].forEach(j => this.releaseWorkersFromJobType(j, Math.ceil(needs.foodUrgency)));
+        }
+
+        // 4) Legacy cleanup for excess crafters
+        this.releaseExcessWorkers();
+    }
+
+    // Remove up to N workers across all buildings for a given job type
+    releaseWorkersFromJobType(jobType, maxToRelease = Infinity) {
+        let released = 0;
+        this.jobAssignments.forEach((jobTypes, buildingId) => {
+            if (released >= maxToRelease) return;
+            const workerIds = jobTypes[jobType];
+            if (Array.isArray(workerIds) && workerIds.length > 0) {
+                // Release from the end to minimize churn
+                const toRelease = Math.min(workerIds.length, maxToRelease - released);
+                for (let i = 0; i < toRelease; i++) {
+                    const workerId = workerIds.pop();
+                    const worker = this.getWorkerById(workerId);
+                    if (worker) {
+                        worker.jobAssignment = null;
+                        worker.status = 'idle';
+                    }
+                    released++;
+                }
+                if (Array.isArray(jobTypes[jobType]) && jobTypes[jobType].length === 0) {
+                    delete jobTypes[jobType];
+                }
+            }
+        });
+        if (released > 0) {
+            console.log(`[JobManager] Released ${released} ${jobType} workers for reassignment`);
+        }
+        return released;
     }
 
     // Get total job capacity across all buildings

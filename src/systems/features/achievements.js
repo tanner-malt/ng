@@ -682,10 +682,12 @@ class AchievementSystem {
             if (resource === 'population' && amount > 0) {
                 // Use generateMassPopulation for proper distribution
                 if (window.gameState?.populationManager?.generateMassPopulation) {
+                    const before = window.gameState.populationManager.getAll().length;
                     const generated = window.gameState.populationManager.generateMassPopulation(amount);
-                    if (generated && generated.length) {
-                        populationGained += generated.length;
-                        console.log(`[Achievements] Generated ${generated.length} new villagers as achievement reward`);
+                    const added = Math.max(0, (window.gameState.populationManager.getAll().length - before));
+                    if (generated && added) {
+                        populationGained += added;
+                        console.log(`[Achievements] Generated ${added} new villagers as achievement reward`);
                     } else {
                         console.warn(`[Achievements] generateMassPopulation failed, incrementing population counter`);
                         window.gameState.population = (window.gameState.population || 0) + amount;
@@ -699,6 +701,7 @@ class AchievementSystem {
             } else if (resource === 'refugee_families' && amount > 0) {
                 // Handle refugee families: 2 adults + 2 children per family
                 if (window.gameState?.populationManager) {
+                    let actuallyAddedPeople = 0;
                     for (let i = 0; i < amount; i++) {
                         // Add 2 adults per family (working age)
                         const adult1 = window.gameState.populationManager.addInhabitant({
@@ -708,6 +711,8 @@ class AchievementSystem {
                             status: 'idle',
                             gender: Math.random() < 0.5 ? 'male' : 'female'
                         });
+                        if (!adult1) break; // Cap reached
+                        actuallyAddedPeople += 1;
                         const adult2 = window.gameState.populationManager.addInhabitant({
                             name: `Refugee Adult ${Math.floor(Math.random() * 1000)}`,
                             age: 20 + Math.floor(Math.random() * 25), // Age 20-45
@@ -715,6 +720,8 @@ class AchievementSystem {
                             status: 'idle',
                             gender: Math.random() < 0.5 ? 'male' : 'female'
                         });
+                        if (!adult2) break;
+                        actuallyAddedPeople += 1;
                         // Add 2 children per family
                         const child1 = window.gameState.populationManager.addInhabitant({
                             name: `Refugee Child ${Math.floor(Math.random() * 1000)}`,
@@ -723,6 +730,8 @@ class AchievementSystem {
                             status: 'idle',
                             gender: Math.random() < 0.5 ? 'male' : 'female'
                         });
+                        if (!child1) break;
+                        actuallyAddedPeople += 1;
                         const child2 = window.gameState.populationManager.addInhabitant({
                             name: `Refugee Child ${Math.floor(Math.random() * 1000)}`,
                             age: 5 + Math.floor(Math.random() * 10), // Age 5-15
@@ -730,17 +739,36 @@ class AchievementSystem {
                             status: 'idle',
                             gender: Math.random() < 0.5 ? 'male' : 'female'
                         });
+                        if (!child2) break;
+                        actuallyAddedPeople += 1;
                         populationGained += 4;
                     }
                     console.log(`[Achievements] Added ${amount} refugee families (${amount * 4} total people) as achievement reward`);
+                    // Partial acceptance notice
+                    const plannedPeople = amount * 4;
+                    if (actuallyAddedPeople < plannedPeople && window.showNotification) {
+                        window.showNotification(`🏠 Housing full: accepted ${actuallyAddedPeople}/${plannedPeople} refugees`, 'warning');
+                    }
                 } else {
                     console.warn(`[Achievements] PopulationManager not available for refugee families`);
                 }
             } else if (window.gameState.resources && window.gameState.resources.hasOwnProperty(resource)) {
-                window.gameState.resources[resource] += amount;
-                // Cap resource if defined in GameData
-                if (GameData.resourceCaps && GameData.resourceCaps[resource]) {
-                    window.gameState.resources[resource] = Math.min(window.gameState.resources[resource], GameData.resourceCaps[resource]);
+                // Apply rewards without reducing existing amounts; block overflow beyond cap
+                const before = window.gameState.resources[resource];
+                const attemptedGain = amount;
+                let cap = GameData?.resourceCaps?.[resource];
+                if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                    try { cap = window.GameData.calculateSeasonalStorageCap(resource, window.gameState.season, window.gameState.buildings); } catch (_) { /* ignore */ }
+                }
+                if (typeof attemptedGain === 'number' && attemptedGain > 0 && typeof cap === 'number') {
+                    const effectiveGain = Math.max(0, Math.min(attemptedGain, Math.max(0, cap - before)));
+                    window.gameState.resources[resource] = before + effectiveGain;
+                    if (effectiveGain < attemptedGain) {
+                        console.log(`[Achievements] Reward for ${resource} blocked at cap ${cap}. Wasted: ${attemptedGain - effectiveGain}`);
+                    }
+                } else if (typeof attemptedGain === 'number') {
+                    // No cap defined or non-positive gain; apply directly
+                    window.gameState.resources[resource] = before + attemptedGain;
                 }
             } else if (window.gameState.hasOwnProperty(resource)) {
                 window.gameState[resource] += amount;

@@ -408,6 +408,7 @@ const GameData = {
             effects: '10 Scholar jobs'
         }
     },
+    
 
     // Building categories for organized UI display
     buildingCategories: {
@@ -722,6 +723,22 @@ const GameData = {
         };
     }
 };
+
+// Normalize derived fields after definition (browser-safe)
+(function ensureGameDataNormalization() {
+    try {
+        if (GameData && GameData.buildingProduction) {
+            Object.keys(GameData.buildingProduction).forEach(type => {
+                const def = GameData.buildingProduction[type];
+                if (def && typeof def === 'object' && !def.storage) {
+                    def.storage = {};
+                }
+            });
+        }
+    } catch (e) {
+        console.error('[GameData] Normalization failed:', e);
+    }
+})();
 
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {

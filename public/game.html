@@ -197,15 +197,14 @@
                 <div class="village-header">
                     <h2>🏘️ Your Village</h2>
                     <div class="resource-panel">
-                        <span>💰 Gold: <span id="gold-count"></span></span>
-                        <span>🌾 Food: <span id="food-count"></span></span>
-                        <span>🌲 Wood: <span id="wood-count"></span></span>
-                        <span>🪵 Planks: <span id="planks-count"></span></span>
-                        <span>🪨 Stone: <span id="stone-count"></span></span>
-                        <span>🪙 Metal: <span id="metal-count"></span></span>
-                        <span>⚙️ Production: <span id="production-count"></span></span>
-                        <span>👥 Population: <span id="population-count"></span>/<span
-                                id="population-cap"></span></span>
+                        <span>💰 Gold: <span id="gold-count"></span>/<span id="gold-cap"></span></span>
+                        <span>🌾 Food: <span id="food-count"></span>/<span id="food-cap"></span></span>
+                        <span>🌲 Wood: <span id="wood-count"></span>/<span id="wood-cap"></span></span>
+                        <span>🪵 Planks: <span id="planks-count"></span>/<span id="planks-cap"></span></span>
+                        <span>🪨 Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
+                        <span>🪙 Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
+                        <span>⚙️ Production: <span id="production-count"></span>/<span id="production-cap"></span></span>
+                        <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
                 </div>
@@ -1217,82 +1216,79 @@
                                 }
                             }
 
-                                // Update building grid in buildings tab
-                                function updateBuildingGrid() {
-                                    const containers = {
-                                        essential: document.getElementById('essential-buildings'),
-                                        production: document.getElementById('production-buildings'),
-                                        craft: document.getElementById('craft-buildings'),
-                                        military: document.getElementById('military-buildings'),
-                                        royal: document.getElementById('royal-buildings'),
-                                        knowledge: document.getElementById('knowledge-buildings'),
-                                        advanced: document.getElementById('advanced-buildings')
-                                    };
+                            // Update building grid in buildings tab
+                            function updateBuildingGrid() {
+                                // Prefer the VillageManager renderer which creates full-width rows
+                                // with 3 columns: name, resources, work points.
+                                if (window.villageManager &&
+                                    typeof window.villageManager.generateBuildingButtons === 'function' &&
+                                    typeof window.villageManager.setupBuildingButtons === 'function') {
+                                    try {
+                                        window.villageManager.generateBuildingButtons();
+                                        window.villageManager.setupBuildingButtons();
+                                        return; // Done – use the new structured rows
+                                    } catch (err) {
+                                        console.warn('[BuildingsTab] Falling back to simple buttons:', err);
+                                    }
+                                }
 
-                                    // Ensure required containers exist
-                                    if (!containers.essential || !containers.production || !containers.military) return;
-
-                                    // Clear existing content
-                                    Object.values(containers).forEach(el => el && (el.innerHTML = ''));
-
-                                    if (!window.GameData) return;
-
-                                    // Populate each category from GameData
-                                    Object.entries(containers).forEach(([category, el]) => {
-                                        if (!el) return;
-                                        const buildings = window.GameData.getBuildingsByCategory
-                                            ? window.GameData.getBuildingsByCategory(category)
-                                            : (window.GameData.buildingCategories?.[category] || []);
-                                        buildings.forEach(type => {
-                                            el.appendChild(createBuildingButton(type));
+                                // Fallback: simple button list (legacy)
+                                const containers = {
+                                    essential: document.getElementById('essential-buildings'),
+                                    production: document.getElementById('production-buildings'),
+                                    craft: document.getElementById('craft-buildings'),
+                                    military: document.getElementById('military-buildings'),
+                                    royal: document.getElementById('royal-buildings'),
+                                    knowledge: document.getElementById('knowledge-buildings'),
+                                    advanced: document.getElementById('advanced-buildings')
+                                };
+                                Object.values(containers).forEach(el => el && (el.innerHTML = ''));
+                                if (!window.GameData) return;
+                                Object.entries(containers).forEach(([category, el]) => {
+                                    if (!el) return;
+                                    const buildings = window.GameData.getBuildingsByCategory
+                                        ? window.GameData.getBuildingsByCategory(category)
+                                        : (window.GameData.buildingCategories?.[category] || []);
+                                    buildings.forEach(type => {
+                                        const btn = document.createElement('button');
+                                        btn.className = 'building-btn';
+                                        const icon = window.GameData?.getBuildingIcon
+                                            ? window.GameData.getBuildingIcon(type)
+                                            : (window.GameData?.buildingInfo?.[type]?.icon || '🏠');
+                                        const name = window.GameData?.getBuildingName
+                                            ? window.GameData.getBuildingName(type)
+                                            : (window.GameData?.buildingInfo?.[type]?.name || type);
+                                        const cost = window.GameData?.formatCost
+                                            ? window.GameData.formatCost(type)
+                                            : '';
+                                        btn.innerHTML = `
+                                            <div class="building-icon">${icon}</div>
+                                            <div class="building-name">${name}</div>
+                                            <div class="building-cost">${cost}</div>`;
+                                        btn.addEventListener('click', function () {
+                                            if (window.village && typeof window.village.buildBuilding === 'function') {
+                                                window.village.buildBuilding(type);
+                                            }
                                         });
+                                        el.appendChild(btn);
                                     });
-                                }
+                                });
+                            }
 
-                                // Create building button element using GameData
-                                function createBuildingButton(buildingType) {
-                                    const button = document.createElement('button');
-                                    button.className = 'building-btn';
-
-                                    const icon = window.GameData?.getBuildingIcon
-                                        ? window.GameData.getBuildingIcon(buildingType)
-                                        : (window.GameData?.buildingInfo?.[buildingType]?.icon || '🏠');
-                                    const name = window.GameData?.getBuildingName
-                                        ? window.GameData.getBuildingName(buildingType)
-                                        : (window.GameData?.buildingInfo?.[buildingType]?.name || buildingType);
-                                    const cost = window.GameData?.formatCost
-                                        ? window.GameData.formatCost(buildingType)
-                                        : '';
-
-                                    button.innerHTML = `
-                <div class="building-icon">${icon}</div>
-                <div class="building-name">${name}</div>
-                <div class="building-cost">${cost}</div>
-            `;
-
-                                    button.addEventListener('click', function () {
-                                        if (window.village && typeof window.village.buildBuilding === 'function') {
-                                            window.village.buildBuilding(buildingType);
-                                        }
-                                    });
-
-                                    return button;
-                                }
-
-                                // Format cost display (fallback only)
-                                function formatCost(cost) {
-                                    if (window.GameData?.formatCost && typeof cost === 'string') return cost;
-                                    if (!cost) return '';
-                                    const costParts = [];
-                                    if (cost.food) costParts.push(`${cost.food}🌾`);
-                                    if (cost.wood) costParts.push(`${cost.wood}🪵`);
-                                    if (cost.stone) costParts.push(`${cost.stone}🗿`);
-                                    if (cost.metal) costParts.push(`${cost.metal}⚒️`);
-                                    if (cost.production) costParts.push(`${cost.production}⚙️`);
-                                    if (cost.gold) costParts.push(`${cost.gold}💰`);
-                                    if (cost.planks) costParts.push(`${cost.planks}🪵`);
-                                    return costParts.join(' ');
-                                }
+                            // Format cost display (fallback only)
+                            function formatCost(cost) {
+                                if (window.GameData?.formatCost && typeof cost === 'string') return cost;
+                                if (!cost) return '';
+                                const costParts = [];
+                                if (cost.food) costParts.push(`${cost.food}🌾`);
+                                if (cost.wood) costParts.push(`${cost.wood}🪵`);
+                                if (cost.stone) costParts.push(`${cost.stone}🗿`);
+                                if (cost.metal) costParts.push(`${cost.metal}⚒️`);
+                                if (cost.production) costParts.push(`${cost.production}⚙️`);
+                                if (cost.gold) costParts.push(`${cost.gold}💰`);
+                                if (cost.planks) costParts.push(`${cost.planks}🪵`);
+                                return costParts.join(' ');
+                            }
 
                             // Update display on game events
                             if (window.eventBus) {

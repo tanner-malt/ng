@@ -59,9 +59,14 @@ class PopulationManager {
             foodScarce: foodScarce
         });
 
-        // 3. Actually add new births to population
+
+        // 3. Actually add new births to population, enforcing cap
+        let birthsAdded = 0;
         if (birthResult.births > 0) {
-            for (let i = 0; i < birthResult.births; i++) {
+            const cap = (typeof gameState.getPopulationCap === 'function') ? gameState.getPopulationCap() : 9999;
+            const current = this.population.length;
+            const allowedBirths = Math.max(0, Math.min(birthResult.births, cap - current));
+            for (let i = 0; i < allowedBirths; i++) {
                 const newborn = {
                     name: this.generateRandomName() + ' the Younger',
                     age: 0, // Start as newborn
@@ -75,15 +80,24 @@ class PopulationManager {
                     experience: {},
                     traits: this.generateRandomTraits('child')
                 };
-
                 this.addInhabitant(newborn);
+                birthsAdded++;
                 console.log(`[PopulationManager] Birth: ${newborn.name} (${newborn.gender})`);
             }
-
+            if (allowedBirths < birthResult.births) {
+                console.log(`[PopulationManager] Births blocked by population cap. Allowed: ${allowedBirths}, Attempted: ${birthResult.births}`);
+                if (window.eventBus) {
+                    window.eventBus.emit('population_birth_blocked', {
+                        blocked: birthResult.births - allowedBirths,
+                        cap,
+                        current
+                    });
+                }
+            }
             // Emit birth event
             if (window.eventBus) {
                 window.eventBus.emit('population_birth', {
-                    births: birthResult.births,
+                    births: birthsAdded,
                     twins: birthResult.twins,
                     totalPopulation: this.population.length
                 });
@@ -131,7 +145,6 @@ class PopulationManager {
                     diedVillagers.push({
                         name: villager.name,
                         role: villager.role,
-                        age: villager.age,
                         deathChance: (deathChance * 100).toFixed(1) + '%'
                     });
                     deaths++;
@@ -168,114 +181,17 @@ class PopulationManager {
         if (age < 180) return 0; // No death before 180 days
 
         // Gradual increase from 180 to 220 days
-        // At 180: 0.1% chance, At 200: 2% chance, At 220: 50% chance
-        const ageAbove180 = age - 180;
-        const maxAge = 220 - 180; // 40 days of death probability
-
-        // Exponential curve for realistic aging
-        const normalizedAge = Math.min(ageAbove180 / maxAge, 1);
-        const deathProbability = 0.001 + (0.499 * Math.pow(normalizedAge, 2.5));
-
-        return Math.min(deathProbability, 0.8); // Cap at 80% max daily chance
-    }
-
-    /**
-     * Get population organized into groups with updated age brackets
-     * @returns {object} - organized population data
-     */
-    getPopulationGroups() {
-        const groups = {
-            children: { name: '👶 Children', age: '0-15 days', count: 0, villagers: [] },
-            youngAdults: { name: '🧑 Young Adults', age: '16-60 days', count: 0, villagers: [] },
-            adults: { name: '👨 Adults', age: '61-120 days', count: 0, villagers: [] },
-            middleAged: { name: '👱 Middle Aged', age: '121-160 days', count: 0, villagers: [] },
-            mature: { name: '🧔 Mature', age: '161-190 days', count: 0, villagers: [] },
-            elderly: { name: '👴 Elderly', age: '191+ days', count: 0, villagers: [] }
-        };
-
-        const jobGroups = {
-            unemployed: { name: '🏠 Unemployed', description: 'Available workers', count: 0, villagers: [] },
-            farmers: { name: '🧑‍🌾 Farmers', description: 'Food production', count: 0, villagers: [] },
-            woodcutters: { name: '🪓 Woodcutters', description: 'Wood production', count: 0, villagers: [] },
-            miners: { name: '⛏️ Miners', description: 'Stone/metal production', count: 0, villagers: [] },
-            builders: { name: '🔨 Builders', description: 'Construction work', count: 0, villagers: [] },
-            guards: { name: '⚔️ Guards', description: 'Defense and security', count: 0, villagers: [] },
-            merchants: { name: '💼 Merchants', description: 'Trade and commerce', count: 0, villagers: [] },
-            drafted: { name: '🪖 Military', description: 'Serving in armies', count: 0, villagers: [] },
-            other: { name: '👤 Other', description: 'Miscellaneous roles', count: 0, villagers: [] }
-        };
-
-        // Categorize population
-        this.population.forEach(villager => {
-            // Age groups
-            if (villager.age <= 15) {
-                groups.children.villagers.push(villager);
-                groups.children.count++;
-            } else if (villager.age <= 60) {
-                groups.youngAdults.villagers.push(villager);
-                groups.youngAdults.count++;
-            } else if (villager.age <= 120) {
-                groups.adults.villagers.push(villager);
-                groups.adults.count++;
-            } else if (villager.age <= 160) {
-                groups.middleAged.villagers.push(villager);
-                groups.middleAged.count++;
-            } else if (villager.age <= 190) {
-                groups.mature.villagers.push(villager);
-                groups.mature.count++;
-            } else {
-                groups.elderly.villagers.push(villager);
-                groups.elderly.count++;
-            }
-
-            // Job groups
-            if (villager.status === 'drafted') {
-                jobGroups.drafted.villagers.push(villager);
-                jobGroups.drafted.count++;
-            } else if (villager.status === 'idle' || !villager.role || villager.role === 'peasant') {
-                jobGroups.unemployed.villagers.push(villager);
-                jobGroups.unemployed.count++;
-            } else {
-                const role = villager.role.toLowerCase();
-                if (role === 'farmer') {
-                    jobGroups.farmers.villagers.push(villager);
-                    jobGroups.farmers.count++;
-                } else if (role === 'woodcutter') {
-                    jobGroups.woodcutters.villagers.push(villager);
-                    jobGroups.woodcutters.count++;
-                } else if (role === 'miner') {
-                    jobGroups.miners.villagers.push(villager);
-                    jobGroups.miners.count++;
-                } else if (role === 'builder') {
-                    jobGroups.builders.villagers.push(villager);
-                    jobGroups.builders.count++;
-                } else if (role === 'guard') {
-                    jobGroups.guards.villagers.push(villager);
-                    jobGroups.guards.count++;
-                } else if (role === 'merchant') {
-                    jobGroups.merchants.villagers.push(villager);
-                    jobGroups.merchants.count++;
-                } else {
-                    jobGroups.other.villagers.push(villager);
-                    jobGroups.other.count++;
-                }
-            }
-        });
-
-        return {
-            total: this.population.length,
-            ageGroups: groups,
-            jobGroups: jobGroups,
-            demographics: {
-                averageAge: this.population.length > 0 ?
-                    Math.round(this.population.reduce((sum, v) => sum + v.age, 0) / this.population.length) : 0,
-                maleCount: this.population.filter(v => v.gender === 'male').length,
-                femaleCount: this.population.filter(v => v.gender === 'female').length,
-                workingAge: this.population.filter(v => v.age >= 16 && v.age <= 190).length,
-                employed: this.population.filter(v => v.status === 'working').length,
-                unemployed: this.population.filter(v => v.status === 'idle').length
-            }
-        };
+        // At 180: ~0.1% chance, At 200: ~2% chance, At 220: ~50% chance
+        if (age <= 200) {
+            const t = (age - 180) / 20; // 0..1
+            return 0.001 + t * (0.02 - 0.001);
+        }
+        if (age <= 220) {
+            const t = (age - 200) / 20; // 0..1
+            return 0.02 + t * (0.5 - 0.02);
+        }
+        // Beyond 220, approach 100% with a soft cap
+        return Math.min(0.99, 0.5 + (age - 220) * 0.01);
     }
 
     /**
@@ -380,7 +296,20 @@ class PopulationManager {
         return { births, twins, bonus, eligibleCouples };
     }
 
-    addInhabitant(details) {
+    addInhabitant(details, options = {}) {
+        const { ignoreCap = false } = options || {};
+        // Enforce population cap if available
+        if (!ignoreCap && typeof window !== 'undefined' && window.gameState && typeof window.gameState.getPopulationCap === 'function') {
+            const cap = window.gameState.getPopulationCap();
+            const current = this.population.length;
+            if (current >= cap) {
+                console.log(`[PopulationManager] Blocked addition of inhabitant: population cap reached (${current}/${cap})`);
+                if (window.eventBus) {
+                    window.eventBus.emit('population_add_blocked', { cap, current, details });
+                }
+                return null;
+            }
+        }
         // If age is not specified, default to 0 (newborn)
         const age = details.age !== undefined ? details.age : 0;
         // Determine if this villager is a child (not eligible to work)
@@ -1103,7 +1032,7 @@ class PopulationManager {
                 role = specialRoles[Math.floor(Math.random() * specialRoles.length)];
             }
 
-            const inhabitant = this.addInhabitant({
+        const inhabitant = this.addInhabitant({
                 name: name,
                 age: age,
                 gender: gender,
@@ -1113,7 +1042,13 @@ class PopulationManager {
                 skills: this.getSkillsForRole(role)
             });
 
-            generated.push(inhabitant);
+            if (inhabitant) {
+                generated.push(inhabitant);
+            } else {
+                // Cap reached; stop generating more
+                console.log('[PopulationManager] Population cap reached during mass generation; stopping early');
+                break;
+            }
         }
 
         console.log(`[PopulationManager] Generated ${count} inhabitants. Age distribution:`, {
@@ -1125,6 +1060,68 @@ class PopulationManager {
         });
 
         return generated;
+    }
+
+    /**
+     * Add refugees (generic adults/children mix) up to population cap
+     * @param {number} count
+     * @returns {number} number actually added
+     */
+    addRefugees(count) {
+        let added = 0;
+        for (let i = 0; i < count; i++) {
+            // Favor working-age adults with a chance of a child
+            const isChild = Math.random() < 0.25;
+            const age = isChild ? (5 + Math.floor(Math.random() * 11)) : (18 + Math.floor(Math.random() * 40));
+            const role = isChild ? 'child' : 'peasant';
+            const status = isChild ? 'child' : 'idle';
+            const villager = this.addInhabitant({
+                name: `${isChild ? 'Refugee Child' : 'Refugee Adult'} ${Math.floor(Math.random() * 1000)}`,
+                age,
+                role,
+                status,
+                gender: Math.random() < 0.5 ? 'male' : 'female'
+            });
+            if (!villager) break; // Cap reached
+            added++;
+        }
+        if (added > 0 && window.eventBus) {
+            window.eventBus.emit('population_gained', { amount: added, source: 'refugees' });
+        }
+        return added;
+    }
+
+    /**
+     * Add deserters back to population as idle adults, up to cap
+     * @param {number} count
+     * @returns {number} number actually added
+     */
+    addDeserters(count) {
+        let added = 0;
+        for (let i = 0; i < count; i++) {
+            const villager = this.addInhabitant({
+                name: `Deserter ${Math.floor(Math.random() * 1000)}`,
+                age: 20 + Math.floor(Math.random() * 25),
+                role: 'peasant',
+                status: 'idle',
+                gender: Math.random() < 0.5 ? 'male' : 'female'
+            });
+            if (!villager) break;
+            added++;
+        }
+        if (added > 0 && window.eventBus) {
+            window.eventBus.emit('population_gained', { amount: added, source: 'deserters' });
+        }
+        return added;
+    }
+
+    /**
+     * Adjust morale/happiness across village (simple implementation)
+     */
+    increaseMorale(delta) {
+        this.population.forEach(v => {
+            v.happiness = Math.max(0, Math.min(100, (v.happiness || 70) + delta));
+        });
     }
 
     /**
@@ -1233,7 +1230,7 @@ class PopulationManager {
             productivity: 1.2,
             traits: ['noble', 'charismatic', 'educated']
         };
-        this.addInhabitant(royalMember);
+    this.addInhabitant(royalMember, { ignoreCap: true });
 
         // 2. Add basic villagers (jobs will be assigned from buildings later)
         const startingCount = (typeof window !== 'undefined' && window.GameData && window.GameData.startingPopulationCount) ? window.GameData.startingPopulationCount : 5;
@@ -1250,7 +1247,7 @@ class PopulationManager {
                 productivity: 0.8 + Math.random() * 0.4,
                 traits: this.generateRandomTraits('adult')
             };
-            this.addInhabitant(villager);
+            this.addInhabitant(villager, { ignoreCap: true });
         }
 
         console.log('[PopulationManager] Generated starting dynasty population:');

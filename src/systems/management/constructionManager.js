@@ -199,7 +199,14 @@ class ConstructionManager {
             site.dailyProgress = 0;
         } else {
             // Calculate total daily points from all builders
-            const totalPoints = builders.reduce((sum, builder) => sum + builder.efficiency, 0);
+            let totalPoints = builders.reduce((sum, builder) => sum + builder.efficiency, 0);
+
+            // Apply foreman boost: +20% to builders (if any foremen on staff anywhere)
+            const foremanMultiplier = this.getForemanBoostMultiplier();
+            if (foremanMultiplier > 1) {
+                totalPoints *= foremanMultiplier;
+                console.log(`[Construction] Applied foreman boost x${foremanMultiplier.toFixed(2)} to builder points`);
+            }
             site.skillEfficiency = totalPoints / builders.length; // Average efficiency per builder
 
             // Teamwork bonus for multiple builders
@@ -214,7 +221,7 @@ class ConstructionManager {
 
             // Apply lumber mill construction speed bonus
             if (this.gameState.villageManager?.buildingEffectsManager) {
-                const building = this.gameState.buildings.find(b => b.id === buildingId);
+                const building = this.gameState.buildings.find(b => b.id === site.buildingId);
                 if (building) {
                     const speedBonus = this.gameState.villageManager.buildingEffectsManager.getConstructionSpeedBonus(building.x, building.y);
                     if (speedBonus > 0) {
@@ -238,6 +245,24 @@ class ConstructionManager {
 
         // Update estimated completion
         this.updateEstimatedCompletion(site);
+    }
+
+    // Determine global foreman boost based on active foremen in job system
+    getForemanBoostMultiplier() {
+        try {
+            const jm = this.gameState.jobManager;
+            if (!jm || !jm.jobAssignments) return 1.0;
+            let hasForeman = false;
+            jm.jobAssignments.forEach((jobs) => {
+                if (jobs && Array.isArray(jobs.foreman) && jobs.foreman.length > 0) {
+                    hasForeman = true;
+                }
+            });
+            return hasForeman ? 1.2 : 1.0; // +20% when at least one foreman is working
+        } catch (e) {
+            console.warn('[Construction] Foreman boost check failed:', e);
+            return 1.0;
+        }
     }
 
     updateEstimatedCompletion(site) {
