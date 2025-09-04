@@ -541,6 +541,9 @@ class QuestManager {
         this.expeditionState = 'traveling_out';
         this.expeditionStartTime = Date.now();
 
+        // Notify systems of expedition start
+        try { window.eventBus && window.eventBus.emit('expedition_started', { location, leader: expeditionLeader }); } catch (_) { }
+
         // Start village time progression
         this.gameState.startExpeditionTimeFlow();
 
@@ -1387,6 +1390,9 @@ class QuestManager {
         this.expeditionState = 'traveling_back';
         this.expeditionStartTime = Date.now(); // Reset timer for return journey
 
+        // Notify systems return journey has started
+        try { window.eventBus && window.eventBus.emit('expedition_return_started', { location: this.currentExpedition?.location }); } catch (_) { }
+
         if (defeated) {
             window.showNotification(
                 `🏠 Army retreats from ${this.currentExpedition.location.name}, returning home with what they can carry...`,
@@ -1555,6 +1561,9 @@ class QuestManager {
         this.currentExpedition = null;
         this.expeditionState = 'none';
         this.expeditionStartTime = null;
+
+        // Notify systems expedition completed
+        try { window.eventBus && window.eventBus.emit('expedition_completed', { location, leader, result: expeditionResult }); } catch (_) { }
 
         // Return to village view
         this.game.switchView('village');

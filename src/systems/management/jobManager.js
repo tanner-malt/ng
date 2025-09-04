@@ -54,7 +54,13 @@ class JobManager {
                 completedBuildings++;
                 const production = GameData.buildingProduction[building.type];
                 if (production && production.jobs) {
-                    this.availableJobs.set(building.id, { ...production.jobs });
+                    // Scale job slots by building level (default: linear; hook for future strategies)
+                    const scaled = {};
+                    Object.entries(production.jobs).forEach(([jobType, baseSlots]) => {
+                        const slots = this.computeJobSlots(baseSlots || 0, building);
+                        if (slots > 0) scaled[jobType] = slots;
+                    });
+                    this.availableJobs.set(building.id, scaled);
                     buildingsWithJobs++;
                 }
             }
@@ -97,6 +103,26 @@ class JobManager {
             if (b.jobType === 'builder' && a.jobType !== 'builder') return 1;
             return a.buildingType.localeCompare(b.buildingType);
         });
+    }
+
+    // Helper to compute job slots per building with configurable scaling
+    computeJobSlots(baseSlots, building) {
+        const level = Math.max(1, building?.level || 1);
+        // Default strategy is linear scaling: baseSlots * level
+        let strategy = 'linear';
+        try {
+            strategy = window.GameData?.jobSlotScalingStrategy || 'linear';
+        } catch (_) { /* ignore */ }
+
+        switch (strategy) {
+            case 'linear':
+            default: {
+                return Math.max(0, Math.floor(baseSlots * level));
+            }
+            // Future strategies (kept in mind):
+            // case 'quadratic': return Math.max(0, Math.floor(baseSlots * level * level));
+            // case 'custom': if (typeof window.GameData?.computeJobSlots === 'function') return Math.max(0, Math.floor(window.GameData.computeJobSlots(baseSlots, level, building)));
+        }
     }
 
     // Assign worker to a specific job
@@ -542,8 +568,23 @@ class JobManager {
             const isYoungEnough = worker.age <= 120; // Dynasty game - people can work until very old
             const isHealthy = (worker.health || 100) >= 30; // Lowered health requirement
             const hasNoBuildingJob = !worker.jobAssignment; // No building job assignment
+            // Exclude the governing monarch from normal jobs
+            const isGoverningLeader = (() => {
+                try {
+                    const monarch = this.gameState?.royalFamily?.currentMonarch;
+                    if (!monarch) return false;
+                    return monarch.isGoverning === true && worker.id === monarch.id;
+                } catch (_) { return false; }
+            })();
 
-            const available = isOldEnough && isYoungEnough && isHealthy && hasNoBuildingJob;
+            // Exclude explicit leadership background roles from normal jobs
+            const isLeadershipRole = (worker.role === 'player' || worker.role === 'monarch' || worker.role === 'royal');
+
+            // Exclude drafted soldiers and expedition/away travelers from auto-assign
+            const isDrafted = worker.status === 'drafted';
+            const isAway = worker.status === 'away' || worker.status === 'traveling' || worker.onExpedition === true;
+
+            const available = isOldEnough && isYoungEnough && isHealthy && hasNoBuildingJob && !isGoverningLeader && !isLeadershipRole && !isDrafted && !isAway;
 
             if (!available) {
                 console.log(`[JobManager] ${worker.name} unavailable: age=${worker.age}, health=${worker.health}, hasJob=${!!worker.jobAssignment}, jobAssignment:`, worker.jobAssignment);
@@ -715,6 +756,13 @@ class JobManager {
         return total;
     }
 
+    // How many slots remain unfilled for a given job type
+    getMissingSlotsForJobType(jobType) {
+        const capacity = this.getTotalJobCapacityByType(jobType);
+        const current = this.countWorkersInJobType(jobType);
+        return Math.max(0, capacity - current);
+    }
+
     countWorkersInJobType(jobType) {
         let count = 0;
         this.jobAssignments.forEach(jobTypes => { if (Array.isArray(jobTypes[jobType])) count += jobTypes[jobType].length; });
@@ -841,6 +889,74 @@ class JobManager {
             console.log(`[JobManager] Released ${released} ${jobType} workers for reassignment`);
         }
         return released;
+    }
+
+    // Specifically fill all available builder slots using any free workers
+    fillAllBuilders() {
+        // Ensure available jobs are up to date
+        this.updateAvailableJobs();
+
+        let assignments = 0;
+        let missing = this.getMissingSlotsForJobType('builder');
+        if (missing <= 0) return 0;
+
+        // Gather builder jobs across buildings
+        const builderJobs = this.getAllAvailableJobs().filter(j => j.jobType === 'builder');
+        if (builderJobs.length === 0) return 0;
+
+        // Available workers after any releases
+        const availableWorkers = this.getAvailableWorkers();
+        if (availableWorkers.length === 0) return 0;
+
+        // Greedy assign to builder jobs until we run out of workers or slots
+        for (const job of builderJobs) {
+            // Recompute current remaining slots for this building
+            const currentWorkers = this.getWorkersInJob(job.buildingId, 'builder').length;
+            const slots = Math.max(0, job.maxWorkers - currentWorkers);
+            if (slots === 0) continue;
+
+            for (let i = 0; i < slots; i++) {
+                if (availableWorkers.length === 0) break;
+                const bestIdx = this.pickBestWorkerIndexForJob(availableWorkers, 'builder');
+                const [chosen] = bestIdx >= 0 ? availableWorkers.splice(bestIdx, 1) : [availableWorkers.shift()];
+                if (chosen && this.assignWorkerToJob(chosen.id, job.buildingId, 'builder')) {
+                    assignments++;
+                    missing--;
+                    if (missing <= 0) break;
+                }
+            }
+            if (missing <= 0 || availableWorkers.length === 0) break;
+        }
+
+        if (assignments > 0) {
+            console.log(`[JobManager] Filled ${assignments} builder slot(s) (fillAllBuilders)`);
+        }
+
+        return assignments;
+    }
+
+    // Reassign from lower-priority jobs and maximize builder staffing across the city
+    maximizeBuilderAssignments() {
+        this.updateAvailableJobs();
+
+        let missing = this.getMissingSlotsForJobType('builder');
+        if (missing <= 0) return 0;
+
+        // Release order: lowest priority first; keep farmers last to avoid starvation
+        const releaseOrder = [
+            'crafter', 'trader', 'engineer', 'blacksmith', 'wizard', 'professor', 'scholar',
+            'drillInstructor', 'militaryTheorist', 'sawyer', 'gatherer', 'miner', 'rockcutter', 'woodcutter', 'farmer'
+        ];
+
+        for (const jt of releaseOrder) {
+            if (missing <= 0) break;
+            const released = this.releaseWorkersFromJobType(jt, missing);
+            missing -= released;
+        }
+
+        // Now fill all builder slots we can
+        const assigned = this.fillAllBuilders();
+        return assigned;
     }
 
     // Get total job capacity across all buildings

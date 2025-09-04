@@ -89,12 +89,12 @@ class ModalSystem {
                     this.closeTopModal();
                 }
             }
-            
+
             // Handle Enter key for modals with OK buttons
             if (e.key === 'Enter' && this.modalStack.length > 0) {
                 const topModal = this.modalStack[this.modalStack.length - 1];
                 const modalElement = topModal.element;
-                
+
                 // Look for OK button, confirm button, or close button
                 const okButton = modalElement.querySelector('.btn-primary, .message-confirm, .modal-close-btn');
                 if (okButton && topModal.closable !== false) {
@@ -107,6 +107,8 @@ class ModalSystem {
 
     // Show a modal with custom content and return a Promise
     showModal(options = {}) {
+        // Always close achievement modals before opening a new modal
+        this.closeAchievementModals();
         return new Promise((resolve, reject) => {
             // Ensure DOM is ready
             if (document.readyState === 'loading') {
@@ -119,7 +121,13 @@ class ModalSystem {
         });
     }
 
-        _showModalInternal(options, resolve, reject) {
+    closeAchievementModals() {
+        // Close any modals with modalType 'achievement-notification'
+        const achievementModals = this.modalStack.filter(m => m.modalType === 'achievement-notification');
+        achievementModals.forEach(m => this.closeModal(m.id));
+    }
+
+    _showModalInternal(options, resolve, reject) {
         const {
             id = 'modal-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
             title = 'Modal',
@@ -142,11 +150,11 @@ class ModalSystem {
             resolve(null);
             return;
         }
-        
+
         // Special handling for tutorial modals - only prevent exact same modal type duplicates
         if (modalType && modalType.includes('tutorial') || className.includes('tutorial')) {
             // Only block if the EXACT same tutorial modal type is already active
-            const existingTutorial = Array.from(this.activeModals).find(activeId => 
+            const existingTutorial = Array.from(this.activeModals).find(activeId =>
                 activeId === modalType
             );
             if (existingTutorial) {
@@ -183,11 +191,11 @@ class ModalSystem {
         `;
 
         // Add to modal stack
-        this.modalStack.push({ 
+        this.modalStack.push({
             id: actualModalId,  // Use actual ID for stack tracking
-            element: modal, 
-            onClose, 
-            modalType, 
+            element: modal,
+            onClose,
+            modalType,
             closable,
             resolve,
             reject,
@@ -204,13 +212,13 @@ class ModalSystem {
 
         // Show overlay and modal
         const overlay = document.getElementById('modal-overlay');
-        
+
         overlay.appendChild(modal);
-        
+
         overlay.style.display = 'flex';
         overlay.style.zIndex = finalZIndex;  // Set calculated z-index
         overlay.classList.add('show'); // Add show class for animations and selectors
-        
+
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
 
@@ -255,11 +263,11 @@ class ModalSystem {
 
         // Remove from stack and active set
         this.modalStack.splice(modalIndex, 1);
-        
+
         // Remove the correct tracking ID from activeModals
         const trackingId = modalData.modalType || modalId;
         this.activeModals.delete(trackingId);
-        
+
         console.log(`[ModalSystem] Removed modal from tracking: ${trackingId}`);
         console.log(`[ModalSystem] Active modals remaining:`, Array.from(this.activeModals));
 
@@ -282,7 +290,7 @@ class ModalSystem {
                 const priorityBonus = (topModal.priority || 0) * 1000;
                 const stackPosition = this.modalStack.length * 10;
                 const finalZIndex = baseZIndex + priorityBonus + stackPosition;
-                
+
                 const overlay = document.getElementById('modal-overlay');
                 overlay.style.zIndex = finalZIndex;
             }
@@ -292,11 +300,11 @@ class ModalSystem {
     // Close all modals (emergency cleanup)
     closeAllModals() {
         console.log('[ModalSystem] Closing all modals (emergency cleanup)');
-        
+
         // Clear all tracking
         this.activeModals.clear();
         this.modalStack = [];
-        
+
         // Remove all modal elements from DOM
         const overlay = document.getElementById('modal-overlay');
         if (overlay) {
@@ -304,7 +312,7 @@ class ModalSystem {
             overlay.style.display = 'none';
             overlay.classList.remove('show');
         }
-        
+
         console.log('[ModalSystem] All modals cleared');
     }
 
@@ -318,7 +326,7 @@ class ModalSystem {
             modalType: m.modalType,
             element: !!m.element
         })));
-        
+
         const overlay = document.getElementById('modal-overlay');
         console.log('Overlay display:', overlay ? overlay.style.display : 'N/A');
         console.log('Overlay children:', overlay ? overlay.children.length : 'N/A');
@@ -463,7 +471,7 @@ class ModalSystem {
 
             const createConfirmationModal = () => {
                 const modalType = `confirmation-${type}-${title.toLowerCase().replace(/\s+/g, '-')}`;
-                
+
                 // Check if this type of confirmation is already active
                 if (this.activeModals.has(modalType)) {
                     console.log(`[ModalSystem] Confirmation of type '${modalType}' already active`);
@@ -497,69 +505,48 @@ class ModalSystem {
                     }
 
                     console.log('[ModalSystem] Confirmation modal created with ID:', modalId);
+                    // Attach handlers immediately; modal element is in DOM now
+                    const modal = document.getElementById(modalId);
+                    if (!modal) {
+                        console.error('[ModalSystem] Could not find modal element with ID:', modalId);
+                        resolve(null);
+                        return;
+                    }
 
-                    // Use setTimeout to ensure modal is fully rendered
-                    setTimeout(() => {
-                        const modal = document.getElementById(modalId);
-                        if (!modal) {
-                            console.error('[ModalSystem] Could not find modal element with ID:', modalId);
-                            resolve(null);
-                            return;
-                        }
-                        
-                        const confirmBtn = modal.querySelector('.confirm-btn');
-                        const cancelBtn = modal.querySelector('.cancel-btn');
+                    const confirmBtn = modal.querySelector('.confirm-btn');
+                    const cancelBtn = modal.querySelector('.cancel-btn');
 
-                        if (!confirmBtn || !cancelBtn) {
-                            console.error('[ModalSystem] Could not find confirm/cancel buttons in modal');
-                            resolve(null);
-                            return;
-                        }
+                    if (!confirmBtn || !cancelBtn) {
+                        console.error('[ModalSystem] Could not find confirm/cancel buttons in modal');
+                        resolve(null);
+                        return;
+                    }
 
-                        console.log('[ModalSystem] Setting up button event handlers');
-                        console.log('[ModalSystem] Confirm button:', confirmBtn);
-                        console.log('[ModalSystem] Cancel button:', cancelBtn);
+                    const handleConfirm = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.closeModal(modalId);
+                        if (onConfirm) onConfirm();
+                        resolve(true);
+                    };
 
-                        // Use direct event listeners instead of delegation
-                        const handleConfirm = (e) => {
-                            console.log('[ModalSystem] Confirm button clicked directly');
-                            e.preventDefault();
-                            e.stopPropagation();
-                            this.closeModal(modalId);
-                            if (onConfirm) {
-                                console.log('[ModalSystem] Calling onConfirm callback');
-                                onConfirm();
-                            }
-                            resolve(true);
-                        };
+                    const handleCancel = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.closeModal(modalId);
+                        if (onCancel) onCancel();
+                        resolve(false);
+                    };
 
-                        const handleCancel = (e) => {
-                            console.log('[ModalSystem] Cancel button clicked directly');
-                            e.preventDefault();
-                            e.stopPropagation();
-                            this.closeModal(modalId);
-                            if (onCancel) {
-                                console.log('[ModalSystem] Calling onCancel callback');
-                                onCancel();
-                            }
-                            resolve(false);
-                        };
+                    confirmBtn.addEventListener('click', handleConfirm);
+                    cancelBtn.addEventListener('click', handleCancel);
 
-                        // Add event listeners directly to buttons
-                        confirmBtn.addEventListener('click', handleConfirm);
-                        cancelBtn.addEventListener('click', handleCancel);
-
-                        // Also add mousedown as fallback
-                        confirmBtn.addEventListener('mousedown', (e) => {
-                            console.log('[ModalSystem] Confirm mousedown detected');
-                        });
-
-                        cancelBtn.addEventListener('mousedown', (e) => {
-                            console.log('[ModalSystem] Cancel mousedown detected');
-                        });
-
-                        console.log('[ModalSystem] Button handlers attached successfully');
-                    }, 200);
+                    // Keyboard shortcuts within this modal
+                    const keyHandler = (ev) => {
+                        if (ev.key === 'Enter') handleConfirm(ev);
+                        if (ev.key === 'Escape') handleCancel(ev);
+                    };
+                    modal.addEventListener('keydown', keyHandler);
                 }).catch(error => {
                     console.error('[ModalSystem] Error creating confirmation modal:', error);
                     reject(error);
@@ -581,7 +568,7 @@ class ModalSystem {
     // Show quest menu (replacing the quest view)
     showQuestMenu(questManager) {
         const questsContent = this.generateQuestMenuContent(questManager);
-        
+
         const modalId = this.showModal({
             id: 'quest-menu-modal',
             title: '🗺️ Expeditions & Quests',
@@ -597,7 +584,7 @@ class ModalSystem {
 
         // Setup quest menu interactions
         this.setupQuestMenuHandlers(modalId, questManager);
-        
+
         return modalId;
     }
 
@@ -620,7 +607,7 @@ class ModalSystem {
 
             // Show available expeditions
             let expeditionsHTML = '<div class="expedition-grid">';
-            
+
             questManager.availableLocations.forEach(location => {
                 if (!location.unlocked) return;
 
@@ -669,9 +656,9 @@ class ModalSystem {
                             <strong>Potential Rewards:</strong>
                             <div class="rewards-list">
                                 ${Object.keys(location.rewards).map(resource => {
-                                    if (resource === 'special') return `<span>✨ ${location.rewards[resource]}</span>`;
-                                    return `<span>${questManager.getSupplyIcon(resource)} ${location.rewards[resource].min}-${location.rewards[resource].max}</span>`;
-                                }).join('')}
+                    if (resource === 'special') return `<span>✨ ${location.rewards[resource]}</span>`;
+                    return `<span>${questManager.getSupplyIcon(resource)} ${location.rewards[resource].min}-${location.rewards[resource].max}</span>`;
+                }).join('')}
                             </div>
                         </div>
                         <button class="expedition-start-btn ${!canAfford || availableRoyals.length === 0 ? 'disabled' : ''}" 
@@ -682,17 +669,17 @@ class ModalSystem {
                     </div>
                 `;
             });
-            
+
             expeditionsHTML += '</div>';
             return expeditionsHTML;
-            
+
         } else {
             // Show active expedition status with enhanced details
             const expedition = questManager.currentExpedition;
             const location = expedition.location;
             const progressPercent = questManager.calculateExpeditionProgress();
             const leader = expedition.leader;
-            
+
             return `
                 <div class="active-expedition">
                     <h4>🚶 Active Expedition: ${location.name}</h4>
@@ -709,8 +696,8 @@ class ModalSystem {
                         <p>Progress: ${Math.floor(progressPercent)}% - Phase: ${questManager.expeditionState}</p>
                         <p class="progress-details">
                             ${questManager.expeditionState === 'traveling_out' ? `Traveling to ${location.name}` :
-                              questManager.expeditionState === 'battling' ? 'Engaged in battle' :
-                              questManager.expeditionState === 'traveling_back' ? 'Returning home' : 'Preparing'}
+                    questManager.expeditionState === 'battling' ? 'Engaged in battle' :
+                        questManager.expeditionState === 'traveling_back' ? 'Returning home' : 'Preparing'}
                         </p>
                     </div>
 
@@ -756,9 +743,9 @@ class ModalSystem {
                             <div class="expedition-inventory">
                                 <h5>📦 Special Equipment</h5>
                                 <div class="inventory-items">
-                                    ${expedition.inventoryItems.map(item => 
-                                        `<span class="inventory-item">${item.name}</span>`
-                                    ).join('')}
+                                    ${expedition.inventoryItems.map(item =>
+                            `<span class="inventory-item">${item.name}</span>`
+                        ).join('')}
                                 </div>
                             </div>
                         ` : ''}
@@ -766,12 +753,12 @@ class ModalSystem {
                         <div class="recent-events">
                             <h5>📰 Recent Events</h5>
                             <div class="events-list">
-                                ${expedition.events.slice(-4).map(event => 
-                                    `<div class="event-item ${event.type}">
+                                ${expedition.events.slice(-4).map(event =>
+                            `<div class="event-item ${event.type}">
                                         <span class="event-time">${event.time}</span>
                                         <span class="event-text">${event.text}</span>
                                     </div>`
-                                ).join('')}
+                        ).join('')}
                             </div>
                         </div>
                     </div>
@@ -794,7 +781,7 @@ class ModalSystem {
             console.log('[ModalSystem] Modal not found for quest menu handlers:', modalId);
             return;
         }
-        
+
         // Handle expedition planning buttons (new system)
         modal.querySelectorAll('.expedition-start-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -840,7 +827,7 @@ class ModalSystem {
     // Show wiki menu
     showWikiMenu() {
         const wikiContent = this.generateWikiContent();
-        
+
         const modalPromise = this.showModal({
             id: 'wiki-modal',
             title: '📖 Game Wiki & Documentation',
@@ -858,13 +845,13 @@ class ModalSystem {
         modalPromise.then(actualModalId => {
             this.setupWikiHandlers(actualModalId);
         });
-        
+
         return modalPromise;
     }
 
     generateWikiContent() {
         const navigation = window.WikiData ? window.WikiData.getNavigation() : this.getDefaultNavigation();
-        
+
         let navigationHTML = '';
         navigation.forEach(category => {
             navigationHTML += `
@@ -879,9 +866,9 @@ class ModalSystem {
                 </div>
             `;
         });
-        
+
         const initialSection = window.WikiData ? window.WikiData.getSection('getting-started') : this.getDefaultSection();
-        
+
         return `
             <div class="wiki-container">
                 <!-- Wiki Navigation -->
@@ -903,11 +890,11 @@ class ModalSystem {
         if (window.WikiData) {
             return window.WikiData.getSection(section).content;
         }
-        
+
         // Fallback content if WikiData not available
         return this.getDefaultSection().content;
     }
-    
+
     getDefaultNavigation() {
         return [
             {
@@ -920,7 +907,7 @@ class ModalSystem {
             }
         ];
     }
-    
+
     getDefaultSection() {
         return {
             content: `
@@ -937,39 +924,39 @@ class ModalSystem {
 
     setupWikiHandlers(modalId) {
         console.log('🔥 [WIKI TRACKER] setupWikiHandlers called with modalId:', modalId);
-        
+
         // Wait for the modal to be fully rendered
         setTimeout(() => {
             const modal = document.getElementById('wiki-modal') || document.getElementById('wiki') || document.querySelector('.wiki-modal');
             console.log('🔥 [WIKI TRACKER] Found modal element:', !!modal);
             console.log('🔥 [WIKI TRACKER] Modal ID in DOM:', modal ? modal.id : 'N/A');
-            
+
             if (!modal) {
                 console.error('🔥 [WIKI TRACKER] No modal found for wiki handlers setup');
                 return;
             }
-            
+
             // Setup navigation button handlers
             const navButtons = modal.querySelectorAll('.wiki-nav-btn');
             console.log('🔥 [WIKI TRACKER] Found navigation buttons:', navButtons.length);
-            
+
             navButtons.forEach((btn, index) => {
                 console.log('🔥 [WIKI TRACKER] Setting up button', index, 'with section:', btn.dataset.section);
-                
+
                 btn.addEventListener('click', (e) => {
                     console.log('🔥 [WIKI TRACKER] Navigation button clicked:', e.target.dataset.section);
-                    
+
                     // Remove active class from all buttons
                     navButtons.forEach(b => b.classList.remove('active'));
-                    
+
                     // Add active class to clicked button
                     e.target.classList.add('active');
-                    
+
                     // Update content area
                     const section = e.target.dataset.section;
                     const contentArea = modal.querySelector('#wiki-content-area');
                     console.log('🔥 [WIKI TRACKER] Content area found:', !!contentArea);
-                    
+
                     if (contentArea) {
                         const newContent = this.getWikiSection(section);
                         console.log('🔥 [WIKI TRACKER] New content length:', newContent.length);
@@ -979,7 +966,7 @@ class ModalSystem {
                     }
                 });
             });
-            
+
             console.log('🔥 [WIKI TRACKER] Wiki handlers setup complete');
         }, 200);
     }
@@ -992,7 +979,7 @@ class ModalSystem {
     // Show tutorial modal
     showTutorialModal(tutorialStep = null) {
         const tutorialContent = this.generateTutorialContent(tutorialStep);
-        
+
         return this.showModal({
             title: '📚 Tutorial',
             content: tutorialContent,
@@ -1051,7 +1038,7 @@ class ModalSystem {
     // Show settings modal
     showSettingsModal() {
         const settingsContent = this.generateSettingsContent();
-        
+
         const modalPromise = this.showModal({
             title: '⚙️ Game Settings',
             content: settingsContent,
@@ -1066,12 +1053,52 @@ class ModalSystem {
             }
         });
 
-        // Update stats after modal is shown
-        setTimeout(() => {
-            if (window.statsIntegration) {
-                window.statsIntegration.updateQuickStats();
+        // After the modal is created, wire up interactions to the actual modal id
+        modalPromise.then((modalId) => {
+            if (!modalId) return;
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+
+            // Wire Save & Close button to close the correct modal id
+            const saveBtn = modal.querySelector('#settings-save-btn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    this.saveSettings();
+                    this.closeModal(modalId);
+                });
             }
-        }, 100);
+
+            // Auto-save on toggle change and apply immediately
+            const applyNow = () => {
+                try {
+                    const current = this.loadSettings();
+                    this.applySettingsUI(current);
+                } catch (e) {
+                    console.warn('[Settings] applySettingsUI error:', e);
+                }
+            };
+
+            ['setting-sound', 'setting-music', 'setting-animations', 'setting-notifications']
+                .forEach(id => {
+                    const el = modal.querySelector(`#${id}`);
+                    if (el) {
+                        el.addEventListener('change', () => {
+                            this.saveSettings();
+                            applyNow();
+                        });
+                    }
+                });
+
+            // Initial apply when modal opens
+            applyNow();
+
+            // Update stats shortly after render
+            setTimeout(() => {
+                if (window.statsIntegration) {
+                    window.statsIntegration.updateQuickStats();
+                }
+            }, 100);
+        });
 
         return modalPromise;
     }
@@ -1084,7 +1111,7 @@ class ModalSystem {
             '../version.json',
             'version.json'
         ];
-        
+
         for (const path of possiblePaths) {
             try {
                 const response = await fetch(path);
@@ -1108,7 +1135,7 @@ class ModalSystem {
 
     generateSettingsContent() {
         const settings = this.loadSettings();
-        
+
         // Load current version safely
         let currentVersion = '0.0.1'; // fallback
         try {
@@ -1126,11 +1153,11 @@ class ModalSystem {
         } catch (error) {
             console.log('[Settings] Error loading version:', error);
         }
-        
+
         return `
             <div class="settings-content">
                 <div class="setting-group">
-                    <h5>🔊 Audio</h5>
+            <h5>🔊 Audio</h5>
                     <div class="setting-item">
                         <label>
                             <input type="checkbox" id="setting-sound" ${settings.soundEnabled ? 'checked' : ''}>
@@ -1215,7 +1242,7 @@ class ModalSystem {
                 </div>
 
                 <div class="settings-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('settings')">Save & Close</button>
+            <button id="settings-save-btn" class="btn btn-primary">Save & Close</button>
                 </div>
             </div>
         `;
@@ -1224,7 +1251,7 @@ class ModalSystem {
     // Show progression modal
     showProgressionModal(game) {
         const progressionContent = this.generateProgressionContent(game);
-        
+
         return this.showModal({
             title: '🏆 Progression',
             content: progressionContent,
@@ -1320,7 +1347,7 @@ class ModalSystem {
 
         try {
             const saved = localStorage.getItem('gameSettings');
-            return saved ? {...defaultSettings, ...JSON.parse(saved)} : defaultSettings;
+            return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
         } catch (e) {
             return defaultSettings;
         }
@@ -1335,14 +1362,34 @@ class ModalSystem {
                 notificationsEnabled: document.getElementById('setting-notifications')?.checked || false
             };
             localStorage.setItem('gameSettings', JSON.stringify(settings));
+            // Apply immediately when saved
+            this.applySettingsUI(settings);
         } catch (e) {
             console.error('Failed to save settings:', e);
         }
     }
 
+    // Apply settings to UI/runtime immediately
+    applySettingsUI(settings) {
+        try {
+            const s = settings || this.loadSettings();
+            // Toggle a class to allow CSS to disable animations globally
+            document.body.classList.toggle('animations-disabled', !s.animationsEnabled);
+            // Expose flags for other systems that check them
+            window.notificationsEnabled = !!s.notificationsEnabled;
+            window.soundEnabled = !!s.soundEnabled;
+            window.musicEnabled = !!s.musicEnabled;
+        } catch (e) {
+            console.warn('[Settings] Failed to apply settings UI:', e);
+        }
+    }
+
     exportSave() {
         try {
-            const saveData = localStorage.getItem('gameState');
+            // Prefer new save key, fallback to legacy
+            const saveData = localStorage.getItem('dynastyBuilder_save')
+                || localStorage.getItem('idleDynastyBuilder')
+                || localStorage.getItem('gameState');
             if (saveData) {
                 const blob = new Blob([saveData], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -1372,8 +1419,11 @@ class ModalSystem {
                     try {
                         const saveData = e.target.result;
                         JSON.parse(saveData); // Validate JSON
+                        // Write to new key; keep legacy for compatibility
+                        localStorage.setItem('dynastyBuilder_save', saveData);
                         localStorage.setItem('idleDynastyBuilder', saveData);
-                        this.showNotification('Save imported successfully! Reload the page to apply.', { type: 'success' });
+                        this.showNotification('Save imported successfully! Reloading to apply...', { type: 'success', duration: 2500 });
+                        setTimeout(() => location.reload(), 600);
                     } catch (err) {
                         this.showNotification('Invalid save file', { type: 'error' });
                     }
@@ -1403,7 +1453,7 @@ class ModalSystem {
                         console.log('[ModalSystem] Reset game confirmed - starting reset process...');
                         console.log('[ModalSystem] LocalStorage before reset:', Object.keys(localStorage));
                         console.log('[ModalSystem] Save data exists:', !!localStorage.getItem('idleDynastyBuilder'));
-                        
+
                         // Call the main app's resetGame for a full reset (in-memory and storage)
                         if (window.app && typeof window.app.resetGame === 'function') {
                             console.log('[ModalSystem] Calling window.app.resetGame()');
@@ -1424,15 +1474,15 @@ class ModalSystem {
                                     console.log('[ModalSystem] Stopping game loop...');
                                     window.game.stopGameLoop();
                                 }
-                                
+
                                 console.log('[ModalSystem] Clearing localStorage...');
                                 // Clear all storage
                                 localStorage.clear();
                                 sessionStorage.clear();
-                                
+
                                 console.log('[ModalSystem] LocalStorage after clear:', Object.keys(localStorage));
                                 console.log('[ModalSystem] Reloading page...');
-                                
+
                                 // Force full page reload to start completely fresh
                                 location.href = location.href.split('?')[0]; // Remove any query params
                             } catch (error) {
@@ -1472,7 +1522,7 @@ class ModalSystem {
         let message = 'This view is locked. Complete the required milestone in the Village view to unlock it!';
         let icon = '🔒';
         let requirement = '';
-        
+
         switch (view) {
             case 'battle':
                 message = 'The Battle area is currently locked.';
@@ -1581,7 +1631,7 @@ class ModalSystem {
     // Show death report modal
     showDeathReportModal(gameState, timeframe = 'daily') {
         const deathReportContent = this.generateDeathReportContent(gameState, timeframe);
-        
+
         return this.showModal({
             id: 'death-report-modal',
             title: '💀 Death Report',
@@ -1599,11 +1649,11 @@ class ModalSystem {
     generateDeathReportContent(gameState, timeframe) {
         const deathData = gameState.getDeathReportData(timeframe);
         const { expectedDeaths, imminentDeaths, ageGroups, totalAtRisk, totalPopulation } = deathData;
-        
+
         // Calculate percentages
         const deathPercentage = totalPopulation > 0 ? ((expectedDeaths / totalPopulation) * 100).toFixed(1) : '0.0';
         const riskPercentage = totalPopulation > 0 ? ((totalAtRisk / totalPopulation) * 100).toFixed(1) : '0.0';
-        
+
         return `
             <div class="death-report-content">
                 <div class="death-report-header">
@@ -1687,7 +1737,7 @@ class ModalSystem {
     // Switch death report timeframe
     switchDeathReportTimeframe(timeframe) {
         if (!window.gameState) return;
-        
+
         // Update the modal content
         const modal = document.getElementById('death-report-modal');
         if (modal) {
@@ -1775,7 +1825,7 @@ class ModalSystem {
             const rect = targetElement.getBoundingClientRect();
             miniModal.style.left = `${rect.right + 10}px`;
             miniModal.style.top = `${rect.top}px`;
-            
+
             // Adjust if going off screen
             setTimeout(() => {
                 const modalRect = miniModal.getBoundingClientRect();
@@ -1861,7 +1911,7 @@ class ModalSystem {
             });
         }
     }
-    
+
     // Test function to verify modal system works
     testModalSystem() {
         console.log('🔥 [TEST] Testing modal system...');

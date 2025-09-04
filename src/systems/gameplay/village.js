@@ -3,9 +3,21 @@
 class VillageManager {
     // Duplicate constructor removed
 
-    // Returns the number of worker slots for a building (equal to its level)
+    // Returns the number of worker slots for a building (sum of JobManager-defined jobs scaled by level)
     getWorkerSlotsForBuilding(building) {
-        // Ensure building has a level (default to 1 if missing)
+        try {
+            const jm = this.gameState?.jobManager;
+            if (jm) {
+                // Ensure available jobs are up to date
+                if (typeof jm.updateAvailableJobs === 'function') jm.updateAvailableJobs();
+                const jobs = jm.availableJobs?.get(building.id);
+                if (jobs) {
+                    return Object.values(jobs).reduce((sum, v) => sum + (v || 0), 0);
+                }
+            }
+        } catch (e) { console.warn('[Village] getWorkerSlotsForBuilding fallback', e); }
+
+        // Fallback: legacy behavior
         if (!building.level && building.built) {
             building.level = 1;
             console.log(`[Village] Fixed missing level for built ${building.type}, set to 1`);
@@ -13,145 +25,40 @@ class VillageManager {
         return building.level || 0;
     }
 
-    // Returns the population assigned to a building
+    // Returns the workers assigned to a building via JobManager (fallback to legacy)
     getAssignedWorkers(building) {
+        try {
+            const jm = this.gameState?.jobManager;
+            if (jm) {
+                const jobTypes = jm.jobAssignments?.get(building.id) || {};
+                const workerIds = Object.values(jobTypes).flat();
+                const workers = workerIds
+                    .map(id => jm.getWorkerById(id))
+                    .filter(Boolean);
+                return workers;
+            }
+        } catch (e) { console.warn('[Village] getAssignedWorkers fallback', e); }
         if (!this.gameState.populationManager) return [];
         return this.gameState.populationManager.population.filter(p => p.buildingId === building.id && p.status === 'working');
     }
 
-    // Returns eligible population for a building type (young adults/adults, correct role)
-    getEligibleWorkers(building) {
-        if (!this.gameState.populationManager) {
-            console.log('[Village] No population manager for eligible workers');
-            return [];
-        }
+    // Legacy eligible worker scan removed; JobManager owns worker selection and assignment
 
-        const role = window.GameData.getDefaultRoleForBuilding(building.type);
-        console.log(`[Village] Looking for eligible workers for ${building.type} (role: ${role})`);
-
-        const allPop = this.gameState.populationManager.population || [];
-        console.log(`[Village] Total population: ${allPop.length}`);
-
-        const eligible = allPop.filter(p => {
-            // Only working age adults (28+), not already assigned
-            const ageOk = (p.age >= 28 && p.age <= 180); // Expanded age range for all working adults
-            const statusOk = p.status !== 'working';
-            const roleOk = (p.role === role || p.role === 'peasant');
-
-            return ageOk && statusOk && roleOk;
-        });
-
-        console.log(`[Village] Found ${eligible.length} eligible workers (${allPop.filter(p => p.age >= 28 && p.age <= 180).length} working age, ${allPop.filter(p => p.status !== 'working').length} not working)`);
-
-        if (eligible.length === 0) {
-            // Detailed breakdown when no workers found
-            const workingAge = allPop.filter(p => p.age >= 28 && p.age <= 180);
-            const notWorking = allPop.filter(p => p.status !== 'working');
-            const rightRole = allPop.filter(p => p.role === role || p.role === 'peasant');
-            console.log(`[Village] No eligible workers: ${workingAge.length} working age, ${notWorking.length} not working, ${rightRole.length} right role`);
-        }
-
-        return eligible;
-    }
-
-    // Assigns workers to all buildings up to their slot limit
+    // Assigns workers using JobManager's resource-aware algorithm (replaces legacy role-based assignment)
     autoAssignCitizens() {
-        console.log('[Village] Starting auto-assign citizens...');
-
-        // Enhanced error checking
-        if (!this.gameState) {
-            console.error('[Village] No gameState available!');
-            return;
-        }
-
-        // Ensure PopulationManager is available
-        if (!this.gameState.populationManager && this.gameState.ensurePopulationManager) {
-            console.log('[Village] Attempting to initialize PopulationManager...');
-            this.gameState.ensurePopulationManager();
-        }
-
-        if (!this.gameState.populationManager) {
-            console.error('[Village] No population manager available!');
-            return;
-        }
-
-        if (!window.GameData) {
-            console.error('[Village] GameData not available!');
-            return;
-        }
-
-        // Check if there are any active construction projects
-        const buildingsUnderConstruction = this.gameState.buildings.filter(b =>
-            b.level === 0 || (b.built === false && b.construction && b.construction.inProgress)
-        );
-
-        console.log(`[Village] Buildings under construction: ${buildingsUnderConstruction.length}`);
-
-        // If no construction is happening, reassign builders to other roles
-        if (buildingsUnderConstruction.length === 0) {
-            this.reassignIdleBuilders();
-        }
-
-        const totalPop = this.gameState.populationManager.population.length;
-        const workingAgePop = this.gameState.populationManager.population.filter(p => p.age >= 16 && p.age <= 190).length;
-        const currentlyWorking = this.gameState.populationManager.population.filter(p => p.status === 'working').length;
-
-        console.log(`[Village] Population: ${totalPop} total, ${workingAgePop} working age, ${currentlyWorking} currently working`);
-        console.log('[Village] Total buildings:', this.gameState.buildings.length);
-
-        let totalAssignments = 0;
-
-        // For each building that can have workers
-        this.gameState.buildings.forEach(building => {
-            try {
-                const role = window.GameData.getDefaultRoleForBuilding(building.type);
-                console.log(`[Village] Building ${building.type} (ID: ${building.id}) -> role: ${role}`);
-
-                if (!role || role === 'peasant') {
-                    console.log(`[Village] Skipping ${building.type} - no specific role needed (role: ${role})`);
-                    return; // skip non-work buildings
-                }
-
-                const slots = this.getWorkerSlotsForBuilding(building);
-                let assigned = this.getAssignedWorkers(building);
-                console.log(`[Village] ${building.type} has ${assigned.length}/${slots} workers assigned`);
-
-                if (assigned.length >= slots) {
-                    console.log(`[Village] ${building.type} is already full`);
-                    return; // already full
-                }
-
-                const needed = slots - assigned.length;
-                const eligible = this.getEligibleWorkers(building);
-                console.log(`[Village] Found ${eligible.length} eligible workers for ${building.type}, need ${needed}`);
-
-                const toAssign = eligible.slice(0, needed);
-                console.log(`[Village] Assigning ${toAssign.length} workers to ${building.type}`);
-
-                toAssign.forEach(worker => {
-                    console.log(`[Village] Assigning ${worker.name} (age: ${worker.age}, role: ${worker.role}) to ${building.type} as ${role}`);
-
-                    // Update worker properties
-                    this.gameState.populationManager.assignRole(worker.id, role);
-                    this.gameState.populationManager.updateStatus(worker.id, 'working');
-                    this.gameState.populationManager.moveInhabitant(worker.id, building.id);
-
-                    // Also set buildingId directly to ensure production counting works
-                    worker.buildingId = building.id;
-                    totalAssignments++;
-
-                    console.log(`[Village] ✅ ${worker.name} now working at ${building.type} (buildingId: ${worker.buildingId}, status: ${worker.status})`);
-                });
-            } catch (error) {
-                console.error(`[Village] Error processing building ${building.type}:`, error);
+        try {
+            const jm = this.gameState?.jobManager;
+            if (!jm) {
+                console.warn('[Village] autoAssignCitizens: JobManager not available');
+                return;
             }
-        });
-
-        console.log(`[Village] Auto-assign citizens completed. Total new assignments: ${totalAssignments}`);
-
-        // Summary report
-        const finalWorkingCount = this.gameState.populationManager.population.filter(p => p.status === 'working').length;
-        console.log(`[Village] Employment Summary: ${finalWorkingCount}/${workingAgePop} working age citizens employed`);
+            if (typeof jm.updateAvailableJobs === 'function') jm.updateAvailableJobs();
+            if (typeof jm.optimizeWorkerAssignments === 'function') jm.optimizeWorkerAssignments();
+            const assigned = jm.autoAssignWorkers();
+            console.log(`[Village] Auto-assign completed via JobManager: ${assigned} assignments`);
+        } catch (e) {
+            console.warn('[Village] autoAssignCitizens failed', e);
+        }
     }
 
     // Manual employment check - can be called on game load or manually
@@ -199,10 +106,12 @@ class VillageManager {
         this.gameState = gameState;
         this.game = game;
         this.villageGrid = null;
-        this.gridSize = 50; // Size of each grid cell
+        this.gridSize = (window.GameData && typeof window.GameData.TILE_SIZE === 'number') ? window.GameData.TILE_SIZE : 50; // Size of each grid cell
         this.supplyChains = []; // For carriages/runners visualization
         // Tutorial tracking
         this.tutorialBuildings = new Set();
+        // Management lock state (when leader is away and no civil leader)
+        this._managementLockModalId = null;
 
         // Building effects system
         this.buildingEffectsManager = null; // Will be initialized after DOM loads
@@ -244,44 +153,17 @@ class VillageManager {
             if (typeof BuildingTutorial !== 'undefined') {
                 this.buildingTutorial = new BuildingTutorial(this.gameState, this);
                 console.log('[Village] Building tutorial initialized');
-                        setTimeout(() => {
-                            if (window.gameState && window.gameState.populationManager) {
-                                const pop = window.gameState.populationManager.getAll();
-                                const hasRoyal = pop.some(p => p.role === 'royal' && p.status !== 'away');
-                                const hasCivilLeader = pop.some(p => (p.role === 'civil_leader' || p.role === 'mayor' || p.role === 'administrator') && p.status !== 'away');
-                                if (!hasRoyal && !hasCivilLeader) {
-                                    if (window.modalSystem && typeof window.modalSystem.showModal === 'function') {
-                                        window.modalSystem.showModal({
-                                            title: 'Village Management Locked',
-                                            content: `<div style='text-align:center;padding:2em;'>
-                                                <h2>🚫 Village Management Unavailable</h2>
-                                                <p>The royal leader is away on campaign, and no civil leader is present.</p>
-                                                <p>Appoint a civil leader or wait for the royal to return to resume management.</p>
-                                            </div>`,
-                                            className: 'village-lockout-modal',
-                                            closable: false
-                                        });
-                                    } else {
-                                        // Fallback overlay
-                                        const overlay = document.createElement('div');
-                                        overlay.className = 'village-lockout-overlay';
-                                        overlay.style.position = 'fixed';
-                                        overlay.style.top = '0';
-                                        overlay.style.left = '0';
-                                        overlay.style.width = '100vw';
-                                        overlay.style.height = '100vh';
-                                        overlay.style.background = 'rgba(44,62,80,0.95)';
-                                        overlay.style.zIndex = '9999';
-                                        overlay.innerHTML = `<div style='position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;text-align:center;'>
-                                            <h2>🚫 Village Management Unavailable</h2>
-                                            <p>The royal leader is away on campaign, and no civil leader is present.</p>
-                                            <p>Appoint a civil leader or wait for the royal to return to resume management.</p>
-                                        </div>`;
-                                        document.body.appendChild(overlay);
-                                    }
-                                }
-                            }
-                        }, 500);
+                setTimeout(() => {
+                    if (window.gameState && window.gameState.populationManager) {
+                        const pop = window.gameState.populationManager.getAll();
+                        const hasRoyal = pop.some(p => p.role === 'royal' && p.status !== 'away');
+                        const hasCivilLeader = pop.some(p => (p.role === 'civil_leader' || p.role === 'mayor' || p.role === 'administrator') && p.status !== 'away');
+                        if (!hasRoyal && !hasCivilLeader) {
+                            // Use central lock handler to avoid duplicate modals
+                            try { this.ensureManagementLock(); } catch (e) { console.warn('[Village] ensureManagementLock failed from tutorial init', e); }
+                        }
+                    }
+                }, 500);
             } else {
                 console.warn('[Village] BuildingTutorial not available');
             }
@@ -309,10 +191,34 @@ class VillageManager {
             this.initProductionPlanner();
             console.log('[Village] Setting up population view button...');
             this.setupPopulationViewButton();
+            // Leadership overview entry point
+            this.setupLeadershipButton();
             console.log('[Village] Setting up jobs management button...');
             this.setupJobsButton();
             console.log('[Village] Setting up effects management button...');
             this.setupEffectsButton();
+
+            // Expose a simple debug hook for leadership from the Village view
+            window.debugLeadership = () => {
+                try {
+                    const out = this.gameState?.debugLeadership?.();
+                    if (!out) return;
+                    if (window.modalSystem) {
+                        const allowedText = out.allowed ? '✅ Allowed' : '⛔ Locked';
+                        const reason = out.reason || 'unknown';
+                        const civil = out.civilLeaders.map(c => c.name).join(', ') || 'None';
+                        const royalsHere = out.royalsPresent.map(r => r.name).join(', ') || 'None';
+                        const royalsAway = out.royalsAway.map(r => r.name).join(', ') || 'None';
+                        window.modalSystem.showMessage('Leadership Debug', `
+                            <p><strong>Status:</strong> ${allowedText} (${reason})</p>
+                            <p><strong>Civil Leaders:</strong> ${civil}</p>
+                            <p><strong>Royals Present:</strong> ${royalsHere}</p>
+                            <p><strong>Royals Away/Traveling:</strong> ${royalsAway}</p>
+                        `);
+                    }
+                    return out;
+                } catch (e) { console.warn('[Village] debugLeadership hook failed', e); }
+            };
 
             // Set up event listeners for building completion
             this.setupEventListeners();
@@ -320,10 +226,85 @@ class VillageManager {
             // Listen for effect and season/day events to keep Active Effects panel fresh
             this.setupEffectEventListeners();
 
+            // Listen for expedition lifecycle to manage lock modal
+            try {
+                if (window.eventBus) {
+                    window.eventBus.on('expedition_started', () => this.ensureManagementLock());
+                    window.eventBus.on('expedition_completed', () => this.closeManagementLock());
+                    window.eventBus.on('expedition_return_started', () => this.ensureManagementLock());
+                    // Periodic safety check on day end
+                    window.eventBus.on('day-ended', () => this.ensureManagementLock());
+                }
+                // Initial lock state check
+                this.ensureManagementLock();
+            } catch (e) {
+                console.warn('[Village] Failed to setup management lock listeners', e);
+            }
+
             console.log('[Village] Village initialization complete');
         } catch (error) {
             console.error('[Village] Error during initialization:', error);
         }
+    }
+
+    // Determine whether village management actions are allowed (centralized in GameState)
+    isManagementAllowed() {
+        return this.gameState?.isManagementAllowed?.() ?? true;
+    }
+
+    // Detailed management status for UI tooltips (delegated)
+    getManagementStatus() {
+        return this.gameState?.getManagementStatus?.() ?? { allowed: true, reason: 'default' };
+    }
+
+    // Show a notification explaining why management is locked
+    showManagementLockedNotification() {
+        try {
+            const mgmt = this.getManagementStatus();
+            const message = mgmt.message || 'Village management is locked';
+            if (window.modalSystem) {
+                window.modalSystem.showNotification(message, { type: 'warning', icon: '⚠️', duration: 3000 });
+            }
+        } catch (_) { /* ignore */ }
+    }
+
+    // Ensure the management lock is reflected in the Buildings UI only (non-blocking)
+    ensureManagementLock() {
+        const allowed = this.isManagementAllowed();
+        // Always keep the Buildings tab banner/buttons in sync
+        try { this.updateBuildingsBanner(); } catch (_) { }
+        try { this.gameState?.updateBuildButtons?.(); } catch (_) { }
+
+        // If allowed, make sure any prior lock state is cleared and return
+        if (allowed) {
+            this.closeManagementLock();
+            return;
+        }
+
+        // When not allowed, do NOT show a blocking modal. Keep the experience inspectable.
+        // Optionally nudge with a lightweight toast once per lock session.
+        if (window.modalSystem && !this._managementLockToastShown) {
+            try {
+                const mgmt = this.getManagementStatus();
+                window.modalSystem.showNotification(
+                    mgmt.message || 'Village management locked: building is disabled until leadership is present.',
+                    { type: 'warning', icon: '🚫', duration: 3500 }
+                );
+            } catch (_) { /* ignore */ }
+            this._managementLockToastShown = true;
+            // Reset the toast flag after a bit so future state changes can notify again
+            setTimeout(() => { this._managementLockToastShown = false; }, 10000);
+        }
+    }
+
+    // Close the management lock modal if open (noop now; kept for API stability)
+    closeManagementLock() {
+        if (this._managementLockModalId && window.modalSystem) {
+            try { window.modalSystem.closeModal(this._managementLockModalId); } catch (_) { /* ignore */ }
+            this._managementLockModalId = null;
+        }
+        try { this.updateBuildingsBanner(); } catch (_) { }
+        try { this.gameState?.updateBuildButtons?.(); } catch (_) { }
     }
 
     // Setup event listeners for village management
@@ -345,7 +326,15 @@ class VillageManager {
                     this.autoAssignWorkersToBuilding(building);
 
                     // Show notification about completion with workers
-                    const requiredWorkers = this.getBuildingWorkerRequirement(building.type);
+                    let requiredWorkers = 0;
+                    try {
+                        const jm = this.gameState?.jobManager;
+                        if (jm) {
+                            jm.updateAvailableJobs?.();
+                            const jobs = jm.availableJobs?.get(building.id);
+                            if (jobs) requiredWorkers = Object.values(jobs).reduce((s, v) => s + (v || 0), 0);
+                        }
+                    } catch (_) { /* ignore */ }
                     if (requiredWorkers > 0 && window.modalSystem) {
                         window.modalSystem.showNotification(
                             `${building.type} completed! Workers assigned automatically.`,
@@ -410,8 +399,9 @@ class VillageManager {
                     buildingRow.className = 'building-row';
                     buildingRow.dataset.building = buildingType;
 
-                    // Set appropriate tooltip based on unlock status
+                    // Set appropriate tooltip based on unlock status and governance
                     const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
+                    const mgmt = this.getManagementStatus();
                     if (!isUnlocked) {
                         const requirementsText = window.unlockSystem ?
                             window.unlockSystem.getUnlockRequirementsText(buildingType) :
@@ -419,6 +409,10 @@ class VillageManager {
                         buildingRow.title = requirementsText;
                         buildingRow.classList.add('locked');
                         console.log(`[Village] Created locked row for ${buildingType}:`, requirementsText);
+                    } else if (!mgmt.allowed) {
+                        buildingRow.title = mgmt.message || 'Village management locked';
+                        buildingRow.classList.add('locked');
+                        console.log(`[Village] Created governance-locked row for ${buildingType}:`, mgmt.message);
                     } else {
                         buildingRow.title = `Click to place ${GameData.getBuildingName(buildingType)}`;
                     }
@@ -482,6 +476,13 @@ class VillageManager {
     setupBuildingButtons() {
         document.querySelectorAll('.building-row').forEach(row => {
             row.addEventListener('click', () => {
+                // Guard: prevent actions while leader is away without civil leader
+                if (!this.isManagementAllowed()) {
+                    this.ensureManagementLock();
+                    this.showManagementLockedNotification();
+                    try { this.updateBuildingsBanner(); } catch (_) { }
+                    return;
+                }
                 if (row.classList.contains('locked')) {
                     return; // Don't do anything for locked buildings
                 }
@@ -506,6 +507,12 @@ class VillageManager {
             row.addEventListener('mouseenter', () => {
                 const buildingType = row.dataset.building;
                 if (!buildingType) return;
+                const mgmt = this.getManagementStatus();
+                if (!mgmt.allowed) {
+                    row.classList.add('locked');
+                    row.title = mgmt.message || 'Village management locked';
+                    return;
+                }
                 const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
                 const canAfford = this.gameState.canAfford(buildingType);
 
@@ -527,6 +534,46 @@ class VillageManager {
                 }
             });
         });
+    }
+
+    // Update the governing banner in the Buildings tab if present
+    updateBuildingsBanner() {
+        try {
+            const banner = document.getElementById('governing-banner');
+            if (!banner) return;
+            const status = this.getManagementStatus();
+            const allowed = !!status.allowed;
+            banner.style.display = allowed ? 'none' : 'block';
+
+            if (!allowed) {
+                // Update message with specific reason
+                const reason = status.message || 'Village management locked';
+                // If the banner already has a control row, just update the text
+                let textSpan = banner.querySelector('[data-banner-text]');
+                if (!textSpan) {
+                    banner.innerHTML = '';
+                    textSpan = document.createElement('span');
+                    textSpan.setAttribute('data-banner-text', '');
+                    banner.appendChild(textSpan);
+                    // Add an action button to open Leadership overview
+                    const btn = document.createElement('button');
+                    btn.id = 'governing-banner-fix-btn';
+                    btn.textContent = 'Open Leadership';
+                    btn.style.marginLeft = '10px';
+                    btn.style.padding = '6px 10px';
+                    btn.style.borderRadius = '6px';
+                    btn.style.border = '1px solid rgba(52,152,219,0.6)';
+                    btn.style.background = 'rgba(52,152,219,0.15)';
+                    btn.style.color = '#ecf0f1';
+                    btn.style.cursor = 'pointer';
+                    btn.addEventListener('click', () => {
+                        try { this.showLeadershipOverview(); } catch (e) { console.warn('[Village] Failed to open Leadership from banner', e); }
+                    });
+                    banner.appendChild(btn);
+                }
+                textSpan.textContent = `${reason}. Open Leadership (👑) to manage governance or appoint a civil leader.`;
+            }
+        } catch (_) { /* ignore */ }
     }
 
     // Update available buildings based on unlock status
@@ -632,6 +679,12 @@ class VillageManager {
     }
 
     enterBuildMode(buildingType) {
+        // Guard: prevent entering build mode while leader is away without civil leader
+        if (!this.isManagementAllowed()) {
+            this.ensureManagementLock();
+            this.showManagementLockedNotification();
+            return;
+        }
         console.log(`[Village] Entering build mode for: ${buildingType}`);
 
         // Clear any existing build mode
@@ -692,6 +745,7 @@ class VillageManager {
 
         // Setup mouse move listener for ghost
         this.ghostMoveHandler = (e) => {
+            // Use local build mode for inventory placement
             if (!this.buildMode || !this.buildMode.active) return;
 
             const rect = this.villageGrid.getBoundingClientRect();
@@ -726,19 +780,36 @@ class VillageManager {
         this.villageGrid.addEventListener('mouseleave', this.ghostLeaveHandler);
     }
 
-    // Validate if position is good for building placement
-    isValidBuildingPosition(x, y) {
-        // Check bounds
-        if (!this.isWithinBounds(x, y)) return false;
-
-        // Check if tile is empty (if tileManager exists)
+    // Validate if position is good for building placement (tile coords)
+    isValidBuildingPosition(tileX, tileY) {
+        if (!this.isWithinTileBounds(tileX, tileY)) return false;
         if (window.tileManager) {
-            const tile = window.tileManager.getTileAt(x, y);
-            return tile && !tile.building;
+            const tile = window.tileManager.getTileAt(tileX, tileY);
+            return !!(tile && !tile.building);
         }
-
-        // Basic bounds check if no tile manager
         return true;
+    }
+
+    // Helpers for tile/pixel conversion
+    toTile(pxX, pxY) {
+        return {
+            x: Math.floor(pxX / this.gridSize),
+            y: Math.floor(pxY / this.gridSize)
+        };
+    }
+
+    toPixel(tx, ty) {
+        return {
+            x: tx * this.gridSize,
+            y: ty * this.gridSize
+        };
+    }
+
+    isWithinTileBounds(tx, ty) {
+        if (window.tileManager && typeof window.tileManager.width === 'number' && typeof window.tileManager.height === 'number') {
+            return tx >= 0 && ty >= 0 && tx < window.tileManager.width && ty < window.tileManager.height;
+        }
+        return tx >= 0 && ty >= 0 && tx < this.terrainWidth && ty < this.terrainHeight;
     }
 
     // Remove ghost preview
@@ -843,6 +914,14 @@ class VillageManager {
 
             if (!this.gameState.buildMode) return;
 
+            // Guard: if build mode somehow active, still prevent placement during lock
+            if (!this.isManagementAllowed()) {
+                this.ensureManagementLock();
+                this.exitBuildMode();
+                this.showManagementLockedNotification();
+                return;
+            }
+
             const rect = this.villageGrid.getBoundingClientRect();
             // Adjust coordinates for the current view offset if it exists
             const offsetX = this.viewOffsetX || 0;
@@ -850,8 +929,9 @@ class VillageManager {
             const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
             const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
 
-            // Check if position is free and within bounds
-            if (this.isPositionFree(x, y) && this.isWithinBounds(x, y)) {
+            // Check if position is free and within bounds (tile-based)
+            const t = this.toTile(x, y);
+            if (this.isWithinTileBounds(t.x, t.y) && this.isValidBuildingPosition(t.x, t.y)) {
                 // Temporarily disable terrain check for debugging
                 // if (!this.isTerrainBuildable(x, y)) {
                 //     console.log('[Village] Cannot build on this terrain type');
@@ -1051,11 +1131,8 @@ class VillageManager {
     }
 
     isWithinBounds(x, y) {
-        // Allow building in a large area since we have a 200% content area
-        // Use grid coordinates instead of pixel coordinates for bounds
-        const maxX = 1600; // Allow building up to 1600px x coordinate
-        const maxY = 1200; // Allow building up to 1200px y coordinate
-        return x >= 0 && y >= 0 && x < maxX && y < maxY;
+        const t = this.toTile(x, y);
+        return this.isWithinTileBounds(t.x, t.y);
     }
 
     placeBuilding(type, x, y) {
@@ -1092,24 +1169,7 @@ class VillageManager {
             window.achievementSystem.triggerBuildingPlaced(type);
         }
 
-        // Immediately start construction and auto-assign builders
-        if (this.gameState.jobManager) {
-            console.log('[Village] Starting construction immediately and auto-assigning builders...');
-
-            // Start construction immediately instead of waiting for end of day
-            const queueItem = this.gameState.buildQueue.find(item => item.type === type);
-            if (queueItem) {
-                this.gameState.startConstructionFromQueue(queueItem);
-                // Remove from queue since construction has started
-                this.gameState.buildQueue = this.gameState.buildQueue.filter(item => item.id !== queueItem.id);
-            }
-
-            // Auto-assign workers to construction jobs
-            const assignedWorkers = this.gameState.jobManager.autoAssignWorkers();
-            if (assignedWorkers > 0) {
-                console.log(`[Village] Assigned ${assignedWorkers} workers to construction jobs`);
-            }
-        }
+        // Construction begins at end of day; do not start immediately here to avoid inconsistencies
 
         // Check for new unlocks after building placement
         if (window.unlockSystem) {
@@ -1239,57 +1299,25 @@ class VillageManager {
 
     // Auto-assign workers to a newly placed building
     autoAssignWorkersToBuilding(building) {
-        if (!window.populationManager) return;
-
-        // Get building requirements
-        const requiredWorkers = this.getBuildingWorkerRequirement(building.type);
-        if (requiredWorkers <= 0) return;
-
-        // Find available workers
-        const population = window.populationManager.getPopulation();
-        const availableWorkers = population.filter(person =>
-            person.job === 'idle' || person.job === 'unemployed'
-        );
-
-        // Assign workers up to requirement
-        const workersToAssign = Math.min(requiredWorkers, availableWorkers.length);
-        for (let i = 0; i < workersToAssign; i++) {
-            const worker = availableWorkers[i];
-            if (window.jobManager) {
-                window.jobManager.assignWorkerToBuilding(worker.id, building.id, building.type);
-            }
-        }
-
-        if (workersToAssign > 0) {
-            console.log(`[Village] Auto-assigned ${workersToAssign} workers to ${building.type}`);
-
-            // Show notification about worker assignment
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(
-                    `${workersToAssign} workers automatically assigned to ${building.type}`,
+        // Delegate to JobManager's job-aware auto-assignment to avoid duplicating logic
+        try {
+            if (!this.gameState?.jobManager) return;
+            // Refresh jobs now that a new building exists
+            this.gameState.jobManager.updateAvailableJobs();
+            const assigned = this.gameState.jobManager.autoAssignWorkers();
+            if (assigned > 0) {
+                console.log(`[Village] Auto-assigned ${assigned} workers after placing ${building.type}`);
+                window.modalSystem?.showNotification?.(
+                    `${assigned} workers assigned to jobs`,
                     { type: 'info', duration: 3000 }
                 );
             }
+        } catch (e) {
+            console.warn('[Village] autoAssignWorkersToBuilding failed', e);
         }
     }
 
-    // Get worker requirement for building type
-    getBuildingWorkerRequirement(buildingType) {
-        const workerRequirements = {
-            tent: 2,
-            farm: 1,
-            woodcutterLodge: 2,
-            quarry: 2,
-            workshop: 2,
-            blacksmith: 1,
-            barracks: 3,
-            house: 0, // No workers needed
-            townCenter: 5, // Town center should have workers for gatherer jobs
-            foundersWagon: 3 // Founders wagon has gatherer and crafter jobs
-        };
-
-        return workerRequirements[buildingType] || 1;
-    }
+    // Legacy worker requirement mapping removed; use JobManager.availableJobs for dynamic slots
 
     // Show construction priority modal
     showConstructionPriorityModal(buildingId) {
@@ -2547,6 +2575,154 @@ class VillageManager {
         }
     }
 
+    // Leadership Overview: royalties, civil leaders, commanders
+    setupLeadershipButton() {
+        try {
+            // Add a button into the manager panel if not present
+            const managerTab = document.getElementById('manager-tab');
+            if (!managerTab) return;
+            let actionsRow = managerTab.querySelector('.population-actions');
+            if (!actionsRow) return;
+            if (!actionsRow.querySelector('#leadership-btn')) {
+                const btn = document.createElement('button');
+                btn.id = 'leadership-btn';
+                btn.className = 'population-view-button';
+                btn.style.marginLeft = '10px';
+                btn.innerHTML = '👑 Leadership';
+                actionsRow.appendChild(btn);
+                let open = false;
+                btn.addEventListener('click', () => {
+                    if (open) return;
+                    open = true;
+                    this.showLeadershipOverview();
+                    setTimeout(() => open = false, 800);
+                });
+            }
+        } catch (e) { console.warn('[Village] setupLeadershipButton failed', e); }
+    }
+
+    showLeadershipOverview() {
+        // Ensure population data exists so we can derive founding monarch on day 0
+        console.log('[Leadership] Opening Leadership Overview');
+        try {
+            if (!this.gameState.populationManager && typeof this.gameState.ensurePopulationManager === 'function') {
+                console.log('[Leadership] PopulationManager missing; calling ensurePopulationManager()');
+                this.gameState.ensurePopulationManager();
+            }
+        } catch (e) { console.warn('[Village] ensurePopulationManager failed in Leadership overview', e); }
+
+        const pop = this.gameState?.populationManager?.getAll?.() || [];
+        console.log('[Leadership] Population snapshot', { total: pop.length, sample: pop.slice(0, 3).map(p => ({ name: p.name, role: p.role, status: p.status })) });
+        const royals = [];
+        // Include current monarch if tracked on gameState.royalFamily
+        if (this.gameState?.royalFamily?.currentMonarch) {
+            const m = this.gameState.royalFamily.currentMonarch;
+            royals.push({ name: m.name, role: 'Monarch', age: m.age, status: m.onExpedition ? 'away' : 'in village' });
+            console.log('[Leadership] Found currentMonarch from royalFamily', m.name);
+        }
+        // Include other royal family members if available
+        if (Array.isArray(this.gameState?.royalFamily?.royalFamily)) {
+            this.gameState.royalFamily.royalFamily.forEach(member => {
+                // Avoid duplicating current monarch
+                if (this.gameState.royalFamily.currentMonarch && member.id === this.gameState.royalFamily.currentMonarch.id) return;
+                royals.push({ name: member.name, role: this.gameState?.royalFamily?.getMemberClass ? this.gameState.royalFamily.getMemberClass(member) : (member.type || 'royal'), age: member.age, status: member.onExpedition ? 'away' : (member.injured ? 'injured' : 'in village') });
+            });
+            console.log('[Leadership] Added royal family members from royalFamily list', { count: this.gameState.royalFamily.royalFamily.length });
+        } else {
+            // Fallback: derive royals from population list if present
+            const derived = pop.filter(p => p.role === 'royal' || p.role === 'monarch' || p.role === 'player');
+            // Normalize role label for display
+            derived.forEach(p => {
+                const role = (p.role === 'royal' && (p.status === 'ruling' || p.status === 'leader')) ? 'Monarch' : (p.role === 'player' ? 'Monarch' : (p.role || 'royal'));
+                royals.push({ name: p.name, role, age: p.age, status: p.onExpedition ? 'away' : (p.injured ? 'injured' : (p.status || 'in village')) });
+            });
+            console.log('[Leadership] Derived royals from population', { count: derived.length });
+        }
+
+        if (royals.length === 0) {
+            console.warn('[Leadership] No royals detected', {
+                hasRoyalFamilyManager: !!this.gameState?.royalFamily,
+                hasCurrentMonarch: !!this.gameState?.royalFamily?.currentMonarch,
+                royalFamilyList: Array.isArray(this.gameState?.royalFamily?.royalFamily) ? this.gameState.royalFamily.royalFamily.length : null,
+                populationTotal: pop.length,
+                populationRoles: pop.map(p => p.role)
+            });
+        }
+        const civil = pop.filter(p => p.role === 'civil_leader' || p.role === 'mayor' || p.role === 'administrator');
+        // Military commanders: current expedition leader and any guard captains
+        const commanders = [];
+        const expeditionLeader = this.game?.questManager?.currentExpedition?.leader;
+        if (expeditionLeader) commanders.push({ name: expeditionLeader.name, type: 'Expedition Leader', icon: '⚔️' });
+        const guards = pop.filter(p => p.role === 'guard_captain' || p.role === 'guard');
+        if (guards.length) commanders.push({ name: `${guards.length} Guard${guards.length > 1 ? 's' : ''}`, type: 'Garrison', icon: '🛡️' });
+
+        const section = (title, list, icon) => `
+            <div class="leader-section">
+                <h4>${icon} ${title}</h4>
+                ${list.length ? `<div class="leader-grid">${list.map(r => `
+                    <div class="leader-card">
+                        <div class="leader-name">${r.name || r.title || 'Unknown'}</div>
+                        <div class="leader-role">${r.role || r.type || '—'}</div>
+                        <div class="leader-meta">Age ${r.age ?? ''} ${r.status ? '· ' + r.status : ''}</div>
+                    </div>`).join('')}</div>`
+                : '<div class="empty">None</div>'}
+            </div>`;
+
+        // Governing toggle UI (for current monarch)
+        const monarch = this.gameState?.royalFamily?.currentMonarch;
+        const governingToggle = monarch ? `
+            <div style="margin: 12px 0; padding: 10px; background: rgba(52,152,219,0.08); border: 1px solid rgba(52,152,219,0.3); border-radius: 8px; display:flex; align-items:center; justify-content: space-between;">
+                <div>
+                    <div style="font-weight: 700; color: #ecf0f1;">Monarch Governing</div>
+                    <div style="font-size: 12px; color: #95a5a6;">When governing, the monarch won’t take normal jobs and building is allowed.</div>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px;">
+                    <span style="color:${monarch.isGoverning ? '#2ecc71' : '#e74c3c'}; font-weight:700;">${monarch.isGoverning ? 'ON' : 'OFF'}</span>
+                    <input type="checkbox" id="governing-toggle" ${monarch.isGoverning ? 'checked' : ''} ${this.game?.questManager?.currentExpedition?.leader ? 'disabled' : ''} />
+                </label>
+            </div>` : '';
+
+        const content = `
+            <div class="leadership-overview">
+                <h3>👑 Leadership Overview</h3>
+                <p class="leadership-subtitle">Quick view of your ruling family, civil administration, and military command.</p>
+                ${governingToggle}
+                ${section('Royalty', royals, '👑')}
+                ${section('Civil Leaders', civil, '🏛️')}
+                ${section('Military Command', commanders, '⚔️')}
+            </div>`;
+
+        if (window.modalSystem) {
+            window.modalSystem.showModal({
+                title: 'Leadership',
+                content,
+                width: '860px',
+                className: 'leadership-modal modern-modal'
+            }).then(() => {
+                // Wire governing toggle
+                try {
+                    const checkbox = document.getElementById('governing-toggle');
+                    if (checkbox) {
+                        checkbox.addEventListener('change', (e) => {
+                            const monarch = this.gameState?.royalFamily?.currentMonarch;
+                            if (!monarch) return;
+                            // If expedition leader exists, block toggling off
+                            const away = !!this.game?.questManager?.currentExpedition?.leader;
+                            if (away) { e.preventDefault(); checkbox.checked = true; return; }
+                            monarch.isGoverning = !!checkbox.checked;
+                            try { this.gameState.save?.(); } catch (_) { }
+                            // Update management lock/banner immediately
+                            this.ensureManagementLock();
+                            try { this.gameState?.updateBuildButtons?.(); } catch (_) { }
+                            // Re-open to refresh label color/state
+                            setTimeout(() => this.showLeadershipOverview(), 150);
+                        });
+                    }
+                } catch (err) { console.warn('[Leadership] Failed to wire governing toggle', err); }
+            });
+        }
+    }
+
     setupJobsButton() {
         const jobsBtn = document.getElementById('jobs-btn');
         if (jobsBtn) {
@@ -3770,7 +3946,7 @@ class VillageManager {
         if (!b) return;
         const pop = this.gameState.populationManager.population || [];
         // Eligible adults, not sick/away/dead
-        const eligible = pop.filter(v => v.age >= 16 && v.age <= 190 && !['sick','away','traveling','dead'].includes(v.status));
+        const eligible = pop.filter(v => v.age >= 16 && v.age <= 190 && !['sick', 'away', 'traveling', 'dead'].includes(v.status));
 
         const items = eligible.map(v => {
             const unemployed = v.status !== 'working';
@@ -4627,20 +4803,19 @@ class VillageManager {
         gameView.addEventListener('contextmenu', this.placementCancelHandler);
     }
 
-    // Attempt to place building at coordinates
-    attemptBuildingPlacement(x, y) {
+    // Attempt to place building at coordinates (tile-based, inventory-only)
+    attemptBuildingPlacement(tileX, tileY) {
         if (!this.buildMode || !window.inventoryManager || !window.tileManager) return;
 
-        console.log('[Village] Attempting to place building at:', x, y);
+        console.log('[Village] Attempting to place building at tile:', tileX, tileY);
 
-        // Check if tile is valid and empty
-        const tile = window.tileManager.getTileAt(x, y);
-        if (!tile) {
+        // Validate tile bounds and occupancy via TileManager
+        if (!this.isWithinTileBounds(tileX, tileY)) {
             console.log('[Village] Invalid tile coordinates');
             return;
         }
-
-        if (tile.building) {
+        const tile = window.tileManager.getTileAt(tileX, tileY);
+        if (!tile || tile.building) {
             if (window.modalSystem) {
                 window.modalSystem.showNotification('Tile already occupied!', { type: 'warning' });
             }
@@ -4648,60 +4823,37 @@ class VillageManager {
         }
 
         // Get the item definition to determine building type
-        const item = window.inventoryManager?.getItemDefinition(this.buildMode.itemId);
-        if (!item || !item.buildingType) {
+        const def = window.inventoryManager?.getItemDefinition(this.buildMode.itemId);
+        if (!def || !def.buildingType) {
             console.error('[Village] Invalid item for building placement:', this.buildMode.itemId);
             return;
         }
 
-        // Check if we have the item in inventory
+        // Ensure we have the item (city inventory)
         if (!window.inventoryManager.hasItem(this.buildMode.itemId, 1)) {
-            window.modalSystem.showNotification('You don\'t have this item!', { type: 'error' });
+            window.modalSystem?.showNotification('You don\'t have this item!', { type: 'error' });
             return;
         }
 
-        // Remove the item from inventory first
+        // Consume the item first (city inventory)
         if (!window.inventoryManager.removeItem(this.buildMode.itemId, 1)) {
-            window.modalSystem.showNotification('Failed to consume item!', { type: 'error' });
+            window.modalSystem?.showNotification('Failed to consume item!', { type: 'error' });
             return;
         }
 
-        // Place the building using different logic for inventory items
-        const buildingType = item.buildingType;
-        let success = false;
-
-        // For inventory items like tents, place immediately without construction
-        if (this.buildMode.source === 'inventory') {
-            success = this.placeInventoryBuilding(buildingType, x, y);
-        } else {
-            success = this.placeBuilding(buildingType, x, y);
-        }
+        // Place immediately without construction queue and without spending resources
+        const success = this.placeInventoryBuilding(def.buildingType, tileX, tileY);
 
         if (success) {
-            console.log('[Village] Building placed successfully');
-
-            // Re-render buildings to show the new one
+            console.log('[Village] Inventory building placed successfully');
             this.renderBuildings();
-
-            // Show success notification
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(
-                    `${this.buildMode.itemId} placed successfully!`,
-                    { type: 'success' }
-                );
-            }
-
-            // Exit building mode
+            window.modalSystem?.showNotification(`${this.buildMode.itemId} placed successfully!`, { type: 'success' });
             this.cancelBuildingPlacement();
-
-            // Update UI
             this.gameState?.updateUI();
         } else {
-            // Refund the item since placement failed
+            // Refund on failure
             window.inventoryManager.addItem(this.buildMode.itemId, 1);
-            if (window.modalSystem) {
-                window.modalSystem.showNotification('Failed to place building!', { type: 'error' });
-            }
+            window.modalSystem?.showNotification('Failed to place building!', { type: 'error' });
         }
     }
 
@@ -5630,92 +5782,7 @@ class VillageManager {
         return `${daysLeft} days`;
     }
 
-    // Reassign idle builders to other production roles when no construction is happening
-    reassignIdleBuilders() {
-        console.log('[Village] Reassigning idle builders...');
-
-        if (!this.gameState.populationManager || !this.gameState.populationManager.population) {
-            console.log('[Village] No population manager or population available');
-            return;
-        }
-
-        // Log all current worker jobs for debugging
-        const allWorkers = this.gameState.populationManager.population.filter(p => p.status === 'working');
-        console.log('[Village] All current worker jobs:', allWorkers.map(w => `${w.name}: ${w.job}`));
-
-        // Find all builders (workers assigned to construction roles)
-        const builders = this.gameState.populationManager.population.filter(p =>
-            p.status === 'working' &&
-            p.job &&
-            (p.job.includes('construction') || p.job.includes('builder') || p.job === 'foreman')
-        );
-
-        if (builders.length === 0) {
-            console.log('[Village] No builders found to reassign');
-            return;
-        }
-
-        console.log(`[Village] Found ${builders.length} builders to potentially reassign:`, builders.map(b => `${b.name}: ${b.job}`));
-
-        // Find production buildings that need more workers
-        const productionBuildings = this.gameState.buildings.filter(b => {
-            if (!b.built || b.level === 0) return false;
-
-            const buildingData = window.GameData.buildingData[b.type];
-            if (!buildingData || !buildingData.role) return false;
-
-            // Check if building has available worker slots
-            const currentWorkers = b.workers || 0;
-            const maxWorkers = buildingData.workerSlots || 1;
-
-            return currentWorkers < maxWorkers;
-        });
-
-        console.log(`[Village] Found ${productionBuildings.length} production buildings with available slots`);
-
-        let reassignmentCount = 0;
-
-        // Reassign builders to production buildings
-        for (const builder of builders) {
-            if (productionBuildings.length === 0) break;
-
-            // Find a suitable building for this builder
-            const availableBuilding = productionBuildings.find(b => {
-                const currentWorkers = b.workers || 0;
-                const buildingData = window.GameData.buildingData[b.type];
-                const maxWorkers = buildingData.workerSlots || 1;
-                return currentWorkers < maxWorkers;
-            });
-
-            if (availableBuilding) {
-                const buildingData = window.GameData.buildingData[availableBuilding.type];
-
-                // Update builder's job
-                builder.job = buildingData.role;
-                builder.building = `${availableBuilding.x},${availableBuilding.y}`;
-
-                // Update building's worker count
-                availableBuilding.workers = (availableBuilding.workers || 0) + 1;
-
-                console.log(`[Village] Reassigned builder to ${availableBuilding.type} at ${availableBuilding.x},${availableBuilding.y} as ${buildingData.role}`);
-                reassignmentCount++;
-
-                // Remove this building from available list if it's now full
-                const maxWorkers = buildingData.workerSlots || 1;
-                if (availableBuilding.workers >= maxWorkers) {
-                    const index = productionBuildings.indexOf(availableBuilding);
-                    if (index > -1) {
-                        productionBuildings.splice(index, 1);
-                    }
-                }
-            }
-        }
-
-        console.log(`[Village] Reassigned ${reassignmentCount} builders to production roles`);
-
-        // Update the UI to reflect the changes
-        this.updateResourceDisplay();
-    }
+    // Legacy reassignIdleBuilders removed; JobManager.optimizeWorkerAssignments handles this
 
     // Generate production information for a specific job type
     generateJobProductionInfo(jobType, workerCount) {

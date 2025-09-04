@@ -4,9 +4,9 @@
 class InventoryManager {
     constructor(gameState, skipDefaults = false) {
         this.gameState = gameState;
-    // Personal inventory is deprecated; inventory is managed per-tile via TileManager.cityInventory
-    // Keep a Map for backward compatibility, but do not use it for storage.
-    this.inventory = new Map(); // legacy; no longer used for gameplay
+        // Personal inventory is deprecated; inventory is managed per-tile via TileManager.cityInventory
+        // Keep a Map for backward compatibility, but do not use it for storage.
+        this.inventory = new Map(); // legacy; no longer used for gameplay
         this.equippedItems = new Map(); // slot -> item_id
         this.itemDefinitions = this.initializeItemDefinitions();
 
@@ -23,7 +23,7 @@ class InventoryManager {
         console.log('[Inventory] Adding default starter items');
 
         // Initialize default items
-        this.addItem('tent', 2); // For building placement - reduced from 5
+        this.addItem('tent', 1); // For building placement - exactly 1 tent
         this.addItem('foundersWagon', 1); // Mobile administrative center
         this.addItem('haste_rune_iii', 2); // For productivity acceleration
 

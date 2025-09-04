@@ -4,6 +4,7 @@
 
 const GameData = {
     // Global constants
+    TILE_SIZE: 50, // Canonical pixels per tile for grid rendering/placement
     startingPopulationCount: 5, // Canonical starting population (1 royal + 4 villagers)
 
     // Resource icons for UI display
@@ -408,7 +409,7 @@ const GameData = {
             effects: '10 Scholar jobs'
         }
     },
-    
+
 
     // Building categories for organized UI display
     buildingCategories: {

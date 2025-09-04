@@ -203,8 +203,8 @@
                         <span>🪵 Planks: <span id="planks-count"></span>/<span id="planks-cap"></span></span>
                         <span>🪨 Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
                         <span>🪙 Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
-                        <span>⚙️ Production: <span id="production-count"></span>/<span id="production-cap"></span></span>
-                        <span>👥 Population: <span id="population-count"></span>/<span id="population-cap"></span></span>
+                        <span>👥 Population: <span id="population-count"></span>/<span
+                                id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
                 </div>
@@ -310,6 +310,11 @@
 
                         <!-- Buildings Tab -->
                         <div class="panel-tab" id="buildings-tab">
+                            <div id="governing-banner"
+                                style="display:none; margin-bottom:8px; padding:10px; border-radius:6px; background: rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.4); color:#e74c3c; font-weight:600;">
+                                🚫 Building is disabled. No leader is Governing. Open Leadership (👑) and toggle
+                                Governing ON, or appoint a civil leader.
+                            </div>
                             <div class="building-grid">
                                 <div class="building-category">
                                     <h4>🏛️ Essential Buildings</h4>
@@ -1226,6 +1231,14 @@
                                     try {
                                         window.villageManager.generateBuildingButtons();
                                         window.villageManager.setupBuildingButtons();
+                                        // After rows are generated, show banner if not allowed to manage
+                                        try {
+                                            const banner = document.getElementById('governing-banner');
+                                            const allowed = window.villageManager.isManagementAllowed();
+                                            if (banner) {
+                                                banner.style.display = allowed ? 'none' : 'block';
+                                            }
+                                        } catch (e) { console.warn('[BuildingsTab] governing banner update failed', e); }
                                         return; // Done – use the new structured rows
                                     } catch (err) {
                                         console.warn('[BuildingsTab] Falling back to simple buttons:', err);
@@ -1295,6 +1308,9 @@
                                 window.eventBus.on('day-ended', updateStatsDisplay);
                                 window.eventBus.on('resources-updated', updateStatsDisplay);
                                 window.eventBus.on('building-built', updateBuildingGrid);
+                                window.eventBus.on('expedition_started', updateBuildingGrid);
+                                window.eventBus.on('expedition_completed', updateBuildingGrid);
+                                window.eventBus.on('expedition_return_started', updateBuildingGrid);
                             }
 
                             // Initial update

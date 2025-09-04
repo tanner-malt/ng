@@ -90,14 +90,14 @@ describe('JobManager resource-aware auto-assign', () => {
         const jm = new JobManager(gs);
 
         jm.updateAvailableJobs();
-    const assigned = jm.autoAssignWorkers();
-    // At least one worker should be assigned under critical food shortage
-    expect(assigned).toBeGreaterThanOrEqual(1);
+        const assigned = jm.autoAssignWorkers();
+        // At least one worker should be assigned under critical food shortage
+        expect(assigned).toBeGreaterThanOrEqual(1);
 
         // Verify assignment went to farmer
-    let farmerAssigned = 0;
-    jm.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerAssigned += jobs.farmer.length; });
-    expect(farmerAssigned).toBeGreaterThanOrEqual(1);
+        let farmerAssigned = 0;
+        jm.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerAssigned += jobs.farmer.length; });
+        expect(farmerAssigned).toBeGreaterThanOrEqual(1);
     });
 
     it('chooses the best-fit worker by relevant skills for farmer', () => {
@@ -109,13 +109,13 @@ describe('JobManager resource-aware auto-assign', () => {
         const jm = new JobManager(gs);
 
         jm.updateAvailableJobs();
-    const assigned = jm.autoAssignWorkers();
-    // At least one worker should be assigned to farmer; building may have multiple slots
-    expect(assigned).toBeGreaterThanOrEqual(1);
+        const assigned = jm.autoAssignWorkers();
+        // At least one worker should be assigned to farmer; building may have multiple slots
+        expect(assigned).toBeGreaterThanOrEqual(1);
 
         // The agriculture-skilled worker should be assigned to farmer
         let farmerWorkerIds = [];
         jm.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerWorkerIds.push(...jobs.farmer); });
-    expect(farmerWorkerIds).toContain('pf');
+        expect(farmerWorkerIds).toContain('pf');
     });
 });

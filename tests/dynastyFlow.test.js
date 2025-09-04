@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Note: The full tutorial.js contains non-ASCII mojibake sequences that upset Vite/Node
 // import analysis in tests. To keep coverage on the flow, we simulate the contract:
 // - If dynastyName exists at load and achievement not unlocked, triggerDynastyNamed(name)
@@ -96,8 +96,8 @@ describe('Dynasty naming flow', () => {
     expect(triggerSpy).toHaveBeenCalledTimes(1);
     expect(triggerSpy).toHaveBeenCalledWith('Stormwind');
 
-  // Modal should be closed
-  expect(document.querySelector('.modal-overlay')).toBeNull();
+    // Modal should be closed
+    expect(document.querySelector('.modal-overlay')).toBeNull();
 
     vi.useRealTimers();
   });

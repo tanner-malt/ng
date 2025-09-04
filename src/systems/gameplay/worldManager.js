@@ -19,11 +19,68 @@ class WorldManager {
         // fallback: just return color
         return color;
     }
+
+    // Lightweight Oregon Trail-style daily events during travel
+    processArmyDailyEvents() {
+        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
+        const today = this.gameState?.currentDay ?? 0;
+        this.parties.expeditions.forEach(army => {
+            const traveling = !!(army.travelPlan && army.travelPlan.path && army.travelPlan.index < army.travelPlan.path.length - 1);
+            if (!traveling) return;
+            const last = this._eventCooldowns.get(army.id) || -10;
+            if (today - last < 3) return; // 3-day cooldown between events per army
+
+            // Base chance 20%, modify by terrain of next tile and ZOC presence
+            const nextIdx = Math.min(army.travelPlan.index + 1, army.travelPlan.path.length - 1);
+            const next = army.travelPlan.path[nextIdx];
+            const terrain = this.hexMap?.[next.row]?.[next.col]?.terrain || 'grass';
+            const inZoc = this.isInEnemyZOC(next.row, next.col);
+            let chance = 0.2 + (inZoc ? 0.1 : 0);
+            if (terrain === 'swamp' || terrain === 'mountain' || terrain === 'desert') chance += 0.1;
+            if (Math.random() > chance) return;
+
+            const roll = Math.random();
+            if (roll < 0.2) {
+                // Forage success: gain PD
+                const people = Math.max(army.members?.length || 1, 1);
+                const gainPD = Math.max(1, Math.floor(people * 0.5));
+                army.supplies.food = (army.supplies.food || 0) + gainPD;
+                window.showToast(`🌿 ${army.name} foraged supplies (+${gainPD} PD).`, { type: 'success', timeout: 2500 });
+            } else if (roll < 0.45) {
+                // Sickness: morale hit
+                army.morale = Math.max(0, (army.morale ?? 100) - 5);
+                window.showToast(`🤒 Sickness in ${army.name} (−5 morale).`, { type: 'warning', timeout: 2500 });
+            } else if (roll < 0.65) {
+                // Weather delay: skip travel today
+                this._skipTravelToday.add(army.id);
+                window.showToast(`🌧️ Bad weather delays ${army.name} for a day.`, { type: 'info', timeout: 2500 });
+            } else if (roll < 0.8) {
+                // Equipment break: lose some PD
+                const lose = Math.max(1, Math.floor((army.supplies.food || 0) * 0.1));
+                army.supplies.food = Math.max(0, (army.supplies.food || 0) - lose);
+                window.showToast(`🪓 Equipment issues cost ${army.name} ${lose} PD.`, { type: 'warning', timeout: 2500 });
+            } else if (roll < 0.95 && inZoc) {
+                // Ambush only if in ZOC: morale hit and small delay
+                army.morale = Math.max(0, (army.morale ?? 100) - 8);
+                this._skipTravelToday.add(army.id);
+                window.showToast(`⚠️ Ambush in hostile territory! ${army.name} loses morale and time.`, { type: 'error', timeout: 3000 });
+            } else {
+                // Interesting find: reveal an extra tile
+                const r = next.row, c = next.col;
+                const nRow = Math.max(0, Math.min(this.mapHeight - 1, r + (Math.random() < 0.5 ? 1 : -1)));
+                const nCol = Math.max(0, Math.min(this.mapWidth - 1, c + (Math.random() < 0.5 ? 1 : -1)));
+                this.revealHex(nRow, nCol);
+                window.showToast(`🔎 ${army.name} discovered something nearby.`, { type: 'info', timeout: 2500 });
+            }
+            this._eventCooldowns.set(army.id, today);
+        });
+    }
     constructor(gameState, game) {
         this.gameState = gameState;
-        this.game = game;
-        this.worldGrid = null;
-        this.hexSize = 20; // Slightly smaller to fit larger map
+        /**
+         * Advance armies along their planned paths by consuming 1 day of movement per day
+         * Supports terrain-weighted step costs and random delays injected by events.
+         */
 
         // Set global reference immediately in constructor
         window.worldManager = this;
@@ -56,12 +113,13 @@ class WorldManager {
         // Exploration tutorial state
         this.tutorialMode = true;
 
-    // Enemy presence and Zone of Control (ZOC)
-    this.enemyUnits = new Map(); // id -> {row,col}
-    this._enemyZOC = new Set(); // 'row,col' strings
-    this._toastCooldowns = new Map(); // armyId -> { lastNoFoodDay, lastLowFoodDay }
-    this._eventCooldowns = new Map(); // armyId -> lastEventDay
-    this.showZOCOverlay = false; // toggleable ZOC shading
+        // Enemy presence and Zone of Control (ZOC)
+        this.enemyUnits = new Map(); // id -> {row,col}
+        this._enemyZOC = new Set(); // 'row,col' strings
+        this._toastCooldowns = new Map(); // armyId -> { lastNoFoodDay, lastLowFoodDay }
+        this._eventCooldowns = new Map(); // armyId -> lastEventDay
+        this.showZOCOverlay = false; // toggleable ZOC shading
+        this._skipTravelToday = new Set(); // armyId set for weather/incident delays
 
         // Set global reference for onclick handlers
         if (typeof window !== 'undefined') {
@@ -470,6 +528,11 @@ class WorldManager {
                     this.processArmyDailyUpkeep();
                 } catch (e) {
                     console.warn('[World] Army upkeep processing error:', e);
+                }
+                try {
+                    this.processArmyDailyEvents();
+                } catch (e) {
+                    console.warn('[World] Army events processing error:', e);
                 }
                 try {
                     this.processArmyDailyTravel();
@@ -970,13 +1033,13 @@ class WorldManager {
     // Compute Zone of Control (orthogonal tiles) for all enemy units
     recomputeEnemyZOC() {
         const z = new Set();
-        const add = (r, c) => { if (r>=0 && r<this.mapHeight && c>=0 && c<this.mapWidth) z.add(`${r},${c}`); };
+        const add = (r, c) => { if (r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth) z.add(`${r},${c}`); };
         for (const { row, col } of this.enemyUnits.values()) {
             add(row, col);
-            add(row+1, col);
-            add(row-1, col);
-            add(row, col+1);
-            add(row, col-1);
+            add(row + 1, col);
+            add(row - 1, col);
+            add(row, col + 1);
+            add(row, col - 1);
         }
         this._enemyZOC = z;
     }
@@ -1282,6 +1345,34 @@ class WorldManager {
         container.appendChild(squareButton);
     }
 
+    // Movement cost helpers
+    _getMoveCostForTile(row, col) {
+        const key = this.hexMap?.[row]?.[col]?.terrain;
+        switch (key) {
+            case 'grass': return 1;
+            case 'plains': return 1;
+            case 'forest': return 2;
+            case 'ruins': return 2;
+            case 'desert': return 2;
+            case 'hill': return 3;
+            case 'swamp': return 3;
+            case 'mountain': return 4;
+            case 'village': return 1;
+            case 'ore': return 2;
+            case 'water': return 99;
+            default: return 1;
+        }
+    }
+
+    _computePathDays(path) {
+        if (!Array.isArray(path) || path.length < 2) return 0;
+        let days = 0;
+        for (let i = 1; i < path.length; i++) {
+            days += this._getMoveCostForTile(path[i].row, path[i].col);
+        }
+        return days;
+    }
+
 
     selectHex(row, col) {
         const hex = this.hexMap[row][col];
@@ -1501,9 +1592,9 @@ class WorldManager {
                 <p><strong>Elevation:</strong> ${'⬆'.repeat(hex.elevation) || 'Sea level'}</p>
         `;
 
-    // Show army information if present
-    if (armyAtPosition) {
-        const foodUpkeepPD = (armyAtPosition.units?.length || 1); // 1 person-day per unit per day
+        // Show army information if present
+        if (armyAtPosition) {
+            const foodUpkeepPD = (armyAtPosition.units?.length || 1); // 1 person-day per unit per day
             content += `
                 <div class="army-info" style="border: 2px solid #e74c3c; border-radius: 8px; padding: 10px; margin: 10px 0; background: rgba(231, 76, 60, 0.1);">
                     <h5>⚔️ Army: ${armyAtPosition.name}</h5>
@@ -1845,6 +1936,10 @@ class WorldManager {
             selectedVillagerIds.forEach(villagerId => {
                 const villager = this.gameState.populationManager.getInhabitant(parseInt(villagerId));
                 if (villager && villager.status !== 'drafted') {
+                    // Record originals before any mutation
+                    const originalRole = villager.role;
+                    const originalStatus = villager.status;
+
                     // Mark villager as drafted
                     this.gameState.populationManager.updateStatus(villager.id, 'drafted');
 
@@ -1855,6 +1950,9 @@ class WorldManager {
                         role: 'Soldier',
                         type: 'villager',
                         villagerId: villager.id,
+                        // Preserve originals for restoration on disband
+                        originalRole: originalRole,
+                        originalStatus: originalStatus,
                         health: 80,
                         attack: 10 + Math.floor(villager.age / 10), // Age affects combat ability
                         experience: 0,
@@ -1895,7 +1993,9 @@ class WorldManager {
             draftedVillagers: armyUnits.filter(u => u.type === 'villager').map(u => ({
                 id: u.villagerId,
                 name: u.name,
-                originalRole: 'Companion',
+                // Use preserved originals captured at draft time
+                originalRole: u.originalRole || 'peasant',
+                originalStatus: u.originalStatus || 'idle',
                 age: u.age
             })),
             armyId: newArmy.id // Link to new army system
@@ -2252,11 +2352,18 @@ class WorldManager {
             army.draftedVillagers.forEach(draftedVillager => {
                 const villager = this.gameState.populationManager.getInhabitant(draftedVillager.id);
                 if (villager) {
-                    // Restore original status
-                    this.gameState.populationManager.updateStatus(villager.id, 'idle');
+                    // Restore original status (fallback to idle)
+                    const restoredStatus = draftedVillager.originalStatus || 'idle';
+                    this.gameState.populationManager.updateStatus(villager.id, restoredStatus);
                     // Restore original role if it was changed
                     if (draftedVillager.originalRole && villager.role !== draftedVillager.originalRole) {
                         this.gameState.populationManager.assignRole(villager.id, draftedVillager.originalRole);
+                    }
+                    // Ensure location is back to village and clear transient flags
+                    villager.location = 'village';
+                    villager.onExpedition = false;
+                    if (villager.status === 'traveling' || villager.status === 'away') {
+                        this.gameState.populationManager.updateStatus(villager.id, 'idle');
                     }
                 }
             });
@@ -2264,6 +2371,9 @@ class WorldManager {
             // Update population count
             this.gameState.population = this.gameState.populationManager.getAll()
                 .filter(v => v.status !== 'drafted').length;
+
+            // Re-optimize jobs after people return
+            try { this.gameState.populationManager.optimizeJobAssignments(); } catch (_) { }
         } else {
             // Fallback: simple population addition
             const returningMembers = army.members.length - 1; // -1 for commander (yourself)
@@ -2299,6 +2409,8 @@ class WorldManager {
                 amount: army.draftedVillagers ? army.draftedVillagers.length : army.members.length - 1,
                 armyName: army.name
             });
+            // Also emit expedition_completed to close any management locks/listeners
+            try { window.eventBus.emit('expedition_completed', { disbanded: true, armyName: army.name }); } catch (_) { }
         }
 
         window.showToast(`🏠 ${army.name} disbanded! Members have returned to the village.`, {
@@ -2330,51 +2442,57 @@ class WorldManager {
         const foodPerPD = 3; // cost: 3 food per person-day
         const totalCost = addPD * foodPerPD;
         const logisticsContent = `
-            <div class="logistics-management" style="padding: 20px;">
-                <h3>📦 Logistics Management - ${army.name}</h3>
-                <p>Manage supplies and equipment for your expedition. Proper preparation is crucial for survival in the wilderness.</p>
-                
-                <div class="current-resources" style="margin: 15px 0; padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px;">
-                    <h4>Available Resources</h4>
-                    <p>🍞 Food: ${currentFood}</p>
+            <div class="logistics-management" style="padding: 12px 16px; max-width: 860px;">
+                <h3 style="margin:0 0 8px 0;">📦 Logistics - ${army.name}</h3>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0;">
+                    <div style="background: rgba(52,152,219,0.15); border:1px solid #2980b9; border-radius:8px; padding:12px;">
+                        <div style="font-weight:700; color:#3498db; margin-bottom:6px;">Available Food</div>
+                        <div style="font-size:1.25em;">🍞 ${currentFood}</div>
+                    </div>
+                    <div style="background: rgba(46,204,113,0.12); border:1px solid #27ae60; border-radius:8px; padding:12px;">
+                        <div style="font-weight:700; color:#27ae60; margin-bottom:6px;">Person-Days</div>
+                        <div>Current: <strong>${totalPD}</strong> · Capacity: <strong>${capacityPD}</strong></div>
+                        <div style="opacity:0.85;">≈ <strong>${daysForArmy}</strong> days for <strong>${people}</strong> people</div>
+                    </div>
+                    <div style="background: rgba(241,196,15,0.12); border:1px solid #f1c40f; border-radius:8px; padding:12px;">
+                        <div style="font-weight:700; color:#f1c40f; margin-bottom:6px;">Status</div>
+                        <div style="color:${totalPD > 0 ? '#2ecc71' : '#e74c3c'};">${totalPD > 0 ? '✅ Ready' : '⚠️ No food packed'}</div>
+                    </div>
                 </div>
-                
-                <div class="supply-grid" style="margin: 20px 0;">
-                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e74c3c; border-radius: 8px;">
-                        <h4>🍞 Food Supplies</h4>
-                        <p>Current: ${totalPD} person-days (≈ ${daysForArmy} day${daysForArmy!==1?'s':''} for ${people} people)</p>
-                        <p>Capacity: ${capacityPD} person-days (${people} people × 5 days each)</p>
-                        <p style="color: ${totalPD > 0 ? '#27ae60' : '#e74c3c'};">
-                            ${totalPD > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
-                        </p>
-                        <button class="action-btn" onclick="window.safeWorldManagerCall?.('addSupply', '${armyId}', 'food', ${addDays}) || (window.worldManager && window.worldManager.addSupply?.('${armyId}', 'food', ${addDays}))" 
-                                style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
+
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+                    <div style="background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
+                        <h4 style="margin:0 0 8px 0;">🥖 Food Supplies</h4>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="action-btn" 
+                                onclick="window.safeWorldManagerCall?.('addSupply','${armyId}','food', ${addDays}) || (window.worldManager && window.worldManager.addSupply?.('${armyId}','food', ${addDays}))"
                                 ${currentFood < totalCost ? 'disabled' : ''}>
-                            Add ${addDays} days for the army (-${totalCost} food) ${currentFood < totalCost ? '(Not enough food)' : ''}
-                        </button>
-                        ${remainingCapacityPD === 0 ? '<p style="color:#e67e22; margin-top:6px;">Capacity full. Supply wagons will increase capacity in future.</p>' : ''}
+                                Add ${addDays} Days (-${totalCost} food)
+                            </button>
+                            ${remainingCapacityPD > 0 ? (() => { const needDays = Math.ceil(remainingCapacityPD / people); const cost = remainingCapacityPD * foodPerPD; return `<button class='action-btn secondary' onclick="window.safeWorldManagerCall?.('addSupply','${armyId}','food', ${needDays}) || (window.worldManager && window.worldManager.addSupply?.('${armyId}','food', ${needDays}))" ${currentFood < cost ? 'disabled' : ''}>Fill to Capacity (-${cost} food)</button>`; })() : `<span style='color:#e67e22; align-self:center;'>Capacity full.</span>`}
+                        </div>
                     </div>
-                    
-                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
-                        <h4>💧 Water</h4>
-                        <p>Current: ${army.supplies.water} days worth</p>
-                        <p style="color: #3498db;">ℹ️ Optional - Can be found along the way</p>
-                    </div>
-                    
-                    <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #f39c12; border-radius: 8px;">
-                        <h4>⚔️ Equipment</h4>
-                        <p>Current: ${army.supplies.equipment}</p>
-                        <p style="color: #f39c12;">Basic equipment suitable for scouting missions</p>
+                    <div style="display:grid; gap:12px;">
+                        <div style="background: rgba(52,152,219,0.1); border:1px solid #3498db; border-radius:10px; padding:10px;">
+                            <div style="font-weight:700; color:#3498db;">💧 Water</div>
+                            <div>Current: ${army.supplies.water} days</div>
+                            <div style="opacity:0.8;">Optional — often found en route</div>
+                        </div>
+                        <div style="background: rgba(243,156,18,0.1); border:1px solid #f39c12; border-radius:10px; padding:10px;">
+                            <div style="font-weight:700; color:#f39c12;">⚔️ Equipment</div>
+                            <div>Current: ${army.supplies.equipment}</div>
+                            <div style="opacity:0.8;">Basic gear for scouting missions</div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="logistics-tutorial" style="padding: 15px; background-color: rgba(241, 196, 15, 0.2); border-radius: 5px;">
-                    <h4>💡 Tutorial: Expedition Logistics</h4>
-                    <ul style="text-align: left; padding-left: 20px; margin: 10px 0;">
-                        <li><strong>Food:</strong> Essential for maintaining army morale and preventing starvation</li>
-                        <li><strong>Travel Speed:</strong> Base speed is 7 days per hex tile</li>
-                        <li><strong>Events:</strong> Random encounters can affect supplies and progress</li>
-                        <li><strong>Planning:</strong> Consider round-trip supplies for safe return</li>
+
+                <div style="margin-top:14px; background: rgba(241,196,15,0.12); border:1px solid #f1c40f; border-radius:8px; padding:12px;">
+                    <h4 style="margin:0 0 8px 0;">💡 Tips</h4>
+                    <ul style="margin-left:16px;">
+                        <li>Keep at least 3–5 days of food per person.</li>
+                        <li>Base travel speed is ~7 days per hex tile.</li>
+                        <li>Events can change supply usage and progress.</li>
+                        <li>Plan for the round trip or build outposts.</li>
                     </ul>
                 </div>
             </div>
@@ -2416,7 +2534,7 @@ class WorldManager {
             // Get current resources from gameState
             const currentFood = this.gameState.food || this.gameState.resources?.food || 0;
 
-            // Generate updated content
+            // Generate updated content (lightweight; not duplicating Fill button here for brevity)
             const logisticsContent = `
                 <div class="logistics-management" style="padding: 20px;">
                     <h3>📦 Logistics Management - ${army.name}</h3>
@@ -2430,9 +2548,9 @@ class WorldManager {
                     <div class="supply-grid" style="margin: 20px 0;">
                         <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e74c3c; border-radius: 8px;">
                             <h4>🍞 Food Supplies</h4>
-                            <p>Current: ${army.supplies.food} days worth</p>
-                            <p style="color: ${army.supplies.food > 0 ? '#27ae60' : '#e74c3c'};">
-                                ${army.supplies.food > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
+                            <p>Current: ${army.supplies.food} person-days</p>
+                            <p style="color: ${(army.supplies.food || 0) > 0 ? '#27ae60' : '#e74c3c'};">
+                                ${(army.supplies.food || 0) > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
                             </p>
                             <button class="action-btn" onclick="window.safeWorldManagerCall?.('addSupply', '${armyId}', 'food', 7) || (window.worldManager && window.worldManager.addSupply?.('${armyId}', 'food', 7))" 
                                     style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
@@ -2577,7 +2695,7 @@ class WorldManager {
 
             if (window.showToast) {
                 const daysForArmy = people > 0 ? Math.floor(addPD / people) : addDaysForArmy;
-                window.showToast(`📦 Added ~${daysForArmy} day${daysForArmy!==1?'s':''} of ${supplyType} for the army (-${totalCost} food)`, {
+                window.showToast(`📦 Added ~${daysForArmy} day${daysForArmy !== 1 ? 's' : ''} of ${supplyType} for the army (-${totalCost} food)`, {
                     icon: '✅',
                     type: 'success',
                     timeout: 3000
@@ -2692,22 +2810,46 @@ class WorldManager {
                         originalSelectHex(row, col);
                         return;
                     }
-                    // Ensure adequate supplies (person-days) for full route
-                    const steps = Math.max(0, (path.length || 1) - 1);
+                    // Compute terrain-weighted travel days for the route
+                    const routeDays = this._computePathDays(path);
                     const people = Math.max(legacyArmy.members?.length || 1, 1);
-                    const needPD = steps * people;
+                    const needPD = routeDays * people;
                     const havePD = legacyArmy.supplies?.food || 0;
                     if (havePD < needPD) {
-                        window.showToast(`🍞 Insufficient supplies for this journey. Need ${needPD} PD (≈ ${Math.ceil(needPD/people)} days for ${people}).`, { type: 'warning', timeout: 4500 });
-                        originalSelectHex(row, col);
-                        return;
+                        // Offer auto-provision if village has enough food
+                        const deficitPD = needPD - havePD;
+                        const perPD = 3;
+                        const addDaysForArmy = Math.ceil(deficitPD / people);
+                        const cost = deficitPD * perPD;
+                        const available = (typeof this.gameState.food === 'number') ? this.gameState.food : (this.gameState.resources?.food || 0);
+                        if (available >= cost) {
+                            const ok = confirm(`Supplies low for this journey (need ${needPD} PD ≈ ${routeDays} travel days for ${people}). Auto-provision ${addDaysForArmy} day(s) for the army for ${cost} food?`);
+                            if (ok) {
+                                this.addSupply(legacyArmy.id, 'food', addDaysForArmy);
+                            } else {
+                                window.showToast(`🍞 Insufficient supplies for this journey. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
+                                originalSelectHex(row, col);
+                                return;
+                            }
+                        } else {
+                            window.showToast(`🍞 Insufficient supplies for this journey. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
+                            originalSelectHex(row, col);
+                            return;
+                        }
                     }
 
                     // Store travel plan on legacy and core
+                    // Build terrain-aware travel plan
+                    const stepCosts = [];
+                    for (let i = 1; i < path.length; i++) {
+                        stepCosts.push(this._getMoveCostForTile(path[i].row, path[i].col));
+                    }
                     legacyArmy.travelPlan = {
                         path,
-                        index: 0, // next step
-                        destination: { row, col }
+                        index: 0, // at start index; next move is to index 1
+                        destination: { row, col },
+                        stepCosts,
+                        remainingForStep: stepCosts[0] || 0
                     };
                     coreArmy.movementPath = path.map(p => ({ x: p.col, y: p.row }));
                     coreArmy.movementIndex = 0;
@@ -2715,7 +2857,7 @@ class WorldManager {
                     coreArmy.movementTarget = { x: goal.col, y: goal.row };
                     coreArmy.movementProgress = 0;
 
-                    window.showToast(`🚶 Marching to (${row}, ${col}). Progresses one step per day.`, { type: 'success', timeout: 3500 });
+                    window.showToast(`🚶 Marching to (${row}, ${col}). Estimated ${routeDays} day(s) by terrain.`, { type: 'success', timeout: 3500 });
                 } finally {
                     // Restore normal selectHex behavior and re-run click for standard UI update
                     this.selectHex = originalSelectHex;
@@ -3234,51 +3376,73 @@ class WorldManager {
     }
 
     /**
-     * Advance armies along their planned paths by one step per day
+     * Advance armies along their planned paths by consuming 1 day of movement per day
+     * Supports terrain-weighted step costs and random delays injected by events.
      */
     processArmyDailyTravel() {
         if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
         this.parties.expeditions.forEach(army => {
             if (!army.travelPlan || !army.travelPlan.path || army.travelPlan.index == null) return;
             const plan = army.travelPlan;
-            // Move one step if possible (second element is first move)
+            // Skip travel if delayed today
+            if (this._skipTravelToday.has(army.id)) {
+                this._skipTravelToday.delete(army.id);
+                return;
+            }
             if (plan.index < plan.path.length - 1) {
-                plan.index += 1;
-                const step = plan.path[plan.index];
-                // ZOC stop: do not enter ZOC tiles mid-travel
-                if (this.isInEnemyZOC(step.row, step.col)) {
-                    plan.index -= 1; // revert
-                    army.status = 'halted (ZOC)';
-                    window.showToast(`🛡️ ${army.name} halted by enemy Zone of Control.`, { type: 'warning', timeout: 3000 });
-                    return;
+                if (plan.remainingForStep == null) {
+                    plan.remainingForStep = (plan.stepCosts && plan.stepCosts[plan.index] != null)
+                        ? plan.stepCosts[plan.index]
+                        : this._getMoveCostForTile(plan.path[plan.index + 1].row, plan.path[plan.index + 1].col);
                 }
-                // Update legacy location indicator for UI
-                army.location = { row: step.row, col: step.col };
+                plan.remainingForStep -= 1;
+                if (plan.remainingForStep <= 0) {
+                    plan.index += 1;
+                    const step = plan.path[plan.index];
+                    // ZOC stop: do not enter ZOC tiles mid-travel
+                    if (this.isInEnemyZOC(step.row, step.col)) {
+                        plan.index -= 1; // revert
+                        plan.remainingForStep = 1; // require another day before retry
+                        army.status = 'halted (ZOC)';
+                        window.showToast(`🛡️ ${army.name} halted by enemy Zone of Control.`, { type: 'warning', timeout: 3000 });
+                        return;
+                    }
+                    // Update legacy location indicator for UI
+                    army.location = { row: step.row, col: step.col };
 
-                // Sync core army position
-                if (army.armyId) {
-                    const core = this.gameState.getArmy(army.armyId);
-                    if (core) {
-                        core.position = { x: step.col, y: step.row };
-                        core.status = plan.index < plan.path.length - 1 ? 'moving' : 'idle';
-                        core.movementProgress = plan.index / (plan.path.length - 1);
-                        if (plan.index >= plan.path.length - 1) {
-                            core.isMoving = false;
-                            core.movementPath = null;
-                            core.movementIndex = null;
+                    // Sync core army position
+                    if (army.armyId) {
+                        const core = this.gameState.getArmy(army.armyId);
+                        if (core) {
+                            core.position = { x: step.col, y: step.row };
+                            core.status = plan.index < plan.path.length - 1 ? 'moving' : 'idle';
+                            const totalDays = this._computePathDays(plan.path);
+                            const progressedDays = this._computePathDays(plan.path.slice(0, plan.index + 1));
+                            core.movementProgress = totalDays > 0 ? progressedDays / totalDays : 1;
+                            if (plan.index >= plan.path.length - 1) {
+                                core.isMoving = false;
+                                core.movementPath = null;
+                                core.movementIndex = null;
+                            }
                         }
                     }
-                }
 
-                // On arrival at destination
-                if (plan.index >= plan.path.length - 1) {
-                    army.status = 'arrived';
-                    window.showToast(`✅ ${army.name} arrived at (${plan.destination.row}, ${plan.destination.col}).`, { type: 'success', timeout: 3000 });
-                    // Reveal destination and neighbors
-                    this.revealHex(step.row, step.col);
-                    this.revealSurroundingHexes(step.row, step.col);
-                    // Clear plan
-                    army.travelPlan = null;
+                    // On arrival at destination
+                    if (plan.index >= plan.path.length - 1) {
+                        army.status = 'arrived';
+                        window.showToast(`✅ ${army.name} arrived at (${plan.destination.row}, ${plan.destination.col}).`, { type: 'success', timeout: 3000 });
+                        // Reveal destination and neighbors
+                        this.revealHex(step.row, step.col);
+                        this.revealSurroundingHexes(step.row, step.col);
+                        // Clear plan
+                        army.travelPlan = null;
+                    } else {
+                        // Prepare next step remaining cost
+                        const nextCost = (plan.stepCosts && plan.stepCosts[plan.index] != null)
+                            ? plan.stepCosts[plan.index]
+                            : this._getMoveCostForTile(plan.path[plan.index + 1].row, plan.path[plan.index + 1].col);
+                        plan.remainingForStep = nextCost;
+                    }
                 }
             }
         });
@@ -3306,16 +3470,19 @@ class WorldManager {
             window.showToast('🛡️ Return path blocked by enemy Zone of Control.', { type: 'warning', timeout: 3000 });
             return;
         }
-        // Require adequate supplies for the return journey
-        const steps = Math.max(0, (path.length || 1) - 1);
+        // Require adequate supplies for the return journey (terrain-weighted)
+        const routeDays = this._computePathDays(path);
         const people = Math.max(legacyArmy.members?.length || 1, 1);
-        const needPD = steps * people;
+        const needPD = routeDays * people;
         const havePD = legacyArmy.supplies?.food || 0;
         if (havePD < needPD) {
-            window.showToast(`🍞 Not enough supplies to return home. Need ${needPD} PD (≈ ${Math.ceil(needPD/people)} days for ${people}).`, { type: 'warning', timeout: 4500 });
+            window.showToast(`🍞 Not enough supplies to return home. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
             return;
         }
-        legacyArmy.travelPlan = { path, index: 0, destination: goal };
+        // Build terrain-aware travel plan
+        const stepCosts = [];
+        for (let i = 1; i < path.length; i++) stepCosts.push(this._getMoveCostForTile(path[i].row, path[i].col));
+        legacyArmy.travelPlan = { path, index: 0, destination: goal, stepCosts, remainingForStep: stepCosts[0] || 0 };
         legacyArmy.status = 'returning';
         if (core) {
             core.movementPath = path.map(p => ({ x: p.col, y: p.row }));

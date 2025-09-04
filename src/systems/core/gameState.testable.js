@@ -77,6 +77,79 @@ class GameStateTestable {
         this.readOnlySave = false;
     }
 
+    // Minimal helpers to mirror core GameState behavior
+    getBuildingCost(buildingType) {
+        return (globalThis.window?.GameData?.buildingCosts?.[buildingType]) || {};
+    }
+    canAffordBuilding(buildingType) {
+        const cost = this.getBuildingCost(buildingType);
+        if (cost.gold && this.gold < cost.gold) return false;
+        for (const [res, amt] of Object.entries(cost)) {
+            if (res === 'gold') continue;
+            if (this.resources[res] == null || this.resources[res] < amt) return false;
+        }
+        return true;
+    }
+    isBuildingUnlocked(type) {
+        return this.unlockedBuildings.includes(type);
+    }
+
+    // Mirror of updateBuildButtons governance/affordance logic (DOM-based)
+    updateBuildButtons() {
+        try {
+            const buttons = document.querySelectorAll('[data-building], .build-btn');
+            let managementAllowed = true;
+            let mgmtStatus = { allowed: true };
+            try {
+                if (globalThis.window?.villageManager?.getManagementStatus) {
+                    mgmtStatus = globalThis.window.villageManager.getManagementStatus();
+                    managementAllowed = !!mgmtStatus.allowed;
+                } else {
+                    managementAllowed = globalThis.window?.villageManager?.isManagementAllowed ? globalThis.window.villageManager.isManagementAllowed() : true;
+                }
+            } catch (_) { managementAllowed = true; }
+            if (!buttons.length) return;
+            buttons.forEach(btn => {
+                const type = btn.dataset.building;
+                if (!type) return;
+                if (!managementAllowed) {
+                    try { if (typeof btn.disabled !== 'undefined') btn.disabled = true; } catch (_) { }
+                    btn.classList.add('disabled');
+                    btn.classList.add('locked');
+                    btn.title = mgmtStatus.message || (mgmtStatus.reason === 'leader_away'
+                        ? 'Village management locked: Leader is away on expedition'
+                        : (mgmtStatus.reason === 'not_governing'
+                            ? 'Village management locked: Monarch is not governing'
+                            : 'Village management locked'));
+                    return;
+                }
+
+                const unlocked = this.isBuildingUnlocked(type);
+                const affordable = unlocked && this.canAffordBuilding(type);
+                try { if (typeof btn.disabled !== 'undefined') btn.disabled = !affordable; } catch (_) { }
+                btn.classList.toggle('locked', !unlocked);
+                btn.classList.toggle('disabled', !affordable);
+                if (!unlocked) {
+                    btn.title = 'Locked';
+                } else if (!affordable) {
+                    try {
+                        const cost = this.getBuildingCost(type) || {};
+                        const missing = Object.entries(cost)
+                            .filter(([res, amt]) => (res === 'gold' ? this.gold < amt : ((this.resources[res] ?? 0) < amt)))
+                            .map(([res, amt]) => {
+                                const have = res === 'gold' ? this.gold : (this.resources[res] ?? 0);
+                                return `${res}: ${have}/${amt}`;
+                            })
+                            .join(', ');
+                        btn.title = missing ? `Insufficient resources (${missing})` : 'Insufficient resources';
+                    } catch (_) { btn.title = 'Insufficient resources'; }
+                } else {
+                    btn.title = '';
+                }
+            });
+        } catch (_) { /* ignore in tests */ }
+    }
+
     ensureInventoryManager(skipDefaults = false) {
         if (this.inventoryManager) return this.inventoryManager;
         if (typeof window !== 'undefined' && window.InventoryManager) {

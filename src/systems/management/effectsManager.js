@@ -117,9 +117,27 @@ class EffectsManager {
             effect.id = `${effect.type}_${Date.now()}`;
         }
 
-        // Add current day if not specified
-        if (!effect.startDay && this.gameState) {
-            effect.startDay = this.gameState.currentDay || 1;
+        // Normalize timing and metadata so custom effects render/expire correctly
+        const currentDay = (this.gameState && (typeof this.gameState.day === 'number' ? this.gameState.day : this.gameState.currentDay)) || 1;
+        if (typeof effect.startDay !== 'number') {
+            effect.startDay = currentDay;
+        }
+        if (typeof effect.duration !== 'number') {
+            // Default to 10 days if not provided
+            effect.duration = 10;
+        }
+        if (typeof effect.endDay !== 'number') {
+            effect.endDay = effect.startDay + effect.duration;
+        }
+        if (!effect.name) {
+            effect.name = (this.effectTypes[effect.type]?.name) || effect.type;
+        }
+        if (!effect.icon) {
+            effect.icon = (this.effectTypes[effect.type]?.icon) || '✨';
+        }
+        if (!effect.category) {
+            // Classify known custom types; default to 'magical' for runes
+            effect.category = effect.type && effect.type.includes('rune') ? 'magical' : (this.effectTypes[effect.type]?.category || 'misc');
         }
 
         this.activeEffects.set(effect.id, effect);
@@ -269,7 +287,9 @@ class EffectsManager {
     getEffectRemainingDays(effectId) {
         const effect = this.activeEffects.get(effectId);
         if (!effect) return 0;
-        return Math.max(0, effect.endDay - this.gameState.day);
+        const now = (typeof this.gameState.day === 'number') ? this.gameState.day : (this.gameState.currentDay || 1);
+        const remaining = (typeof effect.endDay === 'number') ? (effect.endDay - now) : (typeof effect.duration === 'number' ? (effect.startDay + effect.duration - now) : 0);
+        return Math.max(0, remaining);
     }
 
     // Get effect summary for UI
@@ -351,18 +371,55 @@ class EffectsManager {
         }
     }
 
+    // Debug a building's efficiency multiplier and contributing effects
+    debugBuildingEfficiency(buildingType, buildingId = null) {
+        let multiplier = 1.0;
+        console.log(`[EffectsManager] Debug efficiency for ${buildingType}${buildingId != null ? ` (#${buildingId})` : ''}`);
+        for (const effect of this.getActiveEffects()) {
+            const efx = effect.effects || {};
+            let applied = false;
+            let appliedMult = 1.0;
+
+            // Global building efficiency
+            if (efx.buildingEfficiency) {
+                applied = true;
+                appliedMult *= efx.buildingEfficiency;
+            }
+            // Specific building type efficiency
+            const specific = efx[`${buildingType}Efficiency`];
+            if (specific) {
+                applied = true;
+                appliedMult *= specific;
+            }
+            // Per-building rune
+            if (effect.type === 'haste_rune' && buildingId != null && effect.buildingId === buildingId) {
+                const m = typeof effect.multiplier === 'number' ? effect.multiplier : 1.0;
+                applied = true;
+                appliedMult *= m;
+            }
+
+            if (applied && appliedMult !== 1.0) {
+                console.log(`  • ${effect.icon} ${effect.name}: x${appliedMult.toFixed(2)} (${effect.id})`);
+                multiplier *= appliedMult;
+            }
+        }
+        console.log(`=> Total multiplier: x${multiplier.toFixed(2)}`);
+        return multiplier;
+    }
+
     // Console debug commands
     static setupDebugCommands() {
         if (window.effectsManager) {
             window.applyHasteRune = (duration = 10) => window.effectsManager.applyHasteRune(duration);
             window.applyWeather = (type = 'sunny', duration = 3) => window.effectsManager.applyWeatherEffect(type, duration);
             window.listEffects = () => window.effectsManager.listActiveEffects();
+            window.debugBuildingEfficiency = (type, id) => window.effectsManager.debugBuildingEfficiency(type, id);
             window.clearAllEffects = () => {
                 window.effectsManager.activeEffects.clear();
                 window.effectsManager.updateBuildingEfficiency();
                 console.log('[EffectsManager] All effects cleared');
             };
-            console.log('[EffectsManager] Debug commands: applyHasteRune(), applyWeather(), listEffects(), clearAllEffects()');
+            console.log('[EffectsManager] Debug commands: applyHasteRune(), applyWeather(), listEffects(), debugBuildingEfficiency(type, id), clearAllEffects()');
         }
     }
 }
