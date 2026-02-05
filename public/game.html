@@ -131,6 +131,9 @@
 
                 <!-- Icon buttons -->
                 <div class="nav-section nav-right" id="top-right-icons">
+                    <button id="royals-btn" class="icon-btn" title="Royal Family" onclick="if(window.villageManager) window.villageManager.showLeadershipOverview();">
+                        <span>👑</span>
+                    </button>
                     <button id="sound-btn" class="icon-btn" title="Sound">
                         <span>🔊</span>
                     </button>
@@ -165,10 +168,10 @@
                         <span><i class="res-icon food"></i>Food: <span id="food-count"></span>/<span id="food-cap"></span></span>
                         <span><i class="res-icon wood"></i>Wood: <span id="wood-count"></span>/<span id="wood-cap"></span></span>
                         <span><i class="res-icon stone"></i>Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
-                        <span><i class="res-icon metal"></i>Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
-                        <span><i class="res-icon planks"></i>Planks: <span id="planks-count">0</span>/<span id="planks-cap">50</span></span>
-                        <span><i class="res-icon weapons"></i>Weapons: <span id="weapons-count">0</span>/<span id="weapons-cap">100</span></span>
-                        <span><i class="res-icon tools"></i>Tools: <span id="tools-count">0</span>/<span id="tools-cap">100</span></span>
+                        <span id="metal-resource" style="display:none;"><i class="res-icon metal"></i>Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
+                        <span id="planks-resource" style="display:none;"><i class="res-icon planks"></i>Planks: <span id="planks-count">0</span>/<span id="planks-cap">50</span></span>
+                        <span id="weapons-resource" style="display:none;"><i class="res-icon weapons"></i>Weapons: <span id="weapons-count">0</span>/<span id="weapons-cap">100</span></span>
+                        <span id="tools-resource" style="display:none;"><i class="res-icon tools"></i>Tools: <span id="tools-count">0</span>/<span id="tools-cap">100</span></span>
                         <span><i class="res-icon population"></i>Pop: <span id="population-count"></span>/<span id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
@@ -2512,6 +2515,23 @@
             document.getElementById('weapons-count').textContent = resources.weapons ?? 0;
             document.getElementById('tools-count').textContent = resources.tools ?? 0;
             document.getElementById('population-count').textContent = window.gameState.population ?? 0;
+            
+            // Show advanced resources once they become relevant (have value or building exists)
+            const buildings = window.gameState.buildings || [];
+            const hasMine = buildings.some(b => b.type === 'mine' && b.level > 0);
+            const hasLumberMill = buildings.some(b => b.type === 'lumberMill' && b.level > 0);
+            const hasBlacksmith = buildings.some(b => b.type === 'blacksmith' && b.level > 0);
+            
+            const metalEl = document.getElementById('metal-resource');
+            const planksEl = document.getElementById('planks-resource');
+            const weaponsEl = document.getElementById('weapons-resource');
+            const toolsEl = document.getElementById('tools-resource');
+            
+            if (metalEl && (resources.metal > 0 || hasMine)) metalEl.style.display = '';
+            if (planksEl && (resources.planks > 0 || hasLumberMill)) planksEl.style.display = '';
+            if (weaponsEl && (resources.weapons > 0 || hasBlacksmith)) weaponsEl.style.display = '';
+            if (toolsEl && (resources.tools > 0 || hasBlacksmith)) toolsEl.style.display = '';
+            
             // Use cap from GameData if available, else fallback to gameState
             let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);
             document.getElementById('population-cap').textContent = popCap;

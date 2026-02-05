@@ -54,6 +54,17 @@ class TileManager {
         this.placeBuildingAtInternal(centerX, centerY, 'foundersWagon');
 
         console.log('[TileManager] Initial foundersWagon placed at', centerX, centerY, '- humble beginnings!');
+        
+        // Auto-assign workers to the new building after a brief delay
+        if (this.gameState?.jobManager) {
+            setTimeout(() => {
+                console.log('[TileManager] Auto-assigning workers after initial town setup...');
+                const assigned = this.gameState.jobManager.autoAssignWorkers();
+                if (assigned > 0) {
+                    console.log(`[TileManager] Assigned ${assigned} workers to initial buildings`);
+                }
+            }, 300);
+        }
     }
 
     // Get tile at coordinates
@@ -80,6 +91,17 @@ class TileManager {
         if (result) {
             console.log('[TileManager] 🏗️ Building placed, triggering save...');
             this.gameState?.save(); // Auto-save via unified system
+            
+            // Auto-assign workers to jobs after instant building placement
+            if (this.gameState?.jobManager) {
+                console.log('[TileManager] Auto-assigning workers after building placement...');
+                setTimeout(() => {
+                    const assigned = this.gameState.jobManager.autoAssignWorkers();
+                    if (assigned > 0) {
+                        console.log(`[TileManager] Assigned ${assigned} workers to building jobs`);
+                    }
+                }, 100);
+            }
         }
         return result;
     }
