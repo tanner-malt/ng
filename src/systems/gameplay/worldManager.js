@@ -1,94 +1,19 @@
-// World map management with hexagonal grid system
-// World map management with hexagonal grid system
+// World map management with grid-based exploration system
 class WorldManager {
-    // Utility to brighten a hex color (hex string or named)
-    _brightenColor(color, amount) {
-        amount = amount === undefined ? 0.2 : amount;
-        let c = color;
-        if (c[0] === '#') {
-            // Convert hex to RGB
-            let num = parseInt(c.slice(1), 16);
-            let r = (num >> 16) & 0xff;
-            let g = (num >> 8) & 0xff;
-            let b = num & 0xff;
-            r = Math.min(255, Math.floor(r + (255 - r) * amount));
-            g = Math.min(255, Math.floor(g + (255 - g) * amount));
-            b = Math.min(255, Math.floor(b + (255 - b) * amount));
-            return `rgb(${r},${g},${b})`;
-        }
-        // fallback: just return color
-        return color;
-    }
-
-    // Lightweight Oregon Trail-style daily events during travel
-    processArmyDailyEvents() {
-        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
-        const today = this.gameState?.currentDay ?? 0;
-        this.parties.expeditions.forEach(army => {
-            const traveling = !!(army.travelPlan && army.travelPlan.path && army.travelPlan.index < army.travelPlan.path.length - 1);
-            if (!traveling) return;
-            const last = this._eventCooldowns.get(army.id) || -10;
-            if (today - last < 3) return; // 3-day cooldown between events per army
-
-            // Base chance 20%, modify by terrain of next tile and ZOC presence
-            const nextIdx = Math.min(army.travelPlan.index + 1, army.travelPlan.path.length - 1);
-            const next = army.travelPlan.path[nextIdx];
-            const terrain = this.hexMap?.[next.row]?.[next.col]?.terrain || 'grass';
-            const inZoc = this.isInEnemyZOC(next.row, next.col);
-            let chance = 0.2 + (inZoc ? 0.1 : 0);
-            if (terrain === 'swamp' || terrain === 'mountain' || terrain === 'desert') chance += 0.1;
-            if (Math.random() > chance) return;
-
-            const roll = Math.random();
-            if (roll < 0.2) {
-                // Forage success: gain PD
-                const people = Math.max(army.members?.length || 1, 1);
-                const gainPD = Math.max(1, Math.floor(people * 0.5));
-                army.supplies.food = (army.supplies.food || 0) + gainPD;
-                window.showToast(`🌿 ${army.name} foraged supplies (+${gainPD} PD).`, { type: 'success', timeout: 2500 });
-            } else if (roll < 0.45) {
-                // Sickness: morale hit
-                army.morale = Math.max(0, (army.morale ?? 100) - 5);
-                window.showToast(`🤒 Sickness in ${army.name} (−5 morale).`, { type: 'warning', timeout: 2500 });
-            } else if (roll < 0.65) {
-                // Weather delay: skip travel today
-                this._skipTravelToday.add(army.id);
-                window.showToast(`🌧️ Bad weather delays ${army.name} for a day.`, { type: 'info', timeout: 2500 });
-            } else if (roll < 0.8) {
-                // Equipment break: lose some PD
-                const lose = Math.max(1, Math.floor((army.supplies.food || 0) * 0.1));
-                army.supplies.food = Math.max(0, (army.supplies.food || 0) - lose);
-                window.showToast(`🪓 Equipment issues cost ${army.name} ${lose} PD.`, { type: 'warning', timeout: 2500 });
-            } else if (roll < 0.95 && inZoc) {
-                // Ambush only if in ZOC: morale hit and small delay
-                army.morale = Math.max(0, (army.morale ?? 100) - 8);
-                this._skipTravelToday.add(army.id);
-                window.showToast(`⚠️ Ambush in hostile territory! ${army.name} loses morale and time.`, { type: 'error', timeout: 3000 });
-            } else {
-                // Interesting find: reveal an extra tile
-                const r = next.row, c = next.col;
-                const nRow = Math.max(0, Math.min(this.mapHeight - 1, r + (Math.random() < 0.5 ? 1 : -1)));
-                const nCol = Math.max(0, Math.min(this.mapWidth - 1, c + (Math.random() < 0.5 ? 1 : -1)));
-                this.revealHex(nRow, nCol);
-                window.showToast(`🔎 ${army.name} discovered something nearby.`, { type: 'info', timeout: 2500 });
-            }
-            this._eventCooldowns.set(army.id, today);
-        });
-    }
     constructor(gameState, game) {
         this.gameState = gameState;
-        /**
-         * Advance armies along their planned paths by consuming 1 day of movement per day
-         * Supports terrain-weighted step costs and random delays injected by events.
-         */
-
-        // Set global reference immediately in constructor
+        this.game = game;
+        
+        // Set global reference once in constructor
         window.worldManager = this;
-        this.mapWidth = 7; // Expanded to 7x7 grid for more exploration
-        this.mapHeight = 7; // Larger world for exploration
+        console.log('[World] WorldManager instance set globally');
+
+        this.mapWidth = 7; // 7x7 grid for exploration
+        this.mapHeight = 7;
         this.selectedHex = null;
         this.playerVillageHex = { row: 3, col: 3 }; // Center of 7x7 grid
         this.selectedArmy = null;
+        
         // Optional renderer and path preview state
         this.mapRenderer = null;
         this.pendingPath = null; // array of {row,col}
@@ -121,37 +46,86 @@ class WorldManager {
         this.showZOCOverlay = false; // toggleable ZOC shading
         this._skipTravelToday = new Set(); // armyId set for weather/incident delays
 
-        // Set global reference for onclick handlers
-        if (typeof window !== 'undefined') {
-            window.worldManager = this;
-            console.log('[World] WorldManager instance set globally');
-
-            // Add safe world manager call function
-            window.safeWorldManagerCall = (methodName, ...args) => {
-                try {
-                    console.log(`[World] safeWorldManagerCall: ${methodName}`, args);
-                    console.log(`[World] window.worldManager exists:`, !!window.worldManager);
-                    console.log(`[World] method exists:`, !!window.worldManager?.[methodName]);
-
-                    if (window.worldManager && typeof window.worldManager[methodName] === 'function') {
-                        console.log(`[World] Safely calling ${methodName} with args:`, args);
-                        return window.worldManager[methodName](...args);
-                    } else {
-                        console.error(`[World] WorldManager method ${methodName} not available`, {
-                            worldManagerExists: !!window.worldManager,
-                            methodExists: !!window.worldManager?.[methodName],
-                            methodType: typeof window.worldManager?.[methodName]
-                        });
-                        window.showToast(`⚠️ Feature temporarily unavailable: ${methodName}`, { type: 'warning' });
-                        return false;
-                    }
-                } catch (error) {
-                    console.error(`[World] Error calling ${methodName}:`, error);
-                    window.showToast(`❌ Error: ${error.message}`, { type: 'error' });
+        // Add safe world manager call function
+        window.safeWorldManagerCall = (methodName, ...args) => {
+            try {
+                if (window.worldManager && typeof window.worldManager[methodName] === 'function') {
+                    return window.worldManager[methodName](...args);
+                } else {
+                    console.error(`[World] WorldManager method ${methodName} not available`);
+                    window.showToast?.(`⚠️ Feature temporarily unavailable: ${methodName}`, { type: 'warning' });
                     return false;
                 }
-            };
+            } catch (error) {
+                console.error(`[World] Error calling ${methodName}:`, error);
+                window.showToast?.(`❌ Error: ${error.message}`, { type: 'error' });
+                return false;
+            }
+        };
+    }
+
+    // Utility to brighten a hex color
+    _brightenColor(color, amount = 0.2) {
+        if (color[0] === '#') {
+            let num = parseInt(color.slice(1), 16);
+            let r = (num >> 16) & 0xff;
+            let g = (num >> 8) & 0xff;
+            let b = num & 0xff;
+            r = Math.min(255, Math.floor(r + (255 - r) * amount));
+            g = Math.min(255, Math.floor(g + (255 - g) * amount));
+            b = Math.min(255, Math.floor(b + (255 - b) * amount));
+            return `rgb(${r},${g},${b})`;
         }
+        return color;
+    }
+
+    // Lightweight Oregon Trail-style daily events during travel
+    processArmyDailyEvents() {
+        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
+        const today = this.gameState?.currentDay ?? 0;
+        this.parties.expeditions.forEach(army => {
+            const traveling = !!(army.travelPlan && army.travelPlan.path && army.travelPlan.index < army.travelPlan.path.length - 1);
+            if (!traveling) return;
+            const last = this._eventCooldowns.get(army.id) || -10;
+            if (today - last < 3) return; // 3-day cooldown between events per army
+
+            const nextIdx = Math.min(army.travelPlan.index + 1, army.travelPlan.path.length - 1);
+            const next = army.travelPlan.path[nextIdx];
+            const terrain = this.hexMap?.[next.row]?.[next.col]?.terrain || 'grass';
+            const inZoc = this.isInEnemyZOC?.(next.row, next.col) || false;
+            let chance = 0.2 + (inZoc ? 0.1 : 0);
+            if (terrain === 'swamp' || terrain === 'mountain' || terrain === 'desert') chance += 0.1;
+            if (Math.random() > chance) return;
+
+            const roll = Math.random();
+            if (roll < 0.2) {
+                const people = Math.max(army.members?.length || 1, 1);
+                const gainPD = Math.max(1, Math.floor(people * 0.5));
+                army.supplies.food = (army.supplies.food || 0) + gainPD;
+                window.showToast?.(`🌿 ${army.name} foraged supplies (+${gainPD} PD).`, { type: 'success', timeout: 2500 });
+            } else if (roll < 0.45) {
+                army.morale = Math.max(0, (army.morale ?? 100) - 5);
+                window.showToast?.(`🤒 Sickness in ${army.name} (−5 morale).`, { type: 'warning', timeout: 2500 });
+            } else if (roll < 0.65) {
+                this._skipTravelToday.add(army.id);
+                window.showToast?.(`🌧️ Bad weather delays ${army.name} for a day.`, { type: 'info', timeout: 2500 });
+            } else if (roll < 0.8) {
+                const lose = Math.max(1, Math.floor((army.supplies.food || 0) * 0.1));
+                army.supplies.food = Math.max(0, (army.supplies.food || 0) - lose);
+                window.showToast?.(`🪓 Equipment issues cost ${army.name} ${lose} PD.`, { type: 'warning', timeout: 2500 });
+            } else if (roll < 0.95 && inZoc) {
+                army.morale = Math.max(0, (army.morale ?? 100) - 8);
+                this._skipTravelToday.add(army.id);
+                window.showToast?.(`⚠️ Ambush in hostile territory! ${army.name} loses morale and time.`, { type: 'error', timeout: 3000 });
+            } else {
+                const r = next.row, c = next.col;
+                const nRow = Math.max(0, Math.min(this.mapHeight - 1, r + (Math.random() < 0.5 ? 1 : -1)));
+                const nCol = Math.max(0, Math.min(this.mapWidth - 1, c + (Math.random() < 0.5 ? 1 : -1)));
+                this.revealHex?.(nRow, nCol);
+                window.showToast?.(`🔎 ${army.name} discovered something nearby.`, { type: 'info', timeout: 2500 });
+            }
+            this._eventCooldowns.set(army.id, today);
+        });
     }
 
     init() {
@@ -163,10 +137,6 @@ class WorldManager {
             }
             this.isInitializing = true;
 
-            // Set global reference immediately
-            window.worldManager = this;
-            console.log('[World] WorldManager instance set globally');
-
             this.worldGrid = document.getElementById('world-view');
             if (!this.worldGrid) {
                 console.error('[World] world-view element not found');
@@ -174,10 +144,11 @@ class WorldManager {
                 return;
             }
 
-            console.log('[World] Initializing hexagonal world map...');
+            console.log('[World] Initializing world map...');
             this.setupWorldUI();
             this.applyVisualsToAllTerrain();
             this.placeTutorialElements();
+            
             // Prefer MapRenderer (persistent grid + entities) if available
             if (window.MapRenderer) {
                 try {
@@ -186,7 +157,6 @@ class WorldManager {
                     if (ok) {
                         this.mapRenderer.updateEntities();
                     } else {
-                        // Fallback to legacy render
                         this.renderHexMap();
                     }
                 } catch (e) {
@@ -194,7 +164,6 @@ class WorldManager {
                     this.renderHexMap();
                 }
             } else {
-                // Fallback to legacy render
                 this.renderHexMap();
             }
             this.setupHexInteraction();
@@ -2082,9 +2051,6 @@ class WorldManager {
     }
 
     updateExpeditionsList() {
-        // Ensure global reference is maintained when updating UI
-        window.worldManager = this;
-
         const list = document.getElementById('expedition-list');
         if (!list) return;
 

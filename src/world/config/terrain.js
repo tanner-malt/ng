@@ -1,4 +1,7 @@
-export const TERRAIN_TYPES = {
+// Terrain configuration for world map grid
+// Converted to classic global for browser compatibility
+
+const TERRAIN_TYPES = {
   grass: { color: '#3a864f', symbol: '🌱', moveCost: 1 },
   forest: { color: '#2d5a27', symbol: '🌲', moveCost: 2 },
   hill: { color: '#7f6d3a', symbol: '⛰️', moveCost: 3 },
@@ -12,11 +15,18 @@ export const TERRAIN_TYPES = {
   ore: { color: '#7a6f9b', symbol: '⛏️', moveCost: 2 }
 };
 
-export function getTerrain(key) {
+function getTerrain(key) {
   return TERRAIN_TYPES[key] || TERRAIN_TYPES.grass;
 }
 
-export function randomTerrain() {
+function randomTerrain() {
   const keys = Object.keys(TERRAIN_TYPES).filter(k => !['village','water','ore','ruins'].includes(k));
   return keys[Math.floor(Math.random()*keys.length)];
+}
+
+// Expose to global scope for browser use
+if (typeof window !== 'undefined') {
+  window.TERRAIN_TYPES = TERRAIN_TYPES;
+  window.getTerrain = getTerrain;
+  window.randomTerrain = randomTerrain;
 }

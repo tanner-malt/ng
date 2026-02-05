@@ -1,6 +1,7 @@
-import { getTerrain } from './config/terrain.js';
+// Map Renderer for world grid view
+// Converted to classic global for browser compatibility
 
-export class MapRenderer {
+class MapRenderer {
   constructor(worldManager) {
     this.world = worldManager;
     this.container = null;
@@ -8,6 +9,7 @@ export class MapRenderer {
     this.entityLayer = null;
     this.ready = false;
     this.resizeObserver = null;
+    this.currentTileSize = 80;
   }
 
   init() {
@@ -16,8 +18,6 @@ export class MapRenderer {
     if (!this.container) return false;
     this.container.innerHTML = '';
     this.container.classList.add('world-grid');
-    // temp debug outline
-    this.container.style.outline = '1px solid #2de0c6';
 
     // Layers
     const tileLayer = document.createElement('div');
@@ -76,7 +76,7 @@ export class MapRenderer {
     const availableW = rect.width - padding;
     const availableH = rect.height - padding;
 
-    // simple square grid for now
+    // simple square grid
     const gap = 6;
     const tileSize = Math.min(
       Math.floor((availableW - gap * (mapWidth - 1)) / mapWidth),
@@ -85,7 +85,7 @@ export class MapRenderer {
     );
     
     // Ensure minimum tile size for visibility
-    this.currentTileSize = Math.max(tileSize, 80);
+    this.currentTileSize = Math.max(tileSize, 60);
 
     console.log('[MapRenderer] layout(): rect', rect.width, rect.height, 'computed tileSize', this.currentTileSize, 'tiles', this.tileElements.size);
 
@@ -113,26 +113,45 @@ export class MapRenderer {
     const { hexMap } = this.world;
     for (let [key, el] of this.tileElements.entries()) {
       const [r, c] = key.split(',').map(Number);
-      const data = hexMap[r][c];
-      this.applyTileState(el, data, r, c);
+      const data = hexMap[r]?.[c];
+      if (data) {
+        this.applyTileState(el, data, r, c);
+      }
     }
     console.log('[MapRenderer] fullTileStyleRefresh done');
   }
 
   applyTileState(el, data, r, c) {
-    const terrain = getTerrain(data.terrain);
+    // Use global getTerrain function
+    const getTerrainFn = window.getTerrain || function(key) { 
+      return { color: '#444', symbol: '?' }; 
+    };
+    const terrain = getTerrainFn(data.terrain);
     
     // Always ensure tile is visible first
     el.style.display = 'flex';
     el.style.position = 'absolute';
     
     if (data.fogOfWar) {
+      // True fog of war - unexplored
       el.textContent = '🌫️';
       el.style.background = 'linear-gradient(135deg,#2c3e50,#34495e)';
       el.style.border = '2px solid #566';
       el.style.opacity = '0.8';
       el.style.color = '#a5b1b5';
+      el.title = 'Unexplored';
+    } else if (data.discovered && !data.hasPlayerUnit) {
+      // Explored but no unit present - show terrain but hide enemies
+      el.style.opacity = '0.85';
+      el.style.background = terrain.color;
+      el.style.border = data.isPlayerVillage ? '3px solid #f1c40f' : '2px solid rgba(255,255,255,0.2)';
+      el.style.boxShadow = data.isPlayerVillage ? '0 0 10px rgba(241,196,15,0.4)' : 'none';
+      el.style.color = '#ddd';
+      el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
+      el.textContent = terrain.symbol;
+      el.title = `${data.terrain} (explored)`;
     } else {
+      // Fully visible (player unit present or player village)
       el.style.opacity = '1';
       el.style.background = terrain.color;
       el.style.border = data.isPlayerVillage ? '3px solid #f1c40f' : '2px solid rgba(255,255,255,0.3)';
@@ -140,9 +159,10 @@ export class MapRenderer {
       el.style.color = '#fff';
       el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
       el.textContent = terrain.symbol;
+      el.title = data.isPlayerVillage ? 'Your Village' : data.terrain;
     }
 
-    // selection
+    // selection highlight
     if (this.world.selectedHex && this.world.selectedHex.row === r && this.world.selectedHex.col === c) {
       el.classList.add('selected');
       el.style.transform = 'scale(1.07)';
@@ -159,14 +179,17 @@ export class MapRenderer {
   updateTile(r, c) {
     const el = this.tileElements.get(`${r},${c}`);
     if (!el) return;
-    const data = this.world.hexMap[r][c];
-    this.applyTileState(el, data, r, c);
+    const data = this.world.hexMap[r]?.[c];
+    if (data) {
+      this.applyTileState(el, data, r, c);
+    }
   }
 
   updateEntities() {
     console.log('[MapRenderer] updateEntities start');
     if (!this.entityLayer) return;
     this.entityLayer.innerHTML = '';
+    
     // path preview
     if (this.world.pendingPath && this.world.pendingPath.length) {
       this.world.pendingPath.forEach(step => {
@@ -181,6 +204,7 @@ export class MapRenderer {
         this.entityLayer.appendChild(marker);
       });
     }
+    
     // armies
     if (this.world.gameState && typeof this.world.gameState.getAllArmies === 'function') {
       const armies = this.world.gameState.getAllArmies();
@@ -192,7 +216,8 @@ export class MapRenderer {
         this.entityLayer.appendChild(marker);
       });
     }
-    // scouts
+    
+    // scouts/expeditions
     (this.world.expeditions || []).filter(e => e.status === 'stationed').forEach(exp => {
       const marker = document.createElement('div');
       marker.className = 'entity scout-marker';
@@ -200,6 +225,7 @@ export class MapRenderer {
       this.positionEntity(marker, exp.targetHex.row, exp.targetHex.col);
       this.entityLayer.appendChild(marker);
     });
+    
     console.log('[MapRenderer] updateEntities done');
   }
 
@@ -223,8 +249,8 @@ export class MapRenderer {
   }
 }
 
-// basic style injection once
-if (!document.getElementById('map-renderer-style')) {
+// Inject basic styles once
+if (typeof document !== 'undefined' && !document.getElementById('map-renderer-style')) {
   const s = document.createElement('style');
   s.id = 'map-renderer-style';
   s.textContent = `
@@ -240,7 +266,8 @@ if (!document.getElementById('map-renderer-style')) {
   `;
   document.head.appendChild(s);
 }
-// Expose for non-module environments
+
+// Expose to global scope for browser use
 if (typeof window !== 'undefined') {
   window.MapRenderer = MapRenderer;
 }

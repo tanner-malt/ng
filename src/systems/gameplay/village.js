@@ -1656,9 +1656,9 @@ class VillageManager {
             resourceList.appendChild(resourceItem);
         });
 
-        // Show construction time (from GameData)
-        const constructionTime = GameData.constructionTimes[type] || 2;
-        timeText.textContent = `Construction will complete in ${constructionTime} hours during expeditions`;
+        // Show construction work points required
+        const workPoints = GameData.constructionPoints[type] || 25;
+        timeText.textContent = `Requires ${workPoints} work points from assigned builders`;
 
         // Show modal
         modal.style.display = 'flex';

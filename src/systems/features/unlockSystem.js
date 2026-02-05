@@ -257,6 +257,76 @@ class UnlockSystem {
             ],
             autoUnlock: false
         });
+
+        // Tech Tree Feature - Unlocked when Academy is built
+        this.registerUnlock('tech_tree', {
+            type: 'feature',
+            name: 'Technology Research',
+            description: 'Research new technologies to advance your civilization',
+            conditions: [
+                { type: 'building_count', building: 'academy', count: 1 }
+            ],
+            autoUnlock: true,
+            callback: () => {
+                console.log('[UnlockSystem] Tech Tree unlocked!');
+                window.showToast?.('🔬 Technology Research unlocked! Visit the Academy to research new technologies.', { type: 'success' });
+            }
+        });
+
+        // Marriage/Diplomacy System - Requires temple and achievement
+        this.registerUnlock('marriage_alliances', {
+            type: 'feature',
+            name: 'Marriage Alliances',
+            description: 'Form marriage alliances with other kingdoms',
+            conditions: [
+                { type: 'achievement', achievement: 'dynasty_founder' },
+                { type: 'building_count', building: 'temple', count: 1 }
+            ],
+            autoUnlock: true,
+            callback: () => {
+                console.log('[UnlockSystem] Marriage Alliances unlocked!');
+                window.showToast?.('💒 Marriage Alliances unlocked! You can now seek spouses from other kingdoms.', { type: 'success' });
+            }
+        });
+
+        // Village Defense - Active once barracks is built
+        this.registerUnlock('village_defense', {
+            type: 'feature',
+            name: 'Village Defense',
+            description: 'Defend your village from enemy attacks with guards and fortifications',
+            conditions: [
+                { type: 'building_count', building: 'barracks', count: 1 }
+            ],
+            autoUnlock: true,
+            callback: () => {
+                console.log('[UnlockSystem] Village Defense unlocked!');
+                window.showToast?.('🛡️ Village Defense unlocked! Guards will now protect your village.', { type: 'success' });
+            }
+        });
+
+        // Fortifications building unlock
+        this.registerUnlock('fortifications', {
+            type: 'building',
+            name: 'Fortifications',
+            description: 'Defensive walls and towers to protect your village',
+            conditions: [
+                { type: 'building_count', building: 'barracks', count: 1 },
+                { type: 'resource', resource: 'stone', amount: 100 }
+            ],
+            autoUnlock: true
+        });
+
+        // Military Academy - Advanced military training
+        this.registerUnlock('militaryAcademy', {
+            type: 'building',
+            name: 'Military Academy',
+            description: 'Advanced military training and tactics research',
+            conditions: [
+                { type: 'building_count', building: 'barracks', count: 2 },
+                { type: 'building_count', building: 'academy', count: 1 }
+            ],
+            autoUnlock: true
+        });
     }
 
     registerUnlock(unlockId, config) {
