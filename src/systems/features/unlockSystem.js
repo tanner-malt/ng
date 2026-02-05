@@ -667,7 +667,7 @@ class UnlockSystem {
             wood: '🪵',
             stone: '🪨',
             gold: '💰',
-            metal: '⚒️'
+            metal: '⛏️'
         };
         return icons[resource] || '📦';
     }
@@ -713,12 +713,11 @@ class UnlockSystem {
 
         // Add to message history
         if (window.messageHistory) {
-            window.messageHistory.addMessage({
-                type: 'unlock',
-                title: title,
-                message: message,
-                timestamp: new Date()
-            });
+            window.messageHistory.addMessage(
+                title,
+                message,
+                'info'
+            );
         }
 
         // Show toast notification if available

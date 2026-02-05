@@ -1157,6 +1157,155 @@ class ModalSystem {
         });
     }
 
+    // Show statistics in a dedicated modal
+    showStatsModal() {
+        const stats = this.getGameStats();
+        
+        const content = `
+            <div class="stats-modal-content">
+                <div class="stats-dashboard">
+                    <!-- Time Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">⏱️ Time</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.totalDays.toLocaleString()}</div>
+                                <div class="stat-box-label">Days</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.seasonsPassed.toLocaleString()}</div>
+                                <div class="stat-box-label">Seasons</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.yearsPassed.toLocaleString()}</div>
+                                <div class="stat-box-label">Years</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Population Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">👥 Population</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.peakPop.toLocaleString()}</div>
+                                <div class="stat-box-label">Peak Pop</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.totalBirths.toLocaleString()}</div>
+                                <div class="stat-box-label">Births</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.totalDeaths.toLocaleString()}</div>
+                                <div class="stat-box-label">Deaths</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Building Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">🏗️ Construction</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.buildingsBuilt.toLocaleString()}</div>
+                                <div class="stat-box-label">Built</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.buildingsCurrent.toLocaleString()}</div>
+                                <div class="stat-box-label">Current</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Expedition Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">🗺️ Expeditions</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.expeditionsSent.toLocaleString()}</div>
+                                <div class="stat-box-label">Sent</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.expeditionsSuccess.toLocaleString()}</div>
+                                <div class="stat-box-label">Success</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.expeditionsFailed.toLocaleString()}</div>
+                                <div class="stat-box-label">Failed</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Combat Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">⚔️ Combat</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.battlesWon.toLocaleString()}</div>
+                                <div class="stat-box-label">Wins</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.enemiesDefeated.toLocaleString()}</div>
+                                <div class="stat-box-label">Kills</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Dynasty Stats -->
+                    <div class="stats-category">
+                        <div class="stats-category-title">👑 Dynasty</div>
+                        <div class="stats-row">
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.monarchCount.toLocaleString()}</div>
+                                <div class="stat-box-label">Monarchs</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-box-value">${stats.achievementCount.toLocaleString()}</div>
+                                <div class="stat-box-label">Achievements</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.showModal({
+            title: '📊 Game Statistics',
+            content,
+            modalClass: 'stats-modal',
+            buttons: [
+                { text: 'Close', class: 'modal-btn-primary', action: 'close' }
+            ]
+        });
+    }
+
+    // Helper to gather all game stats
+    getGameStats() {
+        const gs = window.gameState || {};
+        
+        const totalDays = gs.currentDay || 1;
+        const seasonsPassed = Math.floor(totalDays / 30);
+        const yearsPassed = Math.floor(totalDays / 120);
+        
+        return {
+            totalDays,
+            seasonsPassed,
+            yearsPassed,
+            peakPop: gs.stats?.peakPopulation || gs.population || 0,
+            totalBirths: gs.stats?.totalBirths || 0,
+            totalDeaths: gs.stats?.totalDeaths || 0,
+            buildingsBuilt: gs.stats?.buildingsBuilt || (gs.buildings?.length || 0),
+            buildingsCurrent: gs.buildings?.length || 0,
+            expeditionsSent: gs.stats?.totalExpeditionsSent || 0,
+            expeditionsSuccess: gs.stats?.successfulExpeditions || 0,
+            expeditionsFailed: gs.stats?.failedExpeditions || 0,
+            battlesWon: window.achievementSystem?.stats?.battles_won || gs.stats?.battlesWon || 0,
+            enemiesDefeated: gs.stats?.enemiesDefeated || 0,
+            monarchCount: gs.royalFamily?.monarchHistory?.length || 1,
+            achievementCount: window.achievementSystem?.unlockedAchievements?.length || 0
+        };
+    }
+
     // Async method to load version without blocking
     async loadVersionAsync() {
         const possiblePaths = [
@@ -1210,186 +1359,76 @@ class ModalSystem {
 
         return `
             <div class="settings-content enhanced-settings">
-                <!-- Two-column layout for settings -->
-                <div class="settings-columns">
-                    <div class="settings-column">
-                        <div class="setting-group setting-group-audio">
-                            <div class="setting-group-header">
-                                <span class="setting-group-icon">🔊</span>
-                                <h5>Audio</h5>
-                            </div>
-                            <div class="setting-item toggle-item">
-                                <span class="setting-label">Sound Effects</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="setting-sound" ${settings.soundEnabled ? 'checked' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="setting-item toggle-item">
-                                <span class="setting-label">Background Music</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="setting-music" ${settings.musicEnabled ? 'checked' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
+                <!-- Single column layout for cleaner settings -->
+                <div class="settings-single-column">
+                    <div class="setting-group setting-group-audio">
+                        <div class="setting-group-header">
+                            <span class="setting-group-icon">🔊</span>
+                            <h5>Audio</h5>
                         </div>
-
-                        <div class="setting-group setting-group-gameplay">
-                            <div class="setting-group-header">
-                                <span class="setting-group-icon">🎮</span>
-                                <h5>Gameplay</h5>
-                            </div>
-                            <div class="setting-item toggle-item">
-                                <span class="setting-label">Animations</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="setting-animations" ${settings.animationsEnabled ? 'checked' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="setting-item toggle-item">
-                                <span class="setting-label">Notifications</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="setting-notifications" ${settings.notificationsEnabled ? 'checked' : ''}>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
+                        <div class="setting-item toggle-item">
+                            <span class="setting-label">Sound Effects</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="setting-sound" ${settings.soundEnabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
-
-                        <div class="setting-group setting-group-data">
-                            <div class="setting-group-header">
-                                <span class="setting-group-icon">💾</span>
-                                <h5>Data Management</h5>
-                            </div>
-                            <div class="setting-buttons-grid">
-                                <button class="settings-btn settings-btn-export" onclick="window.modalSystem.exportSave()">
-                                    <span class="btn-icon">📤</span>
-                                    <span>Export Save</span>
-                                </button>
-                                <button class="settings-btn settings-btn-import" onclick="window.modalSystem.importSave()">
-                                    <span class="btn-icon">📥</span>
-                                    <span>Import Save</span>
-                                </button>
-                                <button class="settings-btn settings-btn-tutorial" onclick="window.modalSystem.restartTutorial()">
-                                    <span class="btn-icon">📖</span>
-                                    <span>Restart Tutorial</span>
-                                </button>
-                                <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.resetGame()">
-                                    <span class="btn-icon">🔄</span>
-                                    <span>Reset Game</span>
-                                </button>
-                            </div>
+                        <div class="setting-item toggle-item">
+                            <span class="setting-label">Background Music</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="setting-music" ${settings.musicEnabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
                     </div>
 
-                    <div class="settings-column">
-                        <div class="setting-group setting-group-stats">
-                            <div class="setting-group-header">
-                                <span class="setting-group-icon">📊</span>
-                                <h5>Game Statistics</h5>
-                            </div>
-                            <div class="stats-dashboard">
-                                <!-- Time Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">⏱️ Time</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-total-days">1</div>
-                                            <div class="stat-box-label">Days</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-seasons-passed">0</div>
-                                            <div class="stat-box-label">Seasons</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-years-passed">0</div>
-                                            <div class="stat-box-label">Years</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Population Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">👥 Population</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-peak-population">0</div>
-                                            <div class="stat-box-label">Peak Pop</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-total-births">0</div>
-                                            <div class="stat-box-label">Births</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-total-deaths">0</div>
-                                            <div class="stat-box-label">Deaths</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Building Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">🏗️ Construction</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-buildings-built">0</div>
-                                            <div class="stat-box-label">Built</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-buildings-current">0</div>
-                                            <div class="stat-box-label">Current</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Expedition Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">🗺️ Expeditions</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-expeditions-sent">0</div>
-                                            <div class="stat-box-label">Sent</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-expeditions-success">0</div>
-                                            <div class="stat-box-label">Success</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-expeditions-failed">0</div>
-                                            <div class="stat-box-label">Failed</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Combat Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">⚔️ Combat</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-battles-won">0</div>
-                                            <div class="stat-box-label">Wins</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-enemies-defeated">0</div>
-                                            <div class="stat-box-label">Kills</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Dynasty Stats -->
-                                <div class="stats-category">
-                                    <div class="stats-category-title">👑 Dynasty</div>
-                                    <div class="stats-row">
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-monarchs">1</div>
-                                            <div class="stat-box-label">Monarchs</div>
-                                        </div>
-                                        <div class="stat-box">
-                                            <div class="stat-box-value" id="modal-stat-achievements">0</div>
-                                            <div class="stat-box-label">Achievements</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="setting-group setting-group-gameplay">
+                        <div class="setting-group-header">
+                            <span class="setting-group-icon">🎮</span>
+                            <h5>Gameplay</h5>
+                        </div>
+                        <div class="setting-item toggle-item">
+                            <span class="setting-label">Animations</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="setting-animations" ${settings.animationsEnabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-item toggle-item">
+                            <span class="setting-label">Notifications</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="setting-notifications" ${settings.notificationsEnabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group setting-group-data">
+                        <div class="setting-group-header">
+                            <span class="setting-group-icon">💾</span>
+                            <h5>Data Management</h5>
+                        </div>
+                        <div class="setting-buttons-grid">
+                            <button class="settings-btn settings-btn-export" onclick="window.modalSystem.exportSave()">
+                                <span class="btn-icon">📤</span>
+                                <span>Export Save</span>
+                            </button>
+                            <button class="settings-btn settings-btn-import" onclick="window.modalSystem.importSave()">
+                                <span class="btn-icon">📥</span>
+                                <span>Import Save</span>
+                            </button>
+                            <button class="settings-btn settings-btn-stats" onclick="window.modalSystem.showStatsModal()">
+                                <span class="btn-icon">📊</span>
+                                <span>View Statistics</span>
+                            </button>
+                            <button class="settings-btn settings-btn-tutorial" onclick="window.modalSystem.restartTutorial()">
+                                <span class="btn-icon">📖</span>
+                                <span>Restart Tutorial</span>
+                            </button>
+                            <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.resetGame()">
+                                <span class="btn-icon">🔄</span>
+                                <span>Reset Game</span>
+                            </button>
                         </div>
                     </div>
                 </div>

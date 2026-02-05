@@ -12,7 +12,7 @@ const GameData = {
         food: '🌾',
         wood: '🌲',
         stone: '🪨',
-        metal: 'ME',
+        metal: '⛏️',
         planks: '🪵',
         production: '⚙️',
         gold: '💰',
@@ -211,10 +211,10 @@ const GameData = {
         tent: 15, // Quick to build
 
         // Essential Buildings
-        townCenter: 50,
-        house: 25,
-        farm: 35,
-        storehouse: 40,
+        townCenter: 10,
+        house: 5,
+        farm: 7,
+        storehouse: 10,
 
         // Production Buildings
         woodcutterLodge: 45,

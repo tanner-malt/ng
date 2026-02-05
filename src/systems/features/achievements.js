@@ -58,11 +58,11 @@ class AchievementSystem {
 
         this.defineAchievement('first_settlement', {
             title: 'Settlement Founder',
-            description: 'Built 2 Houses - establishing your settlement',
-            icon: '🏠',
+            description: 'Built your first House - establishing your settlement',
+            icon: '🏘️',
             type: 'building',
-            requirement: { houses_built: 2 }, // Requires 2 houses built
-            reward: { wood: 75, stone: 50 }
+            requirement: { houses_built: 1 }, // Requires 1 house built
+            reward: { wood: 50, stone: 25 }
         });
 
         this.defineAchievement('town_center_built', {
@@ -70,7 +70,7 @@ class AchievementSystem {
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            reward: { wood: 100, stone: 200 }
+            reward: { wood: 100, stone: 200, food: 100 }
         });
 
         this.defineAchievement('sheltering_citizens', {
@@ -79,7 +79,7 @@ class AchievementSystem {
             icon: '🏠',
             type: 'building',
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { population: 3, wood: 20 }
+            reward: { refugee_families: 3, wood: 20 }
         });
 
         this.defineAchievement('feeding_people', {
@@ -484,7 +484,10 @@ class AchievementSystem {
             this.unlock('master_builder');
         }
 
-        // Check houses requirement for sheltering_citizens
+        // Check houses requirements for house-related achievements
+        if (this.stats.houses_built >= 1 && !this.isUnlocked('first_settlement')) {
+            this.unlock('first_settlement');
+        }
         if (this.stats.houses_built >= 3 && !this.isUnlocked('sheltering_citizens')) {
             this.unlock('sheltering_citizens');
         }

@@ -420,9 +420,13 @@ class VillageManager {
                     // Building name column
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'building-name';
+                    const description = GameData.getBuildingDescription(buildingType);
                     nameDiv.innerHTML = `
-                        <span>${GameData.getBuildingIcon(buildingType)}</span>
-                        <span>${GameData.getBuildingName(buildingType)}</span>
+                        <div class="building-name-row">
+                            <span>${GameData.getBuildingIcon(buildingType)}</span>
+                            <span>${GameData.getBuildingName(buildingType)}</span>
+                        </div>
+                        <div class="building-description">${description}</div>
                     `;
 
                     // Resources column
@@ -706,12 +710,12 @@ class VillageManager {
         }
 
         // Show helpful instruction about shift-click (but not during tutorial to avoid confusion)
-        if (!this.gameState.tutorialActive && window.showToast) {
-            const buildingName = GameData.getBuildingName(buildingType);
-            window.showToast(`💡 Click to place ${buildingName}. Hold Shift+Click to place multiple!`, {
-                icon: '🏗️',
+        // Only show once per session to avoid spam
+        if (!this.gameState.tutorialActive && window.showToast && !this._shownBuildModeTip) {
+            this._shownBuildModeTip = true;
+            window.showToast(`💡 Tip: Hold Shift to place multiple buildings`, {
                 type: 'info',
-                timeout: 4000
+                timeout: 3000
             });
         }
 
@@ -925,16 +929,8 @@ class VillageManager {
 
                     // Update building button states since resources have changed
                     this.updateBuildingButtonStates();
-
-                    // Show helpful toast notification
-                    if (window.showToast) {
-                        const buildingName = GameData.getBuildingName(currentBuildingType);
-                        window.showToast(`Hold Shift and click to place another ${buildingName}! Press Escape to exit.`, {
-                            icon: '🏗️',
-                            type: 'info',
-                            timeout: 3000
-                        });
-                    }
+                    
+                    // No toast here - the placement toast from placeBuilding is enough
                 } else {
                     // Exit build mode
                     let exitReason = 'Normal placement complete';
@@ -1122,12 +1118,13 @@ class VillageManager {
             }, 100);
         }
 
-        // Show queue notification
-        if (window.modalSystem) {
-            window.modalSystem.showNotification(
-                `${type} added to build queue. Construction will begin at end of day.`,
-                { type: 'info', duration: 4000 }
-            );
+        // Show brief feedback (use toast instead of notification for less intrusion)
+        const buildingName = GameData.getBuildingName(type) || type;
+        if (window.showToast) {
+            window.showToast(`🏗️ ${buildingName} placed! Construction in progress...`, {
+                type: 'success',
+                timeout: 2000
+            });
         }
 
         // Re-render to show build queue marker
@@ -1450,7 +1447,7 @@ class VillageManager {
             food: '🍞',
             wood: '🪵',
             stone: '🪨',
-            metal: '⚙️',
+            metal: '⛏️',
             gold: '💰',
             production: '🔧'
         };
@@ -1864,7 +1861,7 @@ class VillageManager {
                     food: '🌾',
                     wood: '🪵',
                     stone: '🪨',
-                    metal: '⚒️',
+                    metal: '⛏️',
                     gold: '💰'
                 }[resource] || '📦';
 
@@ -5093,7 +5090,7 @@ class VillageManager {
             tools: '🔨',
             weapons: '⚔️',
             metal: '⛏️',
-            iron: '⚒️',
+            iron: '⛏️',
             gold: '💰'
         };
         return icons[resource] || '📦';

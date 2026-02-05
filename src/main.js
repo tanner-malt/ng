@@ -117,28 +117,14 @@ function initializeGame() {
             }
         }
 
-        // Set up global error handler
+        // Set up global error handler (log only, don't add to message history)
         window.addEventListener('error', (event) => {
             console.error('[Main] Global error:', event.error);
-            if (window.messageHistory) {
-                window.messageHistory.addMessage(
-                    'System Error',
-                    `An error occurred: ${event.error?.message || 'Unknown error'}`,
-                    'warning'
-                );
-            }
         });
 
-        // Set up unhandled promise rejection handler
+        // Set up unhandled promise rejection handler (log only, don't add to message history)
         window.addEventListener('unhandledrejection', (event) => {
             console.error('[Main] Unhandled promise rejection:', event.reason);
-            if (window.messageHistory) {
-                window.messageHistory.addMessage(
-                    'System Warning',
-                    `Promise rejection: ${event.reason?.message || 'Unknown rejection'}`,
-                    'warning'
-                );
-            }
         });
 
         console.log('[Main] Game initialization complete');

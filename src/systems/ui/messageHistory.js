@@ -130,11 +130,11 @@ class MessageHistory {
                     ${this.messages.map(message => this.formatMessage(message)).join('')}
                 </div>
                 <div style="text-align: center; padding: 15px; border-top: 2px solid rgba(52, 152, 219, 0.3); margin-top: 15px;">
-                    <button onclick="window.messageHistory.markAllAsRead(); window.simpleModal.close();" 
+                    <button onclick="window.messageHistory.markAllAsRead(); if(window.modalSystem) window.modalSystem.closeTopModal();" 
                             style="background: #27ae60; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-right: 10px;">
                         Mark All as Read
                     </button>
-                    <button onclick="window.messageHistory.clearOldMessages(); window.messageHistory.showHistory();" 
+                    <button onclick="window.messageHistory.clearOldMessages(); if(window.modalSystem) window.modalSystem.closeTopModal(); setTimeout(() => window.messageHistory.showHistory(), 100);" 
                             style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer;">
                         Clear Old Messages
                     </button>
