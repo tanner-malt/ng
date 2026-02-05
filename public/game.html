@@ -43,7 +43,6 @@
     <script src="../src/systems/management/constructionManager.js"></script>
     <script src="../src/systems/management/jobManager.js"></script>
     <script src="../src/systems/management/tileManager.js"></script>
-    <script src="../src/systems/management/inventoryManager.js"></script>
     <script src="../src/systems/management/expeditionInventory.js"></script>
     <script src="../src/systems/management/economySystem.js"></script>
     <script src="../src/systems/gameplay/village.js"></script>
@@ -144,50 +143,15 @@
                     <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
                         <span id="achievements-icon">🏆</span>
                     </button>
-                    <button id="inventory-btn" class="icon-btn" title="Inventory" onclick="
-                        console.log('=== INVENTORY BUTTON CLICKED ===');
-                        try {
-                            console.log('window.villageManager:', typeof window.villageManager);
-                            console.log('window.inventoryManager:', typeof window.inventoryManager);
-                            console.log('window.gameState:', typeof window.gameState);
-                            
-                            // Try method 1: villageManager
-                            if (window.villageManager && window.villageManager.showInventoryModal) {
-                                console.log('Trying villageManager.showInventoryModal...');
-                                window.villageManager.showInventoryModal();
-                                return;
-                            }
-                            
-                            // Try method 2: check if systems need initialization
-                            console.log('VillageManager method not available, checking initialization...');
-                            if (window.gameState && !window.inventoryManager) {
-                                console.log('Attempting to initialize inventory...');
-                                if (window.gameState.initializeInventory) {
-                                    window.gameState.initializeInventory();
-                                }
-                                if (window.gameState.inventory) {
-                                    window.inventoryManager = window.gameState.inventory;
-                                    console.log('Inventory manager initialized and exposed');
-                                }
-                            }
-                            
-                            // Try method 3: manual modal
-                            if (window.modalSystem) {
-                                console.log('Falling back to manual modal...');
-                                window.modalSystem.showModal({
-                                    id: 'inventory-fallback',
-                                    title: 'Inventory System',
-                                    content: '<p>Inventory system is initializing...</p><p>Please try again in a moment.</p>',
-                                    modalType: 'inventory-fallback'
-                                });
-                                return;
-                            }
-                            
-                            alert('Inventory system not ready. Check console for details.');
-                            
-                        } catch (error) {
-                            console.error('Inventory button error:', error);
-                            alert('Error opening inventory: ' + error.message);
+                    <button id="inventory-btn" class="icon-btn" title="Inventory (Removed)" onclick="
+                        if (window.modalSystem) {
+                            window.modalSystem.showModal({
+                                title: 'Inventory Removed',
+                                content: '<p>The inventory system has been removed from the game.</p>',
+                                className: 'small'
+                            });
+                        } else {
+                            alert('The inventory system has been removed from the game.');
                         }
                     ">
                         <span>🎒</span>
@@ -236,94 +200,110 @@
                     <div class="management-panel">
                         <!-- Panel Navigation -->
                         <div class="panel-nav">
-                            <button class="panel-nav-btn active" data-panel="manager">👥 Village Manager</button>
-                            <button class="panel-nav-btn" data-panel="buildings">🏗️ Buildings</button>
-                            <button class="panel-nav-btn" data-panel="production">📊 Production</button>
+                            <button class="panel-nav-btn active" data-panel="manager">Overview</button>
+                            <button class="panel-nav-btn" data-panel="buildings">Buildings</button>
+                            <button class="panel-nav-btn" data-panel="production">Production</button>
                         </div>
 
                         <!-- Village Manager Tab (Default) -->
                         <div class="panel-tab active" id="manager-tab">
-                            <div class="manager-section">
-                                <h4>👥 Population</h4>
-                                <div class="population-info">
-                                    <div class="population-stat">
-                                        <span>Current: <span id="manager-population">0</span></span>
+                            <!-- Quick Stats Cards -->
+                            <div class="quick-stats-row">
+                                <div class="stat-card population-card">
+                                    <div class="stat-card-header">
+                                        <span class="stat-card-icon">👥</span>
+                                        <span class="stat-card-title">Population</span>
                                     </div>
-                                    <div class="population-stat">
-                                        <span>Capacity: <span id="manager-population-cap">0</span></span>
+                                    <div class="stat-card-value">
+                                        <span id="manager-population">0</span>
+                                        <span class="stat-divider">/</span>
+                                        <span id="manager-population-cap" class="stat-cap">0</span>
                                     </div>
-                                    <div class="population-stat">
-                                        <span>Weekly Growth: <span id="population-growth-rate">+0</span></span>
-                                    </div>
-                                    <div class="population-stat">
-                                        <span>Expected Deaths: <span id="population-death-rate">0</span>/week</span>
-                                    </div>
-                                    <div class="population-stat">
-                                        <span>Net Change: <span id="population-net-change">+0</span>/week</span>
+                                    <div class="stat-card-trend" id="population-trend">
+                                        <span class="trend-value" id="population-net-change">+0</span>
+                                        <span class="trend-label">per week</span>
                                     </div>
                                 </div>
-                                <div class="population-actions">
-                                    <button id="population-view-btn" class="population-view-button">👥 View
-                                        Population</button>
-                                    <button id="jobs-btn" class="population-view-button" style="margin-left: 10px;">🔨
-                                        Manage Jobs</button>
+                                <div class="stat-card workers-card">
+                                    <div class="stat-card-header">
+                                        <span class="stat-card-icon">⚒</span>
+                                        <span class="stat-card-title">Workers</span>
+                                    </div>
+                                    <div class="stat-card-value">
+                                        <span id="manager-workers-assigned">0</span>
+                                        <span class="stat-divider">/</span>
+                                        <span id="manager-workers-total" class="stat-cap">0</span>
+                                    </div>
+                                    <div class="stat-card-detail">
+                                        <span id="manager-workers-idle">0</span> idle
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Effects Section -->
-                            <div class="manager-section">
-                                <h4>✨ Active Effects</h4>
+                            <!-- Production Summary -->
+                            <div class="production-summary">
+                                <div class="summary-header">Daily Production</div>
+                                <div class="production-row">
+                                    <div class="prod-item">
+                                        <span class="prod-icon food">🍞</span>
+                                        <span class="prod-value" id="daily-food-net">+0</span>
+                                    </div>
+                                    <div class="prod-item">
+                                        <span class="prod-icon wood">🪵</span>
+                                        <span class="prod-value" id="daily-wood-net">+0</span>
+                                    </div>
+                                    <div class="prod-item">
+                                        <span class="prod-icon stone">🪨</span>
+                                        <span class="prod-value" id="daily-stone-net">+0</span>
+                                    </div>
+                                    <div class="prod-item">
+                                        <span class="prod-icon metal">⚙</span>
+                                        <span class="prod-value" id="daily-metal-net">+0</span>
+                                    </div>
+                                </div>
+                            </div>
 
-                                <!-- Weather Effects -->
-                                <div class="effects-group">
-                                    <h5>🌤️ Weather</h5>
-                                    <div id="weather-effects-list" class="effects-list">
-                                        <div class="effect-item">
-                                            <span class="effect-icon">☀️</span>
-                                            <div class="effect-details">
-                                                <div class="effect-name">Clear Skies</div>
-                                                <div class="effect-description">+10% outdoor work efficiency</div>
+                            <!-- Action Buttons -->
+                            <div class="manager-actions">
+                                <button id="population-view-btn" class="action-btn secondary">View Population</button>
+                                <button id="jobs-btn" class="action-btn primary">Manage Jobs</button>
+                            </div>
+
+                            <!-- Effects Section (Collapsed by default) -->
+                            <details class="effects-panel">
+                                <summary class="effects-toggle">Active Effects</summary>
+                                <div class="effects-content">
+                                    <div class="effects-group">
+                                        <h5>Weather</h5>
+                                        <div id="weather-effects-list" class="effects-list">
+                                            <div class="effect-item">
+                                                <div class="effect-details">
+                                                    <div class="effect-name">Clear Skies</div>
+                                                    <div class="effect-description">+10% outdoor work efficiency</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <!-- Building Effects -->
-                                <div class="effects-group">
-                                    <h5>🏗️ Building Bonuses</h5>
-                                    <div id="building-effects-list" class="effects-list">
-                                        <div class="no-effects">No active building effects</div>
+                                    <div class="effects-group">
+                                        <h5>Building Bonuses</h5>
+                                        <div id="building-effects-list" class="effects-list">
+                                            <div class="no-effects">No active building effects</div>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <!-- Magical Effects -->
-                                <div class="effects-group">
-                                    <h5>⚡ Magical Effects</h5>
-                                    <div id="magical-effects-list" class="effects-list">
-                                        <div class="no-effects">No active magical effects</div>
-                                    </div>
-                                </div>
-
-                                <!-- Temporary Bonuses -->
-                                <div class="effects-group">
-                                    <h5>⏱️ Temporary Bonuses</h5>
-                                    <div id="temporary-effects-list" class="effects-list">
-                                        <div class="no-effects">No temporary bonuses active</div>
-                                    </div>
-                                </div>
-                            </div>
+                            </details>
                         </div>
 
                         <!-- Buildings Tab -->
                         <div class="panel-tab" id="buildings-tab">
                             <div id="governing-banner"
                                 style="display:none; margin-bottom:8px; padding:10px; border-radius:6px; background: rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.4); color:#e74c3c; font-weight:600;">
-                                🚫 Building is disabled. No leader is Governing. Open Leadership (👑) and toggle
-                                Governing ON, or appoint a civil leader.
+                                Building is disabled. No leader is Governing. Open Leadership and toggle Governing ON.
                             </div>
                             <div class="building-grid">
                                 <div class="building-category">
-                                    <h4>🏛️ Essential Buildings</h4>
+                                    <h4>Essential Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>
@@ -334,7 +314,7 @@
                                     </div>
                                 </div>
                                 <div class="building-category">
-                                    <h4>🏭 Production Buildings</h4>
+                                    <h4>Production Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>
@@ -345,7 +325,7 @@
                                     </div>
                                 </div>
                                 <div class="building-category">
-                                    <h4>🔧 Craft & Trade Buildings</h4>
+                                    <h4>Craft & Trade Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>
@@ -356,7 +336,7 @@
                                     </div>
                                 </div>
                                 <div class="building-category">
-                                    <h4>⚔️ Military Buildings</h4>
+                                    <h4>Military Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>
@@ -367,7 +347,7 @@
                                     </div>
                                 </div>
                                 <div class="building-category">
-                                    <h4>👑 Royal Buildings</h4>
+                                    <h4>Royal Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>
@@ -378,7 +358,7 @@
                                     </div>
                                 </div>
                                 <div class="building-category">
-                                    <h4>📚 Knowledge Buildings</h4>
+                                    <h4>Knowledge Buildings</h4>
                                     <div class="building-row-header">
                                         <div>Building Name</div>
                                         <div>Resources</div>

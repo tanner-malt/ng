@@ -10,17 +10,17 @@ describe('Governance gating and tooltips', () => {
     // Minimal GameData mock
     global.window.GameData = {
       buildingCosts: {
-        tent: { wood: 10, stone: 5 },
+        house: { wood: 10, stone: 5 },
       },
     };
 
     gs = new GameStateTestable();
-    // Ensure tent is unlocked
-    if (!gs.unlockedBuildings.includes('tent')) gs.unlockedBuildings.push('tent');
+    // Ensure house is unlocked (it now is by default)
+    if (!gs.unlockedBuildings.includes('house')) gs.unlockedBuildings.push('house');
 
     // Create a build button element
     const btn = document.createElement('button');
-    btn.setAttribute('data-building', 'tent');
+    btn.setAttribute('data-building', 'house');
     document.body.appendChild(btn);
   });
 
@@ -32,7 +32,7 @@ describe('Governance gating and tooltips', () => {
 
     gs.updateBuildButtons();
 
-    const btn = document.querySelector('[data-building="tent"]');
+    const btn = document.querySelector('[data-building="house"]');
     expect(btn.classList.contains('disabled')).toBe(true);
     expect(btn.classList.contains('locked')).toBe(true);
     expect(btn.title).toContain('Monarch is not governing');
@@ -49,7 +49,7 @@ describe('Governance gating and tooltips', () => {
 
     gs.updateBuildButtons();
 
-    const btn = document.querySelector('[data-building="tent"]');
+    const btn = document.querySelector('[data-building="house"]');
     expect(btn.classList.contains('disabled')).toBe(true);
     expect(btn.title).toContain('Insufficient resources');
     expect(btn.title).toContain('wood: 3/10');
@@ -63,7 +63,7 @@ describe('Governance gating and tooltips', () => {
 
     gs.updateBuildButtons();
 
-    const btn = document.querySelector('[data-building="tent"]');
+    const btn = document.querySelector('[data-building="house"]');
     expect(btn.classList.contains('disabled')).toBe(true);
     expect(btn.title).toContain('Leader is away');
   });

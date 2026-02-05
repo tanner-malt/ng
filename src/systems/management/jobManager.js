@@ -1098,6 +1098,34 @@ class JobManager {
         return summary;
     }
 
+    // Get worker assignment stats for UI display
+    getWorkerStats() {
+        // Get total eligible workers (not children, not royalty with governing duties)
+        const allPop = this.gameState.populationManager?.population || this.gameState.population || [];
+        const eligibleWorkers = allPop.filter(p => {
+            if (!p) return false;
+            if (p.isChild) return false;
+            if (p.role === 'child') return false;
+            // Exclude royalty that are governing
+            if (p.role === 'monarch' || p.role === 'heir') return false;
+            return true;
+        });
+        
+        // Count assigned workers
+        let assignedCount = 0;
+        this.jobAssignments.forEach((jobTypes, buildingId) => {
+            Object.values(jobTypes).forEach(workerIds => {
+                assignedCount += workerIds.length;
+            });
+        });
+        
+        const total = eligibleWorkers.length;
+        const assigned = Math.min(assignedCount, total);
+        const idle = Math.max(0, total - assigned);
+        
+        return { total, assigned, idle };
+    }
+
     // Debug function for browser console
     debugJobSystem() {
         console.log('=== JOB SYSTEM DEBUG ===');

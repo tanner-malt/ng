@@ -47,11 +47,11 @@ class GameStateTestable {
         this.gold = 100;
         this.resources = { food: 100, wood: 50, stone: 25, metal: 0, production: 0 };
         this.buildings = [];
-        this.unlockedBuildings = ['tent', 'townCenter'];
+        this.unlockedBuildings = ['foundersWagon', 'townCenter', 'house'];
 
         this.population = STARTING_POPULATION;
 
-        this.inventoryManager = null;
+        // inventoryManager removed - inventory system deprecated
 
         // Minimal build queue for tests
         this.buildQueue = [];
@@ -150,19 +150,9 @@ class GameStateTestable {
         } catch (_) { /* ignore in tests */ }
     }
 
+    // Inventory system removed
     ensureInventoryManager(skipDefaults = false) {
-        if (this.inventoryManager) return this.inventoryManager;
-        if (typeof window !== 'undefined' && window.InventoryManager) {
-            this.inventoryManager = new window.InventoryManager(this, skipDefaults);
-            return this.inventoryManager;
-        }
-        // Fallback inline stub for tests if none provided
-        this.inventoryManager = {
-            items: skipDefaults ? { tent: 0 } : { tent: 5 },
-            serialize() { return { items: { ...this.items } }; },
-            deserialize(d) { this.items = { ...d.items }; },
-        };
-        return this.inventoryManager;
+        return null;
     }
 
     toSerializable() {
@@ -178,7 +168,6 @@ class GameStateTestable {
             buildQueue: this.buildQueue,
             population: this.population,
             unlockedBuildings: this.unlockedBuildings,
-            inventoryManagerData: this.inventoryManager ? this.inventoryManager.serialize() : null,
         };
     }
 
@@ -207,10 +196,7 @@ class GameStateTestable {
         this.population = data.population ?? this.population;
         if (Array.isArray(data.unlockedBuildings)) this.unlockedBuildings = data.unlockedBuildings;
 
-        if (data.inventoryManagerData) {
-            this.ensureInventoryManager(true);
-            this.inventoryManager.deserialize(data.inventoryManagerData);
-        }
+        // Inventory system removed
         return true;
     }
 

@@ -719,65 +719,9 @@ class VillageManager {
         this.setupBuildPreview();
     }
 
-    // Setup ghost preview for inventory building items
+    // Setup ghost preview for inventory building items (DEPRECATED - inventory removed)
     setupInventoryBuildPreview(itemId) {
-        // Get item definition to determine building appearance
-        const itemDef = window.inventoryManager?.getItemDefinition(itemId);
-        if (!itemDef) return;
-
-        // Create ghost building element
-        const ghost = document.createElement('div');
-        ghost.className = 'ghost-building';
-        ghost.style.position = 'absolute';
-        ghost.style.width = this.gridSize + 'px';
-        ghost.style.height = this.gridSize + 'px';
-        ghost.style.backgroundColor = 'rgba(76, 175, 80, 0.5)';
-        ghost.style.border = '2px dashed #4CAF50';
-        ghost.style.borderRadius = '4px';
-        ghost.style.pointerEvents = 'none';
-        ghost.style.zIndex = '1000';
-        ghost.style.display = 'none';
-        ghost.innerHTML = `<div style="text-align: center; line-height: ${this.gridSize - 4}px; font-size: 20px;">${itemDef.icon || '🏕️'}</div>`;
-
-        // Add to grid
-        this.villageGrid.appendChild(ghost);
-        this.ghostBuilding = ghost;
-
-        // Setup mouse move listener for ghost
-        this.ghostMoveHandler = (e) => {
-            // Use local build mode for inventory placement
-            if (!this.buildMode || !this.buildMode.active) return;
-
-            const rect = this.villageGrid.getBoundingClientRect();
-            // Account for view offset (panning/scrolling)
-            const offsetX = this.viewOffsetX || 0;
-            const offsetY = this.viewOffsetY || 0;
-            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
-            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
-
-            // Check if position is valid
-            const tileX = Math.floor(x / this.gridSize);
-            const tileY = Math.floor(y / this.gridSize);
-            const isValid = this.isValidBuildingPosition(tileX, tileY);
-
-            // Update ghost appearance
-            ghost.style.left = x + 'px';
-            ghost.style.top = y + 'px';
-            ghost.style.display = 'block';
-            ghost.style.backgroundColor = isValid ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)';
-            ghost.style.borderColor = isValid ? '#4CAF50' : '#f44336';
-        };
-
-        this.villageGrid.addEventListener('mousemove', this.ghostMoveHandler);
-
-        // Hide ghost when mouse leaves grid
-        this.ghostLeaveHandler = () => {
-            if (this.ghostBuilding) {
-                this.ghostBuilding.style.display = 'none';
-            }
-        };
-
-        this.villageGrid.addEventListener('mouseleave', this.ghostLeaveHandler);
+        console.warn('[Village] Inventory system removed - setupInventoryBuildPreview is deprecated');
     }
 
     // Validate if position is good for building placement (tile coords)
@@ -1195,106 +1139,10 @@ class VillageManager {
         return true;
     }
 
-    // Place inventory building immediately (no construction queue)
+    // Place inventory building immediately (DEPRECATED - inventory removed)
     placeInventoryBuilding(type, x, y) {
-        console.log('[Village] placeInventoryBuilding called with:', { type, x, y });
-
-        // Check if tile is valid first
-        if (window.tileManager) {
-            const tile = window.tileManager.getTileAt(x, y);
-            if (!tile) {
-                console.error('[Village] Invalid tile coordinates for placement');
-                return false;
-            }
-            if (tile.building) {
-                console.error('[Village] Tile already occupied');
-                return false;
-            }
-        }
-
-        // Also check for pixel coordinate conflicts with other buildings
-        const pixelX = x * this.gridSize;
-        const pixelY = y * this.gridSize;
-        const buildingAtPosition = this.gameState.buildings.find(building =>
-            building.x === pixelX && building.y === pixelY
-        );
-        if (buildingAtPosition) {
-            console.error('[Village] Position already occupied by building:', buildingAtPosition.type);
-            return false;
-        }
-
-        // Create building with full functionality immediately
-        const id = Date.now() + Math.random();
-        const building = {
-            id,
-            type,
-            level: 1, // Inventory buildings start at level 1
-            built: true, // Already built
-            x: pixelX, // Convert tile coordinates to pixel coordinates
-            y: pixelY, // Convert tile coordinates to pixel coordinates
-            startedAt: Date.now(),
-            source: 'inventory' // Mark as inventory-placed
-        };
-
-        // Place in tile manager first (this will handle tile assignment)
-        if (window.tileManager) {
-            // Get the tile and manually assign the building to avoid duplication
-            const tile = window.tileManager.getTileAt(x, y);
-            tile.building = building;
-            console.log('[TileManager] Placed', type, 'at', x, y);
-        }
-
-        // Add to buildings list (only once, here)
-        this.gameState.buildings.push(building);
-
-        // Auto-assign workers if population manager is available
-        this.autoAssignWorkersToBuilding(building);
-
-        // Apply building effects immediately
-        if (window.villageManager?.buildingEffectsManager) {
-            window.villageManager.buildingEffectsManager.applyBuildingEffects(
-                building.type,
-                `${building.x},${building.y}`
-            );
-        }
-
-        // Trigger events
-        if (window.eventBus) {
-            window.eventBus.emit('building_placed', { type, x, y, id, immediate: true });
-            window.eventBus.emit('building_completed', {
-                buildingType: type,
-                buildingLevel: 1,
-                position: { x, y },
-                immediate: true
-            });
-        }
-
-        // Trigger achievements
-        if (window.achievementSystem) {
-            window.achievementSystem.triggerBuildingPlaced(type);
-        }
-
-        // Auto-assign workers to new building jobs immediately
-        if (this.gameState.jobManager) {
-            console.log('[Village] Auto-assigning workers after inventory building placement...');
-            const assignedWorkers = this.gameState.jobManager.autoAssignWorkers();
-            if (assignedWorkers > 0) {
-                console.log(`[Village] Assigned ${assignedWorkers} workers to building jobs`);
-            }
-        }
-
-        // Check for unlocks
-        if (window.unlockSystem) {
-            setTimeout(() => {
-                window.unlockSystem.checkAllUnlocks();
-            }, 100);
-        }
-
-        // Save game state
-        this.gameState?.save();
-
-        console.log('[Village] Inventory building placed immediately with ID:', id);
-        return true;
+        console.warn('[Village] Inventory system removed - placeInventoryBuilding is deprecated');
+        return false;
     }
 
     // Auto-assign workers to a newly placed building
@@ -2389,9 +2237,6 @@ class VillageManager {
         // The actual resource display is handled by updateResourcePanel() in game.html
         // But we can update village-specific displays here if needed
 
-        // Update production displays in the village manager
-        // this.updateProductionDisplay(); // Removed because method does not exist
-
         // Update efficiency displays
         // this.updateEfficiencyDisplay(); // Removed because method does not exist
 
@@ -2411,6 +2256,38 @@ class VillageManager {
                     window.GameData.calculatePopulationCap(this.gameState.buildings) :
                     (this.gameState.populationCap || 0);
                 populationCapEl.textContent = cap;
+            }
+
+            // Update worker stats
+            if (this.gameState.jobManager) {
+                const workerStats = this.gameState.jobManager.getWorkerStats ? 
+                    this.gameState.jobManager.getWorkerStats() : null;
+                
+                if (workerStats) {
+                    const workersAssignedEl = document.getElementById('manager-workers-assigned');
+                    const workersTotalEl = document.getElementById('manager-workers-total');
+                    const workersIdleEl = document.getElementById('manager-workers-idle');
+                    
+                    if (workersAssignedEl) workersAssignedEl.textContent = workerStats.assigned || 0;
+                    if (workersTotalEl) workersTotalEl.textContent = workerStats.total || 0;
+                    if (workersIdleEl) workersIdleEl.textContent = workerStats.idle || 0;
+                } else {
+                    // Fallback to population manager if jobManager doesn't have getWorkerStats
+                    const popMgr = this.gameState.populationManager;
+                    if (popMgr) {
+                        const total = popMgr.getWorkerCount ? popMgr.getWorkerCount() : 0;
+                        const assigned = popMgr.getAssignedWorkers ? popMgr.getAssignedWorkers() : 0;
+                        const idle = total - assigned;
+                        
+                        const workersAssignedEl = document.getElementById('manager-workers-assigned');
+                        const workersTotalEl = document.getElementById('manager-workers-total');
+                        const workersIdleEl = document.getElementById('manager-workers-idle');
+                        
+                        if (workersAssignedEl) workersAssignedEl.textContent = assigned;
+                        if (workersTotalEl) workersTotalEl.textContent = total;
+                        if (workersIdleEl) workersIdleEl.textContent = idle;
+                    }
+                }
             }
         }
 
@@ -2438,33 +2315,43 @@ class VillageManager {
         if (metalProdEl) metalProdEl.textContent = Math.round(currentProduction.metal);
         if (productionGainEl) productionGainEl.textContent = Math.round(currentProduction.production);
 
+        // Helper to format net values with +/- sign and add styling class
+        const formatNetValue = (value, el) => {
+            if (!el) return;
+            const rounded = Math.round(value);
+            el.textContent = (rounded >= 0 ? '+' : '') + rounded;
+            el.classList.remove('positive', 'negative');
+            if (rounded > 0) el.classList.add('positive');
+            else if (rounded < 0) el.classList.add('negative');
+        };
+
         // Calculate and display net values
         const foodConsumption = this.gameState.population;
         const foodConsumptionEl = document.getElementById('daily-food-consumption');
         const foodNetEl = document.getElementById('daily-food-net');
 
         if (foodConsumptionEl) foodConsumptionEl.textContent = foodConsumption;
-        if (foodNetEl) foodNetEl.textContent = Math.round(currentProduction.food - foodConsumption);
+        formatNetValue(currentProduction.food - foodConsumption, foodNetEl);
 
         const woodConsumptionEl = document.getElementById('daily-wood-consumption');
         const woodNetEl = document.getElementById('daily-wood-net');
         if (woodConsumptionEl) woodConsumptionEl.textContent = '0';
-        if (woodNetEl) woodNetEl.textContent = Math.round(currentProduction.wood);
+        formatNetValue(currentProduction.wood, woodNetEl);
 
         const stoneConsumptionEl = document.getElementById('daily-stone-consumption');
         const stoneNetEl = document.getElementById('daily-stone-net');
         if (stoneConsumptionEl) stoneConsumptionEl.textContent = '0';
-        if (stoneNetEl) stoneNetEl.textContent = Math.round(currentProduction.stone);
+        formatNetValue(currentProduction.stone, stoneNetEl);
 
         const metalConsumptionEl = document.getElementById('daily-metal-consumption');
         const metalNetEl = document.getElementById('daily-metal-net');
         if (metalConsumptionEl) metalConsumptionEl.textContent = '0';
-        if (metalNetEl) metalNetEl.textContent = Math.round(currentProduction.metal);
+        formatNetValue(currentProduction.metal, metalNetEl);
 
         const productionConsumptionEl = document.getElementById('daily-production-consumption');
         const productionNetEl = document.getElementById('daily-production-net');
         if (productionConsumptionEl) productionConsumptionEl.textContent = '0';
-        if (productionNetEl) productionNetEl.textContent = Math.round(currentProduction.production);
+        formatNetValue(currentProduction.production, productionNetEl);
 
         // Update production sources
         this.updateProductionSources();
@@ -2638,20 +2525,21 @@ class VillageManager {
         // Military commanders: current expedition leader and any guard captains
         const commanders = [];
         const expeditionLeader = this.game?.questManager?.currentExpedition?.leader;
-        if (expeditionLeader) commanders.push({ name: expeditionLeader.name, type: 'Expedition Leader', icon: '⚔️' });
+        if (expeditionLeader) commanders.push({ name: expeditionLeader.name, type: 'Expedition Leader' });
         const guards = pop.filter(p => p.role === 'guard_captain' || p.role === 'guard');
-        if (guards.length) commanders.push({ name: `${guards.length} Guard${guards.length > 1 ? 's' : ''}`, type: 'Garrison', icon: '🛡️' });
+        if (guards.length) commanders.push({ name: `${guards.length} Guard${guards.length > 1 ? 's' : ''}`, type: 'Garrison' });
 
-        const section = (title, list, icon) => `
+        // Clean section renderer without emoji overload
+        const section = (title, list, iconClass) => `
             <div class="leader-section">
-                <h4>${icon} ${title}</h4>
+                <h4 class="section-title"><span class="section-icon ${iconClass}"></span>${title}</h4>
                 ${list.length ? `<div class="leader-grid">${list.map(r => `
-                    <div class="leader-card">
+                    <div class="leader-card ${r.role === 'Monarch' ? 'monarch-card' : ''}">
                         <div class="leader-name">${r.name || r.title || 'Unknown'}</div>
                         <div class="leader-role">${r.role || r.type || '—'}</div>
-                        <div class="leader-meta">Age ${r.age ?? ''} ${r.status ? '· ' + r.status : ''}</div>
+                        <div class="leader-meta">${r.age ? `Age ${r.age}` : ''}${r.status ? ` · ${r.status}` : ''}</div>
                     </div>`).join('')}</div>`
-                : '<div class="empty">None</div>'}
+                : '<div class="empty-state">None</div>'}
             </div>`;
 
         // Governing toggle UI (for current monarch)
@@ -2682,7 +2570,7 @@ class VillageManager {
             window.modalSystem.showModal({
                 title: 'Leadership',
                 content,
-                width: '860px',
+                width: '700px',
                 className: 'leadership-modal modern-modal'
             }).then(() => {
                 // Wire governing toggle
@@ -4260,481 +4148,80 @@ class VillageManager {
         }
     }
 
-    // Inventory UI Methods
+    // Inventory UI Methods (DEPRECATED - inventory system removed)
     showInventoryModal() {
-        if (!window.inventoryManager) {
-            console.error('[Village] InventoryManager not available');
-            // Try to initialize if not available
-            if (window.gameState && window.gameState.ensureInventoryManager) {
-                window.gameState.ensureInventoryManager();
-            }
-            if (!window.inventoryManager) {
-                return;
-            }
-        }
-
-        const inventory = window.inventoryManager.getInventory();
-        const equipped = window.inventoryManager.getEquippedItems();
-
-        // Get city inventory from tile manager if available
-        const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
-
-        const modalContent = `
-            <div class="inventory-modal">
-                <h2>City Inventory & Army Supplies</h2>
-                <div class="inventory-tabs">
-                    <button class="tab-button active" onclick="window.villageManager.switchInventoryTab('all')">All Items</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('consumables')">Consumables</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('building')">Building Items</button>
-                    <button class="tab-button" onclick="window.villageManager.switchInventoryTab('city')">City Storage</button>
-                </div>
-                
-                <div class="inventory-notice">
-                    <p><strong>📍 Note:</strong> Equipment and weapons are managed in the <strong>Throne Room</strong> → Equipment tab</p>
-                </div>
-
-                <div class="inventory-items" id="inventory-items">
-                    ${this.renderInventoryItems(inventory, 'all')}
-                </div>
-            </div>
-        `;
-
+        console.warn('[Village] Inventory system removed');
         if (window.modalSystem) {
             window.modalSystem.showModal({
-                title: 'Inventory',
-                content: modalContent,
-                className: 'large'
+                title: 'Inventory Removed',
+                content: '<p>The inventory system has been removed from the game.</p>',
+                className: 'small'
             });
         }
     }
 
     switchInventoryTab(category) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-button').forEach(button => {
-            button.classList.remove('active');
-        });
-        event.target.classList.add('active');
-
-        // Update items display
-        const inventory = window.inventoryManager.getInventory();
-        document.getElementById('inventory-items').innerHTML = this.renderInventoryItems(inventory, category);
+        console.warn('[Village] Inventory system removed');
     }
 
     renderInventoryItems(inventory, category) {
-        let filteredItems;
-
-        if (category === 'city') {
-            // Show city storage from tile manager
-            const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
-
-            // Name mapping for better display
-            const itemNames = {
-                'foundersWagon': GameData.getBuildingName('foundersWagon'),
-                'tent': 'Tent'
-            };
-
-            filteredItems = Object.entries(cityInventory).map(([itemId, data]) => {
-                const def = window.inventoryManager?.getItemDefinition(itemId) || null;
-                const prettyName = def?.name || itemNames[itemId] || itemId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-                const description = def?.description || `Stored in city locations: ${data.locations.length} tiles`;
-                const effects = def?.effects || def?.stats || undefined;
-                return {
-                    id: itemId,
-                    name: prettyName,
-                    category: 'city',
-                    quantity: data.quantity,
-                    locations: data.locations,
-                    description,
-                    rarity: def?.rarity,
-                    type: def?.category,
-                    subcategory: def?.subcategory,
-                    placeable: !!def?.placeable,
-                    buildingType: def?.buildingType,
-                    consumable: !!def?.consumable,
-                    effects
-                };
-            });
-        } else {
-            // Filter out equipment items (weapons, armor, tools, magical) - these go to throne room
-            const equipmentTypes = ['weapon', 'armor', 'tool', 'magical'];
-            const nonEquipmentInventory = inventory.filter(item => !equipmentTypes.includes(item.type));
-
-            filteredItems = category === 'all' ?
-                nonEquipmentInventory :
-                nonEquipmentInventory.filter(item => item.category === category);
-        }
-
-        if (filteredItems.length === 0) {
-            return '<p class="no-items">No items in this category</p>';
-        }
-
-        return filteredItems.map(item => `
-            <div class="inventory-item ${item.rarity || 'common'}" data-item-id="${item.id}">
-                <div class="item-header">
-                    <span class="item-name">${item.name}</span>
-                    <span class="item-quantity">x${item.quantity}</span>
-                </div>
-                <div class="item-description">${item.description}</div>
-                <div class="item-stats">
-                    ${Object.entries(item.effects || {}).map(([stat, value]) =>
-            `<span class="stat-bonus">+${value} ${stat}</span>`
-        ).join(' ')}
-                </div>
-                <div class="item-actions">
-                    ${category === 'city' ?
-                this.renderCityItemActionButtons(item) :
-                this.renderItemActionButtons(item)
-            }
-                    <button onclick="window.villageManager.showItemDetails('${item.id}')">Details</button>
-                </div>
-            </div>
-        `).join('');
+        return '<p>Inventory system removed</p>';
     }
 
     renderItemActionButtons(item) {
-        const buttons = [];
-
-        if (item.category === 'consumable') {
-            buttons.push(`<button onclick="window.villageManager.useInventoryItem('${item.id}')">Use</button>`);
-        } else if (item.category === 'building' && window.inventoryManager.canPlaceBuilding && window.inventoryManager.canPlaceBuilding(item.id)) {
-            buttons.push(`<button onclick="window.villageManager.placeBuildingItem('${item.id}')">Place Building</button>`);
-        } else {
-            buttons.push(`<button onclick="window.villageManager.equipInventoryItem('${item.id}')">Equip</button>`);
-        }
-
-        return buttons.join(' ');
+        return '';
     }
 
-    // Action buttons for items in the City tab (built from TileManager inventory)
     renderCityItemActionButtons(item) {
-        const buttons = [];
-        // Always allow viewing locations
-        buttons.push(`<button onclick="window.villageManager.viewCityItemLocations('${item.id}')">View Locations</button>`);
-
-        // If this city item is a consumable, allow using it directly
-        if (item.consumable) {
-            buttons.push(`<button onclick="window.villageManager.useInventoryItem('${item.id}')">Use</button>`);
-        }
-
-        // If it is a placeable building, allow entering placement mode
-        if (item.placeable && window.inventoryManager.canPlaceBuilding && window.inventoryManager.canPlaceBuilding(item.id)) {
-            buttons.push(`<button onclick="window.villageManager.placeBuildingItem('${item.id}')">Place</button>`);
-        }
-
-        return buttons.join(' ');
+        return '';
     }
 
-    // Use inventory item (for consumables)
     useInventoryItem(itemId) {
-        if (!window.inventoryManager) {
-            console.warn('[Village] Inventory manager not available');
-            return;
-        }
-
-        const itemDef = window.inventoryManager.getItemDefinition(itemId);
-        if (!itemDef) {
-            console.error('[Village] Item definition not found:', itemId);
-            return;
-        }
-
-        // Regular consumable use
-        const success = window.inventoryManager.useItem(itemId);
-        if (success) {
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(`Used ${itemDef.name}!`, { type: 'success' });
-            }
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
-    // View city item locations
     viewCityItemLocations(itemId) {
-        if (!window.tileManager) {
-            console.warn('[Village] Tile manager not available');
-            return;
-        }
-
-        const locations = window.tileManager.findItemLocations(itemId);
-        const locationText = locations.map(loc => {
-            if (loc.isCityStorage) {
-                return `City Storage: ${loc.quantity} available`;
-            } else {
-                return `Tile (${loc.x}, ${loc.y}): ${loc.quantity}`;
-            }
-        }).join('<br>');
-
-        // Get proper item name
-        const itemNames = {
-            'foundersWagon': GameData.getBuildingName('foundersWagon'),
-            'tent': GameData.getBuildingName('tent')
-        };
-
-        if (window.modalSystem) {
-            window.modalSystem.showModal(`
-                <div class="item-locations-modal">
-                    <h3>${itemNames[itemId] || itemId} Locations</h3>
-                    <div class="locations-list">
-                        ${locationText || 'No locations found'}
-                    </div>
-                    <button onclick="window.modalSystem.closeModal()">Close</button>
-                </div>
-            `, 'medium');
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Place building item
     placeBuildingItem(itemId) {
-        if (!window.inventoryManager) {
-            console.warn('[Village] Inventory manager not available');
-            return;
-        }
-
-        // Close the inventory modal first
-        if (window.modalSystem) {
-            window.modalSystem.closeTopModal();
-        }
-
-        // Enable building placement mode
-        this.enterBuildingPlacementMode(itemId);
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Enter building placement mode for inventory items
     enterBuildingPlacementMode(itemId) {
-        console.log('[Village] Entering building placement mode for:', itemId);
-
-        // Set building mode
-        this.buildMode = {
-            active: true,
-            itemId: itemId,
-            buildingType: itemId, // For tents, the itemId is the building type
-            source: 'inventory'
-        };
-
-        // Add visual indicators like regular build mode
-        this.villageGrid.classList.add('build-mode');
-        this.villageGrid.style.cursor = 'crosshair';
-
-        // Show placement instructions
-        if (window.modalSystem) {
-            window.modalSystem.showNotification(
-                `Click on an empty tile to place your ${itemId}. Right-click to cancel.`,
-                { type: 'info', duration: 5000 }
-            );
-        }
-
-        // Update UI to show building mode
-        this.gameState?.updateUI();
-
-        // Setup ghost preview for inventory items
-        this.setupInventoryBuildPreview(itemId);
-
-        // Add event listeners for placement
-        this.setupBuildingPlacementListeners();
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Setup listeners for building placement from inventory
     setupBuildingPlacementListeners() {
-        const gameView = document.getElementById('village-view');
-        if (!gameView) return;
-
-        // Remove existing listeners
-        this.removeBuildingPlacementListeners();
-
-        // Add click listener for placement
-        this.placementClickHandler = (event) => {
-            if (!this.buildMode || !this.buildMode.active) return;
-
-            // Get tile coordinates from click using the village grid bounds and accounting for view offset
-            const rect = this.villageGrid.getBoundingClientRect();
-            const offsetX = this.viewOffsetX || 0;
-            const offsetY = this.viewOffsetY || 0;
-            const x = Math.floor((event.clientX - rect.left - offsetX) / this.gridSize); // Use actual grid size
-            const y = Math.floor((event.clientY - rect.top - offsetY) / this.gridSize);
-
-            this.attemptBuildingPlacement(x, y);
-        };
-
-        // Add right-click listener for cancellation
-        this.placementCancelHandler = (event) => {
-            if (event.button === 2) { // Right click
-                event.preventDefault();
-                this.cancelBuildingPlacement();
-            }
-        };
-
-        gameView.addEventListener('click', this.placementClickHandler);
-        gameView.addEventListener('contextmenu', this.placementCancelHandler);
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Attempt to place building at coordinates (tile-based, inventory-only)
     attemptBuildingPlacement(tileX, tileY) {
-        if (!this.buildMode || !window.inventoryManager || !window.tileManager) return;
-
-        console.log('[Village] Attempting to place building at tile:', tileX, tileY);
-
-        // Validate tile bounds and occupancy via TileManager
-        if (!this.isWithinTileBounds(tileX, tileY)) {
-            console.log('[Village] Invalid tile coordinates');
-            return;
-        }
-        const tile = window.tileManager.getTileAt(tileX, tileY);
-        if (!tile || tile.building) {
-            if (window.modalSystem) {
-                window.modalSystem.showNotification('Tile already occupied!', { type: 'warning' });
-            }
-            return;
-        }
-
-        // Get the item definition to determine building type
-        const def = window.inventoryManager?.getItemDefinition(this.buildMode.itemId);
-        if (!def || !def.buildingType) {
-            console.error('[Village] Invalid item for building placement:', this.buildMode.itemId);
-            return;
-        }
-
-        // Ensure we have the item (city inventory)
-        if (!window.inventoryManager.hasItem(this.buildMode.itemId, 1)) {
-            window.modalSystem?.showNotification('You don\'t have this item!', { type: 'error' });
-            return;
-        }
-
-        // Consume the item first (city inventory)
-        if (!window.inventoryManager.removeItem(this.buildMode.itemId, 1)) {
-            window.modalSystem?.showNotification('Failed to consume item!', { type: 'error' });
-            return;
-        }
-
-        // Place immediately without construction queue and without spending resources
-        const success = this.placeInventoryBuilding(def.buildingType, tileX, tileY);
-
-        if (success) {
-            console.log('[Village] Inventory building placed successfully');
-            this.renderBuildings();
-            window.modalSystem?.showNotification(`${this.buildMode.itemId} placed successfully!`, { type: 'success' });
-            this.cancelBuildingPlacement();
-            this.gameState?.updateUI();
-        } else {
-            // Refund on failure
-            window.inventoryManager.addItem(this.buildMode.itemId, 1);
-            window.modalSystem?.showNotification('Failed to place building!', { type: 'error' });
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Cancel building placement mode
     cancelBuildingPlacement() {
-        console.log('[Village] Cancelling building placement mode');
-
-        this.buildMode = { active: false };
-
-        // Remove visual indicators
-        this.villageGrid.classList.remove('build-mode');
-        this.villageGrid.style.cursor = '';
-
-        // Remove ghost preview
-        this.removeGhostPreview();
-
-        this.removeBuildingPlacementListeners();
-
-        if (window.modalSystem) {
-            window.modalSystem.showNotification('Building placement cancelled', { type: 'info' });
-        }
-
-        this.gameState?.updateUI();
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Remove building placement listeners
     removeBuildingPlacementListeners() {
-        const gameView = document.getElementById('village-view');
-        if (gameView && this.placementClickHandler) {
-            gameView.removeEventListener('click', this.placementClickHandler);
-            gameView.removeEventListener('contextmenu', this.placementCancelHandler);
-        }
+        // No-op
     }
 
     equipInventoryItem(itemId) {
-        const result = window.inventoryManager.equipItem(itemId);
-        if (result.success) {
-            this.showNotification('Item Equipped', result.message, 'success', 3000);
-            // Refresh inventory display
-            this.showInventoryModal();
-        } else {
-            this.showNotification('Cannot Equip Item', result.message, 'error', 3000);
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
     unequipItem(slot) {
-        const result = window.inventoryManager.unequipItem(slot);
-        if (result.success) {
-            this.showNotification('Item Unequipped', result.message, 'success', 3000);
-            // Refresh inventory display
-            this.showInventoryModal();
-        } else {
-            this.showNotification('Cannot Unequip Item', result.message, 'error', 3000);
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
     showItemDetails(itemId) {
-        const item = window.inventoryManager.getItemById(itemId);
-        if (!item) return;
-
-        const detailsContent = `
-            <div class="item-details">
-                <h3 class="${item.rarity}">${item.name}</h3>
-                <p class="item-category">Category: ${item.category}</p>
-                <p class="item-rarity">Rarity: ${item.rarity}</p>
-                <p class="item-description">${item.description}</p>
-                
-                ${item.effects && Object.keys(item.effects).length > 0 ? `
-                    <div class="item-effects">
-                        <h4>Effects:</h4>
-                        ${Object.entries(item.effects).map(([stat, value]) =>
-            `<p>+${value} ${stat}</p>`
-        ).join('')}
-                    </div>
-                ` : ''}
-                
-                ${item.craftingCost ? `
-                    <div class="crafting-cost">
-                        <h4>Crafting Cost:</h4>
-                        ${Object.entries(item.craftingCost).map(([resource, amount]) =>
-            `<p>${amount} ${resource}</p>`
-        ).join('')}
-                    </div>
-                ` : ''}
-                
-                ${item.requirements ? `
-                    <div class="requirements">
-                        <h4>Requirements:</h4>
-                        ${Object.entries(item.requirements).map(([req, value]) =>
-            `<p>${req}: ${value}</p>`
-        ).join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-
-        if (window.modalSystem) {
-            window.modalSystem.showModal(detailsContent, 'medium');
-        }
+        console.warn('[Village] Inventory system removed');
     }
 
-    // Debug method to add test items
     addTestItems() {
-        if (!window.inventoryManager) {
-            console.error('[Village] InventoryManager not available');
-            return;
-        }
-
-        // Add various test items
-        window.inventoryManager.addItem('steel_sword', 1);
-        window.inventoryManager.addItem('chainmail_armor', 1);
-        window.inventoryManager.addItem('steel_pickaxe', 1);
-        window.inventoryManager.addItem('magic_staff', 1);
-        window.inventoryManager.addItem('enchanted_ring', 1);
-        window.inventoryManager.addItem('healing_potion', 5);
-        window.inventoryManager.addItem('rune_of_power', 2);
-
-        this.showNotification('Test Items Added', 'Added various test items to inventory', 'success', 3000);
-        console.log('[Village] Test items added to inventory');
+        console.warn('[Village] Inventory system removed');
     }
 
     /**
