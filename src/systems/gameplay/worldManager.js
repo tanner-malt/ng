@@ -39,12 +39,22 @@ class WorldManager {
         this.tutorialMode = true;
 
         // Enemy presence and Zone of Control (ZOC)
-        this.enemyUnits = new Map(); // id -> {row,col}
+        this.enemyUnits = new Map(); // id -> {row,col,type,strength,name}
         this._enemyZOC = new Set(); // 'row,col' strings
         this._toastCooldowns = new Map(); // armyId -> { lastNoFoodDay, lastLowFoodDay }
         this._eventCooldowns = new Map(); // armyId -> lastEventDay
         this.showZOCOverlay = false; // toggleable ZOC shading
         this._skipTravelToday = new Set(); // armyId set for weather/incident delays
+        
+        // Enemy system configuration
+        this.enemyFactions = {
+            bandits: { icon: '🏴', color: '#e74c3c', aggression: 0.3, name: 'Bandits' },
+            goblins: { icon: '👺', color: '#27ae60', aggression: 0.5, name: 'Goblins' },
+            orcs: { icon: '👹', color: '#8e44ad', aggression: 0.7, name: 'Orcs' },
+            undead: { icon: '💀', color: '#2c3e50', aggression: 0.4, name: 'Undead' }
+        };
+        this._lastEnemySpawnDay = 0;
+        this._enemyIdCounter = 0
 
         // Add safe world manager call function
         window.safeWorldManagerCall = (methodName, ...args) => {
@@ -170,6 +180,11 @@ class WorldManager {
 
             console.log('[World] World map initialization complete');
             this.isInitializing = false;
+
+            // Spawn initial enemies if none exist
+            if (this.enemyUnits.size === 0) {
+                this.spawnInitialEnemies();
+            }
 
             // Rebuild legacy army list from core armies on load
             this.rebuildLegacyArmiesFromCore();
@@ -759,14 +774,23 @@ class WorldManager {
 
     // Helper method to generate a basic player army for encounters
     generateBasicPlayerArmy() {
-        const villagers = this.gameState.villagers || [];
         const army = [];
 
-        // Convert some villagers to army units
-        const availableVillagers = villagers.slice(0, Math.min(5, villagers.length));
+        // Use populationManager if available, filter to adults only (16+)
+        let availableVillagers = [];
+        if (this.gameState.populationManager) {
+            const allVillagers = this.gameState.populationManager.getAll();
+            availableVillagers = allVillagers.filter(v => 
+                v.age >= 16 && // Adults only - no children!
+                v.age <= 65 && // Not too old
+                v.status !== 'drafted' &&
+                v.status !== 'sick' &&
+                v.canWork !== false
+            ).slice(0, 5);
+        }
 
         availableVillagers.forEach(villager => {
-            const unitType = this.getUnitTypeFromProfession(villager.profession);
+            const unitType = this.getUnitTypeFromProfession(villager.role || villager.profession);
             const existingUnit = army.find(u => u.type === unitType);
 
             if (existingUnit) {
@@ -1025,6 +1049,444 @@ class WorldManager {
         return this._enemyZOC.has(`${row},${col}`);
     }
 
+    /**
+     * Initialize enemies on the world map.
+     * Called during world init to populate starting enemies.
+     */
+    spawnInitialEnemies() {
+        console.log('[World] Spawning initial enemies...');
+        
+        // Spawn 2-4 enemy groups on the map edges
+        const numEnemies = 2 + Math.floor(Math.random() * 3);
+        const factionKeys = Object.keys(this.enemyFactions);
+        
+        for (let i = 0; i < numEnemies; i++) {
+            // Pick random edge tile (not adjacent to player village)
+            let row, col, attempts = 0;
+            do {
+                // Prefer edges of the map
+                if (Math.random() < 0.5) {
+                    row = Math.random() < 0.5 ? 0 : this.mapHeight - 1;
+                    col = Math.floor(Math.random() * this.mapWidth);
+                } else {
+                    row = Math.floor(Math.random() * this.mapHeight);
+                    col = Math.random() < 0.5 ? 0 : this.mapWidth - 1;
+                }
+                attempts++;
+            } while (
+                attempts < 20 &&
+                (this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col) ||
+                 (row === this.playerVillageHex.row && col === this.playerVillageHex.col) ||
+                 this.enemyUnits.has(`enemy_${row}_${col}`))
+            );
+            
+            if (attempts >= 20) continue;
+            
+            const faction = factionKeys[Math.floor(Math.random() * factionKeys.length)];
+            this.spawnEnemy(row, col, faction);
+        }
+        
+        this.recomputeEnemyZOC();
+        console.log(`[World] Spawned ${this.enemyUnits.size} enemy groups`);
+    }
+
+    /**
+     * Spawn a single enemy unit at the given location.
+     */
+    spawnEnemy(row, col, faction = 'bandits', strength = null) {
+        const factionData = this.enemyFactions[faction] || this.enemyFactions.bandits;
+        const enemyId = `enemy_${this._enemyIdCounter++}`;
+        
+        // Strength scales with distance from village
+        const distFromVillage = Math.abs(row - this.playerVillageHex.row) + Math.abs(col - this.playerVillageHex.col);
+        const baseStrength = strength || (20 + distFromVillage * 10 + Math.floor(Math.random() * 20));
+        
+        const enemy = {
+            id: enemyId,
+            row,
+            col,
+            faction,
+            name: `${factionData.name} ${this.getEnemyGroupName()}`,
+            strength: baseStrength,
+            maxStrength: baseStrength,
+            aggression: factionData.aggression,
+            icon: factionData.icon,
+            color: factionData.color,
+            lastMoveDay: this.gameState?.day || 0,
+            patrolOrigin: { row, col },
+            patrolRadius: 2
+        };
+        
+        this.enemyUnits.set(enemyId, enemy);
+        console.log(`[World] Spawned ${enemy.name} at (${row}, ${col}) with strength ${baseStrength}`);
+        return enemy;
+    }
+
+    /**
+     * Get a random group name for enemies.
+     */
+    getEnemyGroupName() {
+        const names = ['Warband', 'Raiders', 'Patrol', 'Scouts', 'Marauders', 'Pillagers', 'Horde', 'Pack'];
+        return names[Math.floor(Math.random() * names.length)];
+    }
+
+    /**
+     * Process enemy movement and actions each day.
+     * Called from gameState.endDay() or world update cycle.
+     */
+    processEnemyTurn() {
+        if (!this.enemyUnits || this.enemyUnits.size === 0) return;
+        
+        const currentDay = this.gameState?.day || 0;
+        const enemiesArray = Array.from(this.enemyUnits.values());
+        
+        enemiesArray.forEach(enemy => {
+            // Enemies move every 2-3 days based on aggression
+            const moveInterval = Math.max(1, Math.floor(3 - enemy.aggression * 2));
+            if (currentDay - enemy.lastMoveDay < moveInterval) return;
+            
+            // Decide movement behavior
+            const behavior = Math.random();
+            
+            if (behavior < enemy.aggression * 0.5) {
+                // Aggressive: move toward player village
+                this.moveEnemyToward(enemy, this.playerVillageHex);
+            } else if (behavior < 0.7) {
+                // Patrol: move within patrol radius of origin
+                this.moveEnemyPatrol(enemy);
+            } else {
+                // Stay put
+            }
+            
+            enemy.lastMoveDay = currentDay;
+        });
+        
+        // Check for encounters with player armies
+        this.checkEnemyEncounters();
+        
+        // Recompute ZOC after movement
+        this.recomputeEnemyZOC();
+        
+        // Maybe spawn new enemies periodically
+        this.maybeSpawnNewEnemy();
+        
+        // Update visuals
+        this.updateArmyDisplays();
+    }
+
+    /**
+     * Move enemy toward a target location.
+     */
+    moveEnemyToward(enemy, target) {
+        const dx = target.col - enemy.col;
+        const dy = target.row - enemy.row;
+        
+        // Move one step toward target
+        let newRow = enemy.row;
+        let newCol = enemy.col;
+        
+        if (Math.abs(dy) > Math.abs(dx)) {
+            newRow += Math.sign(dy);
+        } else if (Math.abs(dx) > 0) {
+            newCol += Math.sign(dx);
+        }
+        
+        // Check bounds and don't enter player village
+        if (this.canEnemyMoveTo(newRow, newCol)) {
+            enemy.row = newRow;
+            enemy.col = newCol;
+        }
+    }
+
+    /**
+     * Move enemy in patrol pattern around origin.
+     */
+    moveEnemyPatrol(enemy) {
+        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]];
+        const validMoves = directions.filter(([dr, dc]) => {
+            const newRow = enemy.row + dr;
+            const newCol = enemy.col + dc;
+            const distFromOrigin = Math.abs(newRow - enemy.patrolOrigin.row) + Math.abs(newCol - enemy.patrolOrigin.col);
+            return distFromOrigin <= enemy.patrolRadius && this.canEnemyMoveTo(newRow, newCol);
+        });
+        
+        if (validMoves.length > 0) {
+            const [dr, dc] = validMoves[Math.floor(Math.random() * validMoves.length)];
+            enemy.row += dr;
+            enemy.col += dc;
+        }
+    }
+
+    /**
+     * Check if an enemy can move to a tile.
+     */
+    canEnemyMoveTo(row, col) {
+        // Check bounds
+        if (row < 0 || row >= this.mapHeight || col < 0 || col >= this.mapWidth) return false;
+        
+        // Don't enter player village
+        if (row === this.playerVillageHex.row && col === this.playerVillageHex.col) return false;
+        
+        // Check terrain (no water)
+        const hex = this.hexMap[row]?.[col];
+        if (hex?.terrain === 'water') return false;
+        
+        // Don't stack with other enemies
+        for (const e of this.enemyUnits.values()) {
+            if (e.row === row && e.col === col) return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Check for encounters between player armies and enemies.
+     */
+    checkEnemyEncounters() {
+        if (!this.parties?.expeditions) return;
+        
+        this.parties.expeditions.forEach(army => {
+            // Get army position
+            const core = army.armyId ? this.gameState.getArmy?.(army.armyId) : null;
+            const armyPos = core?.position 
+                ? { row: core.position.y, col: core.position.x }
+                : army.location || null;
+            
+            if (!armyPos) return;
+            
+            // Check if any enemy is on the same tile
+            for (const enemy of this.enemyUnits.values()) {
+                if (enemy.row === armyPos.row && enemy.col === armyPos.col) {
+                    // Trigger encounter!
+                    this.triggerEnemyEncounter(army, enemy);
+                    break;
+                }
+            }
+        });
+    }
+
+    /**
+     * Trigger a combat encounter between player army and enemy.
+     */
+    triggerEnemyEncounter(playerArmy, enemy) {
+        console.log(`[World] Encounter! ${playerArmy.name} meets ${enemy.name} at (${enemy.row}, ${enemy.col})`);
+        
+        // Calculate player army strength
+        const playerStrength = this.calculateArmyStrength(playerArmy);
+        
+        // Show encounter notification
+        window.showToast?.(`⚔️ ${playerArmy.name} encounters ${enemy.name}!`, {
+            type: 'warning',
+            timeout: 4000
+        });
+        
+        // For now, auto-resolve based on strength comparison
+        // Later this can open the battle system
+        const playerRoll = playerStrength * (0.8 + Math.random() * 0.4);
+        const enemyRoll = enemy.strength * (0.8 + Math.random() * 0.4);
+        
+        if (playerRoll > enemyRoll) {
+            // Player wins
+            const damageToEnemy = Math.floor(enemy.strength * 0.6);
+            enemy.strength -= damageToEnemy;
+            
+            // Damage to player army (morale loss)
+            const moraleLoss = Math.floor(10 * (enemyRoll / playerRoll));
+            playerArmy.morale = Math.max(0, (playerArmy.morale || 100) - moraleLoss);
+            
+            if (enemy.strength <= 0) {
+                // Enemy destroyed
+                this.destroyEnemy(enemy, playerArmy);
+            } else {
+                // Enemy retreats
+                this.retreatEnemy(enemy);
+                window.showToast?.(`✅ ${playerArmy.name} drives back ${enemy.name}!`, {
+                    type: 'success',
+                    timeout: 3000
+                });
+            }
+        } else {
+            // Enemy wins - player army takes morale damage and is pushed back
+            const moraleLoss = Math.floor(20 * (enemyRoll / playerRoll));
+            playerArmy.morale = Math.max(0, (playerArmy.morale || 100) - moraleLoss);
+            
+            // Push player army back toward village
+            this.pushArmyBack(playerArmy);
+            
+            window.showToast?.(`❌ ${playerArmy.name} is repelled by ${enemy.name}! (-${moraleLoss} morale)`, {
+                type: 'error',
+                timeout: 4000
+            });
+        }
+        
+        this.recomputeEnemyZOC();
+        this.updateArmyDisplays();
+        this.updateExpeditionsList();
+    }
+
+    /**
+     * Calculate army strength for combat.
+     */
+    calculateArmyStrength(army) {
+        let strength = 0;
+        
+        // Base strength from members
+        if (army.members) {
+            army.members.forEach(member => {
+                const roleBonus = {
+                    'Commander': 25,
+                    'Soldier': 15,
+                    'Guard': 20,
+                    'Villager': 8
+                };
+                strength += roleBonus[member.role] || 10;
+            });
+        }
+        
+        // Morale modifier
+        const moraleMod = (army.morale || 100) / 100;
+        strength *= moraleMod;
+        
+        // Supplies modifier (starving armies fight poorly)
+        const people = Math.max(army.members?.length || 1, 1);
+        const foodDays = Math.floor((army.supplies?.food || 0) / people);
+        if (foodDays <= 0) strength *= 0.5;
+        else if (foodDays <= 2) strength *= 0.8;
+        
+        return Math.floor(strength);
+    }
+
+    /**
+     * Destroy an enemy unit and grant rewards.
+     */
+    destroyEnemy(enemy, playerArmy) {
+        console.log(`[World] Enemy ${enemy.name} destroyed!`);
+        
+        // Remove from map
+        this.enemyUnits.delete(enemy.id);
+        
+        // Grant rewards
+        const goldReward = Math.floor(enemy.maxStrength * 0.5);
+        const foodReward = Math.floor(enemy.maxStrength * 0.2);
+        
+        if (this.gameState) {
+            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
+            this.gameState.resources.food = (this.gameState.resources.food || 0) + foodReward;
+        }
+        
+        window.showToast?.(`🏆 ${playerArmy.name} defeats ${enemy.name}! +${goldReward}💰 +${foodReward}🍖`, {
+            type: 'success',
+            timeout: 4000
+        });
+        
+        // Emit event for achievements
+        window.eventBus?.emit('enemy_defeated', { enemy, army: playerArmy });
+    }
+
+    /**
+     * Make an enemy retreat to a new position.
+     */
+    retreatEnemy(enemy) {
+        // Move away from player village
+        const dx = enemy.col - this.playerVillageHex.col;
+        const dy = enemy.row - this.playerVillageHex.row;
+        
+        let newRow = enemy.row + Math.sign(dy);
+        let newCol = enemy.col + Math.sign(dx);
+        
+        // Clamp to map bounds
+        newRow = Math.max(0, Math.min(this.mapHeight - 1, newRow));
+        newCol = Math.max(0, Math.min(this.mapWidth - 1, newCol));
+        
+        if (this.canEnemyMoveTo(newRow, newCol)) {
+            enemy.row = newRow;
+            enemy.col = newCol;
+            enemy.patrolOrigin = { row: newRow, col: newCol };
+        }
+    }
+
+    /**
+     * Push a player army back toward the village.
+     */
+    pushArmyBack(army) {
+        const core = army.armyId ? this.gameState.getArmy?.(army.armyId) : null;
+        if (!core) return;
+        
+        const currentPos = { row: core.position.y, col: core.position.x };
+        const dx = this.playerVillageHex.col - currentPos.col;
+        const dy = this.playerVillageHex.row - currentPos.row;
+        
+        // Move one step toward village
+        let newCol = currentPos.col + Math.sign(dx);
+        let newRow = currentPos.row + Math.sign(dy);
+        
+        core.position = { x: newCol, y: newRow };
+        army.location = { row: newRow, col: newCol };
+    }
+
+    /**
+     * Maybe spawn a new enemy group (called each day).
+     */
+    maybeSpawnNewEnemy() {
+        const currentDay = this.gameState?.day || 0;
+        
+        // Don't spawn too often (every 10-15 days)
+        if (currentDay - this._lastEnemySpawnDay < 10) return;
+        
+        // Limit total enemies
+        if (this.enemyUnits.size >= 6) return;
+        
+        // 20% chance per eligible day
+        if (Math.random() > 0.2) return;
+        
+        // Spawn on a random edge
+        const factionKeys = Object.keys(this.enemyFactions);
+        const faction = factionKeys[Math.floor(Math.random() * factionKeys.length)];
+        
+        let row, col, attempts = 0;
+        do {
+            if (Math.random() < 0.5) {
+                row = Math.random() < 0.5 ? 0 : this.mapHeight - 1;
+                col = Math.floor(Math.random() * this.mapWidth);
+            } else {
+                row = Math.floor(Math.random() * this.mapHeight);
+                col = Math.random() < 0.5 ? 0 : this.mapWidth - 1;
+            }
+            attempts++;
+        } while (
+            attempts < 15 &&
+            (this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col) ||
+             this.hexMap[row]?.[col]?.terrain === 'water')
+        );
+        
+        if (attempts < 15) {
+            this.spawnEnemy(row, col, faction);
+            this._lastEnemySpawnDay = currentDay;
+            
+            window.showToast?.(`⚠️ ${this.enemyFactions[faction].icon} ${this.enemyFactions[faction].name} spotted on the frontier!`, {
+                type: 'warning',
+                timeout: 4000
+            });
+        }
+    }
+
+    /**
+     * Get enemy at a specific tile (for display/interaction).
+     */
+    getEnemyAt(row, col) {
+        for (const enemy of this.enemyUnits.values()) {
+            if (enemy.row === row && enemy.col === col) return enemy;
+        }
+        return null;
+    }
+
+    /**
+     * Get all enemies as array for display.
+     */
+    getAllEnemies() {
+        return Array.from(this.enemyUnits.values());
+    }
+
     createSquareGrid(container) {
         // Wait for container to be properly sized
         const containerRect = container.getBoundingClientRect();
@@ -1175,6 +1637,9 @@ class WorldManager {
             exp.targetHex.col === col
         );
 
+        // Check if there's an enemy at this position
+        const enemyAtPosition = this.getEnemyAt(row, col);
+
         // Add terrain symbol or unit indicators
         if (hex.fogOfWar) {
             // Don't show details for fog of war tiles
@@ -1185,6 +1650,17 @@ class WorldManager {
                 squareButton.textContent = '🌫️';
                 squareButton.style.color = '#95a5a6';
             }
+        } else if (enemyAtPosition) {
+            // Show enemy unit prominently
+            squareButton.innerHTML = `<div style="position: relative;">
+                <div style="position: absolute; top: -4px; left: 50%; transform: translateX(-50%); background: ${enemyAtPosition.color}; color: white; border-radius: 4px; padding: 2px 6px; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.5); white-space: nowrap; z-index: 10;">
+                    ${enemyAtPosition.icon}
+                </div>
+                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold; opacity: 0.7;">${hex.symbol || '🌱'}</span>
+            </div>`;
+            squareButton.title = `${enemyAtPosition.name} (Strength: ${enemyAtPosition.strength})`;
+            squareButton.style.border = `2px solid ${enemyAtPosition.color}`;
+            squareButton.style.boxShadow = `0 0 8px ${enemyAtPosition.color}80`;
         } else if (armyAtPosition && scoutsAtPosition) {
             // Show both army and scouts
             squareButton.innerHTML = `<div style="position: relative;">
@@ -1553,6 +2029,9 @@ class WorldManager {
             exp.targetHex.col === col
         );
 
+        // Check for enemy at this position
+        const enemyAtPosition = this.getEnemyAt(row, col);
+
         let content = `
             <h4>📍 Hex (${row}, ${col})</h4>
             <div class="hex-details">
@@ -1593,6 +2072,31 @@ class WorldManager {
                     <button class="action-btn secondary" onclick="window.worldManager.orderScoutsHome('${scoutsAtPosition.id}')" style="margin-top: 8px;">
                         🏠 Order Return Home
                     </button>
+                </div>
+            `;
+        }
+
+        // Show enemy information if present
+        if (enemyAtPosition) {
+            const faction = this.enemyFactions[enemyAtPosition.faction] || {};
+            const strengthPercent = Math.round((enemyAtPosition.strength / enemyAtPosition.maxStrength) * 100);
+            const strengthColor = strengthPercent > 60 ? '#27ae60' : strengthPercent > 30 ? '#f39c12' : '#e74c3c';
+            
+            content += `
+                <div class="enemy-info" style="border: 2px solid ${enemyAtPosition.color}; border-radius: 8px; padding: 10px; margin: 10px 0; background: ${enemyAtPosition.color}22;">
+                    <h5>${enemyAtPosition.icon} ${enemyAtPosition.name}</h5>
+                    <p><strong>Faction:</strong> ${faction.name || 'Unknown'}</p>
+                    <p><strong>Strength:</strong> 
+                        <span style="color: ${strengthColor}; font-weight: bold;">${enemyAtPosition.strength}</span>
+                        <span style="color: #888;">/ ${enemyAtPosition.maxStrength}</span>
+                    </p>
+                    <div style="background: #333; border-radius: 4px; height: 8px; margin: 5px 0;">
+                        <div style="background: ${strengthColor}; width: ${strengthPercent}%; height: 100%; border-radius: 4px;"></div>
+                    </div>
+                    <p><strong>Behavior:</strong> ${enemyAtPosition.aggression > 0.5 ? '⚔️ Aggressive' : enemyAtPosition.aggression > 0.3 ? '👁️ Watchful' : '🛡️ Defensive'}</p>
+                    <p style="color: #e74c3c; font-style: italic; margin-top: 8px;">
+                        ⚠️ Hostile! Send an army to engage or avoid this area.
+                    </p>
                 </div>
             `;
         }
@@ -3504,6 +4008,105 @@ class WorldManager {
         } catch (e) {
             console.warn('[World] Failed to sync core army:', e);
         }
+    }
+
+    /**
+     * Serialize enemy data for saving.
+     */
+    serializeEnemies() {
+        return {
+            enemies: Array.from(this.enemyUnits.values()),
+            lastSpawnDay: this._lastEnemySpawnDay,
+            enemyIdCounter: this._enemyIdCounter
+        };
+    }
+
+    /**
+     * Deserialize enemy data from save.
+     */
+    deserializeEnemies(data) {
+        if (!data) return;
+        
+        // Restore enemies
+        if (Array.isArray(data.enemies)) {
+            this.enemyUnits = new Map();
+            data.enemies.forEach(enemy => {
+                this.enemyUnits.set(enemy.id, enemy);
+            });
+            console.log(`[World] Loaded ${this.enemyUnits.size} enemies from save`);
+        }
+        
+        // Restore counters
+        if (typeof data.lastSpawnDay === 'number') {
+            this._lastEnemySpawnDay = data.lastSpawnDay;
+        }
+        if (typeof data.enemyIdCounter === 'number') {
+            this._enemyIdCounter = data.enemyIdCounter;
+        }
+        
+        // Recompute ZOC
+        this.recomputeEnemyZOC();
+    }
+
+    /**
+     * Get full world state for saving.
+     */
+    getWorldSaveData() {
+        return {
+            enemies: this.serializeEnemies(),
+            discoveredTiles: Array.from(this.discoveredTiles),
+            scoutableTiles: Array.from(this.scoutableTiles),
+            parties: this.parties,
+            expeditions: this.expeditions || []
+        };
+    }
+
+    /**
+     * Load world state from save.
+     */
+    loadWorldSaveData(data) {
+        if (!data) return;
+        
+        // Load enemies
+        if (data.enemies) {
+            this.deserializeEnemies(data.enemies);
+        }
+        
+        // Load discovered tiles
+        if (Array.isArray(data.discoveredTiles)) {
+            this.discoveredTiles = new Set(data.discoveredTiles);
+            // Mark hexes as discovered
+            data.discoveredTiles.forEach(key => {
+                const [row, col] = key.split(',').map(Number);
+                if (this.hexMap[row]?.[col]) {
+                    this.hexMap[row][col].discovered = true;
+                    this.hexMap[row][col].fogOfWar = false;
+                }
+            });
+        }
+        
+        // Load scoutable tiles
+        if (Array.isArray(data.scoutableTiles)) {
+            this.scoutableTiles = new Set(data.scoutableTiles);
+            data.scoutableTiles.forEach(key => {
+                const [row, col] = key.split(',').map(Number);
+                if (this.hexMap[row]?.[col]) {
+                    this.hexMap[row][col].scoutable = true;
+                }
+            });
+        }
+        
+        // Load parties
+        if (data.parties) {
+            this.parties = data.parties;
+        }
+        
+        // Load expeditions
+        if (Array.isArray(data.expeditions)) {
+            this.expeditions = data.expeditions;
+        }
+        
+        console.log('[World] Loaded world save data');
     }
 }
 // Inject hex-button CSS for flat-top hexagon styling

@@ -261,150 +261,150 @@ const GameData = {
         foundersWagon: {
             icon: '🚛',
             name: 'Founder Wagon',
-            description: 'Mobile command center and storage facility for new settlements',
-            effects: 'Provides housing for 3 people • Storage capacity • 3 Gatherer jobs • 4 Builder jobs'
+            description: 'Your starting base - provides shelter, storage, and work for your first settlers',
+            effects: '+3 housing • +100 storage • 3 Gatherer jobs (random resources) • 4 Builder jobs'
         },
         townCenter: {
             icon: '🏛️',
             name: 'Town Center',
-            description: 'Central building that serves as the heart of your settlement',
-            effects: 'Enables tax collection • Settlement coordination • +200 Storage'
+            description: 'The heart of your settlement. Enables tax collection from all working citizens',
+            effects: '+200 storage • Taxes: 1💰/citizen/day • +10% per level'
         },
         house: {
             icon: '🏠',
             name: 'House',
-            description: 'Comfortable housing for families and workers',
-            effects: 'Provides housing for 6 people'
+            description: 'Cozy homes for your growing population. More houses = more workers!',
+            effects: '+6 housing capacity per house'
         },
         farm: {
             icon: '🌾',
             name: 'Farm',
-            description: 'Agricultural facility for growing crops and livestock',
-            effects: '2 Farmer jobs • Food via workers (seasonal multipliers apply)'
+            description: 'Grows crops to feed your people. Production varies by season!',
+            effects: '2 Farmer jobs • +3.5🍖 food/farmer/day • Spring/Summer bonus, Winter penalty'
         },
         buildersHut: {
             icon: '🔨',
-            name: 'Builder\'s Hut',
-            description: 'Professional construction facility with skilled workers',
-            effects: '4 Builder jobs • 1 Foreman job • Enhanced construction efficiency'
+            name: "Builder's Hut",
+            description: 'Professional builders work faster and unlock complex construction',
+            effects: '4 Builder jobs • 1 Foreman (speeds up construction)'
         },
         storehouse: {
             icon: '📦',
             name: 'Storehouse',
-            description: 'Central storage building increasing resource caps and basic logistics',
-            effects: '1 Gatherer job • +300 storage to all resources'
+            description: 'Expands your storage capacity and provides gathering work',
+            effects: '+300 storage (all resources) • 1 Gatherer job'
         },
 
         // Production Buildings
         woodcutterLodge: {
             icon: '🪚',
             name: 'Woodcutter Lodge',
-            description: 'Traditional wood processing facility for established settlements',
-            effects: '3 Woodcutter jobs • Wood via workers'
+            description: 'Chop trees and haul lumber back to the village',
+            effects: '3 Woodcutter jobs • +3🪵 wood/worker/day'
         },
         quarry: {
             icon: '⛏️',
             name: 'Quarry',
-            description: 'Large-scale stone extraction operation for major construction projects',
-            effects: '3 Rockcutter jobs • Stone via workers'
+            description: 'Cut stone blocks from the rocky hillside',
+            effects: '3 Rockcutter jobs • +3🪨 stone/worker/day'
         },
         lumberMill: {
             icon: '🪓',
             name: 'Lumber Mill',
-            description: 'Advanced industrial facility processing raw lumber into refined construction materials',
-            effects: '3 Sawyer jobs • Converts wood to planks via workers'
+            description: 'Process raw logs into refined planks for advanced construction',
+            effects: '3 Sawyer jobs • Converts 2🪵→2📐 planks/worker/day'
         },
         mine: {
             icon: '⛏️',
             name: 'Mine',
-            description: 'Deep excavation site for stone and metal extraction',
-            effects: '3 Miner jobs • Extracts stone/metal via workers'
+            description: 'Dig deep for stone and precious metal ore',
+            effects: '3 Miner jobs • +2🪨 stone + 1⛏️ metal/worker/day'
         },
         workshop: {
             icon: '🔧',
             name: 'Workshop',
-            description: 'Engineering facility for construction and machinery',
-            effects: '3 Engineer jobs'
+            description: 'Engineers craft tools and machinery that boost village efficiency',
+            effects: '3 Engineer jobs • +3⚙️ production/worker/day'
         },
         blacksmith: {
             icon: '⚒️',
             name: 'Blacksmith',
-            description: 'Metalworking facility for tools and weapons',
-            effects: '2 Blacksmith jobs • Crafts tools/weapons via workers'
+            description: 'Forge metal into weapons and tools for your people',
+            effects: '2 Blacksmith jobs • Uses 1⛏️ metal → +1⚔️ weapons + 2🔧 tools/day'
         },
 
         // Trade & Culture Buildings
         market: {
             icon: '🏪',
             name: 'Market',
-            description: 'Trading hub for commerce and gold generation',
-            effects: '3 Trader jobs • Generates gold via workers'
+            description: 'Traders buy and sell goods, generating gold for your treasury',
+            effects: '3 Trader jobs • +2💰 gold/trader/day'
         },
         academy: {
             icon: '🎓',
             name: 'Academy',
-            description: 'Educational institution for research and learning',
-            effects: '1 Scholar job'
+            description: 'Scholars research new knowledge and train skilled workers',
+            effects: '1 Scholar job • Accelerates tech research'
         },
         university: {
             icon: '🏛️',
             name: 'University',
-            description: 'Advanced center of learning and innovation',
-            effects: '1 Professor job'
+            description: 'Advanced learning and scientific breakthroughs',
+            effects: '1 Professor job • Unlocks advanced technologies'
         },
 
         // Royal Buildings
         keep: {
             icon: '🏰',
             name: 'The Keep',
-            description: 'Unlocks Throne View and houses members of the royal family',
-            effects: 'Unlocks Throne View • +2 Royal Capacity'
+            description: 'A fortified residence for your royal family and their court',
+            effects: 'Unlocks Throne View • +2 Royal Capacity • Dynasty management'
         },
         monument: {
             icon: '🗿',
             name: 'Monument',
-            description: 'Grand structure celebrating your dynasty\'s achievements',
-            effects: '+10 happiness'
+            description: 'A grand testament to your dynasty\'s glory and achievements',
+            effects: '+10 village happiness • Boosts prestige'
         },
 
         // Military Buildings
         barracks: {
             icon: '⚔️',
             name: 'Barracks',
-            description: 'Military training facility for soldiers and defense',
-            effects: '1 Drill Instructor job • Allows forming an army'
+            description: 'Train soldiers to defend your lands and conquer new territory',
+            effects: '1 Drill Instructor • Enables army recruitment • Guards consume gold upkeep'
         },
         fortifications: {
             icon: '🛡️',
             name: 'Fortifications',
-            description: 'Defensive structures protecting your settlement',
-            effects: 'Bonus to defending during battles'
+            description: 'Walls and towers to protect your people from invaders',
+            effects: 'Defense bonus in battles • Reduces raid damage'
         },
         militaryAcademy: {
             icon: '🎓',
             name: 'Military Academy',
-            description: 'Elite training facility for commanders and heirs',
-            effects: '1 Military Theorist job'
+            description: 'Train commanders and develop advanced military tactics',
+            effects: '1 Military Theorist • Improves army effectiveness'
         },
         castle: {
             icon: '🏰',
             name: 'Castle',
-            description: 'Ultimate fortress and seat of power',
-            effects: '+1 Civil Leader'
+            description: 'The ultimate seat of power - a symbol of your dynasty\'s might',
+            effects: '+1 Civil Leader • Major defense bonus • Prestige symbol'
         },
 
         // Advanced Buildings
         magicalTower: {
             icon: '🔮',
             name: 'Magical Tower',
-            description: 'Mystical research facility for supernatural abilities',
-            effects: '1 Wizard job • Key structure (future)'
+            description: 'Mysterious arts and arcane research (coming soon!)',
+            effects: '1 Wizard job • Future magical abilities'
         },
         grandLibrary: {
             icon: '📚',
             name: 'Grand Library',
-            description: 'Repository of knowledge preserving civilization\'s wisdom',
-            effects: '10 Scholar jobs'
+            description: 'A repository of all knowledge accumulated across generations',
+            effects: '10 Scholar jobs • Preserves dynasty history • Research bonus'
         }
     },
 
