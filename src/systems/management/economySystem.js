@@ -45,8 +45,52 @@ class EconomySystem {
     // Process daily upkeep costs
     processDaily() {
         this.processMilitaryUpkeep();
+        this.processTaxCollection();
         this.processMarketIncome();
         this.processMerchantVisit();
+    }
+    
+    // Collect taxes based on population (1 gold per working-age citizen)
+    processTaxCollection() {
+        // Need a Town Center to collect taxes
+        const buildings = this.gameState.buildings || [];
+        const hasTownCenter = buildings.some(b => b.type === 'townCenter');
+        if (!hasTownCenter) return;
+        
+        // Get working-age population (ages 16-100)
+        let workingAgeCount = 0;
+        if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
+            workingAgeCount = this.gameState.populationManager.population.filter(p => {
+                const age = p.age || 0;
+                return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
+            }).length;
+        } else {
+            // Fallback to total population if no manager
+            workingAgeCount = Math.max(0, (this.gameState.population || 0) - 2); // Rough estimate
+        }
+        
+        if (workingAgeCount <= 0) return;
+        
+        // Base tax: 1 gold per working citizen
+        let taxIncome = workingAgeCount;
+        
+        // Apply Town Center level bonus (+10% per level)
+        const townCenter = buildings.find(b => b.type === 'townCenter');
+        if (townCenter && townCenter.level > 1) {
+            taxIncome = Math.floor(taxIncome * (1 + (townCenter.level - 1) * 0.1));
+        }
+        
+        // Store last tax income for UI display
+        this.lastTaxIncome = taxIncome;
+        
+        if (taxIncome > 0 && this.gameState.resources) {
+            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + taxIncome;
+            
+            // Emit event for daily production display
+            try {
+                window.eventBus?.emit?.('tax_collected', { amount: taxIncome, population: workingAgeCount });
+            } catch (_) {}
+        }
     }
     
     // Calculate and deduct military upkeep
@@ -268,6 +312,42 @@ class EconomySystem {
             total: totalUpkeep,
             breakdown,
             canAfford: (this.gameState.resources?.gold || 0) >= totalUpkeep
+        };
+    }
+    
+    // Get tax income summary for UI display
+    getTaxSummary() {
+        const buildings = this.gameState.buildings || [];
+        const hasTownCenter = buildings.some(b => b.type === 'townCenter');
+        
+        if (!hasTownCenter) {
+            return { income: 0, population: 0, enabled: false, reason: 'Build Town Center to collect taxes' };
+        }
+        
+        // Get working-age population
+        let workingAgeCount = 0;
+        if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
+            workingAgeCount = this.gameState.populationManager.population.filter(p => {
+                const age = p.age || 0;
+                return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
+            }).length;
+        }
+        
+        let taxIncome = workingAgeCount;
+        
+        // Apply Town Center level bonus
+        const townCenter = buildings.find(b => b.type === 'townCenter');
+        const level = townCenter?.level || 1;
+        if (level > 1) {
+            taxIncome = Math.floor(taxIncome * (1 + (level - 1) * 0.1));
+        }
+        
+        return {
+            income: taxIncome,
+            population: workingAgeCount,
+            enabled: true,
+            townCenterLevel: level,
+            bonusPercent: level > 1 ? (level - 1) * 10 : 0
         };
     }
     

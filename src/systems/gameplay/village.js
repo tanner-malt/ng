@@ -402,20 +402,34 @@ class VillageManager {
                     // Set appropriate tooltip based on unlock status and governance
                     const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
                     const mgmt = this.getManagementStatus();
+                    const canAfford = this.gameState.canAfford(buildingType);
+                    
+                    // Determine lock status and icon
+                    let lockIcon = '';
+                    let statusClass = '';
+                    
                     if (!isUnlocked) {
                         const requirementsText = window.unlockSystem ?
                             window.unlockSystem.getUnlockRequirementsText(buildingType) :
                             `Locked: Complete prerequisites to unlock ${buildingType}`;
                         buildingRow.title = requirementsText;
                         buildingRow.classList.add('locked');
-                        console.log(`[Village] Created locked row for ${buildingType}:`, requirementsText);
+                        lockIcon = '🔒 ';
+                        statusClass = 'building-locked';
                     } else if (!mgmt.allowed) {
                         buildingRow.title = mgmt.message || 'Village management locked';
                         buildingRow.classList.add('locked');
-                        console.log(`[Village] Created governance-locked row for ${buildingType}:`, mgmt.message);
+                        lockIcon = '⏳ ';
+                        statusClass = 'building-governance-locked';
+                    } else if (!canAfford) {
+                        buildingRow.title = `Not enough resources for ${GameData.getBuildingName(buildingType)}`;
+                        statusClass = 'building-unaffordable';
                     } else {
                         buildingRow.title = `Click to place ${GameData.getBuildingName(buildingType)}`;
+                        statusClass = 'building-available';
                     }
+                    
+                    buildingRow.classList.add(statusClass);
 
                     // Building name column
                     const nameDiv = document.createElement('div');
@@ -423,8 +437,8 @@ class VillageManager {
                     const description = GameData.getBuildingDescription(buildingType);
                     nameDiv.innerHTML = `
                         <div class="building-name-row">
-                            <span>${GameData.getBuildingIcon(buildingType)}</span>
-                            <span>${GameData.getBuildingName(buildingType)}</span>
+                            <span class="building-icon">${GameData.getBuildingIcon(buildingType)}</span>
+                            <span class="building-title">${lockIcon}${GameData.getBuildingName(buildingType)}</span>
                         </div>
                         <div class="building-description">${description}</div>
                     `;
@@ -511,30 +525,32 @@ class VillageManager {
             row.addEventListener('mouseenter', () => {
                 const buildingType = row.dataset.building;
                 if (!buildingType) return;
+                
+                // Remove old status classes
+                row.classList.remove('building-available', 'building-unaffordable', 'building-locked', 'building-governance-locked', 'locked');
+                
                 const mgmt = this.getManagementStatus();
                 if (!mgmt.allowed) {
-                    row.classList.add('locked');
+                    row.classList.add('locked', 'building-governance-locked');
                     row.title = mgmt.message || 'Village management locked';
                     return;
                 }
+                
                 const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
                 const canAfford = this.gameState.canAfford(buildingType);
 
                 if (!isUnlocked) {
-                    row.classList.add('locked');
-                    // Show specific unlock requirements instead of generic message
+                    row.classList.add('locked', 'building-locked');
                     const requirementsText = window.unlockSystem ?
                         window.unlockSystem.getUnlockRequirementsText(buildingType) :
                         `Locked: Complete prerequisites to unlock ${buildingType}`;
                     row.title = requirementsText;
-                    console.log(`[Village] Setting tooltip for ${buildingType}:`, requirementsText);
+                } else if (!canAfford) {
+                    row.classList.add('building-unaffordable');
+                    row.title = `Not enough resources for ${GameData.getBuildingName(buildingType)}`;
                 } else {
-                    row.classList.remove('locked');
-                    if (!canAfford) {
-                        row.title = `Insufficient resources for ${buildingType}`;
-                    } else {
-                        row.title = `Build ${buildingType}`;
-                    }
+                    row.classList.add('building-available');
+                    row.title = `Click to place ${GameData.getBuildingName(buildingType)}`;
                 }
             });
         });
@@ -2416,6 +2432,67 @@ class VillageManager {
             (breakdown.production?.expense || []).forEach(item => lines.push(`${item.label}: ${Math.round(item.amount)}`));
             if (lines.length === 0) lines.push('No activity');
             productionSourcesEl.textContent = lines.join(', ');
+        }
+
+        // Update gold income sources (taxes, market, upkeep)
+        this.updateGoldSources();
+    }
+
+    // Update gold income display with taxes and upkeep
+    updateGoldSources() {
+        const goldIncomeEl = document.getElementById('daily-gold-income');
+        const goldUpkeepEl = document.getElementById('daily-gold-upkeep');
+        const goldNetEl = document.getElementById('daily-gold-net');
+        const goldSourcesEl = document.querySelector('#gold-sources .sources-list');
+
+        if (!goldIncomeEl && !goldUpkeepEl && !goldNetEl) return;
+
+        // Get tax summary
+        let taxIncome = 0;
+        let taxPop = 0;
+        let marketIncome = 0;
+        let upkeep = 0;
+
+        // Get economy system for tax and upkeep info
+        const economySystem = this.gameState.economySystem;
+        if (economySystem) {
+            const taxSummary = economySystem.getTaxSummary?.() || { income: 0, population: 0 };
+            taxIncome = taxSummary.income || 0;
+            taxPop = taxSummary.population || 0;
+
+            const upkeepSummary = economySystem.getUpkeepSummary?.() || { total: 0 };
+            upkeep = upkeepSummary.total || 0;
+        }
+
+        // Calculate market income (traders * 3 gold per day)
+        const buildings = this.gameState.buildings || [];
+        buildings.forEach(b => {
+            if (b.type === 'market') {
+                const traders = b.workers?.length || 0;
+                marketIncome += traders * 3;
+            }
+        });
+
+        const totalIncome = taxIncome + marketIncome;
+        const netGold = totalIncome - upkeep;
+
+        if (goldIncomeEl) goldIncomeEl.textContent = totalIncome;
+        if (goldUpkeepEl) goldUpkeepEl.textContent = upkeep;
+        if (goldNetEl) {
+            goldNetEl.textContent = (netGold >= 0 ? '+' : '') + netGold;
+            goldNetEl.classList.remove('positive', 'negative');
+            if (netGold > 0) goldNetEl.classList.add('positive');
+            else if (netGold < 0) goldNetEl.classList.add('negative');
+        }
+
+        // Update sources breakdown
+        if (goldSourcesEl) {
+            const lines = [];
+            if (taxIncome > 0) lines.push(`Taxes (${taxPop} citizens): +${taxIncome}`);
+            if (marketIncome > 0) lines.push(`Markets: +${marketIncome}`);
+            if (upkeep > 0) lines.push(`Military Upkeep: -${upkeep}`);
+            if (lines.length === 0) lines.push('Build Town Center to collect taxes');
+            goldSourcesEl.textContent = lines.join(', ');
         }
     }
 

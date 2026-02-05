@@ -51,7 +51,7 @@ const GameData = {
         monument: { stone: 75, gold: 50, wood: 25, planks: 20 },
 
         // Military Buildings
-        barracks: { wood: 40, stone: 30, gold: 20 }, // Removed planks requirement
+        barracks: { wood: 30, stone: 20 }, // Accessible early game - unlocks World view
         fortifications: { stone: 60, wood: 40, gold: 30, planks: 15 },
         militaryAcademy: { wood: 80, stone: 50, gold: 40, planks: 25 },
         castle: { wood: 50, stone: 150, metal: 75, planks: 100 },
@@ -234,7 +234,7 @@ const GameData = {
         monument: 200, // Multi-generational construction
 
         // Military Buildings
-        barracks: 45,
+        barracks: 20, // Quick to build - important for unlocking World view
         fortifications: 65,
         militaryAcademy: 90,
         castle: 150,
@@ -244,7 +244,7 @@ const GameData = {
         grandLibrary: 110,
 
         // Special Buildings
-        buildersHut: 40,
+        buildersHut: 15, // Quick to build - helps scale up construction
         foundersWagon: 0 // Pre-built
     },
 

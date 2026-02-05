@@ -10228,6 +10228,77 @@ html {
     flex-wrap: wrap;
     gap: var(--space-sm);
     justify-content: flex-start;
+    padding: var(--space-sm) var(--space-md);
+    margin: var(--space-xs) 0;
+    border-radius: var(--radius-medium);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.building-row:hover {
+    background: var(--surface-secondary);
+    border-color: var(--border-primary);
+}
+
+.building-row:active {
+    transform: scale(0.98);
+}
+
+/* Building available - ready to place */
+.building-row.building-available {
+    background: rgba(76, 175, 80, 0.08);
+    border-color: rgba(76, 175, 80, 0.2);
+}
+
+.building-row.building-available:hover {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+/* Building unaffordable - unlocked but can't afford */
+.building-row.building-unaffordable {
+    background: rgba(255, 193, 7, 0.05);
+    border-color: rgba(255, 193, 7, 0.15);
+}
+
+.building-row.building-unaffordable:hover {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.3);
+}
+
+.building-row.building-unaffordable .building-resources {
+    color: #f39c12;
+}
+
+/* Building locked - requirements not met */
+.building-row.building-locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--surface-disabled);
+}
+
+.building-row.building-locked:hover {
+    background: var(--surface-disabled);
+    border-color: transparent;
+    transform: none;
+    box-shadow: none;
+}
+
+.building-row.building-locked .building-title {
+    color: var(--text-disabled);
+}
+
+/* Building governance locked - monarch away */
+.building-row.building-governance-locked {
+    opacity: 0.6;
+    cursor: wait;
+    background: rgba(100, 100, 100, 0.1);
+}
+
+.building-row.building-governance-locked:hover {
+    background: rgba(100, 100, 100, 0.15);
 }
 
 /* Building name column with description */

@@ -61,10 +61,9 @@ class UnlockSystem {
         this.registerUnlock('buildersHut', {
             type: 'building',
             name: 'Builder\'s Hut',
-            description: 'Professional construction facility for advanced buildings',
+            description: 'Professional construction facility - speeds up all building',
             conditions: [
-                { type: 'building_count', building: 'townCenter', count: 1 },
-                { type: 'resource', resource: 'population', amount: 12 }
+                { type: 'building_count', building: 'house', count: 1 }
             ],
             autoUnlock: true
         });
@@ -119,11 +118,10 @@ class UnlockSystem {
         this.registerUnlock('barracks', {
             type: 'building',
             name: 'Barracks',
-            description: 'Military training facility requiring refined materials',
+            description: 'Military training facility - unlocks World View and expeditions',
             conditions: [
-                { type: 'building_count', building: 'woodcutterLodge', count: 1 }, // Need woodcutter lodge for refined lumber
-                { type: 'resource', resource: 'population', amount: 10 }, // Need recruits (reduced from 30)
-                { type: 'resource', resource: 'gold', amount: 200 } // Need funding for military
+                { type: 'building_count', building: 'house', count: 2 }, // Need some housing first
+                { type: 'resource', resource: 'population', amount: 6 } // Need some population
             ],
             autoUnlock: true
         });
