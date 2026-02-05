@@ -5499,9 +5499,9 @@ html {
 
 .settings-columns {
     display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 20px;
-    padding: 20px;
+    grid-template-columns: 300px 1fr;
+    gap: 24px;
+    padding: 24px;
 }
 
 @media (max-width: 900px) {
@@ -5696,36 +5696,55 @@ html {
 .stats-dashboard {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
+    max-height: 450px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.stats-dashboard::-webkit-scrollbar {
+    width: 6px;
+}
+
+.stats-dashboard::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.stats-dashboard::-webkit-scrollbar-thumb {
+    background: #3498db;
+    border-radius: 3px;
 }
 
 .stats-category {
-    padding: 10px;
+    padding: 10px 8px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
 }
 
 .stats-category-title {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #95a5a6;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
 }
 
 .stats-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .stat-box {
     flex: 1;
+    min-width: 70px;
     background: rgba(52, 73, 94, 0.5);
     border-radius: 6px;
-    padding: 10px;
+    padding: 10px 6px;
     text-align: center;
     transition: all 0.2s ease;
+    overflow: hidden;
 }
 
 .stat-box:hover {
@@ -5734,18 +5753,21 @@ html {
 }
 
 .stat-box-value {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: #1abc9c;
     line-height: 1.2;
 }
 
 .stat-box-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #7f8c8d;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Game Info Bar */

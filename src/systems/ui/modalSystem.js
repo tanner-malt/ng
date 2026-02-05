@@ -1042,7 +1042,7 @@ class ModalSystem {
         const modalPromise = this.showModal({
             title: '⚙️ Game Settings',
             content: settingsContent,
-            width: '850px',
+            width: '920px',
             height: 'auto',
             className: 'settings-modal',
             modalType: 'settings',
@@ -1294,7 +1294,7 @@ class ModalSystem {
                                     <div class="stats-row">
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-total-days">1</div>
-                                            <div class="stat-box-label">Days Played</div>
+                                            <div class="stat-box-label">Days</div>
                                         </div>
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-seasons-passed">0</div>
@@ -1351,7 +1351,7 @@ class ModalSystem {
                                         </div>
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-expeditions-success">0</div>
-                                            <div class="stat-box-label">Successful</div>
+                                            <div class="stat-box-label">Success</div>
                                         </div>
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-expeditions-failed">0</div>
@@ -1366,11 +1366,11 @@ class ModalSystem {
                                     <div class="stats-row">
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-battles-won">0</div>
-                                            <div class="stat-box-label">Victories</div>
+                                            <div class="stat-box-label">Wins</div>
                                         </div>
                                         <div class="stat-box">
                                             <div class="stat-box-value" id="modal-stat-enemies-defeated">0</div>
-                                            <div class="stat-box-label">Enemies Slain</div>
+                                            <div class="stat-box-label">Kills</div>
                                         </div>
                                     </div>
                                 </div>
