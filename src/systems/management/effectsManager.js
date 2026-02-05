@@ -18,15 +18,6 @@ class EffectsManager {
 
     initializeEffectTypes() {
         return {
-            hasteRune: {
-                name: 'Haste Rune',
-                description: 'Magical enhancement that increases building efficiency',
-                icon: '⚡',
-                category: 'magical',
-                maxStacks: 1,
-                // Default effect is neutral; per-building custom effects provide actual multiplier
-                effects: { buildingEfficiency: 1.0 }
-            },
             weather_sunny: {
                 name: 'Sunny Weather',
                 description: 'Clear skies boost outdoor work efficiency',
@@ -230,7 +221,7 @@ class EffectsManager {
         for (const effect of this.getActiveEffects()) {
             const efx = effect.effects || {};
 
-            // 1) Global building efficiency (e.g., generic hasteRune)
+            // 1) Global building efficiency
             if (efx.buildingEfficiency) {
                 multiplier *= efx.buildingEfficiency;
             }
@@ -239,13 +230,6 @@ class EffectsManager {
             const specificEfficiency = efx[`${buildingType}Efficiency`];
             if (specificEfficiency) {
                 multiplier *= specificEfficiency;
-            }
-
-            // 3) Per-building haste rune applied via inventory (custom object)
-            // Village adds effects with type 'haste_rune' and fields: { buildingId, multiplier }
-            if (effect.type === 'haste_rune' && buildingId != null && effect.buildingId === buildingId) {
-                const m = typeof effect.multiplier === 'number' ? effect.multiplier : 1.0;
-                multiplier *= m;
             }
         }
 
@@ -270,11 +254,6 @@ class EffectsManager {
                 buildings: this.gameState.buildings.length
             });
         }
-    }
-
-    // Apply Haste Rune specifically
-    applyHasteRune(duration = 10) {
-        return this.applyEffect('hasteRune', duration);
     }
 
     // Apply weather effect
@@ -391,12 +370,6 @@ class EffectsManager {
                 applied = true;
                 appliedMult *= specific;
             }
-            // Per-building rune
-            if (effect.type === 'haste_rune' && buildingId != null && effect.buildingId === buildingId) {
-                const m = typeof effect.multiplier === 'number' ? effect.multiplier : 1.0;
-                applied = true;
-                appliedMult *= m;
-            }
 
             if (applied && appliedMult !== 1.0) {
                 console.log(`  • ${effect.icon} ${effect.name}: x${appliedMult.toFixed(2)} (${effect.id})`);
@@ -410,7 +383,6 @@ class EffectsManager {
     // Console debug commands
     static setupDebugCommands() {
         if (window.effectsManager) {
-            window.applyHasteRune = (duration = 10) => window.effectsManager.applyHasteRune(duration);
             window.applyWeather = (type = 'sunny', duration = 3) => window.effectsManager.applyWeatherEffect(type, duration);
             window.listEffects = () => window.effectsManager.listActiveEffects();
             window.debugBuildingEfficiency = (type, id) => window.effectsManager.debugBuildingEfficiency(type, id);
@@ -419,7 +391,7 @@ class EffectsManager {
                 window.effectsManager.updateBuildingEfficiency();
                 console.log('[EffectsManager] All effects cleared');
             };
-            console.log('[EffectsManager] Debug commands: applyHasteRune(), applyWeather(), listEffects(), debugBuildingEfficiency(type, id), clearAllEffects()');
+            console.log('[EffectsManager] Debug commands: applyWeather(), listEffects(), debugBuildingEfficiency(type, id), clearAllEffects()');
         }
     }
 }

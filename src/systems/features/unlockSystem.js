@@ -14,6 +14,10 @@ class UnlockSystem {
         this.unlockedContent = new Set();
         this.unlockConditions = new Map();
         this.unlockCallbacks = new Map();
+        
+        // Throttling for checkAllUnlocks to prevent spam
+        this.lastCheckTime = 0;
+        this.checkThrottleMs = 1000; // Only check once per second at most
 
         // Start with basic content unlocked
         // Tent, town center, founder's wagon, and village view available at start
@@ -353,7 +357,6 @@ class UnlockSystem {
                     const hasAchievement = window.achievementSystem &&
                         typeof window.achievementSystem.isUnlocked === 'function' &&
                         window.achievementSystem.isUnlocked(condition.achievement);
-                    // console.log(`[UnlockSystem] Checking achievement ${condition.achievement}: ${hasAchievement}`);
                     return hasAchievement;
 
                 case 'building_count':
@@ -361,12 +364,18 @@ class UnlockSystem {
                         b => b.type === condition.building && (b.level >= 1 || (b.built && !b.level)) && b.built
                     ).length;
                     const hasEnoughBuildings = buildingCount >= condition.count;
-                    console.log(`[UnlockSystem] Checking building count ${condition.building}: ${buildingCount}/${condition.count} = ${hasEnoughBuildings}`);
+                    // Only log when condition is met (to reduce spam)
+                    if (hasEnoughBuildings) {
+                        console.log(`[UnlockSystem] Building count met: ${condition.building} ${buildingCount}/${condition.count}`);
+                    }
                     return hasEnoughBuildings;
 
                 case 'resource':
                     const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
-                    console.log(`[UnlockSystem] Checking resource ${condition.resource}: ${this.gameState[condition.resource]}/${condition.amount} = ${hasEnoughResource}`);
+                    // Only log when condition is met
+                    if (hasEnoughResource) {
+                        console.log(`[UnlockSystem] Resource met: ${condition.resource} ${this.gameState[condition.resource]}/${condition.amount}`);
+                    }
                     return hasEnoughResource;
 
                 case 'tutorial_step':
@@ -386,7 +395,14 @@ class UnlockSystem {
         });
     }
 
-    checkAllUnlocks() {
+    checkAllUnlocks(force = false) {
+        // Throttle checks to prevent spam
+        const now = Date.now();
+        if (!force && now - this.lastCheckTime < this.checkThrottleMs) {
+            return []; // Skip this check, too soon
+        }
+        this.lastCheckTime = now;
+        
         let newUnlocks = [];
 
         try {

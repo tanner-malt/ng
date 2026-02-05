@@ -303,4 +303,15 @@ class MessageHistory {
 
 // Create global instance
 window.messageHistory = new MessageHistory();
+
+// Update icon once DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        window.messageHistory.updateIcon();
+    });
+} else {
+    // DOM already loaded
+    window.messageHistory.updateIcon();
+}
+
 console.log('[MessageHistory] Message history system ready');

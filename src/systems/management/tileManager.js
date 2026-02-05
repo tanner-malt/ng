@@ -27,7 +27,6 @@ class TileManager {
         // This ensures starter items are only granted for truly new games
         const hasExistingSave = (typeof localStorage !== 'undefined') && !!localStorage.getItem('dynastyBuilder_save');
         if (!skipDefaults && !hasExistingSave) {
-            this.addItemToInventory('haste_rune', 2);
             this.addItemToInventory('tent', 1);
             this.addItemToInventory('foundersWagon', 1);
         }
@@ -432,12 +431,6 @@ class TileManager {
             console.log('[TileManager] Adding missing tents to existing save');
             safeAdd('tent', 1);
         }
-
-        // Check if haste runes exist, if not add some
-        if (!this.cityInventory.has('haste_rune')) {
-            console.log('[TileManager] Adding missing haste runes to existing save');
-            safeAdd('haste_rune', 2);
-        }
     }
 
     // Serialize grid for saving
@@ -579,7 +572,6 @@ class TileManager {
         this.cityInventory.clear();
 
         // Re-add basic items
-        this.addItemToInventory('haste_rune', 2);
         this.addItemToInventory('tent', 1);
 
         console.log('[TileManager] 🔄 City reset, triggering save...');

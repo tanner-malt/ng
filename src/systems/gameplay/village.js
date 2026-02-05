@@ -1856,12 +1856,6 @@ class VillageManager {
             buildingEl.addEventListener('click', (e) => {
                 e.stopPropagation();
 
-                // Check if we're in rune targeting mode
-                if (this.runeTargeting && this.runeTargeting.active) {
-                    this.applyRuneToBuilding(buildingEl, building);
-                    return;
-                }
-
                 // Construction site - show priority modal
                 if (building.level === 0) {
                     this.showConstructionPriorityModal(building.id);
@@ -1869,14 +1863,6 @@ class VillageManager {
                 // Use new building management modal for completed buildings
                 else if (building.level > 0) {
                     this.showBuildingManagement(building.id);
-                }
-            });
-
-            // Add right-click handler to cancel rune targeting
-            buildingEl.addEventListener('contextmenu', (e) => {
-                if (this.runeTargeting && this.runeTargeting.active) {
-                    e.preventDefault();
-                    this.exitRuneTargetingMode();
                 }
             });
 
@@ -3004,18 +2990,6 @@ class VillageManager {
                 <div style="margin-top: 25px;">
                     <h3 style="color: #3498db; margin: 0 0 15px 0;">🧙‍♂️ Apply Effects</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
-                        
-                        <div style="background: rgba(155, 89, 182, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(155, 89, 182, 0.3);">
-                            <div style="text-align: center; margin-bottom: 10px;">
-                                <span style="font-size: 32px;">⚡</span>
-                                <div style="font-weight: bold; color: #9b59b6;">Haste Rune</div>
-                                <div style="font-size: 12px; color: #95a5a6;">+50% Building Efficiency</div>
-                            </div>
-                            <button onclick="window.effectsManager.applyHasteRune(10); setTimeout(() => window.villageManager.showEffectsManagement(), 500);" 
-                                    style="width: 100%; padding: 8px; background: #9b59b6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                Apply (10 days)
-                            </button>
-                        </div>
 
                         <div style="background: rgba(52, 152, 219, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(52, 152, 219, 0.3);">
                             <div style="text-align: center; margin-bottom: 10px;">
@@ -4353,15 +4327,10 @@ class VillageManager {
             // Show city storage from tile manager
             const cityInventory = window.tileManager ? window.tileManager.getCityInventory() : {};
 
-            // Name mapping for better display (include construction/crafting runes)
+            // Name mapping for better display
             const itemNames = {
                 'foundersWagon': GameData.getBuildingName('foundersWagon'),
-                'tent': 'Tent',
-                'haste_rune': 'Haste Rune',
-                'haste_rune_ii': 'Haste Rune II',
-                'haste_rune_iii': 'Haste Rune III',
-                'construction_rune': 'Rune of Haste',
-                'crafting_rune': 'Crafting Rune'
+                'tent': 'Tent'
             };
 
             filteredItems = Object.entries(cityInventory).map(([itemId, data]) => {
@@ -4468,216 +4437,12 @@ class VillageManager {
             return;
         }
 
-        // Check if item is a haste rune (building targeter)
-        if (itemDef.subcategory === 'rune' && itemDef.effects && itemDef.effects.productivityMultiplier) {
-            this.enterRuneTargetingMode(itemId, itemDef);
-        } else {
-            // Regular consumable use
-            const success = window.inventoryManager.useItem(itemId);
-            if (success) {
-                if (window.modalSystem) {
-                    window.modalSystem.showNotification(`Used ${itemDef.name}!`, { type: 'success' });
-                }
-            }
-        }
-    }
-
-    // Enter rune targeting mode - change cursor and wait for building click
-    enterRuneTargetingMode(itemId, itemDef) {
-        console.log('[Village] Entering rune targeting mode for:', itemDef.name);
-
-        // Store targeting state
-        this.runeTargeting = {
-            active: true,
-            itemId: itemId,
-            itemDef: itemDef
-        };
-
-        // Change cursor to rune icon
-        const container = document.getElementById('village-container');
-        if (container) {
-            container.style.cursor = 'url("data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'><text y=\'24\' font-size=\'20\'>⚡</text></svg>") 16 16, crosshair';
-            container.classList.add('rune-targeting-mode');
-        }
-
-        // Show instruction toast
-        if (window.showNotification) {
-            window.showNotification(
-                `🪄 Rune Active`,
-                `Click on a building to apply ${itemDef.name}. Right-click to cancel.`,
-                { timeout: 0, type: 'info' }
-            );
-        }
-    }
-
-    // Exit rune targeting mode
-    exitRuneTargetingMode() {
-        console.log('[Village] Exiting rune targeting mode');
-
-        this.runeTargeting = { active: false };
-
-        // Reset cursor
-        const container = document.getElementById('village-container');
-        if (container) {
-            container.style.cursor = 'default';
-            container.classList.remove('rune-targeting-mode');
-        }
-
-        // Clear notification
-        if (window.clearNotifications) {
-            window.clearNotifications();
-        }
-    }
-
-    // Apply rune effect to building
-    applyRuneToBuilding(buildingElement, building) {
-        if (!this.runeTargeting || !this.runeTargeting.active) return false;
-
-        const { itemId, itemDef } = this.runeTargeting;
-
-        // Use the rune item
+        // Regular consumable use
         const success = window.inventoryManager.useItem(itemId);
         if (success) {
-            // Apply effect to building
-            const effect = {
-                id: `haste_rune_${building.id}_${Date.now()}`,
-                type: 'haste_rune',
-                name: itemDef.name,
-                icon: itemDef.icon,
-                buildingId: building.id,
-                buildingType: building.type,
-                multiplier: itemDef.effects.productivityMultiplier,
-                duration: 24, // 24 in-game days
-                startDay: window.gameState.currentDay || 1,
-                description: `${itemDef.name} applied to ${building.type}`
-            };
-
-            // Add effect to effects manager
-            if (window.gameState.effectsManager) {
-                window.gameState.effectsManager.addEffect(effect);
-            }
-
-            // Show success notification
-            if (window.showNotification) {
-                window.showNotification(
-                    `✨ Rune Applied!`,
-                    `${itemDef.name} applied to ${building.type} (+${Math.round((itemDef.effects.productivityMultiplier - 1) * 100)}% efficiency for 24 days)`,
-                    { timeout: 4000, type: 'success' }
-                );
-            }
-
-            // Exit targeting mode
-            this.exitRuneTargetingMode();
-
-            return true;
-        }
-
-        return false;
-    }
-
-    // Show job targeting modal for haste runes
-    showJobTargetingModal(itemId, itemDef) {
-        if (!window.gameState || !window.gameState.populationManager) {
-            console.warn('[Village] Population manager not available');
-            return;
-        }
-
-        const population = window.gameState.populationManager.getAll();
-        const workers = population.filter(p => p.role !== 'child' && p.role !== 'royal');
-
-        if (workers.length === 0) {
             if (window.modalSystem) {
-                window.modalSystem.showModal({
-                    title: 'No Workers Available',
-                    content: `
-                        <div class="no-workers-modal">
-                            <p>There are no workers available to boost with the ${itemDef.name}.</p>
-                            <button onclick="window.modalSystem.closeTopModal()">OK</button>
-                        </div>
-                    `,
-                    width: '300px'
-                });
+                window.modalSystem.showNotification(`Used ${itemDef.name}!`, { type: 'success' });
             }
-            return;
-        }
-
-        const workerOptions = workers.map(worker => `
-            <div class="worker-option">
-                <button onclick="window.villageManager.applyHasteRuneToWorker('${itemId}', ${worker.id})" class="worker-btn">
-                    <div class="worker-info">
-                        <strong>${worker.name}</strong>
-                        <span class="worker-role">${worker.role}</span>
-                        <span class="boost-info">→ ${itemDef.effects.productivityMultiplier}x productivity</span>
-                    </div>
-                </button>
-            </div>
-        `).join('');
-
-        if (window.modalSystem) {
-            window.modalSystem.showModal({
-                title: `Use ${itemDef.name}`,
-                content: `
-                    <div class="job-targeting-modal">
-                        <p>Select a worker to boost their productivity by ${itemDef.effects.productivityMultiplier}x:</p>
-                        <div class="worker-list">
-                            ${workerOptions}
-                        </div>
-                        <button onclick="window.modalSystem.closeTopModal()" class="cancel-btn">Cancel</button>
-                    </div>
-                `,
-                width: '450px'
-            });
-        }
-    }
-
-    // Apply haste rune to specific worker
-    applyHasteRuneToWorker(itemId, workerId) {
-        if (!window.inventoryManager || !window.gameState || !window.gameState.populationManager) {
-            console.warn('[Village] Required managers not available');
-            return;
-        }
-
-        const itemDef = window.inventoryManager.getItemDefinition(itemId);
-        const worker = window.gameState.populationManager.getById(workerId);
-
-        if (!itemDef || !worker) {
-            console.error('[Village] Item or worker not found');
-            return;
-        }
-
-        // Use the item from inventory
-        const success = window.inventoryManager.useItem(itemId);
-        if (success) {
-            // Apply productivity boost to worker
-            const multiplier = itemDef.effects.productivityMultiplier;
-            worker.productivityBoost = {
-                multiplier: multiplier,
-                source: itemDef.name,
-                duration: 24, // 24 hours/days
-                startDay: window.gameState.currentDay || 1
-            };
-
-            // Close modal
-            if (window.modalSystem) {
-                window.modalSystem.closeTopModal();
-            }
-
-            // Show success notification
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(
-                    `${worker.name} now has ${multiplier}x productivity from ${itemDef.name}!`,
-                    { type: 'success' }
-                );
-            }
-
-            console.log('[Village] Applied productivity boost:', {
-                worker: worker.name,
-                multiplier: multiplier,
-                duration: 24
-            });
-
-            // Update UI
-            this.gameState?.updateUI();
         }
     }
 
@@ -4700,10 +4465,7 @@ class VillageManager {
         // Get proper item name
         const itemNames = {
             'foundersWagon': GameData.getBuildingName('foundersWagon'),
-            'tent': GameData.getBuildingName('tent'),
-            'haste_rune': 'Haste Rune',
-            'haste_rune_ii': 'Haste Rune II',
-            'haste_rune_iii': 'Haste Rune III'
+            'tent': GameData.getBuildingName('tent')
         };
 
         if (window.modalSystem) {
@@ -5686,23 +5448,6 @@ class VillageManager {
                         </div>
                     </div>
                 `);
-            });
-        } else if (window.gameState?.buildings) {
-            // Fallback legacy per-building hasteRune flags
-            window.gameState.buildings.forEach(building => {
-                if (building.hasteRune) {
-                    const timeLeft = this.calculateTimeLeft(building.hasteRune);
-                    effects.push(`
-                        <div class="effect-item">
-                            <span class="effect-icon">⚡</span>
-                            <div class="effect-details">
-                                <div class="effect-name">${building.hasteRune.runeName} on ${building.type}</div>
-                                <div class="effect-description">${building.hasteRune.multiplier}x productivity boost</div>
-                                <div class="effect-duration">⏱️ ${timeLeft} remaining</div>
-                            </div>
-                        </div>
-                    `);
-                }
             });
         }
 

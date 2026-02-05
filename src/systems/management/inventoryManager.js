@@ -25,7 +25,6 @@ class InventoryManager {
         // Initialize default items
         this.addItem('tent', 1); // For building placement - exactly 1 tent
         this.addItem('foundersWagon', 1); // Mobile administrative center
-        this.addItem('haste_rune_iii', 2); // For productivity acceleration
 
         // Add some basic starter gear
         this.addItem('iron_sword', 1);
@@ -285,69 +284,6 @@ class InventoryManager {
 
             // MAGICAL ARTIFACTS
             magical: {
-                haste_rune: {
-                    id: 'haste_rune',
-                    name: 'Haste Rune',
-                    category: 'consumable',
-                    subcategory: 'rune',
-                    icon: '⚡',
-                    rarity: 'common',
-                    description: 'A magical rune that boosts productivity by 2x for selected job',
-                    effects: { productivityMultiplier: 2 },
-                    consumable: true,
-                    stackable: true,
-                    maxStack: 20,
-                    targetable: true, // Can target specific jobs
-                    craftable: true,
-                    craftCost: { arcaneEssence: 3, stone: 5 }
-                },
-                haste_rune_ii: {
-                    id: 'haste_rune_ii',
-                    name: 'Haste Rune II',
-                    category: 'consumable',
-                    subcategory: 'rune',
-                    icon: '⚡⚡',
-                    rarity: 'uncommon',
-                    description: 'An enhanced magical rune that boosts productivity by 3x for selected job',
-                    effects: { productivityMultiplier: 3 },
-                    consumable: true,
-                    stackable: true,
-                    maxStack: 20,
-                    targetable: true, // Can target specific jobs
-                    craftable: true,
-                    craftCost: { arcaneEssence: 8, stone: 10, gold: 5 }
-                },
-                haste_rune_iii: {
-                    id: 'haste_rune_iii',
-                    name: 'Haste Rune III',
-                    category: 'consumable',
-                    subcategory: 'rune',
-                    icon: '⚡⚡⚡',
-                    rarity: 'rare',
-                    description: 'A powerful magical rune that boosts productivity by 4x for selected job',
-                    effects: { productivityMultiplier: 4 },
-                    consumable: true,
-                    stackable: true,
-                    maxStack: 20,
-                    targetable: true, // Can target specific jobs
-                    craftable: true,
-                    craftCost: { arcaneEssence: 15, stone: 20, gold: 15 }
-                },
-                runes_of_haste: {
-                    id: 'runes_of_haste',
-                    name: 'Runes of Haste',
-                    category: 'magical',
-                    subcategory: 'rune',
-                    icon: '🔮',
-                    rarity: 'uncommon',
-                    description: 'Magical runes that accelerate construction and crafting',
-                    stats: { speedBonus: 50, duration: 7 },
-                    consumable: true,
-                    stackable: true,
-                    maxStack: 10,
-                    craftable: true,
-                    craftCost: { arcaneEssence: 5, stone: 10 }
-                },
                 crystal_of_vision: {
                     id: 'crystal_of_vision',
                     name: 'Crystal of Vision',

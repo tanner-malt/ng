@@ -158,7 +158,7 @@ class GameStateTestable {
         }
         // Fallback inline stub for tests if none provided
         this.inventoryManager = {
-            items: skipDefaults ? { tent: 0, hasteRune: 0 } : { tent: 5, hasteRune: 2 },
+            items: skipDefaults ? { tent: 0 } : { tent: 5 },
             serialize() { return { items: { ...this.items } }; },
             deserialize(d) { this.items = { ...d.items }; },
         };

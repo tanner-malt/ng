@@ -7,8 +7,18 @@ class JobManager {
         this.jobAssignments = new Map(); // buildingId -> { jobType -> [workerIds] }
         this.availableJobs = new Map(); // buildingId -> { jobType -> maxWorkers }
         this.jobEfficiency = new Map(); // Define base efficiency for each job type
+        
+        // Debug mode - set to true for verbose logging
+        this.debugMode = false;
 
         this.initializeJobEfficiency();
+    }
+    
+    // Helper for debug logging
+    debugLog(...args) {
+        if (this.debugMode) {
+            console.log('[JobManager]', ...args);
+        }
     }
 
     initializeJobEfficiency() {
@@ -66,8 +76,8 @@ class JobManager {
             }
         });
 
-        console.log(`[JobManager] Buildings: ${totalBuildings} total, ${completedBuildings} completed, ${buildingsWithJobs} provide jobs`);
-        console.log(`[JobManager] Updated available jobs: ${this.availableJobs.size} buildings with jobs`);
+        this.debugLog(`Buildings: ${totalBuildings} total, ${completedBuildings} completed, ${buildingsWithJobs} provide jobs`);
+        this.debugLog(`Updated available jobs: ${this.availableJobs.size} buildings with jobs`);
     }
 
     // Get all available job positions
@@ -142,12 +152,12 @@ class JobManager {
         });
 
         invalidKeys.forEach(key => {
-            console.log(`[JobManager] Removing invalid building assignment for ID: ${key}`);
+            this.debugLog(`Removing invalid building assignment for ID: ${key}`);
             this.jobAssignments.delete(key);
         });
 
         if (invalidKeys.length > 0) {
-            console.log(`[JobManager] Cleaned up ${invalidKeys.length} invalid building assignments`);
+            this.debugLog(`Cleaned up ${invalidKeys.length} invalid building assignments`);
         }
     }
 
@@ -163,7 +173,7 @@ class JobManager {
             return false;
         }
 
-        console.log(`[JobManager] Attempting to assign worker ${workerId} to building ${buildingId} for job: ${jobType}`);
+        this.debugLog(`Attempting to assign worker ${workerId} to building ${buildingId} for job: ${jobType}`);
 
         // Check if job slot is available
         const availableJobs = this.availableJobs.get(buildingId);
@@ -210,7 +220,7 @@ class JobManager {
         };
         worker.status = 'working'; // Working in building job
 
-        console.log(`[JobManager] Assigned ${worker.name} (population role: ${worker.role}) to building job: ${jobType} at ${buildingId}`);
+        this.debugLog(`Assigned ${worker.name} to building job: ${jobType} at ${buildingId}`);
         return true;
     }
 
@@ -235,7 +245,7 @@ class JobManager {
         worker.jobAssignment = null;
         worker.status = 'idle';
 
-        console.log(`[JobManager] Removed ${worker.name} from ${jobType} job`);
+        this.debugLog(`Removed ${worker.name} from ${jobType} job`);
         return true;
     }
 
@@ -251,7 +261,7 @@ class JobManager {
 
     // Calculate daily resource production from all job assignments
     calculateDailyProduction() {
-        console.log('[JobManager] calculateDailyProduction() called');
+        this.debugLog('calculateDailyProduction() called');
 
         const production = {
             food: 0,
@@ -262,28 +272,28 @@ class JobManager {
             production: 0
         };
 
-        console.log(`[JobManager] Job assignments: ${this.jobAssignments.size} buildings`);
+        this.debugLog(`Job assignments: ${this.jobAssignments.size} buildings`);
 
         this.jobAssignments.forEach((jobTypes, buildingId) => {
-            console.log(`[JobManager] Building ${buildingId} has jobs:`, Object.keys(jobTypes));
+            this.debugLog(`Building ${buildingId} has jobs:`, Object.keys(jobTypes));
 
             Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
-                console.log(`[JobManager] Processing ${jobType}: ${workerIds.length} workers`);
+                this.debugLog(`Processing ${jobType}: ${workerIds.length} workers`);
 
                 const efficiency = this.jobEfficiency.get(jobType) || {};
 
-                console.log(`[JobManager] Job ${jobType} efficiency:`, efficiency);
+                this.debugLog(`Job ${jobType} efficiency:`, efficiency);
 
                 workerIds.forEach(workerId => {
                     const worker = this.getWorkerById(workerId);
                     if (!worker) {
-                        console.log(`[JobManager] ⚠️ Worker ${workerId} not found`);
+                        this.debugLog(`⚠️ Worker ${workerId} not found`);
                         return;
                     }
 
                     // Calculate worker efficiency based on skills and conditions
                     const workerEfficiency = this.calculateWorkerEfficiency(worker, jobType);
-                    console.log(`[JobManager] Worker ${worker.name} efficiency: ${workerEfficiency.toFixed(2)}`);
+                    this.debugLog(`Worker ${worker.name} efficiency: ${workerEfficiency.toFixed(2)}`);
 
                     if (jobType === 'gatherer') {
                         // RNG pick: food, wood, or stone (equal chance)
@@ -298,7 +308,7 @@ class JobManager {
                         } catch (_) { }
                         const amount = 1 * workerEfficiency * seasonMult;
                         production[choice] += amount;
-                        console.log(`[JobManager] ${worker.name} (gatherer) produced ${amount.toFixed(2)} ${choice}`);
+                        this.debugLog(`${worker.name} (gatherer) produced ${amount.toFixed(2)} ${choice}`);
                     } else {
                         // Add production for each resource type this job produces
                         Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
@@ -317,7 +327,7 @@ class JobManager {
 
                                 const resourceGenerated = baseAmount * workerEfficiency * seasonMult;
                                 production[resourceType] += resourceGenerated;
-                                console.log(`[JobManager] ${worker.name} (${jobType}) produced ${resourceGenerated.toFixed(2)} ${resourceType}`);
+                                this.debugLog(`${worker.name} (${jobType}) produced ${resourceGenerated.toFixed(2)} ${resourceType}`);
                             }
                         });
                     }
@@ -327,7 +337,7 @@ class JobManager {
             });
         });
 
-        console.log('[JobManager] Total daily production:', production);
+        this.debugLog('Total daily production:', production);
         return production;
     }
 
@@ -339,7 +349,7 @@ class JobManager {
 
     // Calculate detailed daily production with per-source income/expense breakdown
     calculateDetailedDailyProduction() {
-        console.log('[JobManager] calculateDetailedDailyProduction() called');
+        this.debugLog('calculateDetailedDailyProduction() called');
 
         // Clean up any invalid assignments first
         this.cleanupInvalidAssignments();
@@ -386,7 +396,7 @@ class JobManager {
             production: 0
         };
 
-        console.log(`[JobManager] Job assignments: ${this.jobAssignments.size} buildings`);
+        this.debugLog(`Job assignments: ${this.jobAssignments.size} buildings`);
 
         this.jobAssignments.forEach((jobTypes, buildingId) => {
             // Check for undefined buildingId
@@ -396,7 +406,7 @@ class JobManager {
             }
 
             const building = window.gameState?.buildings.find(b => b.id === buildingId);
-            console.log(`[JobManager] Building lookup for ID ${buildingId}:`, building);
+            this.debugLog(`Building lookup for ID ${buildingId}:`, building);
 
             let buildingName;
             if (building) {
@@ -409,10 +419,10 @@ class JobManager {
                     // Fallback to capitalize building type
                     buildingName = building.type.charAt(0).toUpperCase() + building.type.slice(1);
                 }
-                console.log(`[JobManager] Building type: ${building.type}, resolved name: ${buildingName}`);
+                this.debugLog(`Building type: ${building.type}, resolved name: ${buildingName}`);
             } else {
                 buildingName = `Building ${buildingId}`;
-                console.log(`[JobManager] Building not found for ID ${buildingId}, using fallback name`);
+                this.debugLog(`Building not found for ID ${buildingId}, using fallback name`);
             }
 
             Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
@@ -500,7 +510,7 @@ class JobManager {
             }
         } catch (_) { }
 
-        console.log('[JobManager] Total daily production with breakdown:', { production, sources, workerCounts });
+        this.debugLog('Total daily production with breakdown:', { production, sources, workerCounts });
         return { production, sources, workerCounts, breakdown };
     }
 
@@ -549,7 +559,7 @@ class JobManager {
 
     // Get available workers for job assignment
     getAvailableWorkers() {
-        console.log('[JobManager] Getting available workers...');
+        this.debugLog('Getting available workers...');
         const allWorkers = [];
 
         if (this.gameState.populationManager?.population && Array.isArray(this.gameState.populationManager.population)) {
@@ -558,7 +568,7 @@ class JobManager {
             allWorkers.push(...this.gameState.population);
         }
 
-        console.log(`[JobManager] Total population: ${allWorkers.length}`);
+        this.debugLog(`Total population: ${allWorkers.length}`);
 
         // Filter for workers available for building jobs
         // Note: worker.role (farmer, guard, etc.) is just background flavor
@@ -587,7 +597,7 @@ class JobManager {
             const available = isOldEnough && isYoungEnough && isHealthy && hasNoBuildingJob && !isGoverningLeader && !isLeadershipRole && !isDrafted && !isAway;
 
             if (!available) {
-                console.log(`[JobManager] ${worker.name} unavailable: age=${worker.age}, health=${worker.health}, hasJob=${!!worker.jobAssignment}, jobAssignment:`, worker.jobAssignment);
+                this.debugLog(`${worker.name} unavailable: age=${worker.age}, health=${worker.health}, hasJob=${!!worker.jobAssignment}`);
             }
 
             return available;
@@ -603,17 +613,14 @@ class JobManager {
             status: worker.status || 'idle'
         }));
 
-        console.log(`[JobManager] Available workers: ${availableWorkers.length}`);
-        availableWorkers.forEach(w => {
-            console.log(`[JobManager] - ${w.name} (background role: ${w.role}) age ${w.age}, no building job`);
-        });
+        this.debugLog(`Available workers: ${availableWorkers.length}`);
 
         return availableWorkers;
     }
 
     // Auto-assign workers to available jobs with optimization
     autoAssignWorkers() {
-        console.log('[JobManager] Auto-assigning workers with resource-aware optimization...');
+        this.debugLog('Auto-assigning workers with resource-aware optimization...');
 
         // First, redistribute workers if we have better job opportunities
         this.optimizeWorkerAssignments();
@@ -621,7 +628,7 @@ class JobManager {
         const availableWorkers = this.getAvailableWorkers();
         const availableJobs = this.getAllAvailableJobs();
 
-        console.log(`[JobManager] After optimization: ${availableWorkers.length} available workers, ${availableJobs.length} available jobs`);
+        this.debugLog(`After optimization: ${availableWorkers.length} available workers, ${availableJobs.length} available jobs`);
 
         if (availableWorkers.length === 0 || availableJobs.length === 0) {
             return 0;
@@ -727,7 +734,7 @@ class JobManager {
         }
 
         if (assignedCount > 0) {
-            console.log(`[JobManager] Auto-assigned ${assignedCount} workers to jobs (resource-aware)`);
+            this.debugLog(`Auto-assigned ${assignedCount} workers to jobs (resource-aware)`);
         }
 
         return assignedCount;
@@ -831,11 +838,11 @@ class JobManager {
 
     // Optimize worker assignments when new jobs become available
     optimizeWorkerAssignments() {
-        console.log('[JobManager] Optimizing worker assignments (resource-aware)...');
+        this.debugLog('Optimizing worker assignments (resource-aware)...');
 
         const totalJobSlots = this.getTotalJobCapacity();
         const assignedWorkers = this.getTotalAssignedWorkers();
-        console.log(`[JobManager] Total job slots: ${totalJobSlots}, Currently assigned: ${assignedWorkers}`);
+        this.debugLog(`Total job slots: ${totalJobSlots}, Currently assigned: ${assignedWorkers}`);
 
         const needs = this.computeResourceNeeds();
         const gs = this.gameState;
@@ -886,11 +893,10 @@ class JobManager {
             }
         });
         if (released > 0) {
-            console.log(`[JobManager] Released ${released} ${jobType} workers for reassignment`);
+            this.debugLog(`Released ${released} ${jobType} workers for reassignment`);
         }
         return released;
     }
-
     // Specifically fill all available builder slots using any free workers
     fillAllBuilders() {
         // Ensure available jobs are up to date
@@ -929,7 +935,7 @@ class JobManager {
         }
 
         if (assignments > 0) {
-            console.log(`[JobManager] Filled ${assignments} builder slot(s) (fillAllBuilders)`);
+            this.debugLog(`Filled ${assignments} builder slot(s) (fillAllBuilders)`);
         }
 
         return assignments;
@@ -989,7 +995,7 @@ class JobManager {
                     workersToRelease.forEach(workerId => {
                         if (this.removeWorkerFromJob(workerId)) {
                             releasedCount++;
-                            console.log(`[JobManager] Released excess crafter worker ${workerId} from building ${buildingId}`);
+                            this.debugLog(`Released excess crafter worker ${workerId} from building ${buildingId}`);
                         }
                     });
                 }
@@ -997,7 +1003,7 @@ class JobManager {
         });
 
         if (releasedCount > 0) {
-            console.log(`[JobManager] Released ${releasedCount} workers for reassignment`);
+            this.debugLog(`Released ${releasedCount} workers for reassignment`);
         }
     }
 
@@ -1045,7 +1051,7 @@ class JobManager {
         }
 
         if (assignedCount > 0) {
-            console.log(`[JobManager] Auto-assigned ${assignedCount} workers to jobs`);
+            this.debugLog(`Auto-assigned ${assignedCount} workers to jobs`);
         }
 
         return assignedCount;
@@ -1128,13 +1134,13 @@ class JobManager {
 
     // Call this when new buildings complete to optimize worker distribution
     onBuildingCompleted(buildingId) {
-        console.log(`[JobManager] Building ${buildingId} completed, optimizing worker assignments...`);
+        this.debugLog(`Building ${buildingId} completed, optimizing worker assignments...`);
 
         // First auto-assign any available workers to new jobs
         const newAssignments = this.autoAssignWorkers();
 
         if (newAssignments > 0) {
-            console.log(`[JobManager] Assigned ${newAssignments} workers to jobs from newly completed building`);
+            this.debugLog(`Assigned ${newAssignments} workers to jobs from newly completed building`);
         }
 
         // Update UI to reflect changes
@@ -1244,13 +1250,13 @@ class JobManager {
         // Restore job assignments
         if (data.jobAssignments) {
             this.jobAssignments = new Map(Object.entries(data.jobAssignments));
-            console.log(`[JobManager] Restored ${this.jobAssignments.size} building job assignments`);
+            this.debugLog(`Restored ${this.jobAssignments.size} building job assignments`);
         }
 
         // Restore available jobs
         if (data.availableJobs) {
             this.availableJobs = new Map(Object.entries(data.availableJobs));
-            console.log(`[JobManager] Restored ${this.availableJobs.size} building job definitions`);
+            this.debugLog(`Restored ${this.availableJobs.size} building job definitions`);
         }
 
         // Update population job assignments in PopulationManager
@@ -1291,7 +1297,7 @@ class JobManager {
             });
         });
 
-        console.log(`[JobManager] Restored ${restoredAssignments} individual worker job assignments`);
+        this.debugLog(`Restored ${restoredAssignments} individual worker job assignments`);
     }
 }
 

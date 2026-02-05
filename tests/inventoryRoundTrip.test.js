@@ -7,7 +7,7 @@ if (!globalThis.window) globalThis.window = globalThis;
 class InventoryManager {
     constructor(gameState, skipDefaults = false) {
         this.gameState = gameState;
-        this.items = skipDefaults ? { tent: 0, hasteRune: 0 } : { tent: 5, hasteRune: 2 };
+        this.items = skipDefaults ? { tent: 0 } : { tent: 5 };
     }
     serialize() { return { items: { ...this.items } }; }
     deserialize(data) { this.items = { ...data.items }; }
@@ -34,6 +34,6 @@ describe('inventory serialize/deserialize round-trip', () => {
         gs2.ensureInventoryManager(true);
         gs2.inventoryManager.deserialize(snap.inventoryManagerData);
 
-        expect(gs2.inventoryManager.items).toEqual({ tent: 3, hasteRune: 2 });
+        expect(gs2.inventoryManager.items).toEqual({ tent: 3 });
     });
 });
