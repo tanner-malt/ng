@@ -825,7 +825,7 @@ class BattleManager {
         // Skill-based unit assignment priority
         if (skills.includes('Fighting') || role === 'guard') {
             return 'veteran_soldier';
-        } else if (skills.includes('Crafting') || role === 'blacksmith') {
+        } else if (skills.includes('Blacksmithing') || role === 'blacksmith') {
             return 'heavy_infantry';
         } else if (skills.includes('Woodcutting') || skills.includes('Farming')) {
             return 'archer';
@@ -888,7 +888,7 @@ class BattleManager {
                     bonus.defense += 0.1;
                     bonus.morale += 0.1;
                     break;
-                case 'Crafting':
+                case 'Blacksmithing':
                     bonus.defense += 0.1;
                     bonus.health += 0.05;
                     break;

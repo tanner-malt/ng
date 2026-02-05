@@ -31,7 +31,6 @@ class JobManager {
         // Gatherers now produce a random basic resource each day (food OR wood OR stone)
         // We leave efficiency blank and handle via RNG in calculateDailyProduction
         this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
-        this.jobEfficiency.set('crafter', { production: 1 }); // Kept for town center legacy
         // Sawyer produces planks from wood
         this.jobEfficiency.set('sawyer', { planks: 2, wood: -2 }); // From lumber mills - plank production
         // Foreman no longer contributes direct construction points; boosts builders instead
@@ -59,6 +58,15 @@ class JobManager {
         let completedBuildings = 0;
         let buildingsWithJobs = 0;
 
+        // Always provide baseline builder slots (global job - no building required)
+        // This ensures players can always start construction
+        const globalBuilderSlots = 4; // 4 builders available by default
+        const globalGathererSlots = 2; // 2 gatherers for basic resource collection
+        this.availableJobs.set('global', { 
+            builder: globalBuilderSlots,
+            gatherer: globalGathererSlots
+        });
+
         this.gameState.buildings.forEach(building => {
             if (building.level > 0 && building.built) {
                 completedBuildings++;
@@ -77,7 +85,7 @@ class JobManager {
         });
 
         this.debugLog(`Buildings: ${totalBuildings} total, ${completedBuildings} completed, ${buildingsWithJobs} provide jobs`);
-        this.debugLog(`Updated available jobs: ${this.availableJobs.size} buildings with jobs`);
+        this.debugLog(`Updated available jobs: ${this.availableJobs.size} buildings with jobs (includes global)`);
     }
 
     // Get all available job positions
@@ -85,6 +93,29 @@ class JobManager {
         const jobs = [];
 
         this.availableJobs.forEach((jobTypes, buildingId) => {
+            // Handle global jobs (no building required)
+            if (buildingId === 'global') {
+                Object.entries(jobTypes).forEach(([jobType, maxWorkers]) => {
+                    const currentWorkers = this.getWorkersInJob(buildingId, jobType).length;
+                    const availableSlots = maxWorkers - currentWorkers;
+
+                    if (availableSlots > 0) {
+                        jobs.push({
+                            buildingId: 'global',
+                            buildingType: 'village',
+                            buildingIcon: '🏘️',
+                            jobType,
+                            availableSlots,
+                            maxWorkers,
+                            currentWorkers,
+                            position: { x: 0, y: 0 },
+                            isGlobal: true
+                        });
+                    }
+                });
+                return;
+            }
+
             const building = this.gameState.buildings.find(b => b.id === buildingId);
             if (!building) return;
 
@@ -142,6 +173,9 @@ class JobManager {
         this.jobAssignments.forEach((jobTypes, buildingId) => {
             if (buildingId === undefined || buildingId === null) {
                 invalidKeys.push(buildingId);
+            } else if (buildingId === 'global') {
+                // Global jobs are always valid - skip
+                return;
             } else {
                 // Check if building still exists
                 const building = window.gameState?.buildings.find(b => b.id === buildingId);
@@ -698,18 +732,27 @@ class JobManager {
             // Gold if useful later (keep small weight)
             if (job.jobType === 'trader') score += needs.goldUrgency * 1.5;
 
-            // Production (engineer/crafter) minor until crafting exists
-            if (job.jobType === 'engineer' || job.jobType === 'crafter') {
+            // Production (engineer) minor
+            if (job.jobType === 'engineer') {
                 score += needs.productionUrgency * 1; // small weight
             }
 
-            // Builders only if there is active construction
-            if (job.jobType === 'builder') score += hasActiveConstruction ? 8 : -20;
+            // Builders: prioritize when construction active, but always keep some available
+            // so player can START building (chicken-and-egg problem)
+            if (job.jobType === 'builder') {
+                if (hasActiveConstruction) {
+                    score += 8; // High priority when building
+                } else if (currentBuilders < 2) {
+                    score += 3; // Always have at least 2 builders ready
+                } else {
+                    score -= 5; // Lower priority for excess builders when idle
+                }
+            }
             if (job.jobType === 'foreman') score += hasActiveConstruction ? 6 : -20;
 
             // Encourage meeting floors/desired counts
             if (job.jobType === 'farmer' && currentFarmers < minFarmers) score += 15;
-            if (job.jobType === 'builder' && currentBuilders >= desiredBuilders) score -= 30;
+            if (job.jobType === 'builder' && currentBuilders >= desiredBuilders && desiredBuilders > 0) score -= 30;
             if (job.jobType === 'foreman' && currentForemen >= desiredForemen) score -= 30;
 
             // Military/academic none for now
@@ -886,11 +929,8 @@ class JobManager {
 
         // 3) If food urgency is high, free workers from lower priority jobs
         if (needs.foodUrgency > 1.0) {
-            ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer', 'crafter'].forEach(j => this.releaseWorkersFromJobType(j, Math.ceil(needs.foodUrgency)));
+            ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer'].forEach(j => this.releaseWorkersFromJobType(j, Math.ceil(needs.foodUrgency)));
         }
-
-        // 4) Legacy cleanup for excess crafters
-        this.releaseExcessWorkers();
     }
 
     // Remove up to N workers across all buildings for a given job type
@@ -974,7 +1014,7 @@ class JobManager {
 
         // Release order: lowest priority first; keep farmers last to avoid starvation
         const releaseOrder = [
-            'crafter', 'trader', 'engineer', 'blacksmith', 'wizard', 'professor', 'scholar',
+            'trader', 'engineer', 'blacksmith', 'wizard', 'professor', 'scholar',
             'drillInstructor', 'militaryTheorist', 'sawyer', 'gatherer', 'miner', 'rockcutter', 'woodcutter', 'farmer'
         ];
 
@@ -1007,28 +1047,7 @@ class JobManager {
 
     // Release workers from overstaffed or low-priority positions
     releaseExcessWorkers() {
-        let releasedCount = 0;
-
-        this.jobAssignments.forEach((jobTypes, buildingId) => {
-            Object.entries(jobTypes).forEach(([jobType, workerIds]) => {
-                // Houses provide crafter jobs, but if we have many crafter jobs and few gatherer jobs,
-                // we might want to balance better
-                if (jobType === 'crafter' && workerIds.length > 1) {
-                    // Keep only 1 crafter per house for now, release others
-                    const workersToRelease = workerIds.slice(1);
-                    workersToRelease.forEach(workerId => {
-                        if (this.removeWorkerFromJob(workerId)) {
-                            releasedCount++;
-                            this.debugLog(`Released excess crafter worker ${workerId} from building ${buildingId}`);
-                        }
-                    });
-                }
-            });
-        });
-
-        if (releasedCount > 0) {
-            this.debugLog(`Released ${releasedCount} workers for reassignment`);
-        }
+        // No excess worker release logic currently needed
     }
 
     // Get total number of workers currently assigned to jobs
@@ -1259,7 +1278,6 @@ class JobManager {
             builder: ['Carpentry', 'Masonry', 'Engineering'],
             gatherer: ['Hunting', 'Forestry', 'Agriculture'],
             woodcutter: ['Forestry'],
-            crafter: ['Carpentry', 'Blacksmithing'],
             sawyer: ['Forestry', 'Carpentry'],
             foreman: ['Carpentry', 'Masonry', 'Engineering'],
             miner: ['Mining'],

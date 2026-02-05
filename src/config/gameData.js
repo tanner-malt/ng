@@ -79,8 +79,7 @@ const GameData = {
             // Storage contribution for all resources
             storage: { all: 100 },
             jobs: {
-                gatherer: 2, // Provides 2 gatherer jobs
-                crafter: 1, // Provides 1 crafter job
+                gatherer: 3, // Provides 3 gatherer jobs
                 builder: 4  // Provides 4 builder jobs for construction
             }
         },
@@ -88,8 +87,7 @@ const GameData = {
             // Storage contribution for all resources
             storage: { all: 200 },
             jobs: {
-                gatherer: 1, // Reduced to 1 gatherer job
-                crafter: 1 // Reduced to 1 crafter job
+                gatherer: 2 // Provides 2 gatherer jobs
             }
         },
         house: {
@@ -265,13 +263,13 @@ const GameData = {
             icon: '🚛',
             name: 'Founder Wagon',
             description: 'Mobile command center and storage facility for new settlements',
-            effects: 'Provides housing for 3 people • Storage capacity • 2 Gatherer jobs • 1 Crafter job'
+            effects: 'Provides housing for 3 people • Storage capacity • 3 Gatherer jobs • 4 Builder jobs'
         },
         townCenter: {
             icon: '🏛️',
             name: 'Town Center',
             description: 'Central building that serves as the heart of your settlement',
-            effects: '1 Gatherer job • 1 Crafter job • Settlement coordination'
+            effects: '2 Gatherer jobs • Settlement coordination'
         },
         house: {
             icon: '🏠',

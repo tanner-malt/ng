@@ -2025,8 +2025,7 @@ class WorldManager {
             'farmer': 'Experienced with crops',
             'builder': 'Skilled in construction',
             'guard': 'Trained in combat',
-            'scout': 'Quick and observant',
-            'crafter': 'Skilled artisan'
+            'scout': 'Quick and observant'
         };
 
         const roleDesc = roleDescs[role] || 'Willing worker';

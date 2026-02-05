@@ -5492,6 +5492,335 @@ html {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* Enhanced Settings Modal Styles */
+.enhanced-settings {
+    padding: 0 !important;
+}
+
+.settings-columns {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+    padding: 20px;
+}
+
+@media (max-width: 900px) {
+    .settings-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+.settings-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.enhanced-settings .setting-group {
+    margin-bottom: 0;
+    padding: 16px;
+    background: rgba(30, 35, 45, 0.9);
+    border-radius: 12px;
+    border-left: 3px solid #3498db;
+    transition: all 0.2s ease;
+}
+
+.enhanced-settings .setting-group:hover {
+    background: rgba(40, 45, 55, 0.95);
+}
+
+.setting-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setting-group-icon {
+    font-size: 1.3em;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(52, 152, 219, 0.2);
+    border-radius: 8px;
+}
+
+.enhanced-settings .setting-group h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #ecf0f1;
+}
+
+.setting-group-audio { border-left-color: #9b59b6; }
+.setting-group-audio .setting-group-icon { background: rgba(155, 89, 182, 0.2); }
+
+.setting-group-gameplay { border-left-color: #3498db; }
+.setting-group-gameplay .setting-group-icon { background: rgba(52, 152, 219, 0.2); }
+
+.setting-group-data { border-left-color: #e67e22; }
+.setting-group-data .setting-group-icon { background: rgba(230, 126, 34, 0.2); }
+
+.setting-group-stats { border-left-color: #2ecc71; }
+.setting-group-stats .setting-group-icon { background: rgba(46, 204, 113, 0.2); }
+
+.setting-group-info { 
+    border-left: none;
+    background: transparent;
+    padding: 12px 20px;
+}
+
+/* Toggle Switch Styling */
+.toggle-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.setting-label {
+    color: #bdc3c7;
+    font-size: 0.9rem;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 50px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #4a5568;
+    border-radius: 26px;
+    transition: all 0.3s ease;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
+
+/* Settings Buttons Grid */
+.setting-buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-btn .btn-icon {
+    font-size: 1.1em;
+}
+
+.settings-btn-export,
+.settings-btn-import {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.settings-btn-export:hover,
+.settings-btn-import:hover {
+    background: rgba(52, 152, 219, 0.3);
+    transform: translateY(-1px);
+}
+
+.settings-btn-tutorial {
+    background: rgba(155, 89, 182, 0.2);
+    color: #9b59b6;
+    border: 1px solid rgba(155, 89, 182, 0.3);
+}
+
+.settings-btn-tutorial:hover {
+    background: rgba(155, 89, 182, 0.3);
+    transform: translateY(-1px);
+}
+
+.settings-btn-reset {
+    background: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.settings-btn-reset:hover {
+    background: rgba(231, 76, 60, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Stats Dashboard */
+.stats-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.stats-category {
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.stats-category-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #95a5a6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.stats-row {
+    display: flex;
+    gap: 8px;
+}
+
+.stat-box {
+    flex: 1;
+    background: rgba(52, 73, 94, 0.5);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.stat-box:hover {
+    background: rgba(52, 73, 94, 0.7);
+    transform: translateY(-1px);
+}
+
+.stat-box-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #1abc9c;
+    line-height: 1.2;
+}
+
+.stat-box-label {
+    font-size: 0.7rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 4px;
+}
+
+/* Game Info Bar */
+.game-info-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 10px 0;
+}
+
+.game-info-bar .info-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.game-info-bar .info-icon {
+    font-size: 1em;
+    opacity: 0.7;
+}
+
+.game-info-bar .info-text {
+    font-size: 0.85rem;
+    color: #95a5a6;
+}
+
+.info-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.version-badge {
+    background: rgba(52, 152, 219, 0.2);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: #3498db !important;
+}
+
+/* Enhanced Save Button */
+.settings-save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    font-size: 1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #1abc9c, #16a085);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-save-btn:hover {
+    background: linear-gradient(135deg, #16a085, #1abc9c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4);
+}
+
+.settings-save-btn .btn-icon {
+    font-size: 1.1em;
+}
+
+.enhanced-settings .settings-actions {
+    padding: 16px 20px 20px;
+    margin-top: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
 /* Progression Modal Styles */
 .progression-modal .progression-content {
     padding: 1rem;

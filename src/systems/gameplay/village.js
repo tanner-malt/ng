@@ -2946,7 +2946,6 @@ class VillageManager {
             miner: '⛏️',
             stonecutter: '🔨',
             builder: '🔨',
-            crafter: '⚒️',
             gatherer: '🧺',
             foreman: '👷‍♂️'
         };
@@ -3022,7 +3021,7 @@ class VillageManager {
             'Yara', 'Zoe', 'Aiden', 'Bella', 'Caleb', 'Diana', 'Ethan', 'Fiona'
         ];
 
-        const roles = ['peasant', 'farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'worker'];
+        const roles = ['peasant', 'farmer', 'builder', 'gatherer', 'woodcutter', 'worker'];
         const statuses = ['idle', 'working', 'resting'];
 
         const name = names[Math.floor(Math.random() * names.length)];
@@ -3052,7 +3051,7 @@ class VillageManager {
     }
 
     generateRandomSkills() {
-        const allSkills = ['Farming', 'Woodcutting', 'Mining', 'Building', 'Trading', 'Crafting', 'Fighting'];
+        const allSkills = ['Farming', 'Woodcutting', 'Mining', 'Building', 'Trading', 'Fighting'];
         const numSkills = Math.floor(Math.random() * 3) + 1; // 1-3 skills
         const skills = [];
 
@@ -3945,7 +3944,6 @@ class VillageManager {
             builder: 'Carpentry',
             gatherer: 'Hunting',
             woodcutter: 'Forestry',
-            crafter: 'Carpentry',
             sawyer: 'Forestry',
             foreman: 'Engineering'
         };
@@ -4587,7 +4585,6 @@ class VillageManager {
             builder: '#3498db',
             gatherer: '#f39c12',
             woodcutter: '#8e44ad',
-            crafter: '#e74c3c',
             sawyer: '#16a085',
             foreman: '#d35400'
         };
@@ -5060,7 +5057,6 @@ class VillageManager {
                 { resource: 'wood', amount: 0.5 }
             ],
             woodcutter: [{ resource: 'wood', amount: 2.5 }],
-            crafter: [{ resource: 'tools', amount: 0.8 }],
             sawyer: [
                 { resource: 'planks', amount: 2.0 },
                 { resource: 'wood', amount: -2.0 }

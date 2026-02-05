@@ -23,7 +23,7 @@ Units are recruited from the villager population based on their skills and chara
 - **Militia**: Default units from unskilled villagers
 - **Archer**: Woodcutters and farmers with ranged combat skills
 - **Veteran Soldier**: Guards and villagers with Fighting skills
-- **Heavy Infantry**: Blacksmiths and crafters with defensive focus
+- **Heavy Infantry**: Blacksmiths and skilled workers with defensive focus
 - **Engineer**: Builders specialized in siege and fortifications
 - **Scout**: Merchants and traders with mobility advantages
 - **Sapper**: Miners skilled in demolition and underground tactics

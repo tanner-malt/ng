@@ -25,7 +25,6 @@ class PopulationManager {
             builder: ['Carpentry', 'Masonry', 'Engineering'],
             gatherer: ['Hunting', 'Forestry', 'Agriculture'],
             woodcutter: ['Forestry'],
-            crafter: ['Carpentry', 'Blacksmithing'], // From houses, town center, founders wagon
             sawyer: ['Forestry', 'Carpentry'], // From woodcutter lodges
             foreman: ['Carpentry', 'Masonry', 'Engineering', 'Administration'], // From builder huts
             // Legacy roles that don't have jobs but exist for flavor/battle system
@@ -82,6 +81,12 @@ class PopulationManager {
                 };
                 this.addInhabitant(newborn);
                 birthsAdded++;
+                
+                // Track birth in game stats
+                if (window.gameState?.stats) {
+                    window.gameState.stats.totalBirths = (window.gameState.stats.totalBirths || 0) + 1;
+                }
+                
                 console.log(`[PopulationManager] Birth: ${newborn.name} (${newborn.gender})`);
             }
             if (allowedBirths < birthResult.births) {
@@ -167,6 +172,12 @@ class PopulationManager {
             this.population = this.population.filter(villager =>
                 !deceasedIds.includes(villager.id)
             );
+            
+            // Track deaths in game stats
+            if (window.gameState?.stats) {
+                window.gameState.stats.totalDeaths = (window.gameState.stats.totalDeaths || 0) + deaths;
+            }
+            
             console.log(`[PopulationManager] ${deaths} villagers died. Population: ${beforeCount} -> ${this.population.length}`);
         }
 
@@ -348,6 +359,14 @@ class PopulationManager {
             ...details
         };
         this.population.push(inhabitant);
+
+        // Track peak population
+        if (window.gameState?.stats) {
+            const currentPop = this.population.length;
+            if (currentPop > (window.gameState.stats.peakPopulation || 0)) {
+                window.gameState.stats.peakPopulation = currentPop;
+            }
+        }
 
         console.log(`[PopulationManager] Added inhabitant: ${inhabitant.name} (age ${inhabitant.age}, role: ${inhabitant.role}), Total population: ${this.population.length}`);
 
@@ -1028,7 +1047,7 @@ class PopulationManager {
                 role = 'child';
             } else if (Math.random() < 0.3) {
                 // 30% chance for specialized roles for working age adults
-                const specialRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter'];
+                const specialRoles = ['farmer', 'builder', 'gatherer', 'woodcutter'];
                 role = specialRoles[Math.floor(Math.random() * specialRoles.length)];
             }
 
@@ -1151,8 +1170,8 @@ class PopulationManager {
             elderly: 0.10
         };
 
-        const roles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'worker'];
-        const skills = ['farming', 'crafting', 'building', 'combat', 'leadership', 'scholarship'];
+        const roles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'worker'];
+        const skills = ['farming', 'building', 'combat', 'leadership', 'scholarship'];
 
         for (let i = 0; i < targetSize; i++) {
             const rand = Math.random();
@@ -1272,7 +1291,6 @@ class PopulationManager {
                 'builder': 'master',           // Craftsman with construction skills
                 'guard': 'military',           // Military skills
                 'worker': 'default',           // Basic skills
-                'crafter': 'master',           // Crafting skills
                 'scholar': 'trader',           // Knowledge/leadership skills
                 'trader': 'trader',            // Trading/leadership skills
                 'royal': 'master'              // High-level skills
@@ -1288,16 +1306,15 @@ class PopulationManager {
         // Fallback to simple skill arrays if SkillSystem not available
         const roleSkills = {
             'farmer': ['farming'],
-            'builder': ['building', 'crafting'],
+            'builder': ['building'],
             'guard': ['combat'],
-            'worker': ['crafting'],
-            'villager': ['crafting'], // Basic villager skills
-            'crafter': ['crafting'],
+            'worker': ['building'],
+            'villager': ['farming'], // Basic villager skills
             'scholar': ['scholarship'],
             'trader': ['leadership'],
             'royal': ['leadership', 'combat', 'scholarship']
         };
-        return roleSkills[role] || ['crafting'];
+        return roleSkills[role] || ['farming'];
     }
 
     /**
@@ -1317,7 +1334,7 @@ class PopulationManager {
                 role = preferredProfessions[i];
             } else {
                 // Random role for extras
-                const allRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'worker'];
+                const allRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'worker'];
                 role = allRoles[Math.floor(Math.random() * allRoles.length)];
             }
 
@@ -1508,7 +1525,6 @@ class PopulationManager {
         Object.entries(roleDistribution).forEach(([role, count]) => {
             const roleNames = {
                 'farmer': '🌾 Farmers',
-                'crafter': '🔨 Crafters',
                 'builder': '🏗️ Builders',
                 'guard': '⚔️ Guards',
                 'merchant': '💰 Merchants',
@@ -1702,7 +1718,7 @@ class PopulationManager {
      * Fix legacy roles that don't match current job system
      */
     fixLegacyRoles() {
-        const validJobRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'crafter', 'sawyer', 'foreman'];
+        const validJobRoles = ['farmer', 'builder', 'gatherer', 'woodcutter', 'sawyer', 'foreman'];
         const roleMapping = {
             'guard': 'worker', // Guards become general workers
             'trader': 'worker', // Traders become general workers  
@@ -1776,7 +1792,7 @@ class PopulationManager {
      */
     generateNewWorkers(count = 5) {
         const newWorkers = [];
-        const roles = ['farmer', 'gatherer', 'crafter', 'builder'];
+        const roles = ['farmer', 'gatherer', 'builder'];
 
         for (let i = 0; i < count; i++) {
             const newWorker = {

@@ -44,7 +44,7 @@ The Battle system is accessed from the World view and handles army management an
 
 ### 🛡️ Heavy Infantry
 - **Health:** 120 | **Attack:** 16 | **Defense:** 20
-- **Source:** Blacksmiths and crafters
+- **Source:** Blacksmiths and skilled workers
 - **Role:** Heavily armored defensive specialists
 
 ### � Engineer

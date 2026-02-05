@@ -149,21 +149,21 @@ class BuildingEffectsManager {
         console.log('[BuildingEffects] Military Academy constructed - advanced military training enabled');
     }
 
-    // Workshop effects - Crafting and tool production
+    // Workshop effects - Production and tool manufacturing
     applyWorkshopEffects(position) {
         const bonus = {
             type: 'workshop',
             position: position,
             effects: {
-                craftingSpeed: 0.25, // 25% faster crafting
+                productionSpeed: 0.25, // 25% faster production
                 toolQuality: 15, // +15% tool durability and effectiveness
-                craftingSkillGain: 0.3, // 30% faster crafting skill growth
+                engineerSkillGain: 0.3, // 30% faster engineer skill growth
                 specializedProduction: true // Can produce specialized items
             }
         };
         
         this.activeBonuses.set(`workshop_${position}`, bonus);
-        console.log('[BuildingEffects] Workshop constructed - crafting capabilities enhanced');
+        console.log('[BuildingEffects] Workshop constructed - production capabilities enhanced');
     }
 
     // Mine effects - Resource extraction and geology
@@ -334,7 +334,7 @@ class BuildingEffectsManager {
                 break;
             case 'workshop_masterwork':
                 bonus.effects.masterworkChance = 0.15;
-                bonus.effects.craftingSpeed += 0.25;
+                bonus.effects.productionSpeed += 0.25;
                 break;
             case 'mine_deep':
                 bonus.effects.deepMining = true;
