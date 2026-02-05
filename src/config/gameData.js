@@ -85,10 +85,9 @@ const GameData = {
         },
         townCenter: {
             // Storage contribution for all resources
-            storage: { all: 200 },
-            jobs: {
-                gatherer: 2 // Provides 2 gatherer jobs
-            }
+            storage: { all: 200 }
+            // Town Center is administrative - no direct jobs
+            // Tax collection is handled by economySystem based on population
         },
         house: {
             populationCapacity: 6 // Each house provides capacity for 6 population; 0 jobs
@@ -269,7 +268,7 @@ const GameData = {
             icon: '🏛️',
             name: 'Town Center',
             description: 'Central building that serves as the heart of your settlement',
-            effects: '2 Gatherer jobs • Settlement coordination'
+            effects: 'Enables tax collection • Settlement coordination • +200 Storage'
         },
         house: {
             icon: '🏠',

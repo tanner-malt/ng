@@ -8390,6 +8390,162 @@ html {
     font-size: 0.9em;
 }
 
+/* Population Charts */
+.population-charts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.chart-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.chart-box {
+    flex: 1;
+    min-width: 280px;
+    background: #2a2a2a;
+    border: 1px solid #404040;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.chart-box.chart-wide {
+    flex: 2;
+    min-width: 100%;
+}
+
+.chart-title {
+    color: #fff;
+    font-size: 0.95em;
+    font-weight: 500;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #404040;
+}
+
+.chart-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #aaa;
+    font-size: 0.8em;
+    cursor: pointer;
+    padding: 4px 8px;
+    background: #333;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.filter-checkbox:hover {
+    background: #444;
+}
+
+.filter-checkbox input[type="checkbox"] {
+    accent-color: #3498db;
+}
+
+.chart-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.chart-placeholder {
+    color: #888;
+    font-size: 0.9em;
+    text-align: center;
+    padding: 30px;
+    font-style: italic;
+}
+
+/* SVG Chart Styles */
+.population-trend-chart,
+.population-pie-chart,
+.population-bar-chart {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+}
+
+.chart-axis-label {
+    font-size: 10px;
+    fill: #888;
+}
+
+.chart-grid-line {
+    stroke: #333;
+    stroke-width: 1;
+    stroke-dasharray: 2,2;
+}
+
+.chart-line {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.pie-slice {
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+
+.pie-slice:hover {
+    opacity: 0.8;
+}
+
+.chart-bar-label {
+    font-size: 10px;
+    fill: #aaa;
+}
+
+.chart-bar-value {
+    font-size: 10px;
+    fill: #fff;
+    font-weight: 500;
+}
+
+/* Chart Legends */
+.chart-legend,
+.pie-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: center;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75em;
+    color: #aaa;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.pie-legend {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.pie-legend .legend-item {
+    font-size: 0.8em;
+}
+
 @media (max-width: 768px) {
     .population-stats-grid {
         grid-template-columns: repeat(2, 1fr);

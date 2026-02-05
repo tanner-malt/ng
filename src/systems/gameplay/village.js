@@ -1814,18 +1814,21 @@ class VillageManager {
                 `;
             }
 
-            // Jobs
-            if (production.jobs) {
-                Object.entries(production.jobs).forEach(([jobType, slots]) => {
-                    const totalSlots = slots * building.level;
-                    const jobIcon = this.getJobIcon(jobType);
-                    contentHTML += `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                            <span style="color: #ecf0f1; font-size: 11px;">${jobIcon} ${jobType.charAt(0).toUpperCase() + jobType.slice(1)} Jobs</span>
-                            <span style="color: #2ecc71; font-weight: bold; font-size: 11px;">${totalSlots} slots</span>
-                        </div>
-                    `;
-                });
+            // Jobs - only show if building has job slots defined
+            if (production.jobs && Object.keys(production.jobs).length > 0) {
+                const jobEntries = Object.entries(production.jobs).filter(([, slots]) => slots > 0);
+                if (jobEntries.length > 0) {
+                    jobEntries.forEach(([jobType, slots]) => {
+                        const totalSlots = slots * building.level;
+                        const jobIcon = this.getJobIcon(jobType);
+                        contentHTML += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                <span style="color: #ecf0f1; font-size: 11px;">${jobIcon} ${jobType.charAt(0).toUpperCase() + jobType.slice(1)} Jobs</span>
+                                <span style="color: #2ecc71; font-weight: bold; font-size: 11px;">${totalSlots} slots</span>
+                            </div>
+                        `;
+                    });
+                }
             }
 
             // Storage
@@ -3254,6 +3257,48 @@ class VillageManager {
                 </div>
         `;
 
+        // Add population trends section with charts
+        const populationHistory = this.gameState.populationHistory || [];
+        contentHTML += `
+            <div class="population-section">
+                <div class="section-header">
+                    <h4><span class="section-icon">📈</span> Population Trends</h4>
+                    <div class="section-subtitle">Historical data and age distribution visualizations</div>
+                </div>
+                <div class="population-charts-container">
+                    <div class="chart-row">
+                        <div class="chart-box">
+                            <div class="chart-title">Population Over Time</div>
+                            <div class="chart-filters" id="trend-chart-filters">
+                                <label class="filter-checkbox"><input type="checkbox" value="total" checked> Total</label>
+                                <label class="filter-checkbox"><input type="checkbox" value="youngAdults"> Young Adults</label>
+                                <label class="filter-checkbox"><input type="checkbox" value="adults"> Adults</label>
+                                <label class="filter-checkbox"><input type="checkbox" value="children"> Children</label>
+                                <label class="filter-checkbox"><input type="checkbox" value="elderly"> Elderly</label>
+                            </div>
+                            <div id="population-trend-chart" class="chart-content">
+                                ${this.generatePopulationTrendChart(populationHistory, ['total'])}
+                            </div>
+                        </div>
+                        <div class="chart-box">
+                            <div class="chart-title">Current Age Distribution</div>
+                            <div id="population-pie-chart" class="chart-content">
+                                ${this.generateAgePieChart(populationData.ageGroups)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-row">
+                        <div class="chart-box chart-wide">
+                            <div class="chart-title">Age Group Comparison</div>
+                            <div id="population-bar-chart" class="chart-content">
+                                ${this.generateAgeBarChart(populationData.ageGroups)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
         // Add skills section if skill system is available
         if (populationData.skills && populationData.skills.available) {
             contentHTML += `
@@ -3453,6 +3498,24 @@ class VillageManager {
             maxWidth: '900px',
             customClass: 'population-modal modern-modal enhanced-population'
         });
+
+        // Attach event listeners for chart filter checkboxes after modal renders
+        setTimeout(() => {
+            const filtersContainer = document.getElementById('trend-chart-filters');
+            if (filtersContainer) {
+                filtersContainer.addEventListener('change', () => {
+                    const checkboxes = filtersContainer.querySelectorAll('input[type="checkbox"]:checked');
+                    const filters = Array.from(checkboxes).map(cb => cb.value);
+                    const chartContainer = document.getElementById('population-trend-chart');
+                    if (chartContainer) {
+                        chartContainer.innerHTML = this.generatePopulationTrendChart(
+                            this.gameState.populationHistory || [],
+                            filters.length > 0 ? filters : ['total']
+                        );
+                    }
+                });
+            }
+        }, 50);
     }
 
     showDetailedPopulationView() {
@@ -5202,6 +5265,204 @@ class VillageManager {
         `;
 
         return productionHTML;
+    }
+
+    /**
+     * Generate an SVG trend line chart for population history.
+     * @param {Array} history - Population history array from gameState.populationHistory
+     * @param {string[]} filters - Age brackets to include (empty = total only)
+     * @returns {string} SVG markup
+     */
+    generatePopulationTrendChart(history, filters = []) {
+        if (!history || history.length < 2) {
+            return '<div class="chart-placeholder">Not enough data yet. Check back after a few days.</div>';
+        }
+
+        const width = 400;
+        const height = 180;
+        const padding = { top: 20, right: 20, bottom: 30, left: 45 };
+        const chartWidth = width - padding.left - padding.right;
+        const chartHeight = height - padding.top - padding.bottom;
+
+        // Determine data series to plot
+        const series = [];
+        const colors = {
+            total: '#3498db',
+            infants: '#e74c3c',
+            children: '#9b59b6',
+            youngAdults: '#2ecc71',
+            adults: '#f39c12',
+            middleAged: '#1abc9c',
+            seniors: '#e67e22',
+            elderly: '#95a5a6'
+        };
+
+        // Always include total if no filters
+        if (filters.length === 0) {
+            series.push({ key: 'total', color: colors.total, data: history.map(h => h.total) });
+        } else {
+            filters.forEach(f => {
+                if (f === 'total') {
+                    series.push({ key: 'total', color: colors.total, data: history.map(h => h.total) });
+                } else if (colors[f]) {
+                    series.push({ key: f, color: colors[f], data: history.map(h => h.ageBrackets?.[f] || 0) });
+                }
+            });
+        }
+
+        // Calculate Y scale
+        let maxVal = 1;
+        series.forEach(s => {
+            s.data.forEach(v => { if (v > maxVal) maxVal = v; });
+        });
+        maxVal = Math.ceil(maxVal * 1.1); // 10% headroom
+
+        // Build SVG
+        let svg = `<svg viewBox="0 0 ${width} ${height}" class="population-trend-chart">`;
+
+        // Y axis labels
+        for (let i = 0; i <= 4; i++) {
+            const yVal = Math.round(maxVal * (4 - i) / 4);
+            const yPos = padding.top + (i / 4) * chartHeight;
+            svg += `<text x="${padding.left - 5}" y="${yPos + 4}" class="chart-axis-label" text-anchor="end">${yVal}</text>`;
+            svg += `<line x1="${padding.left}" y1="${yPos}" x2="${width - padding.right}" y2="${yPos}" class="chart-grid-line"/>`;
+        }
+
+        // X axis (days)
+        const days = history.map(h => h.day);
+        const minDay = days[0];
+        const maxDay = days[days.length - 1];
+        const dayRange = maxDay - minDay || 1;
+        const xLabels = [minDay, Math.round(minDay + dayRange * 0.5), maxDay];
+        xLabels.forEach(d => {
+            const xPos = padding.left + ((d - minDay) / dayRange) * chartWidth;
+            svg += `<text x="${xPos}" y="${height - 5}" class="chart-axis-label" text-anchor="middle">Day ${d}</text>`;
+        });
+
+        // Plot each series
+        series.forEach(s => {
+            let pathD = '';
+            s.data.forEach((val, idx) => {
+                const x = padding.left + (idx / (s.data.length - 1)) * chartWidth;
+                const y = padding.top + chartHeight - (val / maxVal) * chartHeight;
+                pathD += idx === 0 ? `M${x},${y}` : ` L${x},${y}`;
+            });
+            svg += `<path d="${pathD}" stroke="${s.color}" stroke-width="2" fill="none" class="chart-line"/>`;
+        });
+
+        svg += '</svg>';
+
+        // Legend
+        let legend = '<div class="chart-legend">';
+        series.forEach(s => {
+            const label = s.key === 'total' ? 'Total' : s.key.replace(/([A-Z])/g, ' $1').trim();
+            legend += `<span class="legend-item"><span class="legend-color" style="background:${s.color}"></span>${label}</span>`;
+        });
+        legend += '</div>';
+
+        return svg + legend;
+    }
+
+    /**
+     * Generate an SVG pie chart for current age distribution.
+     * @param {Object} ageGroups - Current age group data from getDetailedStatistics
+     * @returns {string} SVG markup
+     */
+    generateAgePieChart(ageGroups) {
+        const total = Object.values(ageGroups).reduce((sum, g) => sum + g.count, 0);
+        if (total === 0) {
+            return '<div class="chart-placeholder">No population data available.</div>';
+        }
+
+        const size = 160;
+        const cx = size / 2;
+        const cy = size / 2;
+        const radius = 60;
+
+        const colors = {
+            infants: '#e74c3c',
+            children: '#9b59b6',
+            youngAdults: '#2ecc71',
+            adults: '#f39c12',
+            middleAged: '#1abc9c',
+            seniors: '#e67e22',
+            elderly: '#95a5a6'
+        };
+
+        let svg = `<svg viewBox="0 0 ${size} ${size}" class="population-pie-chart">`;
+        let startAngle = -Math.PI / 2; // Start at top
+
+        Object.entries(ageGroups).forEach(([key, group]) => {
+            if (group.count === 0) return;
+            const sliceAngle = (group.count / total) * 2 * Math.PI;
+            const endAngle = startAngle + sliceAngle;
+
+            const x1 = cx + radius * Math.cos(startAngle);
+            const y1 = cy + radius * Math.sin(startAngle);
+            const x2 = cx + radius * Math.cos(endAngle);
+            const y2 = cy + radius * Math.sin(endAngle);
+            const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+            svg += `<path d="M${cx},${cy} L${x1},${y1} A${radius},${radius} 0 ${largeArc},1 ${x2},${y2} Z" 
+                         fill="${colors[key] || '#888'}" stroke="#fff" stroke-width="1" class="pie-slice" data-bracket="${key}"/>`;
+
+            startAngle = endAngle;
+        });
+
+        svg += '</svg>';
+
+        // Legend
+        let legend = '<div class="pie-legend">';
+        Object.entries(ageGroups).forEach(([key, group]) => {
+            if (group.count === 0) return;
+            const pct = Math.round((group.count / total) * 100);
+            legend += `<span class="legend-item"><span class="legend-color" style="background:${colors[key] || '#888'}"></span>${group.name}: ${group.count} (${pct}%)</span>`;
+        });
+        legend += '</div>';
+
+        return svg + legend;
+    }
+
+    /**
+     * Generate an SVG bar chart for age distribution comparison.
+     * @param {Object} ageGroups - Current age group data
+     * @returns {string} SVG markup
+     */
+    generateAgeBarChart(ageGroups) {
+        const entries = Object.entries(ageGroups).filter(([, g]) => g.count > 0);
+        if (entries.length === 0) {
+            return '<div class="chart-placeholder">No population data available.</div>';
+        }
+
+        const width = 300;
+        const barHeight = 24;
+        const height = entries.length * (barHeight + 6) + 20;
+        const maxCount = Math.max(...entries.map(([, g]) => g.count));
+
+        const colors = {
+            infants: '#e74c3c',
+            children: '#9b59b6',
+            youngAdults: '#2ecc71',
+            adults: '#f39c12',
+            middleAged: '#1abc9c',
+            seniors: '#e67e22',
+            elderly: '#95a5a6'
+        };
+
+        let svg = `<svg viewBox="0 0 ${width} ${height}" class="population-bar-chart">`;
+
+        entries.forEach(([key, group], idx) => {
+            const y = idx * (barHeight + 6) + 10;
+            const barWidth = maxCount > 0 ? (group.count / maxCount) * (width - 100) : 0;
+            const label = group.name.split(' ')[1] || key; // Remove emoji
+
+            svg += `<rect x="60" y="${y}" width="${barWidth}" height="${barHeight - 2}" fill="${colors[key] || '#888'}" rx="3"/>`;
+            svg += `<text x="55" y="${y + barHeight / 2 + 4}" class="chart-bar-label" text-anchor="end">${label}</text>`;
+            svg += `<text x="${65 + barWidth}" y="${y + barHeight / 2 + 4}" class="chart-bar-value">${group.count}</text>`;
+        });
+
+        svg += '</svg>';
+        return svg;
     }
 }
 
