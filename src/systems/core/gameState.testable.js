@@ -6,7 +6,7 @@ const SAVE_SCHEMA_VERSION = 1;
 
 const SAVE_MIGRATIONS = {
     0: (data) => {
-        data.resources = data.resources || { food: 0, wood: 0, stone: 0, metal: 0, production: 0 };
+        data.resources = data.resources || { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, weapons: 0, tools: 0, production: 0 };
         data.buildings = Array.isArray(data.buildings) ? data.buildings : [];
         if (data.day != null && data.currentDay == null) data.currentDay = data.day;
         data.schemaVersion = 1;
@@ -45,7 +45,7 @@ class GameStateTestable {
         this.currentDay = 1;
         this.season = 'Spring';
         this.gold = 100;
-        this.resources = { food: 100, wood: 50, stone: 25, metal: 0, production: 0 };
+        this.resources = { food: 100, wood: 50, stone: 25, metal: 0, planks: 0, weapons: 0, tools: 0, production: 0 };
         this.buildings = [];
         this.unlockedBuildings = ['foundersWagon', 'townCenter', 'house'];
 

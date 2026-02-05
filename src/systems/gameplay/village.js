@@ -5062,8 +5062,13 @@ class VillageManager {
             woodcutter: [{ resource: 'wood', amount: 2.5 }],
             crafter: [{ resource: 'tools', amount: 0.8 }],
             sawyer: [
-                { resource: 'wood', amount: 1.5 },
-                { resource: 'planks', amount: 1.0 }
+                { resource: 'planks', amount: 2.0 },
+                { resource: 'wood', amount: -2.0 }
+            ],
+            blacksmith: [
+                { resource: 'weapons', amount: 1.0 },
+                { resource: 'tools', amount: 2.0 },
+                { resource: 'metal', amount: -1.0 }
             ],
             foreman: [{ resource: 'stone', amount: 1.2 }],
             builder: [] // Builders don't produce resources directly
@@ -5088,8 +5093,10 @@ class VillageManager {
             food: '🍞',
             wood: '🪵',
             stone: '🪨',
+            planks: '🪵',
             tools: '🔨',
-            planks: '📦',
+            weapons: '⚔️',
+            metal: '⛏️',
             iron: '⚒️',
             gold: '💰'
         };

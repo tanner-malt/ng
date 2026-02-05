@@ -86,6 +86,12 @@
     <div id="notification-overlay" style="display:none;"></div>
     <div id="notification-container" style="display:flex;"></div>
 
+    <!-- Loading overlay for new players -->
+    <div id="game-loading-overlay" class="game-loading-overlay hidden">
+        <h1>👑 Dynasty Builder</h1>
+        <p>Preparing your realm...</p>
+    </div>
+
     <!-- Game Container -->
     <div id="game-container">
         <!-- Navigation -->
@@ -112,14 +118,15 @@
                             <span id="current-day-number-nav">Day 1</span>
                         </div>
                     </div>
-                    <button id="end-day-btn-nav" class="end-day-button time-btn">End Day</button>
-                    <button id="auto-play-btn-nav" class="auto-play-button time-btn">
-                        <span id="auto-play-icon-nav">▶️</span>
-                        <span id="auto-play-text-nav">Play</span>
-                    </button>
-                    <button id="speed-1x-btn-nav" class="time-btn selected">1x</button>
-                    <button id="speed-2x-btn-nav" class="time-btn">2x</button>
-                    <button id="speed-4x-btn-nav" class="time-btn">4x</button>
+                    <div class="time-btn-group">
+                        <button id="pause-btn-nav" class="time-btn pause-btn" title="Pause/Resume">
+                            <span id="pause-icon-nav">⏸️</span>
+                        </button>
+                        <button id="speed-1x-btn-nav" class="time-btn speed-btn selected" data-speed="2000">1x</button>
+                        <button id="speed-2x-btn-nav" class="time-btn speed-btn" data-speed="1000">2x</button>
+                        <button id="speed-4x-btn-nav" class="time-btn speed-btn" data-speed="500">4x</button>
+                    </div>
+                    <button id="end-day-btn-nav" class="end-day-button time-btn" title="Skip to next day">⏩ Next</button>
                 </div>
 
                 <!-- Icon buttons -->
@@ -143,19 +150,6 @@
                     <button id="achievements-btn" class="icon-btn achievements-incomplete" title="Achievements">
                         <span id="achievements-icon">🏆</span>
                     </button>
-                    <button id="inventory-btn" class="icon-btn" title="Inventory (Removed)" onclick="
-                        if (window.modalSystem) {
-                            window.modalSystem.showModal({
-                                title: 'Inventory Removed',
-                                content: '<p>The inventory system has been removed from the game.</p>',
-                                className: 'small'
-                            });
-                        } else {
-                            alert('The inventory system has been removed from the game.');
-                        }
-                    ">
-                        <span>🎒</span>
-                    </button>
                 </div>
             </div>
         </nav>
@@ -167,14 +161,15 @@
                 <div class="village-header">
                     <h2>🏘️ Your Village</h2>
                     <div class="resource-panel">
-                        <span>💰 Gold: <span id="gold-count"></span>/<span id="gold-cap"></span></span>
-                        <span>🌾 Food: <span id="food-count"></span>/<span id="food-cap"></span></span>
-                        <span>🌲 Wood: <span id="wood-count"></span>/<span id="wood-cap"></span></span>
-                        <span>🪵 Planks: <span id="planks-count"></span>/<span id="planks-cap"></span></span>
-                        <span>🪨 Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
-                        <span>🪙 Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
-                        <span>👥 Population: <span id="population-count"></span>/<span
-                                id="population-cap"></span></span>
+                        <span><i class="res-icon gold"></i>Gold: <span id="gold-count"></span>/<span id="gold-cap"></span></span>
+                        <span><i class="res-icon food"></i>Food: <span id="food-count"></span>/<span id="food-cap"></span></span>
+                        <span><i class="res-icon wood"></i>Wood: <span id="wood-count"></span>/<span id="wood-cap"></span></span>
+                        <span><i class="res-icon stone"></i>Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
+                        <span><i class="res-icon metal"></i>Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
+                        <span><i class="res-icon planks"></i>Planks: <span id="planks-count">0</span>/<span id="planks-cap">50</span></span>
+                        <span><i class="res-icon weapons"></i>Weapons: <span id="weapons-count">0</span>/<span id="weapons-cap">100</span></span>
+                        <span><i class="res-icon tools"></i>Tools: <span id="tools-count">0</span>/<span id="tools-cap">100</span></span>
+                        <span><i class="res-icon population"></i>Pop: <span id="population-count"></span>/<span id="population-cap"></span></span>
                         <span>🌸 Season: <span id="season-count"></span></span>
                     </div>
                 </div>
@@ -2511,9 +2506,11 @@
             document.getElementById('gold-count').textContent = resources.gold ?? 0;
             document.getElementById('food-count').textContent = resources.food ?? 0;
             document.getElementById('wood-count').textContent = resources.wood ?? 0;
-            document.getElementById('planks-count').textContent = resources.planks ?? 0;
             document.getElementById('stone-count').textContent = resources.stone ?? 0;
             document.getElementById('metal-count').textContent = resources.metal ?? 0;
+            document.getElementById('planks-count').textContent = resources.planks ?? 0;
+            document.getElementById('weapons-count').textContent = resources.weapons ?? 0;
+            document.getElementById('tools-count').textContent = resources.tools ?? 0;
             document.getElementById('population-count').textContent = window.gameState.population ?? 0;
             // Use cap from GameData if available, else fallback to gameState
             let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);

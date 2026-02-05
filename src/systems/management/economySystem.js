@@ -9,7 +9,9 @@ class EconomySystem {
             wood: 2,      // 2 gold per wood
             stone: 3,     // 3 gold per stone
             metal: 5,     // 5 gold per metal
-            planks: 4     // 4 gold per plank
+            planks: 4,    // 4 gold per plank
+            weapons: 10,  // 10 gold per weapon
+            tools: 6      // 6 gold per tool
         };
         
         // Military upkeep costs per unit per day

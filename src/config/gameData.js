@@ -80,7 +80,8 @@ const GameData = {
             storage: { all: 100 },
             jobs: {
                 gatherer: 2, // Provides 2 gatherer jobs
-                crafter: 1 // Provides 1 crafter job
+                crafter: 1, // Provides 1 crafter job
+                builder: 4  // Provides 4 builder jobs for construction
             }
         },
         townCenter: {
@@ -452,6 +453,8 @@ const GameData = {
         stone: 50,
         metal: 50,
         planks: 50,
+        weapons: 50,
+        tools: 50,
         production: 50,
         gold: 100    // Slightly higher base for gold
     },

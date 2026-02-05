@@ -32,8 +32,8 @@ class JobManager {
         // We leave efficiency blank and handle via RNG in calculateDailyProduction
         this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
         this.jobEfficiency.set('crafter', { production: 1 }); // Kept for town center legacy
-        // Sawyer consumes wood to produce planks
-        this.jobEfficiency.set('sawyer', { wood: -3, planks: 3 }); // From lumber mills - processing
+        // Sawyer produces planks from wood
+        this.jobEfficiency.set('sawyer', { planks: 2, wood: -2 }); // From lumber mills - plank production
         // Foreman no longer contributes direct construction points; boosts builders instead
         this.jobEfficiency.set('foreman', {}); // Boost applied in ConstructionManager
         this.jobEfficiency.set('miner', { stone: 2, metal: 1 }); // From mines
@@ -41,8 +41,8 @@ class JobManager {
         // Engineers now produce more production
         this.jobEfficiency.set('engineer', { production: 3 }); // From workshops
         this.jobEfficiency.set('trader', { gold: 2 }); // From markets
-        // Blacksmith no longer consumes metal
-        this.jobEfficiency.set('blacksmith', { production: 2 });
+        // Blacksmith produces weapons and tools from metal
+        this.jobEfficiency.set('blacksmith', { weapons: 1, tools: 2, metal: -1 });
         // Removed production from military/academic support roles
         this.jobEfficiency.set('drillInstructor', {}); // Organizational value (no direct resource)
         this.jobEfficiency.set('militaryTheorist', {}); // Planning value (no direct resource)
@@ -269,6 +269,8 @@ class JobManager {
             stone: 0,
             metal: 0,
             planks: 0,
+            weapons: 0,
+            tools: 0,
             production: 0
         };
 
@@ -360,6 +362,8 @@ class JobManager {
             stone: 0,
             metal: 0,
             planks: 0,
+            weapons: 0,
+            tools: 0,
             production: 0
         };
 
@@ -369,6 +373,8 @@ class JobManager {
             stone: [],
             metal: [],
             planks: [],
+            weapons: [],
+            tools: [],
             production: []
         };
 
@@ -379,6 +385,8 @@ class JobManager {
             stone: { income: [], expense: [] },
             metal: { income: [], expense: [] },
             planks: { income: [], expense: [] },
+            weapons: { income: [], expense: [] },
+            tools: { income: [], expense: [] },
             production: { income: [], expense: [] }
         };
 
@@ -393,6 +401,8 @@ class JobManager {
             stone: 0,
             metal: 0,
             planks: 0,
+            weapons: 0,
+            tools: 0,
             production: 0
         };
 
@@ -429,7 +439,7 @@ class JobManager {
                 const efficiency = this.jobEfficiency.get(jobType);
                 if (!efficiency) return;
 
-                let jobTotal = { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, production: 0 };
+                let jobTotal = { food: 0, wood: 0, stone: 0, metal: 0, weapons: 0, tools: 0, production: 0 };
 
                 // Building-level efficiency multiplier (effects, haste rune, weather, etc.)
                 let buildingMult = 1.0;
@@ -477,7 +487,7 @@ class JobManager {
 
                 // Accumulate totals by job type across all buildings
                 if (!jobAggregates[jobType]) {
-                    jobAggregates[jobType] = { workers: 0, resources: { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, production: 0 } };
+                    jobAggregates[jobType] = { workers: 0, resources: { food: 0, wood: 0, stone: 0, metal: 0, weapons: 0, tools: 0, production: 0 } };
                 }
                 jobAggregates[jobType].workers += Array.isArray(workerIds) ? workerIds.length : 0;
                 Object.entries(jobTotal).forEach(([resourceType, amount]) => {
@@ -677,11 +687,19 @@ class JobManager {
                 if (wood < 3) score -= 15;
             }
 
+            // Blacksmith produces weapons and tools
+            if (job.jobType === 'blacksmith') {
+                const metal = resources.metal || 0;
+                score += needs.weaponsUrgency * 2;
+                score += needs.toolsUrgency * 2;
+                if (metal < 2) score -= 10;
+            }
+
             // Gold if useful later (keep small weight)
             if (job.jobType === 'trader') score += needs.goldUrgency * 1.5;
 
-            // Production (engineer/blacksmith/crafter) minor until crafting exists
-            if (job.jobType === 'engineer' || job.jobType === 'blacksmith' || job.jobType === 'crafter') {
+            // Production (engineer/crafter) minor until crafting exists
+            if (job.jobType === 'engineer' || job.jobType === 'crafter') {
                 score += needs.productionUrgency * 1; // small weight
             }
 
@@ -811,7 +829,10 @@ class JobManager {
         const food = res.food || 0;
         const wood = res.wood || 0;
         const stone = res.stone || 0;
+        const metal = res.metal || 0;
         const planks = res.planks || 0;
+        const weapons = res.weapons || 0;
+        const tools = res.tools || 0;
         const gold = res.gold || 0;
 
         // Urgency scales: 0-1+ higher means more urgent
@@ -823,10 +844,13 @@ class JobManager {
         const basicUrgency = Math.max(woodUrgency, stoneUrgency) * 0.5 + foodUrgency * 0.5;
 
         const planksUrgency = this.capUrgency(planks, caps.planks || 50) * 0.6 + woodUrgency * 0.4; // want planks when wood healthy
+        const metalUrgency = this.capUrgency(metal, caps.metal || 50);
+        const weaponsUrgency = this.capUrgency(weapons, caps.weapons || 50) * 0.6 + metalUrgency * 0.4; // want weapons when metal healthy
+        const toolsUrgency = this.capUrgency(tools, caps.tools || 50) * 0.5; // tools improve production
         const goldUrgency = this.capUrgency(gold, caps.gold || 100) * 0.3; // low weight for now
         const productionUrgency = 0.1; // placeholder until crafting implemented
 
-        return { foodUrgency, woodUrgency, stoneUrgency, basicUrgency, planksUrgency, goldUrgency, productionUrgency };
+        return { foodUrgency, woodUrgency, stoneUrgency, basicUrgency, planksUrgency, metalUrgency, weaponsUrgency, toolsUrgency, goldUrgency, productionUrgency };
     }
 
     capUrgency(current, cap) {
