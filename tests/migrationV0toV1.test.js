@@ -22,7 +22,7 @@ describe('save migration v0 -> v1', () => {
 
         // Post-migration expectations
         expect(gs.currentDay).toBe(7);
-        expect(gs.resources).toMatchObject({ food: 10, wood: 50, stone: 25, metal: 0, production: 0 });
+        expect(gs.resources).toMatchObject({ food: 10, wood: 150, stone: 25, metal: 0, production: 0 });
         // Buildings should be an array
         expect(Array.isArray(gs.buildings)).toBe(true);
 

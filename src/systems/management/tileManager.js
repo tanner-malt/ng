@@ -45,15 +45,11 @@ class TileManager {
         console.log('[TileManager] Empty grid initialized');
     }
 
-    // Setup initial town (only called for new games)
+    // Setup initial town (only called for new games) - DEPRECATED, kept for compatibility
     setupInitialTown() {
-        // Place initial foundersWagon at center - humble beginnings!
-        const centerX = Math.floor(this.width / 2);
-        const centerY = Math.floor(this.height / 2);
-
-        this.placeBuildingAtInternal(centerX, centerY, 'foundersWagon');
-
-        console.log('[TileManager] Initial foundersWagon placed at', centerX, centerY, '- humble beginnings!');
+        // No longer places any initial buildings
+        // Players start with an empty grid and must build everything themselves
+        console.log('[TileManager] setupInitialTown called but no buildings placed - start empty');
         
         // Auto-assign workers to the new building after a brief delay
         if (this.gameState?.jobManager) {

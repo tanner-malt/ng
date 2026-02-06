@@ -879,16 +879,6 @@ body {
 }
 
 /* Professional Building Types */
-.building.tent {
-    background: linear-gradient(135deg, #8bc34a, #689f38);
-    color: var(--text-primary);
-}
-
-.building.foundersWagon {
-    background: linear-gradient(135deg, #ff9800, #f57c00);
-    color: var(--text-primary);
-}
-
 .building.house {
     background: linear-gradient(135deg, var(--accent-error), #c62828);
     color: var(--text-primary);

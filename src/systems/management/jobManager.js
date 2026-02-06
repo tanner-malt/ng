@@ -27,10 +27,10 @@ class JobManager {
         // Farmers baseline food per day
         this.jobEfficiency.set('farmer', { food: 3.5 }); // From farms (was 3)
         this.jobEfficiency.set('woodcutter', { wood: 3 }); // From woodcutter lodges
-        this.jobEfficiency.set('builder', { construction: 1 }); // From tents, builder huts
+        this.jobEfficiency.set('builder', { construction: 1 }); // From builder huts
         // Gatherers now produce a random basic resource each day (food OR wood OR stone)
         // We leave efficiency blank and handle via RNG in calculateDailyProduction
-        this.jobEfficiency.set('gatherer', {}); // From tents, founders wagon, town center
+        this.jobEfficiency.set('gatherer', {}); // From storehouses
         // Sawyer produces planks from wood
         this.jobEfficiency.set('sawyer', { planks: 2, wood: -2 }); // From lumber mills - plank production
         // Foreman no longer contributes direct construction points; boosts builders instead

@@ -414,7 +414,6 @@ class ConstructionManager {
             farm: ['Agriculture', 'Carpentry'],
             woodcutterLodge: ['Forestry', 'Carpentry', 'Engineering'],
             lumberMill: ['Forestry', 'Carpentry'],
-            tent: ['Carpentry'],
 
             // Stone-heavy buildings
             townCenter: ['Masonry', 'Engineering', 'Administration'],

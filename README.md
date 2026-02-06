@@ -76,9 +76,8 @@ Next
 
 Later
 - Bigger worlds with biomes and seasons.
-- Tactical battle improvements and diplomacy.
+- Tactical battle improvements.
 - Tech/research progression and economy depth.
-- TypeScript + automated tests.
 
 ## License
 

@@ -15,8 +15,7 @@ This document outlines the new organized structure of the Dynasty Builder codeba
 │   │   ├── gameplay/     # Game mechanics (Village, Battle, Quest)
 │   │   └── features/     # Specific features (Tutorial, Achievements)
 │   ├── utils/            # Utility functions and helpers
-│   ├── config/           # Configuration files and constants
-│   └── types/            # Type definitions (for future TypeScript)
+│   └── config/           # Configuration files and constants
 ├── public/               # Static assets and HTML files
 ├── docs/                 # Documentation and screenshots
 │   ├── architecture/     # System architecture docs

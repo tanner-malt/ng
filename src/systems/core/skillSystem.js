@@ -45,8 +45,8 @@ class SkillSystem {
                     archery: { name: 'Archery', icon: '🏹', description: 'Bow mastery, tactical positioning, and ranged combat precision' },
                     meleeCombat: { name: 'Melee Combat', icon: '⚔️', description: 'Sword, axe, and spear fighting techniques' },
                     cavalry: { name: 'Cavalry', icon: '🐎', description: 'Mounted warfare, horse training, and mobile combat tactics' },
-                    siegeWarfare: { name: 'Siege Warfare', icon: '🏰', description: 'Catapult operation, wall destruction, and fortification assault' },
-                    fortification: { name: 'Fortification', icon: '🛡️', description: 'Defensive structure design, garrison management, and siege defense' },
+                    heavyCombat: { name: 'Heavy Combat', icon: '🏰', description: 'Large-scale battle tactics, fortification assault, and defensive operations' },
+                    fortification: { name: 'Fortification', icon: '🛡️', description: 'Defensive structure design and garrison management' },
                     scouting: { name: 'Scouting', icon: '👁️', description: 'Reconnaissance, stealth movement, and intelligence gathering' },
                     militaryEngineering: { name: 'Military Engineering', icon: '🔧', description: 'Battlefield preparation, trap setting, and tactical construction' }
                 }
@@ -454,16 +454,16 @@ class SkillSystem {
                     },
                     bonuses: { defense: 2.0, loyalty: 1.5 }
                 },
-                siegeEngineer: {
-                    name: 'Siege Engineer',
-                    description: 'Specialized in fortification assault and defensive construction',
+                combatEngineer: {
+                    name: 'Combat Engineer',
+                    description: 'Specialized in battlefield preparation and tactical construction',
                     requirements: {
                         skills: {
-                            siegeWarfare: 'expert',
+                            militaryEngineering: 'expert',
                             engineering: 'journeyman'
                         }
                     },
-                    bonuses: { siegePower: 2.0, construction: 1.5 }
+                    bonuses: { battlePrep: 2.0, construction: 1.5 }
                 }
             },
             administrative: {

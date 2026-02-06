@@ -23,20 +23,19 @@ Starting Conditions (ENFORCED):
 - Jobs: None (buildingProduction.jobs only available when buildings exist)
 - Auto-placement: FORBIDDEN (setupInitial=false in all calls)
 - Starting Resources: GameData.startingResources (minimal survival amounts)
-- Inventory: 5 tents, 2 haste runes, 1 founders wagon (tileManager initialization)
 ```
 
 ## 🚫 **Absolute Prohibitions**
 
 ### Code-Level Constraints
 1. **NO automatic building placement**
-   - No tent spawning on initialization (setupInitial=false in gameState.reset)
+   - No building spawning on initialization (setupInitial=false in gameState.reset)
    - No "helpful" starting buildings (setupInitial=false in app.js)
-   - Players must place everything manually (tileManager.placeTentFromInventory)
+   - Players must place everything manually
 
 2. **NO population cap minimums**
    - Base capacity is 0, not 1 or 5 (GameData.calculatePopulationCap)
-   - Only buildings provide capacity (houses=6, tents=4, townCenters=3)
+   - Only buildings provide capacity (houses=6, townCenters=3)
    - `Math.max(cap, 1)` is FORBIDDEN (removed from calculatePopulationCap)
 
 3. **NO pre-assigned job roles**
@@ -155,7 +154,7 @@ Testing tool:
 - Contains ALL game constants and calculations
 - Population cap calculation MUST return actual building total (no Math.max)
 - Building costs, production rates, construction points defined here
-- Starting resources and inventory items specified
+- Starting resources specified
 - Seasonal modifiers and progression systems
 
 ### `gameState.js`
@@ -179,8 +178,7 @@ Testing tool:
 
 ### `tileManager.js`
 - NEVER call `setupInitialTown()` automatically
-- Players place all buildings manually (placeTentFromInventory)
-- Inventory provides building items, not automatic placements
+- Players place all buildings manually through the build queue
 - Grid management and building placement validation
 
 ### `effectsManager.js`
@@ -211,18 +209,16 @@ Testing tool:
 
 ### New Game Start Should Show:
 - **Population**: 5/0 (5 villagers, 0 capacity - immediate housing crisis)
-- **Buildings**: Empty village grid (no automatic tent placement)
+- **Buildings**: Empty village grid (no automatic building placement)
 - **Jobs**: None available (no buildings built yet)
-- **Inventory**: 5 tents, 2 haste runes, 1 founders wagon for manual placement
 - **Resources**: Minimal starting amounts (GameData.startingResources)
 
 ### Player Experience Goals:
 - Immediate resource pressure (need housing for 5 villagers)
-- Strategic placement decisions (where to build first tent/house)
+- Strategic placement decisions (where to build first house)
 - Clear progression path (build → capacity → jobs → more building)
 - Sense of accomplishment (earned everything through construction)
 - Construction management (assign builders, track progress)
-- Effects utilization (use haste runes strategically for faster building)
 
 ---
 

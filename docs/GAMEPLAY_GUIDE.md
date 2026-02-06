@@ -15,7 +15,7 @@ Idle Dynasty Builder is a strategic city-building and exploration game where you
 - **No buildings** - you must construct everything from scratch
 - **Population cap starts at 0** - only buildings and technology can increase capacity
 - **Jobs are derived from buildings** - villagers get roles based on constructed buildings
-- **Starting inventory**: 5 tents, 2 haste runes, 1 founders wagon for manual placement
+- **Starting resources**: Wood, food, and stone to begin construction
 - Your immediate priority is building shelter to house your population before they face penalties
 
 ### 3. First Steps Tutorial
@@ -34,8 +34,8 @@ The game revolves around four primary resources:
 
 ### Population Management
 - **Jobs are assigned based on buildings** - construct buildings to create job opportunities
-- Houses provide **6 population capacity** each, tents provide **4 capacity**
-- Town centers provide **3 capacity** plus administrative jobs
+- Houses provide **6 population capacity** each
+- Town centers provide storage and administrative functions
 - Balance population growth with resource consumption and housing capacity
 - Unemployed population can be drafted for military service
 - Population without adequate housing capacity may face happiness penalties
@@ -45,7 +45,7 @@ The game revolves around four primary resources:
 The game uses a work-point based construction system:
 
 #### Construction Process
-1. **Place Building**: Use inventory items to place building foundations on the village grid
+1. **Place Building**: Select a building type and place it on the village grid
 2. **Assign Builders**: Buildings require builders to accumulate work points daily
 3. **Track Progress**: Construction sites show progress bars and estimated completion time
 4. **Complete Building**: Once work points are met, building becomes functional and provides jobs

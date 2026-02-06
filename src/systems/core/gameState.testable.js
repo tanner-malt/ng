@@ -45,9 +45,9 @@ class GameStateTestable {
         this.currentDay = 1;
         this.season = 'Spring';
         this.gold = 100;
-        this.resources = { food: 100, wood: 50, stone: 25, metal: 0, planks: 0, weapons: 0, tools: 0, production: 0 };
+        this.resources = { food: 50, wood: 150, stone: 25, metal: 0, planks: 0, weapons: 0, tools: 0, production: 0 };
         this.buildings = [];
-        this.unlockedBuildings = ['foundersWagon', 'townCenter', 'house'];
+        this.unlockedBuildings = ['townCenter', 'house'];
 
         this.population = STARTING_POPULATION;
 

@@ -1954,8 +1954,6 @@ class VillageManager {
             lumberMill: '🪓',
             magicalTower: '🔮',
             grandLibrary: '🏛️',
-            tent: '⛺',
-            foundersWagon: '🚛',
             buildersHut: '🏗️',
             storehouse: '📦'
         };
@@ -4155,7 +4153,7 @@ class VillageManager {
             barracks: [
                 { id: 'elite', name: 'Elite Training', description: 'Trains elite units with +20 morale bonus' },
                 { id: 'rapid', name: 'Rapid Deployment', description: '50% faster unit recruitment' },
-                { id: 'fortified', name: 'Fortified Barracks', description: '+30 defense and siege resistance' }
+                { id: 'fortified', name: 'Fortified Barracks', description: '+30 defense bonus' }
             ],
             workshop: [
                 { id: 'masterwork', name: 'Masterwork Crafting', description: '15% chance for masterwork items' },

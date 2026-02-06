@@ -127,15 +127,6 @@ Formations influence how commanders direct their armies without providing direct
 - Provides contextual enemy forces and conditions
 - Integrates battle outcomes with story progression
 
-## Future Expansion
-
-### Planned Features
-- **Siege Warfare**: Castle attacks with specialized units and equipment
-- **Naval Combat**: Ship-based battles with unique unit types
-- **Mercenary System**: Hireable units independent of population
-- **Alliance Battles**: Multi-army conflicts with diplomatic elements
-- **Seasonal Campaigns**: Extended conflicts across multiple battles
-
 ### Technical Notes
 - Battle state persists across sessions via gameState integration
 - Commander AI can be expanded with machine learning techniques

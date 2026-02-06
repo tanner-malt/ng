@@ -15,48 +15,6 @@
 
 const BUILDING_DATA = {
     // =========================================
-    // STARTER BUILDINGS
-    // =========================================
-    tent: {
-        name: 'Tent',
-        icon: '⛺',
-        description: 'Temporary shelter providing basic housing and worker assignments',
-        effects: 'Provides housing for 4 people • 2 Builder jobs • 2 Gatherer jobs',
-        category: 'starter',
-        
-        costs: {}, // Free - placed from inventory
-        constructionPoints: 15,
-        
-        production: {
-            populationCapacity: 4,
-            jobs: { builder: 2, gatherer: 2 }
-        },
-        
-        unlockConditions: [], // Always available
-        startsUnlocked: true
-    },
-
-    foundersWagon: {
-        name: "Founder's Wagon",
-        icon: '🚛',
-        description: 'Your starting base - provides shelter, storage, and work for your first settlers',
-        effects: '+3 housing • +100 storage • 3 Gatherer jobs • 4 Builder jobs',
-        category: 'starter',
-        
-        costs: {},
-        constructionPoints: 0, // Pre-built
-        
-        production: {
-            populationCapacity: 3,
-            storage: { all: 100 },
-            jobs: { gatherer: 3, builder: 4 }
-        },
-        
-        unlockConditions: [],
-        startsUnlocked: true
-    },
-
-    // =========================================
     // ESSENTIAL BUILDINGS
     // =========================================
     townCenter: {

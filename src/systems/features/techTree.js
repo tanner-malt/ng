@@ -141,15 +141,15 @@ class TechTree {
                 effects: { marketGold: 0.25, tradingEnabled: true },
                 description: '+25% market gold, enable trading'
             },
-            siegeEngineering: {
-                id: 'siegeEngineering',
-                name: 'Siege Engineering',
+            fortificationTactics: {
+                id: 'fortificationTactics',
+                name: 'Fortification Tactics',
                 tier: 3,
                 cost: 250,
                 requires: ['advancedConstruction'],
                 requiresBuilding: 'university',
-                effects: { siegeDamage: 0.30 },
-                description: '+30% damage vs enemy bases'
+                effects: { fortificationDamage: 0.30 },
+                description: '+30% damage vs fortified enemies'
             },
 
             // Tier 4: Empire Era
@@ -163,15 +163,15 @@ class TechTree {
                 effects: { weaponQuality: 0.40, armorQuality: 0.40 },
                 description: '+40% weapon/armor quality'
             },
-            diplomacy: {
-                id: 'diplomacy',
-                name: 'Diplomacy',
+            advancedLogistics: {
+                id: 'advancedLogistics',
+                name: 'Advanced Logistics',
                 tier: 4,
                 cost: 400,
                 requires: ['tradeRoutes'],
                 requiresBuilding: 'university',
-                effects: { marriageChance: 0.30, kingdomDiscovery: 0.20 },
-                description: 'Easier marriage alliances, discover more kingdoms'
+                effects: { expeditionCapacity: 0.30, travelSpeed: 0.20 },
+                description: '+30% expedition capacity, +20% travel speed'
             },
             architecture: {
                 id: 'architecture',

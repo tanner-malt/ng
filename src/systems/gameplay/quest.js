@@ -142,7 +142,7 @@ class QuestManager {
                 unlocked: false,
                 discovered: false,
                 unlockRequirement: 'defeat_bandit_stronghold',
-                specialFeatures: ['military_engineering', 'strategic_position', 'siege_weapons']
+                specialFeatures: ['military_engineering', 'strategic_position', 'war_machines']
             },
             {
                 id: 'enchanted_grove',

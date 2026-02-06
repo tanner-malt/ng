@@ -21,10 +21,6 @@ const GameData = {
 
     // Building costs - what resources are required to build each building
     buildingCosts: {
-        // Starter Buildings
-        tent: {}, // Placed from inventory; no construction cost
-        foundersWagon: {}, // Free to place from inventory
-
         // Essential Buildings
         townCenter: { wood: 50 },
         house: { wood: 25 },
@@ -64,25 +60,7 @@ const GameData = {
 
     // Building production - capabilities per building (no direct resource outputs)
     buildingProduction: {
-        // Starter Buildings
-        tent: {
-            populationCapacity: 4, // Provides housing for 4 people (reduced from 5)
-            jobs: {
-                builder: 2, // Provides 2 builder jobs
-                gatherer: 2 // Provides 2 gatherer jobs
-            }
-        },
-
         // Essential Buildings
-        foundersWagon: {
-            populationCapacity: 3, // Provides housing for 3 people
-            // Storage contribution for all resources
-            storage: { all: 100 },
-            jobs: {
-                gatherer: 3, // Provides 3 gatherer jobs
-                builder: 4  // Provides 4 builder jobs for construction
-            }
-        },
         townCenter: {
             // Storage contribution for all resources
             storage: { all: 200 }
@@ -206,9 +184,6 @@ const GameData = {
 
     // Construction point requirements - how many work points each building requires
     constructionPoints: {
-        // Starter Buildings
-        tent: 15, // Quick to build
-
         // Essential Buildings
         townCenter: 10,
         house: 5,
@@ -243,27 +218,12 @@ const GameData = {
         grandLibrary: 110,
 
         // Special Buildings
-        buildersHut: 15, // Quick to build - helps scale up construction
-        foundersWagon: 0 // Pre-built
+        buildersHut: 15 // Quick to build - helps scale up construction
     },
 
     // Building metadata - icons, names, descriptions
     buildingInfo: {
-        // Starter Buildings
-        tent: {
-            icon: '⛺',
-            name: 'Tent',
-            description: 'Temporary shelter providing basic housing and worker assignments',
-            effects: 'Provides housing for 4 people • 2 Builder jobs • 2 Gatherer jobs'
-        },
-
         // Essential Buildings
-        foundersWagon: {
-            icon: '🚛',
-            name: 'Founder Wagon',
-            description: 'Your starting base - provides shelter, storage, and work for your first settlers',
-            effects: '+3 housing • +100 storage • 3 Gatherer jobs (random resources) • 4 Builder jobs'
-        },
         townCenter: {
             icon: '🏛️',
             name: 'Town Center',
@@ -431,7 +391,7 @@ const GameData = {
         advanced: 'Specialized late-game buildings with unique abilities'
     },
 
-    // Starting resources for new games - minimal start with just one tent
+    // Starting resources for new games - minimal start
     // Note: Starting population is handled by PopulationManager (1 royal + 4 villagers = 5)
     startingResources: {
         food: 10, // Small food supply to survive first few days

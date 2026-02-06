@@ -31,9 +31,8 @@ Your **Idle: Dynasty Builder** project has been successfully reorganized for bet
 │   │   ├── management/             # Resource & entity management
 │   │   │   ├── buildingEffects.js
 │   │   │   ├── constructionManager.js
+│   │   │   ├── economySystem.js
 │   │   │   ├── effectsManager.js
-│   │   │   ├── expeditionInventory.js
-│   │   │   ├── inventoryManager.js
 │   │   │   ├── jobManager.js
 │   │   │   ├── populationManager.js
 │   │   │   ├── royalFamily.js
@@ -103,11 +102,10 @@ Resource and entity management:
 - **jobManager.js** - Work assignment & economy
 - **constructionManager.js** - Building construction
 - **tileManager.js** - Grid & building placement
-- **inventoryManager.js** - Item management
+- **economySystem.js** - Resource economy & taxes
 - **effectsManager.js** - Temporary effects & buffs
 - **buildingEffects.js** - Building bonuses & effects
 - **royalFamily.js** - Dynasty family management
-- **expeditionInventory.js** - Expedition-specific inventory
 
 ### **Feature Systems** (`/src/systems/features/`)
 Specific game features:

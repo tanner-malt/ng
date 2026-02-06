@@ -20,10 +20,8 @@ class UnlockSystem {
         this.checkThrottleMs = 1000; // Only check once per second at most
 
         // Start with basic content unlocked
-        // Tent, town center, founder's wagon, and village view available at start
-        this.unlockedContent.add('tent');
+        // Town center and village view available at start
         this.unlockedContent.add('townCenter'); // Town center unlocked from start
-        this.unlockedContent.add('foundersWagon'); // Founder's wagon unlocked from start
         this.unlockedContent.add('village_view'); // Village view always available
 
         this.initializeUnlockConditions();
@@ -642,7 +640,6 @@ class UnlockSystem {
 
     getBuildingIcon(buildingType) {
         const icons = {
-            foundersWagon: '🚛',
             townCenter: '🏛️',
             house: '🏠',
             farm: '🌾',
@@ -790,7 +787,7 @@ class UnlockSystem {
                 workshop: '🔧', market: '🏪', buildersHut: '🔨', woodcutterLodge: '🪚',
                 quarry: '⛏️', lumberMill: '🪓', mine: '⛏️', blacksmith: '⚒️',
                 keep: '🏰', monument: '🗿', fortifications: '🛡️', academy: '🎓',
-                storehouse: '📦', tent: '⛺', foundersWagon: '🚛'
+                storehouse: '📦'
             };
             return buildingIcons[config.type === 'building' ? config.name?.toLowerCase().replace(/\s+/g, '') : ''] || '🏗️';
         } else if (config.type === 'view') {
@@ -816,11 +813,11 @@ class UnlockSystem {
             const saveData = localStorage.getItem('unlockSystem');
             if (saveData) {
                 const parsed = JSON.parse(saveData);
-                this.unlockedContent = new Set(parsed.unlockedContent || ['tent', 'village_view']);
+                this.unlockedContent = new Set(parsed.unlockedContent || ['townCenter', 'village_view']);
             }
         } catch (error) {
             console.warn('[UnlockSystem] Error loading from storage:', error);
-            this.unlockedContent = new Set(['tent', 'village_view']);
+            this.unlockedContent = new Set(['townCenter', 'village_view']);
         }
     }
 
@@ -830,10 +827,10 @@ class UnlockSystem {
     }
 
     resetUnlocks() {
-        this.unlockedContent = new Set(['tent', 'village_view']);
+        this.unlockedContent = new Set(['townCenter', 'village_view']);
         this.saveToStorage();
         this.updateBuildingButtons();
-        console.log('[UnlockSystem] All unlocks reset (except tent and village_view)');
+        console.log('[UnlockSystem] All unlocks reset (except townCenter and village_view)');
     }
 
     // Debug methods
