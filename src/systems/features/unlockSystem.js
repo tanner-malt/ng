@@ -747,11 +747,11 @@ class UnlockSystem {
             );
         }
 
-        // Show modal notification for unlocks
+        // Show notification for unlocks - uses 'notification' type to queue behind blocking modals
         if (window.modalSystem) {
             const icon = this.getUnlockIcon(config);
             window.modalSystem.showModal({
-                id: 'unlock-notification',
+                id: 'unlock-notification-' + Date.now(),
                 title: title,
                 content: `
                     <div class="unlock-notification-content" style="text-align: center; padding: 20px;">
@@ -765,15 +765,14 @@ class UnlockSystem {
                 width: '400px',
                 height: 'auto',
                 className: 'unlock-modal',
-                modalType: 'info',
-                buttons: [
-                    { text: 'Awesome!', className: 'btn-primary', action: 'close' }
-                ],
+                modalType: 'notification',  // This ensures it queues behind blocking modals like tutorial/dynasty
+                closable: true,
+                showCloseButton: true,
                 autoClose: 5000 // Auto-close after 5 seconds
             });
         } else if (window.showToast) {
             // Fallback to toast if modal not available
-            window.showToast(title, message, 'success', 5000);
+            window.showToast(`${title} - ${message}`, { type: 'success', timeout: 5000 });
         } else {
             console.log(`[UnlockSystem] ${title} - ${message}`);
         }
@@ -798,6 +797,12 @@ class UnlockSystem {
     }
 
     saveToStorage() {
+        // Don't save during hard reset
+        if (window.StorageManager?.isHardResetInProgress()) {
+            console.log('[UnlockSystem] Skipping save - hard reset in progress');
+            return;
+        }
+        
         try {
             const saveData = {
                 unlockedContent: Array.from(this.unlockedContent)
@@ -809,6 +814,13 @@ class UnlockSystem {
     }
 
     loadFromStorage() {
+        // Don't load during hard reset
+        if (window.StorageManager?.isHardResetInProgress()) {
+            console.log('[UnlockSystem] Skipping load - hard reset in progress');
+            this.unlockedContent = new Set(['townCenter', 'village_view']);
+            return;
+        }
+        
         try {
             const saveData = localStorage.getItem('unlockSystem');
             if (saveData) {

@@ -11,6 +11,14 @@
  * - Keyboard and click handling for accessibility
  * - Modal stacking and overlay management
  * - Integration with tutorial system
+ * - **Priority-based modal queue** - Modals are queued by type priority
+ * 
+ * Modal Type Hierarchy (lowest number = highest priority):
+ * - CRITICAL (0): Must be dismissed, blocks everything
+ * - BLOCKING (1): Requires user action, queued (tutorial, dynasty naming)
+ * - ATTENTION (2): Important info, waits for blocking modals
+ * - NOTIFICATION (3): Auto-dismissable, never blocks other modals
+ * - TOAST (4): Non-modal, stacks in corner
  * 
  * Usage:
  * - window.showModal(title, content, options) - Main modal function
@@ -18,10 +26,32 @@
  * - Automatic DOM container creation and management
  */
 
+// Modal type priorities (lower = higher priority)
+const MODAL_TYPES = {
+    CRITICAL: { priority: 0, name: 'critical', blocking: true, autoClose: false },
+    BLOCKING: { priority: 1, name: 'blocking', blocking: true, autoClose: false },
+    ATTENTION: { priority: 2, name: 'attention', blocking: false, autoClose: true, defaultDuration: 8000 },
+    NOTIFICATION: { priority: 3, name: 'notification', blocking: false, autoClose: true, defaultDuration: 5000 },
+    TOAST: { priority: 4, name: 'toast', blocking: false, autoClose: true, defaultDuration: 3000 }
+};
+
+// Game states that suppress certain modal types
+const SUPPRESSION_RULES = {
+    // During tutorial, suppress attention/notification modals
+    tutorial: ['attention', 'notification'],
+    // During dynasty naming, suppress everything except critical
+    dynastyNaming: ['attention', 'notification'],
+    // During hard reset, suppress everything
+    hardReset: ['critical', 'blocking', 'attention', 'notification']
+};
+
 class ModalSystem {
     constructor() {
         this.activeModals = new Set();
         this.modalStack = [];
+        this.modalQueue = [];  // Queue for modals waiting to be shown
+        this.currentGameState = null;  // Track current game state for suppression
+        this.isProcessingQueue = false;
         this.init();
     }
 
@@ -36,6 +66,137 @@ class ModalSystem {
             this.createModalContainer();
             this.setupEventListeners();
         }
+    }
+
+    /**
+     * Set the current game state for modal suppression
+     * @param {string|null} state - 'tutorial', 'dynastyNaming', 'hardReset', or null
+     */
+    setGameState(state) {
+        console.log(`[ModalSystem] Game state changed: ${this.currentGameState} -> ${state}`);
+        this.currentGameState = state;
+        
+        // When leaving a suppressed state, process any queued modals
+        if (state === null) {
+            this.processQueue();
+        }
+    }
+
+    /**
+     * Check if a modal type should be suppressed given current game state
+     * @param {string} modalTypeName - The modal type name
+     * @returns {boolean} True if the modal should be suppressed/queued
+     */
+    shouldSuppressModal(modalTypeName) {
+        if (!this.currentGameState) return false;
+        
+        const suppressedTypes = SUPPRESSION_RULES[this.currentGameState];
+        if (!suppressedTypes) return false;
+        
+        return suppressedTypes.includes(modalTypeName);
+    }
+
+    /**
+     * Get the modal type configuration
+     * @param {string} typeName - The type name (critical, blocking, attention, notification, toast)
+     * @returns {object} The modal type configuration
+     */
+    getModalTypeConfig(typeName) {
+        const typeMap = {
+            'critical': MODAL_TYPES.CRITICAL,
+            'blocking': MODAL_TYPES.BLOCKING,
+            'attention': MODAL_TYPES.ATTENTION,
+            'notification': MODAL_TYPES.NOTIFICATION,
+            'toast': MODAL_TYPES.TOAST,
+            // Aliases for backwards compatibility
+            'tutorial': MODAL_TYPES.BLOCKING,
+            'tutorial-step': MODAL_TYPES.BLOCKING,
+            'dynasty-modal': MODAL_TYPES.BLOCKING,
+            'confirmation': MODAL_TYPES.BLOCKING,
+            'settings': MODAL_TYPES.CRITICAL,
+            'achievement-notification': MODAL_TYPES.NOTIFICATION,
+            'unlock-notification': MODAL_TYPES.NOTIFICATION,
+            'message': MODAL_TYPES.ATTENTION,
+            'info': MODAL_TYPES.ATTENTION,
+            'general': MODAL_TYPES.ATTENTION
+        };
+        return typeMap[typeName] || MODAL_TYPES.ATTENTION;
+    }
+
+    /**
+     * Check if there's a blocking modal currently active
+     * @returns {boolean}
+     */
+    hasBlockingModal() {
+        return this.modalStack.some(m => {
+            const typeConfig = this.getModalTypeConfig(m.modalType);
+            return typeConfig.blocking;
+        });
+    }
+
+    /**
+     * Add a modal to the queue
+     * @param {object} options - Modal options
+     * @param {function} resolve - Promise resolve function
+     * @param {function} reject - Promise reject function
+     */
+    queueModal(options, resolve, reject) {
+        const typeConfig = this.getModalTypeConfig(options.modalType || 'general');
+        
+        this.modalQueue.push({
+            options,
+            resolve,
+            reject,
+            priority: typeConfig.priority,
+            queuedAt: Date.now()
+        });
+        
+        // Sort queue by priority (lower = higher priority)
+        this.modalQueue.sort((a, b) => a.priority - b.priority);
+        
+        console.log(`[ModalSystem] Modal queued: "${options.title}" (type: ${options.modalType}, priority: ${typeConfig.priority}, queue size: ${this.modalQueue.length})`);
+    }
+
+    /**
+     * Process the modal queue, showing the next appropriate modal
+     */
+    processQueue() {
+        if (this.isProcessingQueue) return;
+        if (this.modalQueue.length === 0) return;
+        
+        // Don't process if there's a blocking modal active
+        if (this.hasBlockingModal()) {
+            console.log('[ModalSystem] Queue processing deferred - blocking modal active');
+            return;
+        }
+        
+        this.isProcessingQueue = true;
+        
+        // Find the next modal that isn't suppressed
+        let nextModalIndex = -1;
+        for (let i = 0; i < this.modalQueue.length; i++) {
+            const queued = this.modalQueue[i];
+            const typeConfig = this.getModalTypeConfig(queued.options.modalType);
+            
+            if (!this.shouldSuppressModal(typeConfig.name)) {
+                nextModalIndex = i;
+                break;
+            }
+        }
+        
+        if (nextModalIndex === -1) {
+            console.log('[ModalSystem] No processable modals in queue (all suppressed)');
+            this.isProcessingQueue = false;
+            return;
+        }
+        
+        // Remove from queue and show
+        const nextModal = this.modalQueue.splice(nextModalIndex, 1)[0];
+        console.log(`[ModalSystem] Processing queued modal: "${nextModal.options.title}"`);
+        
+        this._showModalInternal(nextModal.options, nextModal.resolve, nextModal.reject);
+        
+        this.isProcessingQueue = false;
     }
 
     createModalContainer() {
@@ -113,12 +274,36 @@ class ModalSystem {
             // Ensure DOM is ready
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => {
-                    this._showModalInternal(options, resolve, reject);
+                    this._handleModalRequest(options, resolve, reject);
                 });
             } else {
-                this._showModalInternal(options, resolve, reject);
+                this._handleModalRequest(options, resolve, reject);
             }
         });
+    }
+
+    /**
+     * Handle a modal request - decide whether to show immediately or queue
+     */
+    _handleModalRequest(options, resolve, reject) {
+        const typeConfig = this.getModalTypeConfig(options.modalType || 'general');
+        
+        // Check if this modal type should be suppressed due to game state
+        if (this.shouldSuppressModal(typeConfig.name)) {
+            console.log(`[ModalSystem] Modal "${options.title}" suppressed (game state: ${this.currentGameState}), queuing`);
+            this.queueModal(options, resolve, reject);
+            return;
+        }
+        
+        // For non-blocking modals, check if there's a blocking modal active
+        if (!typeConfig.blocking && this.hasBlockingModal()) {
+            console.log(`[ModalSystem] Modal "${options.title}" (${typeConfig.name}) waiting for blocking modal, queuing`);
+            this.queueModal(options, resolve, reject);
+            return;
+        }
+        
+        // Show immediately
+        this._showModalInternal(options, resolve, reject);
     }
 
     closeAchievementModals() {
@@ -139,7 +324,8 @@ class ModalSystem {
             closable = true,
             showCloseButton = true,
             modalType = 'general',
-            priority = 0  // Add priority support: 0 = normal, 1 = high (settings), 2 = critical
+            priority = 0,  // Add priority support: 0 = normal, 1 = high (settings), 2 = critical
+            autoClose = null  // Auto-close after this many milliseconds
         } = options;
 
         console.log(`[ModalSystem] Creating modal: "${title}" (type: ${modalType}, id: ${id})`);
@@ -222,6 +408,17 @@ class ModalSystem {
         // Setup event listeners
         this._setupModalEventListeners(modal, closable);
 
+        // Setup auto-close if requested
+        if (autoClose && typeof autoClose === 'number' && autoClose > 0) {
+            setTimeout(() => {
+                // Only close if this modal is still open
+                if (this.modalStack.find(m => m.id === actualModalId)) {
+                    console.log(`[ModalSystem] Auto-closing modal: "${title}" after ${autoClose}ms`);
+                    this.closeModal(actualModalId);
+                }
+            }, autoClose);
+        }
+
         // Resolve the Promise with the actual modal ID
         resolve(actualModalId);
     }
@@ -294,6 +491,9 @@ class ModalSystem {
                 const overlay = document.getElementById('modal-overlay');
                 overlay.style.zIndex = finalZIndex;
             }
+            
+            // Process any queued modals after this one closes
+            this.processQueue();
         }, 200);
     }
 
@@ -314,6 +514,9 @@ class ModalSystem {
         }
 
         console.log('[ModalSystem] All modals cleared');
+        
+        // Process any queued modals
+        setTimeout(() => this.processQueue(), 100);
     }
 
     // Debug method to show current modal state
@@ -321,6 +524,8 @@ class ModalSystem {
         console.log('=== Modal System Debug ===');
         console.log('Active modals:', Array.from(this.activeModals));
         console.log('Modal stack length:', this.modalStack.length);
+        console.log('Modal queue length:', this.modalQueue.length);
+        console.log('Current game state:', this.currentGameState);
         console.log('Modal stack:', this.modalStack.map(m => ({
             id: m.id,
             modalType: m.modalType,
@@ -1779,24 +1984,37 @@ class ModalSystem {
         // Close settings modal first
         this.closeAllModals();
         
+        // Set game state to prevent any new modals
+        this.setGameState('hardReset');
+        
         // Use native confirm for reliability
         setTimeout(() => {
             const confirmed = confirm('⚠️ HARD RESET ⚠️\n\nWARNING: This will delete ALL your data!\n\nThis includes:\n• Current game progress\n• Legacy points and upgrades\n• All achievements\n• Dynasty history\n\nThis action CANNOT be undone.\n\nAre you absolutely sure?');
             
             if (confirmed) {
-                console.log('[ModalSystem] Hard Reset confirmed - wiping all data');
+                console.log('[ModalSystem] Hard Reset confirmed - delegating to StorageManager');
                 
-                // Clear everything
-                localStorage.clear();
-                sessionStorage.clear();
+                // Clear the modal queue as well
+                this.modalQueue = [];
                 
-                // Also clear any in-memory state
-                if (window.gameState) {
-                    window.gameState = null;
+                // Use StorageManager for reliable reset
+                if (window.StorageManager) {
+                    window.StorageManager.hardReset(true);
+                } else {
+                    // Fallback if StorageManager not loaded
+                    console.warn('[ModalSystem] StorageManager not available, using fallback');
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    if (window.gameState) {
+                        window.gameState = null;
+                    }
+                    
+                    window.location.href = window.location.origin + window.location.pathname;
                 }
-                
-                // Force reload to home screen
-                window.location.href = window.location.origin + window.location.pathname;
+            } else {
+                // User cancelled, restore game state
+                this.setGameState(null);
             }
         }, 150);
     }
@@ -2408,13 +2626,40 @@ class ModalSystem {
         console.log('🔥 [TEST] Test modal result:', testModal);
         return testModal;
     }
+
+    /**
+     * Debug method to inspect queue state
+     */
+    debugQueue() {
+        console.log('=== Modal Queue Debug ===');
+        console.log('Current game state:', this.currentGameState);
+        console.log('Queue length:', this.modalQueue.length);
+        console.log('Active modals:', Array.from(this.activeModals));
+        console.log('Modal stack:', this.modalStack.map(m => ({ id: m.id, type: m.modalType })));
+        console.log('Queue contents:');
+        this.modalQueue.forEach((item, i) => {
+            console.log(`  ${i}: "${item.options.title}" (type: ${item.options.modalType}, priority: ${item.priority})`);
+        });
+        return {
+            gameState: this.currentGameState,
+            queueLength: this.modalQueue.length,
+            activeModals: Array.from(this.activeModals),
+            stackLength: this.modalStack.length
+        };
+    }
 }
+
+// Export MODAL_TYPES for external use
+window.MODAL_TYPES = MODAL_TYPES;
 
 // Create global modal system instance
 window.modalSystem = new ModalSystem();
 
 // Add test function globally
 window.testModal = () => window.modalSystem.testModalSystem();
+
+// Add debug function globally
+window.debugModalQueue = () => window.modalSystem.debugQueue();
 
 // Global showModal function for backwards compatibility
 window.showModal = (title, content, options = {}) => {

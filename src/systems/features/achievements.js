@@ -1249,6 +1249,22 @@ class AchievementSystem {
     }
 
     loadFromStorage() {
+        // Don't load during hard reset
+        if (window.StorageManager?.isHardResetInProgress()) {
+            console.log('[Achievements] Skipping load - hard reset in progress');
+            this.achievements = {};
+            this.unlockedAchievements = [];
+            this.stats = {
+                buildings_built: 0,
+                battles_won: 0,
+                houses_built: 0,
+                farms_built: 0,
+                barracks_built: 0,
+                towncenters_built: 0
+            };
+            return;
+        }
+        
         try {
             const saved = localStorage.getItem('achievements');
             if (saved) {
