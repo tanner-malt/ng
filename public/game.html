@@ -10,6 +10,10 @@
 
     <!-- Game Scripts -->
     <script src="../src/config/gameData.js"></script>
+    <!-- New Data Model System - Unified Data Definitions -->
+    <script src="../src/config/buildingData.js"></script>
+    <script src="../src/config/resourceData.js"></script>
+    <script src="../src/config/jobData.js"></script>
     <script>
         // Load the generated wikiData from public folder (built by scripts/build-wiki.js)
         (function loadWikiData() {
@@ -25,6 +29,16 @@
         })();
     </script>
     <script src="../src/systems/core/eventBus.js"></script>
+    <!-- Reactive Data Model System -->
+    <script src="../src/systems/core/dataModel.js"></script>
+    <script src="../src/systems/core/buildingModel.js"></script>
+    <script src="../src/systems/core/resourceModel.js"></script>
+    <script src="../src/systems/core/jobModel.js"></script>
+    <script src="../src/systems/core/modelInit.js"></script>
+    <script src="../src/systems/core/modelBridge.js"></script>
+    <!-- World Map Data Model System -->
+    <script src="../src/config/worldData.js"></script>
+    <script src="../src/systems/core/worldModel.js"></script>
     <script src="../src/systems/core/skillSystem.js"></script>
     <script src="../src/systems/management/populationManager.js"></script>
     <script src="../src/systems/core/gameState.js"></script>
@@ -35,7 +49,6 @@
     <script src="../src/systems/features/achievements.js"></script>
     <script src="../src/systems/features/unlockSystem.js"></script>
     <script src="../src/systems/features/techTree.js"></script>
-    <script src="../src/systems/features/diplomacySystem.js"></script>
     <script src="../src/systems/features/tutorial.js"></script>
     <script src="../src/systems/management/royalFamily.js"></script>
     <script src="../src/systems/management/buildingEffects.js"></script>
@@ -43,19 +56,15 @@
     <script src="../src/systems/management/constructionManager.js"></script>
     <script src="../src/systems/management/jobManager.js"></script>
     <script src="../src/systems/management/tileManager.js"></script>
-    <script src="../src/systems/management/expeditionInventory.js"></script>
     <script src="../src/systems/management/economySystem.js"></script>
-    <script src="../src/systems/features/randomEvents.js"></script>
     <script src="../src/systems/features/legacySystem.js"></script>
     <script src="../src/systems/gameplay/village.js"></script>
     <script src="../src/systems/gameplay/throne.js"></script>
     <script src="../src/systems/gameplay/battle.js"></script>
-    <script src="../src/systems/gameplay/strategicCombat.js"></script>
-    <script src="../src/systems/gameplay/battleViewer.js"></script>
     <script src="../src/systems/gameplay/quest.js"></script>
-    <script src="../src/systems/gameplay/quests.js"></script>
     <script src="../src/systems/gameplay/monarch.js"></script>
     <script src="../src/systems/ui/uiPopups.js"></script>
+    <script src="../src/systems/ui/uiBindings.js"></script>
     <script src="../src/systems/core/eventBusIntegrations.js"></script>
     <!-- World map system (terrain, pathfinding, renderer must load before worldManager) -->
     <script src="../src/world/config/terrain.js"></script>
@@ -64,9 +73,9 @@
     <script src="../src/world/UnitManager.js"></script>
     <script src="../src/world/mapRenderer.js"></script>
     <script src="../src/systems/gameplay/worldManager.js"></script>
+    <script src="../src/systems/core/worldBridge.js"></script>
     <script src="../src/systems/gameplay/enemySpawnSystem.js"></script>
     <script src="../src/systems/gameplay/villageDefense.js"></script>
-    <script src="../src/systems/core/statsIntegration.js"></script>
     <script src="../src/app.js"></script>
     <script src="../src/main.js"></script>
 </head>

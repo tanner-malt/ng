@@ -1733,76 +1733,72 @@ class ModalSystem {
      * End Run - kills current run and lets you start fresh (preserves legacy data)
      */
     endRun() {
-        this.showConfirmation(
-            '<p>This will end your current run and return you to the home screen.</p><p>Your <strong>legacy data</strong> and <strong>achievements</strong> will be preserved.</p><p>Are you sure?</p>',
-            {
-                title: 'End Current Run',
-                confirmText: 'End Run',
-                cancelText: 'Cancel',
-                type: 'warning',
-                exclusive: true,
-                onConfirm: () => {
-                    console.log('[ModalSystem] End Run confirmed - clearing run data only');
-                    
-                    // Keys to preserve (legacy and achievements)
-                    const preserveKeys = [
-                        'dynastyBuilder_legacy',
-                        'dynastyBuilder_achievements',
-                        'idleDynastyBuilder_achievements'
-                    ];
-                    
-                    // Store preserved data
-                    const preserved = {};
-                    preserveKeys.forEach(key => {
-                        const data = localStorage.getItem(key);
-                        if (data) preserved[key] = data;
-                    });
-                    
-                    // Clear all localStorage
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    
-                    // Restore preserved data
-                    Object.entries(preserved).forEach(([key, value]) => {
-                        localStorage.setItem(key, value);
-                    });
-                    
-                    // Force reload to home screen
-                    window.location.href = window.location.origin + window.location.pathname;
-                }
+        // Close settings modal first  
+        this.closeAllModals();
+        
+        // Use native confirm for reliability
+        setTimeout(() => {
+            const confirmed = confirm('End Current Run?\n\nThis will end your current run and return you to the home screen.\n\nYour legacy data and achievements will be preserved.');
+            
+            if (confirmed) {
+                console.log('[ModalSystem] End Run confirmed - clearing run data only');
+                
+                // Keys to preserve (legacy and achievements)
+                const preserveKeys = [
+                    'dynastyBuilder_legacy',
+                    'dynastyBuilder_achievements',
+                    'idleDynastyBuilder_achievements'
+                ];
+                
+                // Store preserved data
+                const preserved = {};
+                preserveKeys.forEach(key => {
+                    const data = localStorage.getItem(key);
+                    if (data) preserved[key] = data;
+                });
+                
+                // Clear all localStorage
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Restore preserved data
+                Object.entries(preserved).forEach(([key, value]) => {
+                    localStorage.setItem(key, value);
+                });
+                
+                // Force reload to home screen
+                window.location.href = window.location.origin + window.location.pathname;
             }
-        );
+        }, 150);
     }
 
     /**
      * Hard Reset - wipes ALL data including legacy and returns to home screen
      */
     hardReset() {
-        this.showConfirmation(
-            '<p style="color: #e74c3c;"><strong>WARNING: This will delete ALL your data!</strong></p><p>This includes:</p><ul><li>Current game progress</li><li>Legacy points and upgrades</li><li>All achievements</li><li>Dynasty history</li></ul><p>This action <strong>cannot be undone</strong>.</p><p>Are you absolutely sure?</p>',
-            {
-                title: '⚠️ Hard Reset',
-                confirmText: 'Delete Everything',
-                cancelText: 'Cancel',
-                type: 'danger',
-                exclusive: true,
-                onConfirm: () => {
-                    console.log('[ModalSystem] Hard Reset confirmed - wiping all data');
-                    
-                    // Clear everything
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    
-                    // Also clear any in-memory state
-                    if (window.gameState) {
-                        window.gameState = null;
-                    }
-                    
-                    // Force reload to home screen
-                    window.location.href = window.location.origin + window.location.pathname;
+        // Close settings modal first
+        this.closeAllModals();
+        
+        // Use native confirm for reliability
+        setTimeout(() => {
+            const confirmed = confirm('⚠️ HARD RESET ⚠️\n\nWARNING: This will delete ALL your data!\n\nThis includes:\n• Current game progress\n• Legacy points and upgrades\n• All achievements\n• Dynasty history\n\nThis action CANNOT be undone.\n\nAre you absolutely sure?');
+            
+            if (confirmed) {
+                console.log('[ModalSystem] Hard Reset confirmed - wiping all data');
+                
+                // Clear everything
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // Also clear any in-memory state
+                if (window.gameState) {
+                    window.gameState = null;
                 }
+                
+                // Force reload to home screen
+                window.location.href = window.location.origin + window.location.pathname;
             }
-        );
+        }, 150);
     }
 
     /**

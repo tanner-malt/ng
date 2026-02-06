@@ -1,3 +1,456 @@
+/**
+ * battle.js - Consolidated Battle System
+ * Includes: StrategicCombat, BattleViewer, and BattleManager
+ */
+
+// ============================================
+// STRATEGIC COMBAT - Combat calculations
+// ============================================
+
+class StrategicCombat {
+    constructor(gameState) {
+        this.gameState = gameState;
+        
+        this.unitTypes = {
+            infantry: {
+                category: 'infantry',
+                name: 'Infantry',
+                icon: '⚔️',
+                stats: { hp: 30, attack: 5, defense: 3, speed: 2 },
+                cost: { food: 20, gold: 10 },
+                isHuman: true,
+                description: 'Standard infantry soldiers'
+            }
+        };
+        
+        this.formations = {
+            line: {
+                name: 'Battle Line',
+                icon: '═',
+                description: 'Standard formation, balanced stats',
+                modifiers: { attack: 1.0, defense: 1.0, speed: 1.0 }
+            }
+        };
+        
+        this.terrainModifiers = {
+            plains: { infantry: { attack: 1.0, defense: 1.0 } },
+            forest: { infantry: { attack: 1.1, defense: 1.2 } },
+            hills: { infantry: { attack: 1.0, defense: 1.1 } },
+            mountains: { infantry: { attack: 1.1, defense: 1.3 } },
+            swamp: { infantry: { attack: 0.8, defense: 0.9 } },
+            desert: { infantry: { attack: 0.9, defense: 0.8 } }
+        };
+        
+        console.log('[StrategicCombat] System initialized');
+    }
+    
+    calculateTerrainModifier(terrain, stat) {
+        const terrainMods = this.terrainModifiers[terrain];
+        if (!terrainMods) return 1.0;
+        const infantryMods = terrainMods.infantry;
+        if (!infantryMods) return 1.0;
+        return infantryMods[stat] || 1.0;
+    }
+    
+    simulateCombatRound(attackingArmy, defendingArmy, terrain = 'plains') {
+        const results = { attackerCasualties: 0, defenderCasualties: 0, events: [] };
+        
+        const attackingUnits = (attackingArmy.units || []).filter(u => u.alive);
+        const defendingUnits = (defendingArmy.units || []).filter(u => u.alive);
+        
+        if (attackingUnits.length === 0 || defendingUnits.length === 0) return results;
+        
+        attackingUnits.forEach(attacker => {
+            const aliveDefenders = defendingUnits.filter(u => u.alive);
+            if (aliveDefenders.length === 0) return;
+            
+            const target = aliveDefenders[Math.floor(Math.random() * aliveDefenders.length)];
+            const terrainMod = this.calculateTerrainModifier(terrain, 'attack');
+            const legacyMod = this.gameState?.legacyCombatMultiplier || 1.0;
+            
+            const attackPower = (attacker.attack || 5) * terrainMod * legacyMod;
+            const defensePower = (target.defense || 3);
+            const damage = Math.max(1, Math.round(attackPower - defensePower * 0.5 + Math.random() * 3));
+            
+            target.hp -= damage;
+            if (target.hp <= 0) {
+                target.alive = false;
+                results.defenderCasualties++;
+            }
+        });
+        
+        const survivingDefenders = defendingUnits.filter(u => u.alive);
+        survivingDefenders.forEach(defender => {
+            const aliveAttackers = attackingUnits.filter(u => u.alive);
+            if (aliveAttackers.length === 0) return;
+            
+            const target = aliveAttackers[Math.floor(Math.random() * aliveAttackers.length)];
+            const terrainMod = this.calculateTerrainModifier(terrain, 'attack');
+            const attackPower = (defender.attack || 5) * terrainMod;
+            const defensePower = (target.defense || 3);
+            const damage = Math.max(1, Math.round(attackPower - defensePower * 0.5 + Math.random() * 3));
+            
+            target.hp -= damage;
+            if (target.hp <= 0) {
+                target.alive = false;
+                results.attackerCasualties++;
+            }
+        });
+        
+        return results;
+    }
+    
+    assessThreat(enemyArmy, playerArmy) {
+        const analysis = {
+            threatLevel: 'low', threatScore: 0, advantages: [], disadvantages: [], recommendation: ''
+        };
+        
+        const enemyUnits = enemyArmy.units || [];
+        const playerUnits = playerArmy.units || [];
+        
+        const enemyStrength = enemyUnits.reduce((sum, u) => sum + (u.attack || 5) + (u.defense || 3), 0);
+        const playerStrength = playerUnits.reduce((sum, u) => sum + (u.attack || 5) + (u.defense || 3), 0);
+        
+        analysis.threatScore = Math.round((enemyStrength / Math.max(1, playerStrength)) * 100);
+        
+        if (analysis.threatScore < 50) {
+            analysis.threatLevel = 'low';
+            analysis.recommendation = '✓ Favorable odds. Attack with confidence.';
+        } else if (analysis.threatScore < 80) {
+            analysis.threatLevel = 'moderate';
+            analysis.recommendation = '🗡️ Winnable battle with good tactics.';
+        } else if (analysis.threatScore < 120) {
+            analysis.threatLevel = 'high';
+            analysis.recommendation = '⚔️ Even fight. Prepare carefully.';
+        } else {
+            analysis.threatLevel = 'extreme';
+            analysis.recommendation = '⚠️ Dangerous! Consider retreating or reinforcing.';
+        }
+        
+        if (playerUnits.length > enemyUnits.length) {
+            analysis.advantages.push(`Numerical advantage: ${playerUnits.length} vs ${enemyUnits.length}`);
+        } else if (enemyUnits.length > playerUnits.length) {
+            analysis.disadvantages.push(`Outnumbered: ${playerUnits.length} vs ${enemyUnits.length}`);
+        }
+        
+        return analysis;
+    }
+    
+    getThreatIcon(threatLevel) {
+        switch(threatLevel) {
+            case 'low': return '🟢';
+            case 'moderate': return '🟡';
+            case 'high': return '🟠';
+            case 'extreme': return '🔴';
+            default: return '⚪';
+        }
+    }
+}
+
+// ============================================
+// BATTLE VIEWER - Animated battle visualization
+// ============================================
+
+class BattleViewer {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.isAnimating = false;
+        this.animationId = null;
+        this.playerUnits = [];
+        this.enemyUnits = [];
+        this.deadUnits = [];
+        this.unitRadius = 8;
+        this.unitSpeed = 1.5;
+        this.battlePhase = 'approaching';
+        this.result = null;
+        this.onBattleComplete = null;
+        console.log('[BattleViewer] Initialized');
+    }
+    
+    showBattle(playerArmy, enemyArmy, terrain = 'plains', onComplete = null) {
+        this.onBattleComplete = onComplete;
+        this.battlePhase = 'approaching';
+        this.result = null;
+        this.deadUnits = [];
+        this.initializeUnits(playerArmy, enemyArmy);
+        this.createBattleModal(playerArmy, enemyArmy, terrain);
+        this.startAnimation();
+    }
+    
+    initializeUnits(playerArmy, enemyArmy) {
+        const playerUnitList = playerArmy.units || [];
+        const enemyUnitList = enemyArmy.units || [];
+        this.playerUnits = [];
+        this.enemyUnits = [];
+        
+        const canvasWidth = 700, canvasHeight = 400, marginX = 80, startY = 60, spacing = 25;
+        const maxPerRow = Math.floor((canvasHeight - 100) / spacing);
+        
+        playerUnitList.filter(u => u.alive !== false).forEach((unit, i) => {
+            const row = i % maxPerRow, col = Math.floor(i / maxPerRow);
+            this.playerUnits.push({
+                ...unit, x: marginX + col * 30, y: startY + row * spacing,
+                targetX: canvasWidth / 2 - 50, vx: 0, vy: 0, alive: true,
+                hp: unit.hp || 30, maxHp: unit.maxHp || 30, attack: unit.attack || 5,
+                defense: unit.defense || 3, color: '#3498db', fighting: false
+            });
+        });
+        
+        enemyUnitList.filter(u => u.alive !== false).forEach((unit, i) => {
+            const row = i % maxPerRow, col = Math.floor(i / maxPerRow);
+            this.enemyUnits.push({
+                ...unit, x: canvasWidth - marginX - col * 30, y: startY + row * spacing,
+                targetX: canvasWidth / 2 + 50, vx: 0, vy: 0, alive: true,
+                hp: unit.hp || 30, maxHp: unit.maxHp || 30, attack: unit.attack || 5,
+                defense: unit.defense || 3, color: '#e74c3c', fighting: false
+            });
+        });
+    }
+    
+    createBattleModal(playerArmy, enemyArmy, terrain) {
+        const existing = document.getElementById('battle-viewer-modal');
+        if (existing) existing.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'battle-viewer-modal';
+        modal.innerHTML = `
+            <div class="battle-viewer-overlay">
+                <div class="battle-viewer-container">
+                    <div class="battle-header">
+                        <div class="army-info player-info">
+                            <span class="army-icon">⚔️</span>
+                            <span class="army-name">Your Army</span>
+                            <span class="army-count" id="player-count">${this.playerUnits.length} soldiers</span>
+                        </div>
+                        <div class="battle-status"><span id="battle-phase">Armies Approaching...</span></div>
+                        <div class="army-info enemy-info">
+                            <span class="army-icon">☠️</span>
+                            <span class="army-name">${enemyArmy.name || 'Raiders'}</span>
+                            <span class="army-count" id="enemy-count">${this.enemyUnits.length} soldiers</span>
+                        </div>
+                    </div>
+                    <canvas id="battle-canvas" width="700" height="400"></canvas>
+                    <div class="battle-controls">
+                        <button id="battle-speed-1x" class="speed-btn active">1x</button>
+                        <button id="battle-speed-2x" class="speed-btn">2x</button>
+                        <button id="battle-speed-4x" class="speed-btn">4x</button>
+                        <button id="battle-skip" class="skip-btn">Skip to End</button>
+                    </div>
+                    <div id="battle-result" class="battle-result" style="display:none;">
+                        <h3 id="result-title">Battle Complete</h3>
+                        <p id="result-details"></p>
+                        <button id="close-battle" class="close-btn">Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        if (!document.getElementById('battle-viewer-styles')) {
+            const style = document.createElement('style');
+            style.id = 'battle-viewer-styles';
+            style.textContent = `
+                .battle-viewer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+                .battle-viewer-container { background: #1a1a2e; border-radius: 12px; padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 2px solid #333; }
+                .battle-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #2a2a4a; border-radius: 8px; }
+                .army-info { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
+                .army-icon { font-size: 24px; } .army-name { font-weight: bold; color: #ecf0f1; } .army-count { font-size: 14px; color: #95a5a6; }
+                .player-info .army-count { color: #3498db; } .enemy-info .army-count { color: #e74c3c; }
+                .battle-status { font-size: 18px; font-weight: bold; color: #f39c12; text-transform: uppercase; }
+                #battle-canvas { background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 20%, #228B22 20%, #228B22 100%); border-radius: 8px; border: 2px solid #333; display: block; }
+                .battle-controls { display: flex; justify-content: center; gap: 10px; margin-top: 15px; }
+                .speed-btn, .skip-btn { padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+                .speed-btn { background: #34495e; color: #ecf0f1; } .speed-btn.active { background: #3498db; color: white; } .speed-btn:hover { background: #4a6785; }
+                .skip-btn { background: #e74c3c; color: white; } .skip-btn:hover { background: #c0392b; }
+                .battle-result { text-align: center; padding: 20px; margin-top: 15px; background: #2a2a4a; border-radius: 8px; }
+                .battle-result h3 { color: #f39c12; margin-bottom: 10px; } .battle-result p { color: #bdc3c7; }
+                .close-btn { margin-top: 15px; padding: 10px 30px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; } .close-btn:hover { background: #2ecc71; }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(modal);
+        this.canvas = document.getElementById('battle-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.setupControls();
+    }
+    
+    setupControls() {
+        document.getElementById('battle-speed-1x')?.addEventListener('click', () => this.setSpeed(1));
+        document.getElementById('battle-speed-2x')?.addEventListener('click', () => this.setSpeed(2));
+        document.getElementById('battle-speed-4x')?.addEventListener('click', () => this.setSpeed(4));
+        document.getElementById('battle-skip')?.addEventListener('click', () => this.skipToEnd());
+        document.getElementById('close-battle')?.addEventListener('click', () => this.closeBattle());
+    }
+    
+    setSpeed(speed) {
+        this.unitSpeed = 1.5 * speed;
+        document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`battle-speed-${speed}x`)?.classList.add('active');
+    }
+    
+    skipToEnd() {
+        this.isAnimating = false;
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        this.resolveBattleInstant();
+    }
+    
+    resolveBattleInstant() {
+        let playerStrength = this.playerUnits.filter(u => u.alive).reduce((sum, u) => sum + u.attack + u.defense, 0);
+        let enemyStrength = this.enemyUnits.filter(u => u.alive).reduce((sum, u) => sum + u.attack + u.defense, 0);
+        
+        while (playerStrength > 0 && enemyStrength > 0) {
+            const playerDamage = playerStrength * 0.2, enemyDamage = enemyStrength * 0.2;
+            playerStrength -= enemyDamage;
+            enemyStrength -= playerDamage;
+            
+            const playerLossRatio = Math.min(1, enemyDamage / Math.max(1, this.playerUnits.filter(u => u.alive).length * 8));
+            const enemyLossRatio = Math.min(1, playerDamage / Math.max(1, this.enemyUnits.filter(u => u.alive).length * 8));
+            
+            this.playerUnits.filter(u => u.alive).forEach(u => { if (Math.random() < playerLossRatio * 0.3) u.alive = false; });
+            this.enemyUnits.filter(u => u.alive).forEach(u => { if (Math.random() < enemyLossRatio * 0.3) u.alive = false; });
+        }
+        this.finishBattle();
+    }
+    
+    startAnimation() { this.isAnimating = true; this.animate(); }
+    
+    animate() {
+        if (!this.isAnimating) return;
+        this.update();
+        this.render();
+        
+        const playerAlive = this.playerUnits.filter(u => u.alive).length;
+        const enemyAlive = this.enemyUnits.filter(u => u.alive).length;
+        if (playerAlive === 0 || enemyAlive === 0) { this.finishBattle(); return; }
+        this.animationId = requestAnimationFrame(() => this.animate());
+    }
+    
+    update() {
+        const allPlayerAlive = this.playerUnits.filter(u => u.alive);
+        const allEnemyAlive = this.enemyUnits.filter(u => u.alive);
+        
+        document.getElementById('player-count').textContent = `${allPlayerAlive.length} soldiers`;
+        document.getElementById('enemy-count').textContent = `${allEnemyAlive.length} soldiers`;
+        
+        if (this.battlePhase === 'approaching') {
+            let anyApproaching = false;
+            [...allPlayerAlive, ...allEnemyAlive].forEach(unit => {
+                const dx = unit.targetX - unit.x;
+                if (Math.abs(dx) > 5) { unit.x += Math.sign(dx) * this.unitSpeed; anyApproaching = true; }
+            });
+            if (!anyApproaching) {
+                this.battlePhase = 'fighting';
+                document.getElementById('battle-phase').textContent = '⚔️ BATTLE!';
+            }
+        }
+        
+        if (this.battlePhase === 'fighting') {
+            allPlayerAlive.forEach(unit => {
+                if (allEnemyAlive.length === 0) return;
+                const target = this.findNearestEnemy(unit, allEnemyAlive);
+                if (!target) return;
+                const dx = target.x - unit.x, dy = target.y - unit.y, dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > this.unitRadius * 2.5) { unit.x += (dx / dist) * this.unitSpeed; unit.y += (dy / dist) * this.unitSpeed * 0.5; }
+                else if (Math.random() < 0.1) this.attackUnit(unit, target);
+            });
+            
+            allEnemyAlive.forEach(unit => {
+                if (allPlayerAlive.length === 0) return;
+                const target = this.findNearestEnemy(unit, allPlayerAlive);
+                if (!target) return;
+                const dx = target.x - unit.x, dy = target.y - unit.y, dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > this.unitRadius * 2.5) { unit.x += (dx / dist) * this.unitSpeed; unit.y += (dy / dist) * this.unitSpeed * 0.5; }
+                else if (Math.random() < 0.1) this.attackUnit(unit, target);
+            });
+        }
+    }
+    
+    findNearestEnemy(unit, enemies) {
+        let nearest = null, nearestDist = Infinity;
+        enemies.forEach(enemy => {
+            if (!enemy.alive) return;
+            const dx = enemy.x - unit.x, dy = enemy.y - unit.y, dist = dx*dx + dy*dy;
+            if (dist < nearestDist) { nearestDist = dist; nearest = enemy; }
+        });
+        return nearest;
+    }
+    
+    attackUnit(attacker, target) {
+        if (!target.alive) return;
+        const damage = Math.max(1, attacker.attack - target.defense * 0.5 + Math.random() * 3);
+        target.hp -= damage;
+        if (target.hp <= 0) { target.alive = false; this.deadUnits.push({ ...target, deathTime: Date.now() }); }
+    }
+    
+    render() {
+        const ctx = this.ctx, w = this.canvas.width, h = this.canvas.height;
+        
+        const skyGradient = ctx.createLinearGradient(0, 0, 0, h * 0.2);
+        skyGradient.addColorStop(0, '#87CEEB'); skyGradient.addColorStop(1, '#5DADE2');
+        ctx.fillStyle = skyGradient; ctx.fillRect(0, 0, w, h * 0.2);
+        
+        const grassGradient = ctx.createLinearGradient(0, h * 0.2, 0, h);
+        grassGradient.addColorStop(0, '#2ECC71'); grassGradient.addColorStop(0.5, '#27AE60'); grassGradient.addColorStop(1, '#1E8449');
+        ctx.fillStyle = grassGradient; ctx.fillRect(0, h * 0.2, w, h * 0.8);
+        
+        this.deadUnits.forEach(unit => {
+            ctx.globalAlpha = 0.3; ctx.fillStyle = '#555';
+            ctx.beginPath(); ctx.arc(unit.x, unit.y, this.unitRadius * 0.7, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+        });
+        
+        this.playerUnits.filter(u => u.alive).forEach(unit => this.drawUnit(unit));
+        this.enemyUnits.filter(u => u.alive).forEach(unit => this.drawUnit(unit));
+    }
+    
+    drawUnit(unit) {
+        const ctx = this.ctx, r = this.unitRadius;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(unit.x, unit.y + r * 0.7, r * 0.9, r * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = unit.color;
+        ctx.beginPath(); ctx.arc(unit.x, unit.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = unit.color === '#3498db' ? '#2980b9' : '#c0392b'; ctx.lineWidth = 2; ctx.stroke();
+        
+        const hpPercent = unit.hp / unit.maxHp, barWidth = r * 2, barHeight = 3, barX = unit.x - r, barY = unit.y - r - 6;
+        ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
+        ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+    }
+    
+    finishBattle() {
+        this.isAnimating = false; this.battlePhase = 'finished';
+        const playerAlive = this.playerUnits.filter(u => u.alive).length;
+        const enemyAlive = this.enemyUnits.filter(u => u.alive).length;
+        const victory = playerAlive > 0 && enemyAlive === 0;
+        
+        this.result = {
+            victory, playerSurvivors: playerAlive, playerLosses: this.playerUnits.length - playerAlive,
+            enemySurvivors: enemyAlive, enemyLosses: this.enemyUnits.length - enemyAlive
+        };
+        
+        document.getElementById('battle-phase').textContent = victory ? '🏆 VICTORY!' : '💀 DEFEAT';
+        document.getElementById('result-title').textContent = victory ? '🏆 Victory!' : '💀 Defeat';
+        document.getElementById('result-details').innerHTML = `
+            <strong>Your Army:</strong> ${playerAlive} survived, ${this.result.playerLosses} lost<br>
+            <strong>Enemy Army:</strong> ${enemyAlive} survived, ${this.result.enemyLosses} lost
+        `;
+        document.getElementById('battle-result').style.display = 'block';
+        this.render();
+    }
+    
+    closeBattle() {
+        this.isAnimating = false;
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        document.getElementById('battle-viewer-modal')?.remove();
+        if (this.onBattleComplete) this.onBattleComplete(this.result);
+    }
+}
+
+// ============================================
+// BATTLE MANAGER - Main battle orchestration
+// ============================================
+
 // Battle system with AI personalities and automation
 class BattleManager {
     constructor(gameState) {
@@ -1491,5 +1944,10 @@ class BattleManager {
     }
 }
 
-// Make BattleManager globally available
+// Make all battle classes globally available
+window.StrategicCombat = StrategicCombat;
+window.BattleViewer = BattleViewer;
 window.BattleManager = BattleManager;
+
+// Create instances used by battle.js
+window.battleViewer = new BattleViewer();
