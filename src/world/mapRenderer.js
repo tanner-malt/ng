@@ -132,34 +132,48 @@ class MapRenderer {
     el.style.display = 'flex';
     el.style.position = 'absolute';
     
-    if (data.fogOfWar) {
+    // Use new visibility model with fallback for legacy
+    const visibility = data.visibility || (data.discovered ? 'explored' : data.scoutable ? 'scoutable' : 'hidden');
+    
+    // Format coordinates relative to capital
+    const coordLabel = this.world.formatCoords?.(r, c) || `(${r}, ${c})`;
+    
+    if (visibility === 'hidden') {
       // True fog of war - unexplored
-      el.textContent = '🌫️';
-      el.style.background = 'linear-gradient(135deg,#2c3e50,#34495e)';
-      el.style.border = '2px solid #566';
-      el.style.opacity = '0.8';
-      el.style.color = '#a5b1b5';
-      el.title = 'Unexplored';
-    } else if (data.discovered && !data.hasPlayerUnit) {
-      // Explored but no unit present - show terrain but hide enemies
+      el.textContent = '?';
+      el.style.background = 'linear-gradient(135deg,#1a252f,#2c3e50)';
+      el.style.border = '2px solid #4a5568';
+      el.style.opacity = '0.5';
+      el.style.color = '#718096';
+      el.title = `${coordLabel} - Unexplored`;
+    } else if (visibility === 'scoutable') {
+      // Scoutable - adjacent to explored tiles
+      el.textContent = '👁️';
+      el.style.background = 'linear-gradient(135deg,#2c5282,#2b6cb0)';
+      el.style.border = '2px dashed #4299e1';
       el.style.opacity = '0.85';
-      el.style.background = terrain.color;
-      el.style.border = data.isPlayerVillage ? '3px solid #f1c40f' : '2px solid rgba(255,255,255,0.2)';
-      el.style.boxShadow = data.isPlayerVillage ? '0 0 10px rgba(241,196,15,0.4)' : 'none';
-      el.style.color = '#ddd';
-      el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
-      el.textContent = terrain.symbol;
-      el.title = `${data.terrain} (explored)`;
-    } else {
-      // Fully visible (player unit present or player village)
+      el.style.color = '#bee3f8';
+      el.title = `${coordLabel} - Send scouts to explore`;
+    } else if (data.isPlayerVillage) {
+      // Player village - special styling
       el.style.opacity = '1';
+      el.style.background = `linear-gradient(145deg, #f6e05e, #d69e2e)`;
+      el.style.border = '3px solid #f1c40f';
+      el.style.boxShadow = '0 0 12px rgba(241,196,15,0.5)';
+      el.style.color = '#fff';
+      el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
+      el.textContent = '🏰';
+      el.title = `${coordLabel} - Your Capital`;
+    } else {
+      // Explored - show terrain
+      el.style.opacity = data.hasPlayerUnit ? '1' : '0.9';
       el.style.background = terrain.color;
-      el.style.border = data.isPlayerVillage ? '3px solid #f1c40f' : '2px solid rgba(255,255,255,0.3)';
-      el.style.boxShadow = data.isPlayerVillage ? '0 0 10px rgba(241,196,15,0.4)' : 'none';
+      el.style.border = '2px solid rgba(255,255,255,0.25)';
+      el.style.boxShadow = 'none';
       el.style.color = '#fff';
       el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
       el.textContent = terrain.symbol;
-      el.title = data.isPlayerVillage ? 'Your Village' : data.terrain;
+      el.title = `${coordLabel} - ${data.terrain}`;
     }
 
     // selection highlight
@@ -217,6 +231,81 @@ class MapRenderer {
       });
     }
     
+    // Enemy armies with threat indicators
+    if (window.enemySpawnSystem && window.enemySpawnSystem.enemyArmies) {
+      window.enemySpawnSystem.enemyArmies.forEach(enemy => {
+        if (!enemy.hostile) return;
+        
+        const marker = document.createElement('div');
+        marker.className = 'entity enemy-army-marker';
+        marker.textContent = '☠️';
+        this.positionEntity(marker, enemy.row, enemy.col);
+        marker.style.background = '#e74c3c';
+        
+        // Add threat indicator if strategic combat is available
+        if (window.strategicCombat && this.world.gameState?.army) {
+          const playerArmy = { units: this.world.gameState.army };
+          const assessment = window.strategicCombat.assessThreat(enemy, playerArmy);
+          const threatIcon = window.strategicCombat.getThreatIcon(assessment.threatLevel);
+          
+          // Add small threat badge
+          const badge = document.createElement('span');
+          badge.className = 'threat-badge';
+          badge.textContent = threatIcon;
+          badge.style.position = 'absolute';
+          badge.style.top = '-6px';
+          badge.style.right = '-6px';
+          badge.style.fontSize = '12px';
+          marker.appendChild(badge);
+          marker.title = `${enemy.name || 'Enemy Army'} - Threat: ${assessment.threatLevel.toUpperCase()}`;
+        }
+        
+        this.entityLayer.appendChild(marker);
+      });
+    }
+    
+    // Enemy lairs
+    if (window.enemySpawnSystem && window.enemySpawnSystem.lairs) {
+      window.enemySpawnSystem.lairs.forEach(lair => {
+        if (lair.destroyed) return;
+        
+        // Only show lairs on explored tiles
+        const hexData = this.world.hexMap?.[lair.row]?.[lair.col];
+        const visibility = hexData?.visibility || (hexData?.discovered ? 'explored' : 'hidden');
+        if (visibility === 'hidden') return;
+        
+        const marker = document.createElement('div');
+        marker.className = 'entity lair-marker';
+        marker.textContent = lair.icon || '🕳️';
+        this.positionEntity(marker, lair.row, lair.col);
+        marker.style.background = 'rgba(100, 50, 50, 0.9)';
+        marker.style.border = '2px solid #a00';
+        
+        // Strength indicator
+        const strength = Math.round(lair.currentUnits);
+        const maxUnits = lair.maxUnits;
+        const fillPercent = Math.round((strength / maxUnits) * 100);
+        
+        marker.title = `${lair.name} - Strength: ${strength}/${maxUnits} (${fillPercent}%)`;
+        
+        // Add garrison count badge
+        const badge = document.createElement('span');
+        badge.className = 'garrison-badge';
+        badge.textContent = strength.toString();
+        badge.style.position = 'absolute';
+        badge.style.bottom = '-4px';
+        badge.style.right = '-4px';
+        badge.style.fontSize = '10px';
+        badge.style.background = '#c0392b';
+        badge.style.borderRadius = '50%';
+        badge.style.padding = '2px 4px';
+        badge.style.color = 'white';
+        marker.appendChild(badge);
+        
+        this.entityLayer.appendChild(marker);
+      });
+    }
+    
     // scouts/expeditions
     (this.world.expeditions || []).filter(e => e.status === 'stationed').forEach(exp => {
       const marker = document.createElement('div');
@@ -262,7 +351,15 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
     .world-grid .entity { pointer-events:none; }
     .army-marker { color:#fff; background:#c0392b !important; }
     .scout-marker { color:#fff; background:#2980b9 !important; }
+    .enemy-army-marker { color:#fff; animation: pulse-threat 1.5s infinite; }
+    .lair-marker { color:#fff; }
     .path-step { font-size:10px; color:#fff; }
+    @keyframes pulse-threat {
+      0%, 100% { box-shadow: 0 0 8px rgba(231, 76, 60, 0.6); }
+      50% { box-shadow: 0 0 16px rgba(231, 76, 60, 0.9); }
+    }
+    .threat-badge { text-shadow: 0 0 4px rgba(0,0,0,0.8); }
+    .garrison-badge { font-weight: bold; text-shadow: 0 0 2px rgba(0,0,0,0.8); }
   `;
   document.head.appendChild(s);
 }

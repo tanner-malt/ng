@@ -142,10 +142,10 @@ class ConstructionManager {
     }
 
     calculateBuilderEfficiency(worker) {
-        let efficiency = 1.0; // Base +1 point per builder per day
+        let efficiency = 1.25; // Base +1.25 points per builder per day (4 builders = 5 points)
 
         // Skills that affect building (from original system but simplified)
-        const skills = worker.skills || {};
+        const skills = worker.skills || {}
         const relevantSkills = ['Carpentry', 'Masonry', 'Engineering'];
 
         let skillBonus = 0;
@@ -198,8 +198,22 @@ class ConstructionManager {
             site.teamworkBonus = 1.0;
             site.dailyProgress = 0;
         } else {
-            // Calculate total daily points from all builders
-            let totalPoints = builders.reduce((sum, builder) => sum + builder.efficiency, 0);
+            // Smart builder allocation: don't over-assign builders to nearly-complete sites
+            // Calculate how many builders are actually needed based on remaining work
+            const pointsNeeded = site.pointsRemaining;
+            const avgEfficiency = builders.length > 0 ? builders.reduce((s, b) => s + b.efficiency, 0) / builders.length : 1.25;
+            const neededBuilders = Math.ceil(pointsNeeded / avgEfficiency);
+            const effectiveBuilders = builders.slice(0, Math.max(1, neededBuilders)); // At least 1 builder
+            
+            // Track how many builders are actually working vs available
+            site.effectiveBuilderCount = effectiveBuilders.length;
+            site.excessBuilders = builders.length - effectiveBuilders.length;
+            if (site.excessBuilders > 0) {
+                console.log(`[Construction] ${site.buildingType}: Only ${effectiveBuilders.length}/${builders.length} builders needed (${pointsNeeded.toFixed(1)} points remaining)`);
+            }
+
+            // Calculate total daily points from effective builders only
+            let totalPoints = effectiveBuilders.reduce((sum, builder) => sum + builder.efficiency, 0);
 
             // Apply foreman boost: +20% to builders (if any foremen on staff anywhere)
             const foremanMultiplier = this.getForemanBoostMultiplier();

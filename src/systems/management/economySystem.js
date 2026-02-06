@@ -84,11 +84,22 @@ class EconomySystem {
         this.lastTaxIncome = taxIncome;
         
         if (taxIncome > 0 && this.gameState.resources) {
-            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + taxIncome;
+            // Cap gold at storage limit
+            const currentGold = this.gameState.resources.gold || 0;
+            let goldCap = 999999;
+            if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                try { goldCap = window.GameData.calculateSeasonalStorageCap('gold', this.gameState.season, this.gameState.buildings); } catch(_) {}
+            }
+            const effectiveGain = Math.max(0, Math.min(taxIncome, goldCap - currentGold));
+            this.gameState.resources.gold = currentGold + effectiveGain;
+            
+            if (effectiveGain < taxIncome) {
+                console.log(`[EconomySystem] Tax collection capped at storage limit ${goldCap}. Wasted: ${taxIncome - effectiveGain}`);
+            }
             
             // Emit event for daily production display
             try {
-                window.eventBus?.emit?.('tax_collected', { amount: taxIncome, population: workingAgeCount });
+                window.eventBus?.emit?.('tax_collected', { amount: effectiveGain, population: workingAgeCount });
             } catch (_) {}
         }
     }

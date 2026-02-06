@@ -309,6 +309,46 @@ class BattleManager {
     resolveBattleInstantly() {
         if (!this.currentBattle) return;
         
+        // Use strategic combat system if available for detailed simulation
+        if (window.strategicCombat && this.currentBattle.playerArmy && this.currentBattle.enemyArmy) {
+            const terrain = this.currentBattle.terrain || 'plains';
+            const playerArmy = this.currentBattle.playerArmy;
+            const enemyArmy = this.currentBattle.enemyArmy;
+            
+            // Simulate combat rounds until one side is defeated
+            let rounds = 0;
+            const maxRounds = 20;
+            
+            while (rounds < maxRounds) {
+                const playerAlive = (playerArmy.units || []).filter(u => u.alive).length;
+                const enemyAlive = (enemyArmy.units || []).filter(u => u.alive).length;
+                
+                if (playerAlive === 0) {
+                    this.defeat();
+                    return;
+                }
+                if (enemyAlive === 0) {
+                    this.victory();
+                    return;
+                }
+                
+                window.strategicCombat.simulateCombatRound(playerArmy, enemyArmy, terrain);
+                rounds++;
+            }
+            
+            // If timeout, check who has more alive
+            const playerAlive = (playerArmy.units || []).filter(u => u.alive).length;
+            const enemyAlive = (enemyArmy.units || []).filter(u => u.alive).length;
+            
+            if (playerAlive > enemyAlive) {
+                this.victory();
+            } else {
+                this.defeat();
+            }
+            return;
+        }
+        
+        // Fallback: original power calculation
         const playerPower = this.calculatePlayerPower();
         const enemyPower = this.calculateEnemyPower();
         
@@ -317,6 +357,18 @@ class BattleManager {
         } else {
             this.defeat();
         }
+    }
+    
+    /**
+     * Get threat assessment for current battle target.
+     */
+    getThreatAssessment() {
+        if (!this.currentBattle || !window.strategicCombat) return null;
+        
+        const playerArmy = this.currentBattle.playerArmy || { units: this.gameState.army || [] };
+        const enemyArmy = this.currentBattle.enemyArmy || { units: [] };
+        
+        return window.strategicCombat.assessThreat(enemyArmy, playerArmy);
     }
     
     calculatePlayerPower() {

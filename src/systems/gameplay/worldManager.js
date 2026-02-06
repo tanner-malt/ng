@@ -203,41 +203,96 @@ class WorldManager {
     }
 
     initializeHexMap() {
-        // Create larger 7x7 grid with diverse terrain
+        // Create 7x7 grid with zone-based terrain generation
+        // Capital is at center (3,3) but displayed as (0,0)
+        const centerRow = this.playerVillageHex.row;
+        const centerCol = this.playerVillageHex.col;
+        
         for (let row = 0; row < this.mapHeight; row++) {
             this.hexMap[row] = [];
             for (let col = 0; col < this.mapWidth; col++) {
-                const isPlayerVillage = row === this.playerVillageHex.row && col === this.playerVillageHex.col;
-                const isAdjacent = this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col);
+                const isPlayerVillage = row === centerRow && col === centerCol;
+                const isAdjacent = this.isAdjacent(row, col, centerRow, centerCol);
+                const distance = this.getDistanceFromCapital(row, col);
 
-                // Generate terrain first
+                // Generate terrain using zone-based algorithm
                 const terrain = this.generateTerrain(row, col);
+                const zone = this.getTerrainZone(distance);
+
+                // Unified visibility state: 'hidden' | 'scoutable' | 'explored'
+                let visibility = 'hidden';
+                if (isPlayerVillage) visibility = 'explored';
+                else if (isAdjacent) visibility = 'scoutable';
 
                 this.hexMap[row][col] = {
+                    // Core position (grid coordinates)
                     row,
                     col,
+                    // Display coordinates (offset from capital)
+                    displayX: col - centerCol,
+                    displayY: row - centerRow,
+                    
+                    // Unified visibility state
+                    visibility: visibility,
+                    // Legacy compat - derive from visibility
+                    get discovered() { return this.visibility === 'explored'; },
+                    get fogOfWar() { return this.visibility === 'hidden'; },
+                    get scoutable() { return this.visibility === 'scoutable' || this.visibility === 'explored'; },
+                    
+                    // Terrain and zone
                     terrain: terrain,
-                    discovered: isPlayerVillage, // Only player village starts discovered
-                    fogOfWar: !isPlayerVillage,
-                    scoutable: isPlayerVillage || isAdjacent, // Player can scout adjacent tiles
-                    units: [],
-                    resources: this.generateResources(row, col),
-                    buildings: isPlayerVillage ? ['village'] : [],
-                    weather: 'clear',
+                    zone: zone, // 'core' | 'inner' | 'middle' | 'outer' | 'frontier'
+                    biome: this.generateBiomeForTerrain(terrain),
                     elevation: this.generateElevation(row, col),
+                    
+                    // Features
+                    isPlayerVillage: isPlayerVillage,
+                    buildings: isPlayerVillage ? ['village'] : [],
+                    resources: this.generateResources(row, col),
+                    landmarks: this.generateLandmarks(row, col),
                     explorationValue: this.generateExplorationValue(row, col),
-                    biome: this.generateBiomeForTerrain(terrain), // Pass terrain directly
-                    landmarks: this.generateLandmarks(row, col)
+                    
+                    // Dynamic state
+                    units: [],
+                    weather: 'clear'
                 };
             }
         }
 
         // Initialize discovered tiles set
-        this.discoveredTiles.add(`${this.playerVillageHex.row},${this.playerVillageHex.col}`);
+        this.discoveredTiles.add(`${centerRow},${centerCol}`);
         this.updateScoutableTiles();
 
-        // Initialize expeditions array
+        // Initialize expeditions array (scouts separate from armies)
         this.expeditions = [];
+    }
+
+    // Get Chebyshev distance from capital
+    getDistanceFromCapital(row, col) {
+        return Math.max(
+            Math.abs(row - this.playerVillageHex.row),
+            Math.abs(col - this.playerVillageHex.col)
+        );
+    }
+
+    // Get terrain zone based on distance from capital
+    getTerrainZone(distance) {
+        if (distance === 0) return 'core';      // Capital tile
+        if (distance === 1) return 'inner';     // Adjacent to capital
+        if (distance === 2) return 'middle';    // Second ring
+        if (distance === 3) return 'outer';     // Edge of known world
+        return 'frontier';                       // Beyond (for future expansion)
+    }
+
+    // Format coordinates for display (relative to capital)
+    formatCoords(row, col) {
+        const x = col - this.playerVillageHex.col;
+        const y = row - this.playerVillageHex.row;
+        // Format with direction indicators
+        const xDir = x > 0 ? 'E' : x < 0 ? 'W' : '';
+        const yDir = y > 0 ? 'S' : y < 0 ? 'N' : '';
+        if (x === 0 && y === 0) return '(Capital)';
+        return `(${Math.abs(x)}${xDir}, ${Math.abs(y)}${yDir})`;
     }
 
     // Helper method to check if two tiles are adjacent
@@ -247,32 +302,93 @@ class WorldManager {
         return (rowDiff <= 1 && colDiff <= 1) && !(rowDiff === 0 && colDiff === 0);
     }
 
-    // Generate diverse terrain types
+    // Zone-based terrain generation for coherent world building
     generateTerrain(row, col) {
-        // Use terrain keys compatible with src/world/config/terrain.js
-        const terrainTypes = ['grass', 'forest', 'hill', 'mountain', 'swamp', 'desert', 'plains', 'water'];
         const centerRow = this.playerVillageHex.row;
         const centerCol = this.playerVillageHex.col;
-        const distance = Math.abs(row - centerRow) + Math.abs(col - centerCol);
+        const distance = this.getDistanceFromCapital(row, col);
 
-        // Player village is always grass
-        if (row === centerRow && col === centerCol) return 'grass';
+        // Capital is always a village/grass tile
+        if (distance === 0) return 'grass';
 
-        // Use pseudo-random generation based on position
-        const seed = row * 7 + col + (row * col);
-        const random = Math.abs(Math.sin(seed)) * 10000;
-        const terrainIndex = Math.floor(random % terrainTypes.length);
+        // Create a seeded random for deterministic terrain
+        const seed = (row * 1000 + col * 7) ^ 0xDEADBEEF;
+        const seededRand = () => {
+            const x = Math.sin(seed + row * 17 + col * 31) * 10000;
+            return x - Math.floor(x);
+        };
+        const rand = seededRand();
 
-        // Bias certain terrains based on distance from center
-        if (distance >= 4) {
-            // Outer edges more likely to have extreme terrain
-            const extremeTerrains = ['mountain', 'desert', 'swamp'];
-            if (random % 100 < 40) {
-                return extremeTerrains[Math.floor(random % extremeTerrains.length)];
+        // Zone-based terrain pools
+        // Core (distance 0): Capital - handled above
+        // Inner ring (distance 1): Fertile farmland - grass, plains, light forest
+        // Middle ring (distance 2): Mixed terrain - forests, hills, some water
+        // Outer ring (distance 3): Challenging terrain - mountains, swamps, deserts
+        
+        // Direction-based biome coherence (NW = cold, SE = warm, etc.)
+        const dirX = col - centerCol; // Positive = East
+        const dirY = row - centerRow; // Positive = South
+
+        if (distance === 1) {
+            // Inner ring: 70% fertile (grass/plains), 20% light forest, 10% hill
+            if (rand < 0.40) return 'grass';
+            if (rand < 0.70) return 'plains';
+            if (rand < 0.90) return 'forest';
+            return 'hill';
+        }
+
+        if (distance === 2) {
+            // Middle ring: Directional biomes + mixed terrain
+            if (dirY < 0) {
+                // North: Colder - more forest/hills
+                if (rand < 0.35) return 'forest';
+                if (rand < 0.60) return 'hill';
+                if (rand < 0.80) return 'plains';
+                return 'mountain';
+            } else if (dirY > 0) {
+                // South: Warmer - more plains/desert potential
+                if (rand < 0.30) return 'plains';
+                if (rand < 0.55) return 'grass';
+                if (rand < 0.75) return 'forest';
+                if (rand < 0.90) return 'desert';
+                return 'swamp';
+            } else {
+                // East/West: Temperate mix
+                if (rand < 0.25) return 'forest';
+                if (rand < 0.50) return 'plains';
+                if (rand < 0.70) return 'hill';
+                if (rand < 0.85) return 'grass';
+                return rand < 0.93 ? 'water' : 'swamp';
             }
         }
 
-        return terrainTypes[terrainIndex];
+        // Outer ring (distance 3+): Challenging frontier terrain
+        // More extreme based on direction
+        if (dirY < 0 && dirX <= 0) {
+            // Northwest: Mountains and tundra
+            if (rand < 0.45) return 'mountain';
+            if (rand < 0.70) return 'hill';
+            if (rand < 0.85) return 'forest';
+            return 'plains';
+        } else if (dirY < 0 && dirX > 0) {
+            // Northeast: Dense forests and hills
+            if (rand < 0.40) return 'forest';
+            if (rand < 0.65) return 'hill';
+            if (rand < 0.80) return 'mountain';
+            return 'swamp';
+        } else if (dirY >= 0 && dirX <= 0) {
+            // Southwest: Swamps and water
+            if (rand < 0.35) return 'swamp';
+            if (rand < 0.55) return 'water';
+            if (rand < 0.75) return 'plains';
+            return 'forest';
+        } else {
+            // Southeast: Deserts and arid lands
+            if (rand < 0.40) return 'desert';
+            if (rand < 0.65) return 'plains';
+            if (rand < 0.80) return 'hill';
+            return 'grass';
+        }
     }
 
     // Generate elevation for terrain
@@ -354,23 +470,26 @@ class WorldManager {
         return null;
     }
 
-    // Update which tiles can be scouted
+    // Update which tiles can be scouted based on explored territories
     updateScoutableTiles() {
         this.scoutableTiles.clear();
 
-        // Add all tiles adjacent to discovered tiles
+        // Add all tiles adjacent to explored tiles
         for (const tileKey of this.discoveredTiles) {
             const [row, col] = tileKey.split(',').map(Number);
 
-            // Check all adjacent tiles
+            // Check all adjacent tiles (8-directional)
             for (let r = row - 1; r <= row + 1; r++) {
                 for (let c = col - 1; c <= col + 1; c++) {
                     if (r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth) {
                         const adjKey = `${r},${c}`;
                         if (!this.discoveredTiles.has(adjKey)) {
                             this.scoutableTiles.add(adjKey);
+                            // Update visibility using new model
                             if (this.hexMap[r] && this.hexMap[r][c]) {
-                                this.hexMap[r][c].scoutable = true;
+                                if (this.hexMap[r][c].visibility === 'hidden') {
+                                    this.hexMap[r][c].visibility = 'scoutable';
+                                }
                             }
                         }
                     }
@@ -390,17 +509,16 @@ class WorldManager {
             const tileKey = availableForDiscovery[randomIndex];
             const [row, col] = tileKey.split(',').map(Number);
 
-            // Reveal the tile
+            // Reveal the tile using new visibility model
             if (this.hexMap[row] && this.hexMap[row][col]) {
-                this.hexMap[row][col].discovered = true;
-                this.hexMap[row][col].fogOfWar = false;
+                this.hexMap[row][col].visibility = 'explored';
                 this.discoveredTiles.add(tileKey);
 
                 // Remove from available list
                 availableForDiscovery.splice(randomIndex, 1);
                 revealed++;
 
-                console.log(`[World] Discovered new territory at (${row}, ${col}): ${this.hexMap[row][col].terrain}`);
+                console.log(`[World] Discovered ${this.formatCoords(row, col)}: ${this.hexMap[row][col].terrain}`);
             }
         }
 
@@ -442,11 +560,15 @@ class WorldManager {
                 <div class="world-main" style="display: flex; flex-direction: row; gap: 1rem; flex: 1; min-height: 0; padding: 1rem; margin: 0;">
                     <div class="hex-info-panel" id="hex-info-panel" style="min-width:320px;max-width:320px;width:320px;flex:0 0 320px;background:#2c3e50;border-radius:12px;padding:1rem;border:1px solid #34495e;align-self:stretch;height:100%;display:flex;flex-direction:column;">
                         <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                            <h4 style="margin:0;">📍 Select a Hex</h4>
+                            <h4 style="margin:0;">�️ Territory Info</h4>
                             <button id="hex-panel-toggle" class="panel-header-btn" title="Expand/Collapse">⤢</button>
                         </div>
                         <div id="hex-info-content" style="flex:1; overflow:auto; margin-top:8px;">
-                            <p>Click on any hex to view its details and available actions.</p>
+                            <div style="text-align:center; padding:20px 10px; color:#95a5a6;">
+                                <div style="font-size:32px; margin-bottom:10px;">🏰</div>
+                                <p style="margin:0 0 10px 0;">Your capital is at the center of the map.</p>
+                                <p style="margin:0; font-size:0.9em;">Click any tile to view details.<br/>Coordinates show distance from capital.</p>
+                            </div>
                         </div>
                     </div>
                     <div class="world-map-container" style="flex:1;min-width:0;background:#22303a;border-radius:16px;border:2px solid #2de0c6;box-shadow:0 2px 16px #0002;position:relative;display:flex;align-items:center;justify-content:center;">
@@ -912,21 +1034,25 @@ class WorldManager {
     }
 
     applyTerrainVisuals(hex) {
-        const terrainVisuals = {
-            grass: { symbol: '🌱', color: '#4a7c59', bgColor: '#7fb069' },
-            forest: { symbol: '🌲', color: '#2d5a27', bgColor: '#4f7942' },
-            hills: { symbol: '⛰️', color: '#8b7355', bgColor: '#a0956b' },
-            mountains: { symbol: '🏔️', color: '#706c61', bgColor: '#8a8680' },
-            swamp: { symbol: '🟤', color: '#4a5d23', bgColor: '#6b7c32' },
-            desert: { symbol: '🏜️', color: '#deb887', bgColor: '#f4e4bc' },
-            plains: { symbol: '🌾', color: '#9aad7c', bgColor: '#b8c99c' },
-            river: { symbol: '🌊', color: '#4682b4', bgColor: '#87ceeb' },
-            village: { symbol: '🏘️', color: '#d4a574', bgColor: '#e8c299' }
+        // Use global terrain config for consistency
+        const terrainData = window.getTerrain?.(hex.terrain) || { symbol: '🌱', color: '#48bb78' };
+        
+        // Fallback visuals with brighter colors for zone-based terrain
+        const fallbackVisuals = {
+            grass: { symbol: '🌱', color: '#48bb78', bgColor: '#68d391' },
+            plains: { symbol: '🌾', color: '#68d391', bgColor: '#9ae6b4' },
+            forest: { symbol: '🌲', color: '#276749', bgColor: '#48bb78' },
+            hill: { symbol: '⛰️', color: '#a0855b', bgColor: '#c9a87c' },
+            mountain: { symbol: '🏔️', color: '#718096', bgColor: '#a0aec0' },
+            swamp: { symbol: '🪵', color: '#4a5568', bgColor: '#718096' },
+            desert: { symbol: '🏜️', color: '#d69e2e', bgColor: '#ecc94b' },
+            water: { symbol: '💧', color: '#4299e1', bgColor: '#63b3ed' },
+            village: { symbol: '🏰', color: '#ecc94b', bgColor: '#f6e05e' }
         };
-
-        const visual = terrainVisuals[hex.terrain] || terrainVisuals.grass;
-        hex.symbol = visual.symbol;
-        hex.color = visual.color;
+        
+        const visual = fallbackVisuals[hex.terrain] || fallbackVisuals.grass;
+        hex.symbol = terrainData.symbol || visual.symbol;
+        hex.color = terrainData.color || visual.color;
         hex.bgColor = visual.bgColor;
     }
 
@@ -938,13 +1064,13 @@ class WorldManager {
         const villageHex = this.hexMap[centerRow][centerCol];
         villageHex.terrain = 'village';
         villageHex.buildings = ['Town Center', 'Houses', 'Farms'];
-        villageHex.discovered = true;
+        villageHex.visibility = 'explored';
         villageHex.isPlayerVillage = true;
 
         // Apply village visuals
         this.applyTerrainVisuals(villageHex);
 
-        console.log(`[World] Tutorial elements placed - Village at (${centerRow}, ${centerCol})`);
+        console.log(`[World] Tutorial elements placed - Capital at ${this.formatCoords(centerRow, centerCol)}`);
     }
 
     renderHexMap() {
@@ -1578,35 +1704,37 @@ class WorldManager {
         squareButton.style.width = size + 'px';
         squareButton.style.height = size + 'px';
 
-        // Create square shape with CSS - apply fog of war styling
-        if (hex.fogOfWar) {
-            // Check if this tile is scoutable
-            if (hex.scoutable) {
-                // Scoutable but not yet discovered
-                squareButton.style.background = 'linear-gradient(45deg, #3498db, #2980b9)';
-                squareButton.style.borderRadius = '8px';
-                squareButton.style.border = '2px solid #3498db';
-                squareButton.style.opacity = '0.8';
-                squareButton.textContent = '👁️';
-                squareButton.style.color = '#ecf0f1';
-                squareButton.title = 'Scoutable Territory - Send scouts to explore!';
-            } else {
-                // Fog of war tiles
-                squareButton.style.background = 'linear-gradient(45deg, #2c3e50, #34495e)';
-                squareButton.style.borderRadius = '8px';
-                squareButton.style.border = '2px solid #7f8c8d';
-                squareButton.style.opacity = '0.6';
-                squareButton.textContent = '🌫️';
-                squareButton.style.color = '#95a5a6';
-                squareButton.title = 'Unexplored Territory';
-            }
-        } else {
-            // Discovered tiles
-            squareButton.style.background = `linear-gradient(145deg, ${hex.bgColor || '#4a90a4'}, ${hex.color || '#2980b9'})`;
+        // Get visibility state (use new model or fallback to legacy)
+        const visibility = hex.visibility || (hex.discovered ? 'explored' : hex.scoutable ? 'scoutable' : 'hidden');
+        const coordLabel = this.formatCoords(row, col);
+
+        // Apply styling based on visibility state
+        if (visibility === 'hidden') {
+            // Fog of war - unexplored
+            squareButton.style.background = 'linear-gradient(45deg, #1a252f, #2c3e50)';
             squareButton.style.borderRadius = '8px';
-            squareButton.style.border = '2px solid rgba(255,255,255,0.3)';
+            squareButton.style.border = '2px solid #4a5568';
+            squareButton.style.opacity = '0.5';
+            squareButton.textContent = '?';
+            squareButton.style.color = '#718096';
+            squareButton.title = `${coordLabel} - Unexplored Territory`;
+        } else if (visibility === 'scoutable') {
+            // Scoutable - adjacent to explored tiles
+            squareButton.style.background = 'linear-gradient(45deg, #2c5282, #2b6cb0)';
+            squareButton.style.borderRadius = '8px';
+            squareButton.style.border = '2px dashed #4299e1';
+            squareButton.style.opacity = '0.85';
+            squareButton.textContent = '👁️';
+            squareButton.style.color = '#bee3f8';
+            squareButton.title = `${coordLabel} - Send scouts to explore`;
+        } else {
+            // Explored - full visibility
+            const terrainInfo = window.getTerrain?.(hex.terrain) || { color: hex.color || '#4a90a4' };
+            squareButton.style.background = `linear-gradient(145deg, ${this._brightenColor(terrainInfo.color, 0.2)}, ${terrainInfo.color})`;
+            squareButton.style.borderRadius = '8px';
+            squareButton.style.border = '2px solid rgba(255,255,255,0.25)';
             squareButton.style.opacity = '1';
-            squareButton.title = `${hex.terrain} - ${hex.biome || 'Unknown biome'}`;
+            squareButton.title = `${coordLabel} - ${hex.terrain} (${hex.biome || 'Unknown'})`;
         }
 
         squareButton.style.cursor = 'pointer';
@@ -2016,7 +2144,6 @@ class WorldManager {
     updateHexInfoPanel(hex, row, col) {
         const panel = document.getElementById('hex-info-panel');
         if (!panel) return;
-        // Prefer content container if present so we don't overwrite header + toggle
         const contentContainer = document.getElementById('hex-info-content');
 
         // Check for armies at this position
@@ -2032,12 +2159,41 @@ class WorldManager {
         // Check for enemy at this position
         const enemyAtPosition = this.getEnemyAt(row, col);
 
+        // Get terrain info
+        const terrainInfo = window.getTerrain?.(hex.terrain) || { symbol: hex.symbol, color: hex.color };
+        const zone = hex.zone || this.getTerrainZone(this.getDistanceFromCapital(row, col));
+        const zoneLabels = {
+            core: '🏰 Capital',
+            inner: '🌾 Heartlands',
+            middle: '🌲 Borderlands', 
+            outer: '⚔️ Frontier',
+            frontier: '🗺️ Wilds'
+        };
+
         let content = `
-            <h4>📍 Hex (${row}, ${col})</h4>
-            <div class="hex-details">
-                <p><strong>Terrain:</strong> ${hex.symbol} ${hex.terrain}</p>
-                <p><strong>Weather:</strong> ${this.getWeatherIcon(hex.weather)} ${hex.weather}</p>
-                <p><strong>Elevation:</strong> ${'⬆'.repeat(hex.elevation) || 'Sea level'}</p>
+            <div class="hex-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h4 style="margin:0;">📍 ${this.formatCoords(row, col)}</h4>
+                <span style="color:#7f8c8d;font-size:0.85em;">${zoneLabels[zone] || zone}</span>
+            </div>
+            <div class="hex-terrain" style="background:#2c3e50;border-radius:8px;padding:10px;margin-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:28px;">${terrainInfo.symbol || hex.symbol}</span>
+                    <div>
+                        <div style="font-weight:bold;color:#ecf0f1;text-transform:capitalize;">${hex.terrain}</div>
+                        <div style="font-size:0.85em;color:#95a5a6;">${hex.biome || 'Unknown biome'}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="hex-details" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+                <div style="background:#34495e;padding:8px;border-radius:6px;text-align:center;">
+                    <div style="color:#95a5a6;font-size:0.75em;">WEATHER</div>
+                    <div>${this.getWeatherIcon(hex.weather)} ${hex.weather}</div>
+                </div>
+                <div style="background:#34495e;padding:8px;border-radius:6px;text-align:center;">
+                    <div style="color:#95a5a6;font-size:0.75em;">ELEVATION</div>
+                    <div>${Math.min(hex.elevation || 0, 5) > 0 ? '⬆'.repeat(Math.min(Math.ceil((hex.elevation || 0) / 20), 5)) : '〰️ Low'}</div>
+                </div>
+            </div>
         `;
 
         // Show army information if present
@@ -2094,6 +2250,7 @@ class WorldManager {
                         <div style="background: ${strengthColor}; width: ${strengthPercent}%; height: 100%; border-radius: 4px;"></div>
                     </div>
                     <p><strong>Behavior:</strong> ${enemyAtPosition.aggression > 0.5 ? '⚔️ Aggressive' : enemyAtPosition.aggression > 0.3 ? '👁️ Watchful' : '🛡️ Defensive'}</p>
+                    ${this.getThreatAssessmentHTML(enemyAtPosition)}
                     <p style="color: #e74c3c; font-style: italic; margin-top: 8px;">
                         ⚠️ Hostile! Send an army to engage or avoid this area.
                     </p>
@@ -2182,6 +2339,67 @@ class WorldManager {
             fog: '🌫️'
         };
         return icons[weather] || '🌤️';
+    }
+
+    /**
+     * Generate HTML for strategic threat assessment display.
+     */
+    getThreatAssessmentHTML(enemy) {
+        if (!window.strategicCombat || !this.gameState?.army) {
+            return '';
+        }
+        
+        try {
+            const playerArmy = { units: this.gameState.army || [] };
+            const enemyArmy = { units: enemy.units || [] };
+            
+            // If enemy doesn't have detailed units, create fake ones based on strength
+            if (enemyArmy.units.length === 0 && enemy.strength) {
+                for (let i = 0; i < Math.ceil(enemy.strength / 10); i++) {
+                    enemyArmy.units.push({ 
+                        type: 'militia', 
+                        attack: 5, 
+                        defense: 3, 
+                        alive: true 
+                    });
+                }
+            }
+            
+            const assessment = window.strategicCombat.assessThreat(enemyArmy, playerArmy);
+            if (!assessment) return '';
+            
+            const threatColors = {
+                low: '#27ae60',
+                moderate: '#f39c12',
+                high: '#e67e22',
+                extreme: '#e74c3c'
+            };
+            const threatIcon = window.strategicCombat.getThreatIcon(assessment.threatLevel);
+            const color = threatColors[assessment.threatLevel] || '#95a5a6';
+            
+            let html = `
+                <div style="background: ${color}22; border: 1px solid ${color}; border-radius: 6px; padding: 8px; margin: 8px 0;">
+                    <p style="margin: 0 0 6px; font-weight: bold; color: ${color};">
+                        ${threatIcon} Threat: ${assessment.threatLevel.toUpperCase()} (${assessment.threatScore}%)
+                    </p>
+                    <p style="margin: 0; font-size: 0.9em; color: #bdc3c7;">
+                        ${assessment.recommendation}
+                    </p>
+            `;
+            
+            if (assessment.advantages.length > 0) {
+                html += `<p style="margin: 6px 0 0; font-size: 0.85em; color: #27ae60;">✓ ${assessment.advantages[0]}</p>`;
+            }
+            if (assessment.disadvantages.length > 0) {
+                html += `<p style="margin: 4px 0 0; font-size: 0.85em; color: #e74c3c;">✗ ${assessment.disadvantages[0]}</p>`;
+            }
+            
+            html += '</div>';
+            return html;
+        } catch (e) {
+            console.warn('[World] Failed to generate threat assessment:', e);
+            return '';
+        }
     }
 
     enterVillage() {
@@ -3718,8 +3936,8 @@ class WorldManager {
 
     revealHex(row, col) {
         if (this.hexMap[row] && this.hexMap[row][col]) {
-            this.hexMap[row][col].discovered = true;
-            this.hexMap[row][col].fogOfWar = false;
+            this.hexMap[row][col].visibility = 'explored';
+            this.discoveredTiles.add(`${row},${col}`);
         }
     }
 
@@ -4075,12 +4293,11 @@ class WorldManager {
         // Load discovered tiles
         if (Array.isArray(data.discoveredTiles)) {
             this.discoveredTiles = new Set(data.discoveredTiles);
-            // Mark hexes as discovered
+            // Mark hexes as explored using new visibility model
             data.discoveredTiles.forEach(key => {
                 const [row, col] = key.split(',').map(Number);
                 if (this.hexMap[row]?.[col]) {
-                    this.hexMap[row][col].discovered = true;
-                    this.hexMap[row][col].fogOfWar = false;
+                    this.hexMap[row][col].visibility = 'explored';
                 }
             });
         }
@@ -4091,7 +4308,10 @@ class WorldManager {
             data.scoutableTiles.forEach(key => {
                 const [row, col] = key.split(',').map(Number);
                 if (this.hexMap[row]?.[col]) {
-                    this.hexMap[row][col].scoutable = true;
+                    // Only set scoutable if not already explored
+                    if (this.hexMap[row][col].visibility !== 'explored') {
+                        this.hexMap[row][col].visibility = 'scoutable';
+                    }
                 }
             });
         }

@@ -8,12 +8,14 @@
 class RandomEventSystem {
     constructor(gameState) {
         this.gameState = gameState;
-        this.eventChance = 0.15; // 15% chance per day for an event
+        // Stellaris-style: Rare, impactful events that pause the game
+        this.eventChance = 0.05; // 5% chance per day (reduced from 15%)
         this.lastEventDay = 0;
-        this.minDaysBetweenEvents = 3; // Minimum 3 days between events
+        this.minDaysBetweenEvents = 7; // Minimum 7 days between events (was 3)
         this.eventHistory = [];
+        this.pendingEvent = null; // Event waiting for player decision
         
-        console.log('[RandomEvents] System initialized');
+        console.log('[RandomEvents] Stellaris-style event system initialized');
     }
 
     /**
@@ -21,6 +23,12 @@ class RandomEventSystem {
      * Called from gameState.endDay()
      */
     checkForEvent() {
+        // Don't trigger events during tutorial
+        if (localStorage.getItem('tutorialComplete') !== 'true') {
+            console.log('[RandomEvents] Tutorial not complete, skipping events');
+            return null;
+        }
+        
         // Don't trigger events in early game (first 5 days)
         if (this.gameState.day < 5) return null;
         
@@ -111,14 +119,14 @@ class RandomEventSystem {
         if (pop < popCap - 2 && pop >= 5) {
             events.push({
                 id: 'refugee_family',
-                title: '👨‍👩‍👧 Refugee Family',
+                title: 'Refugee Family',
                 description: 'A family fleeing hardship seeks shelter in your village.',
                 weight: 1.5,
                 choices: [
                     {
-                        text: 'Welcome them (+3 population)',
+                        text: 'Welcome them',
                         reward: { population: 3 },
-                        message: 'The family is grateful for your kindness!'
+                        message: 'The family is grateful for your kindness! (+3 population)'
                     },
                     {
                         text: 'Offer supplies and directions',
@@ -295,19 +303,35 @@ class RandomEventSystem {
 
     /**
      * Trigger an event and show the modal.
+     * Pauses the game until player makes a decision (Stellaris-style).
      */
     triggerEvent(event) {
         console.log(`[RandomEvents] Triggering event: ${event.id}`);
         this.eventHistory.push({ id: event.id, day: this.gameState.day });
+        this.pendingEvent = event;
+        
+        // Pause autoplay while event is active (Stellaris-style)
+        if (this.gameState.autoPlayActive) {
+            this.wasAutoPlaying = true;
+            this.gameState.stopAutoPlay();
+            console.log('[RandomEvents] Paused autoplay for event decision');
+        } else {
+            this.wasAutoPlaying = false;
+        }
         
         // Auto-reward events (no choice needed)
         if (event.autoReward) {
             this.applyReward(event.autoReward);
             this.showEventNotification(event.title, event.message || event.description);
+            this.pendingEvent = null;
+            // Resume autoplay if it was active
+            if (this.wasAutoPlaying) {
+                setTimeout(() => this.gameState.startAutoPlay(), 500);
+            }
             return;
         }
         
-        // Events with choices - show modal
+        // Events with choices - show modal (game stays paused)
         this.showEventModal(event);
     }
 
@@ -322,7 +346,8 @@ class RandomEventSystem {
     }
 
     /**
-     * Show an event modal with choices.
+     * Show an event modal with choices (Stellaris-style).
+     * Game is paused until player decides.
      */
     showEventModal(event) {
         if (!window.modalSystem?.showModal) {
@@ -330,9 +355,19 @@ class RandomEventSystem {
             return;
         }
         
-        let content = `<div class="random-event-modal">
-            <div class="event-description">${event.description}</div>
-            <div class="event-choices">`;
+        // Get event icon based on type/id
+        const eventIcon = this.getEventIcon(event);
+        
+        let content = `<div class="random-event-modal stellaris-style">
+            <div class="event-banner" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:linear-gradient(135deg,#2c3e50,#34495e);border-radius:8px;border-left:4px solid #f39c12;">
+                <span style="font-size:48px;">${eventIcon}</span>
+                <div>
+                    <div style="font-size:0.8em;color:#f39c12;text-transform:uppercase;letter-spacing:1px;">Event</div>
+                    <div style="font-size:1.1em;color:#ecf0f1;">${event.title}</div>
+                </div>
+            </div>
+            <div class="event-description" style="color:#bdc3c7;line-height:1.6;margin-bottom:20px;padding:0 4px;">${event.description}</div>
+            <div class="event-choices" style="display:flex;flex-direction:column;gap:10px;">`;
         
         event.choices.forEach((choice, index) => {
             let costText = '';
@@ -353,20 +388,26 @@ class RandomEventSystem {
             }
             
             content += `
-                <button class="event-choice-btn" data-choice="${index}">
-                    <span class="choice-text">${choice.text}</span>
-                    ${costText}
-                    ${rewardText}
+                <button class="event-choice-btn" data-choice="${index}" style="display:flex;flex-direction:column;align-items:flex-start;padding:12px 16px;background:#34495e;border:1px solid #4a6278;border-radius:8px;cursor:pointer;transition:all 0.2s;text-align:left;">
+                    <span class="choice-text" style="color:#ecf0f1;font-weight:500;">${choice.text}</span>
+                    <div style="display:flex;gap:12px;margin-top:6px;">
+                        ${costText}
+                        ${rewardText}
+                    </div>
                 </button>`;
         });
         
-        content += `</div></div>`;
+        content += `</div>
+            <div style="margin-top:16px;padding-top:12px;border-top:1px solid #4a6278;text-align:center;">
+                <span style="color:#7f8c8d;font-size:0.85em;">⏸️ Game paused - Make your decision</span>
+            </div>
+        </div>`;
         
         window.modalSystem.showModal({
-            title: event.title,
+            title: `📜 ${event.title}`,
             content: content,
-            customClass: 'random-event-modal-container',
-            maxWidth: '450px',
+            customClass: 'random-event-modal-container stellaris-event',
+            maxWidth: '500px',
             showCloseButton: false
         });
         
@@ -377,12 +418,40 @@ class RandomEventSystem {
                     const choiceIndex = parseInt(btn.dataset.choice);
                     this.handleChoice(event, event.choices[choiceIndex]);
                 });
+                // Hover effects
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = '#3d566e';
+                    btn.style.borderColor = '#f39c12';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = '#34495e';
+                    btn.style.borderColor = '#4a6278';
+                });
             });
         }, 50);
     }
 
     /**
-     * Handle a player's choice.
+     * Get an icon for the event based on its type.
+     */
+    getEventIcon(event) {
+        const iconMap = {
+            refugee_family: '👨‍👩‍👧',
+            wandering_merchant: '🛒',
+            bumper_harvest: '🌾',
+            skilled_visitor: '🎓',
+            cold_snap: '❄️',
+            bandit_raid: '⚔️',
+            plague_rumor: '🦠',
+            festival: '🎉',
+            drought: '☀️',
+            flood: '🌊'
+        };
+        return iconMap[event.id] || '📜';
+    }
+
+    /**
+     * Handle a player's choice and resume game.
      */
     handleChoice(event, choice) {
         // Check if player can afford the cost
@@ -420,6 +489,19 @@ class RandomEventSystem {
             window.modalSystem.closeModal();
         }
         
+        // Clear pending event
+        this.pendingEvent = null;
+        
+        // Resume autoplay if it was active before the event
+        if (this.wasAutoPlaying) {
+            console.log('[RandomEvents] Resuming autoplay after event decision');
+            setTimeout(() => {
+                if (this.gameState.startAutoPlay && !this.gameState.autoPlayActive) {
+                    this.gameState.startAutoPlay();
+                }
+            }, 300);
+        }
+        
         // Show result message
         if (choice.message) {
             setTimeout(() => {
@@ -447,12 +529,22 @@ class RandomEventSystem {
     }
 
     /**
-     * Apply a reward to the game state.
+     * Apply a reward to the game state (with storage cap enforcement).
      */
     applyReward(reward) {
         for (const [resource, amount] of Object.entries(reward)) {
             if (resource === 'gold') {
-                this.gameState.gold = (this.gameState.gold || 0) + amount;
+                // Cap gold at storage limit
+                const currentGold = this.gameState.gold || 0;
+                let goldCap = 999999;
+                if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                    try { goldCap = window.GameData.calculateSeasonalStorageCap('gold', this.gameState.season, this.gameState.buildings); } catch(_) {}
+                }
+                const newGold = Math.min(currentGold + amount, goldCap);
+                this.gameState.gold = newGold;
+                if (newGold < currentGold + amount) {
+                    console.log(`[RandomEvents] Gold capped at storage limit ${goldCap}`);
+                }
             } else if (resource === 'population') {
                 // Add refugees via population manager
                 if (this.gameState.populationManager && amount > 0) {
@@ -470,7 +562,17 @@ class RandomEventSystem {
                 // TODO: Apply happiness bonus when happiness system exists
                 console.log(`[RandomEvents] Happiness bonus: +${amount}`);
             } else if (this.gameState.resources) {
-                this.gameState.resources[resource] = (this.gameState.resources[resource] || 0) + amount;
+                // Cap at storage limit
+                const current = this.gameState.resources[resource] || 0;
+                let cap = 999999;
+                if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                    try { cap = window.GameData.calculateSeasonalStorageCap(resource, this.gameState.season, this.gameState.buildings); } catch(_) {}
+                }
+                const newAmount = Math.min(current + amount, cap);
+                this.gameState.resources[resource] = newAmount;
+                if (newAmount < current + amount) {
+                    console.log(`[RandomEvents] ${resource} capped at storage limit ${cap}`);
+                }
             }
         }
     }

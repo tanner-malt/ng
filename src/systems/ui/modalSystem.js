@@ -1425,9 +1425,13 @@ class ModalSystem {
                                 <span class="btn-icon">📖</span>
                                 <span>Restart Tutorial</span>
                             </button>
-                            <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.resetGame()">
-                                <span class="btn-icon">🔄</span>
-                                <span>Reset Game</span>
+                            <button class="settings-btn settings-btn-legacy" onclick="window.modalSystem.showLegacyPanel()">
+                                <span class="btn-icon">🏛️</span>
+                                <span>Legacy</span>
+                            </button>
+                            <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.endDynasty()">
+                                <span class="btn-icon">👑</span>
+                                <span>End Dynasty</span>
                             </button>
                         </div>
                     </div>
@@ -1723,6 +1727,163 @@ class ModalSystem {
             sessionStorage.clear();
             location.reload();
         }
+    }
+
+    /**
+     * End Dynasty - prestige mechanic with legacy rewards
+     */
+    endDynasty() {
+        if (window.legacySystem && window.gameState) {
+            const dynastyName = window.gameState.dynastyName || 'Unknown';
+            window.legacySystem.showEndDynastyModal(window.gameState, dynastyName);
+        } else {
+            // Fallback to regular reset if legacy system not available
+            console.warn('[ModalSystem] Legacy system not available, falling back to reset');
+            this.resetGame();
+        }
+    }
+
+    /**
+     * Show the Legacy Panel to view/spend legacy points
+     */
+    showLegacyPanel() {
+        if (!window.legacySystem) {
+            this.showError('Legacy system not available');
+            return;
+        }
+
+        const stats = window.legacySystem.getStats();
+        const bonuses = stats.bonuses;
+        
+        // Define upgrade costs (increasing)
+        const upgradeCosts = {
+            startingGold: Math.max(25, Math.floor((bonuses.startingGold / 50) * 10) + 25),
+            startingFood: Math.max(20, Math.floor((bonuses.startingFood / 25) * 10) + 20),
+            startingPopulation: Math.max(50, Math.floor(bonuses.startingPopulation * 25) + 50),
+            productionBonus: Math.max(30, Math.floor((bonuses.productionBonus / 5) * 15) + 30),
+            buildSpeedBonus: Math.max(30, Math.floor((bonuses.buildSpeedBonus / 5) * 15) + 30),
+            combatBonus: Math.max(40, Math.floor((bonuses.combatBonus / 5) * 20) + 40),
+            explorationBonus: Math.max(20, Math.floor((bonuses.explorationBonus / 10) * 10) + 20)
+        };
+
+        const upgradeLabels = {
+            startingGold: { icon: '💰', name: 'Starting Gold', value: `+${bonuses.startingGold}`, per: '+50 gold' },
+            startingFood: { icon: '🍖', name: 'Starting Food', value: `+${bonuses.startingFood}`, per: '+25 food' },
+            startingPopulation: { icon: '👥', name: 'Starting Pop', value: `+${bonuses.startingPopulation}`, per: '+1 villager' },
+            productionBonus: { icon: '⚒️', name: 'Production', value: `+${bonuses.productionBonus}%`, per: '+5%' },
+            buildSpeedBonus: { icon: '🔨', name: 'Build Speed', value: `+${bonuses.buildSpeedBonus}%`, per: '+5%' },
+            combatBonus: { icon: '⚔️', name: 'Combat', value: `+${bonuses.combatBonus}%`, per: '+5%' },
+            explorationBonus: { icon: '🗺️', name: 'Exploration', value: `+${bonuses.explorationBonus}%`, per: '+10%' }
+        };
+
+        let upgradesHtml = Object.entries(upgradeLabels).map(([key, info]) => {
+            const cost = upgradeCosts[key];
+            const canAfford = stats.totalPoints >= cost;
+            const btnClass = canAfford ? 'legacy-upgrade-btn' : 'legacy-upgrade-btn disabled';
+            return `
+                <div class="legacy-upgrade-row">
+                    <span class="upgrade-icon">${info.icon}</span>
+                    <span class="upgrade-name">${info.name}</span>
+                    <span class="upgrade-value">${info.value}</span>
+                    <button class="${btnClass}" data-upgrade="${key}" data-cost="${cost}" ${!canAfford ? 'disabled' : ''}>
+                        ${info.per} (${cost} pts)
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        let titlesHtml = stats.titles.length > 0 
+            ? stats.titles.map(t => `<span class="legacy-title">${t}</span>`).join(' ') 
+            : '<span style="color:#7f8c8d;">No titles earned yet</span>';
+
+        let historyHtml = stats.history.length > 0
+            ? stats.history.slice(-5).reverse().map(d => `
+                <div class="dynasty-history-item">
+                    <strong>${d.name}</strong> - ${d.daysRuled} days, ${d.peakPopulation} pop
+                    <span style="color:#f39c12;float:right;">+${d.legacyEarned} pts</span>
+                </div>
+            `).join('')
+            : '<p style="color:#7f8c8d;">No dynasties completed yet</p>';
+
+        const content = `
+            <div class="legacy-panel">
+                <div class="legacy-header">
+                    <div class="legacy-points-display">
+                        <span class="points-icon">🏛️</span>
+                        <span class="points-value">${stats.totalPoints}</span>
+                        <span class="points-label">Legacy Points</span>
+                    </div>
+                    <div class="legacy-stats">
+                        <div>Dynasties: ${stats.dynastiesCompleted}</div>
+                        <div>Best Run: ${stats.highestDay} days</div>
+                        <div>Peak Pop: ${stats.highestPopulation}</div>
+                    </div>
+                </div>
+
+                <div class="legacy-section">
+                    <h4>🎖️ Titles Earned</h4>
+                    <div class="titles-container">${titlesHtml}</div>
+                </div>
+
+                <div class="legacy-section">
+                    <h4>⬆️ Permanent Upgrades</h4>
+                    <p style="color:#7f8c8d;font-size:0.9em;margin-bottom:12px;">
+                        These bonuses apply to all future dynasties
+                    </p>
+                    <div class="upgrades-container">${upgradesHtml}</div>
+                </div>
+
+                <div class="legacy-section">
+                    <h4>📜 Dynasty History</h4>
+                    <div class="history-container">${historyHtml}</div>
+                </div>
+            </div>
+            <style>
+                .legacy-panel { color: #ecf0f1; }
+                .legacy-header { display: flex; justify-content: space-between; align-items: center; background: #2c3e50; padding: 16px; border-radius: 8px; margin-bottom: 20px; }
+                .legacy-points-display { display: flex; align-items: center; gap: 10px; }
+                .points-icon { font-size: 32px; }
+                .points-value { font-size: 32px; font-weight: bold; color: #f39c12; }
+                .points-label { font-size: 14px; color: #95a5a6; }
+                .legacy-stats { text-align: right; font-size: 14px; color: #bdc3c7; }
+                .legacy-section { background: #1a252f; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+                .legacy-section h4 { margin: 0 0 12px; color: #f39c12; }
+                .titles-container { display: flex; flex-wrap: wrap; gap: 8px; }
+                .legacy-title { background: #34495e; padding: 4px 12px; border-radius: 16px; font-size: 0.9em; }
+                .upgrades-container { display: flex; flex-direction: column; gap: 8px; }
+                .legacy-upgrade-row { display: flex; align-items: center; gap: 12px; padding: 8px; background: #2c3e50; border-radius: 6px; }
+                .upgrade-icon { font-size: 20px; width: 30px; text-align: center; }
+                .upgrade-name { flex: 1; }
+                .upgrade-value { color: #2ecc71; font-weight: bold; min-width: 60px; text-align: right; }
+                .legacy-upgrade-btn { padding: 6px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+                .legacy-upgrade-btn:hover:not(:disabled) { background: #2ecc71; }
+                .legacy-upgrade-btn.disabled { background: #34495e; color: #7f8c8d; cursor: not-allowed; }
+                .history-container { max-height: 150px; overflow-y: auto; }
+                .dynasty-history-item { padding: 8px; background: #2c3e50; border-radius: 4px; margin-bottom: 6px; font-size: 0.9em; }
+            </style>
+        `;
+
+        this.showModal({
+            title: '🏛️ Dynasty Legacy',
+            content: content,
+            maxWidth: '550px'
+        });
+
+        // Add click handlers for upgrade buttons
+        setTimeout(() => {
+            document.querySelectorAll('.legacy-upgrade-btn:not(.disabled)').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const upgradeType = btn.dataset.upgrade;
+                    const cost = parseInt(btn.dataset.cost);
+                    const result = window.legacySystem.purchaseBonus(upgradeType, cost);
+                    if (result.success) {
+                        // Refresh the panel
+                        this.closeAllModals();
+                        setTimeout(() => this.showLegacyPanel(), 100);
+                    }
+                });
+            });
+        }, 50);
     }
 
     // Restart the tutorial

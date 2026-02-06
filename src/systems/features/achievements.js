@@ -437,12 +437,17 @@ class AchievementSystem {
         this.unlock('dynasty_founder');
     }
 
-    // Trigger achievement for building placement (no longer awards achievements - just tracking)
+    // Trigger tracking for building placement (stats are NOT updated here - only on completion)
     triggerBuildingPlaced(buildingType) {
-        // Track total buildings built (placed)
-        this.stats.buildings_built++;
+        // Note: Stats used for achievements are now tracked on building COMPLETION, not placement
+        // This method is kept for tracking/logging purposes only
+        console.log(`[Achievements] Building placed: ${buildingType} (awaiting construction completion)`);
+    }
 
-        // Track specific building types
+    // Trigger achievement for building completion (level 1+)
+    triggerBuildingCompleted(buildingType) {
+        // Track stats on completion (not placement)
+        this.stats.buildings_built++;
         switch (buildingType) {
             case 'house':
                 this.stats.houses_built++;
@@ -456,17 +461,8 @@ class AchievementSystem {
             case 'townCenter':
                 this.stats.towncenters_built++;
                 break;
-            case 'buildersHut':
-                // No specific stat tracking needed for buildersHut
-                break;
         }
 
-        // Note: Achievements are now triggered on building completion, not placement
-        console.log(`[Achievements] Building placed: ${buildingType} (total built: ${this.stats.buildings_built})`);
-    }
-
-    // Trigger achievement for building completion (level 1+)
-    triggerBuildingCompleted(buildingType) {
         const achievementMap = {
             'townCenter': 'town_center_built',
             'farm': 'feeding_people',
@@ -1319,14 +1315,15 @@ if (!window.achievementSystem) {
         if (window.achievementSystem && window.gameState && window.gameState.buildings) {
             const stats = window.achievementSystem.stats;
 
-            // Count buildings from gameState
-            stats.buildings_built = window.gameState.buildings.length;
-            stats.houses_built = window.gameState.buildings.filter(b => b.type === 'house').length;
-            stats.farms_built = window.gameState.buildings.filter(b => b.type === 'farm').length;
-            stats.barracks_built = window.gameState.buildings.filter(b => b.type === 'barracks').length;
-            stats.towncenters_built = window.gameState.buildings.filter(b => b.type === 'townCenter').length;
+            // Count only COMPLETED buildings (level > 0) from gameState
+            const completedBuildings = window.gameState.buildings.filter(b => b.level > 0);
+            stats.buildings_built = completedBuildings.length;
+            stats.houses_built = completedBuildings.filter(b => b.type === 'house').length;
+            stats.farms_built = completedBuildings.filter(b => b.type === 'farm').length;
+            stats.barracks_built = completedBuildings.filter(b => b.type === 'barracks').length;
+            stats.towncenters_built = completedBuildings.filter(b => b.type === 'townCenter').length;
 
-            console.log('[Achievements] Stats synced:', stats);
+            console.log('[Achievements] Stats synced (completed buildings only):', stats);
             window.achievementSystem.saveToStorage();
             return stats;
         } else {

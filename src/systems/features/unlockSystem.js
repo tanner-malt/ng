@@ -686,7 +686,34 @@ class UnlockSystem {
     }
 
     updateBuildingButtons() {
-        // Update building button visibility and state
+        // Update building row visibility and state (for .building-row elements)
+        document.querySelectorAll('.building-row').forEach(row => {
+            const buildingType = row.dataset.building;
+            if (buildingType) {
+                const isUnlocked = this.isBuildingUnlocked(buildingType);
+                const titleSpan = row.querySelector('.building-title');
+                
+                if (isUnlocked) {
+                    row.classList.remove('locked', 'building-locked');
+                    row.classList.add('building-available');
+                    row.style.opacity = '1';
+                    row.style.pointerEvents = 'auto';
+                    row.title = `Click to place ${buildingType}`;
+                    // Remove lock icon from title if present
+                    if (titleSpan && titleSpan.textContent.startsWith('🔒 ')) {
+                        titleSpan.textContent = titleSpan.textContent.replace('🔒 ', '');
+                    }
+                } else {
+                    row.classList.add('locked', 'building-locked');
+                    row.classList.remove('building-available');
+                    row.style.opacity = '0.5';
+                    const requirementsText = this.getUnlockRequirementsText(buildingType);
+                    row.title = requirementsText || `${buildingType} - Locked`;
+                }
+            }
+        });
+        
+        // Also update legacy .build-btn elements if any
         document.querySelectorAll('.build-btn').forEach(btn => {
             const buildingType = btn.dataset.building;
             if (buildingType) {
@@ -703,6 +730,11 @@ class UnlockSystem {
                 }
             }
         });
+        
+        // Trigger village manager to regenerate buttons if available
+        if (window.villageManager && typeof window.villageManager.generateBuildingButtons === 'function') {
+            window.villageManager.generateBuildingButtons();
+        }
     }
 
     notifyUnlock(config) {
@@ -718,12 +750,54 @@ class UnlockSystem {
             );
         }
 
-        // Show toast notification if available
-        if (window.showToast) {
+        // Show modal notification for unlocks
+        if (window.modalSystem) {
+            const icon = this.getUnlockIcon(config);
+            window.modalSystem.showModal({
+                id: 'unlock-notification',
+                title: title,
+                content: `
+                    <div class="unlock-notification-content" style="text-align: center; padding: 20px;">
+                        <div class="unlock-icon" style="font-size: 64px; margin-bottom: 15px;">${icon}</div>
+                        <div class="unlock-message">
+                            <p style="font-size: 16px; margin-bottom: 10px;">${message}</p>
+                            <p style="color: #27ae60; font-weight: bold;">You can now build this!</p>
+                        </div>
+                    </div>
+                `,
+                width: '400px',
+                height: 'auto',
+                className: 'unlock-modal',
+                modalType: 'info',
+                buttons: [
+                    { text: 'Awesome!', className: 'btn-primary', action: 'close' }
+                ],
+                autoClose: 5000 // Auto-close after 5 seconds
+            });
+        } else if (window.showToast) {
+            // Fallback to toast if modal not available
             window.showToast(title, message, 'success', 5000);
         } else {
             console.log(`[UnlockSystem] ${title} - ${message}`);
         }
+    }
+
+    getUnlockIcon(config) {
+        // Return appropriate icon based on unlock type
+        if (config.type === 'building') {
+            const buildingIcons = {
+                house: '🏠', farm: '🌾', townCenter: '🏛️', barracks: '⚔️',
+                workshop: '🔧', market: '🏪', buildersHut: '🔨', woodcutterLodge: '🪚',
+                quarry: '⛏️', lumberMill: '🪓', mine: '⛏️', blacksmith: '⚒️',
+                keep: '🏰', monument: '🗿', fortifications: '🛡️', academy: '🎓',
+                storehouse: '📦', tent: '⛺', foundersWagon: '🚛'
+            };
+            return buildingIcons[config.type === 'building' ? config.name?.toLowerCase().replace(/\s+/g, '') : ''] || '🏗️';
+        } else if (config.type === 'view') {
+            const viewIcons = { world: '🗺️', battle: '⚔️', monarch: '👑', throne: '🏰' };
+            return viewIcons[config.name?.toLowerCase()] || '🔓';
+        }
+        return '🔓';
     }
 
     saveToStorage() {

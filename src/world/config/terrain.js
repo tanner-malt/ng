@@ -2,17 +2,24 @@
 // Converted to classic global for browser compatibility
 
 const TERRAIN_TYPES = {
-  grass: { color: '#3a864f', symbol: '🌱', moveCost: 1 },
-  forest: { color: '#2d5a27', symbol: '🌲', moveCost: 2 },
-  hill: { color: '#7f6d3a', symbol: '⛰️', moveCost: 3 },
-  village: { color: '#f39c12', symbol: '🏰', moveCost: 1 },
-  water: { color: '#2e86de', symbol: '💧', moveCost: 99 },
-  plains: { color: '#6ba84f', symbol: '🌾', moveCost: 1 },
-  swamp: { color: '#3f5f46', symbol: '🪵', moveCost: 3 },
-  mountain: { color: '#555555', symbol: '🏔️', moveCost: 4 },
-  ruins: { color: '#7d4f6a', symbol: '🏚️', moveCost: 2 },
-  desert: { color: '#cfae58', symbol: '🏜️', moveCost: 2 },
-  ore: { color: '#7a6f9b', symbol: '⛏️', moveCost: 2 }
+  // Fertile/Safe terrains (inner zones)
+  grass: { color: '#48bb78', symbol: '🌱', moveCost: 1, description: 'Lush grassland' },
+  plains: { color: '#68d391', symbol: '🌾', moveCost: 1, description: 'Open plains' },
+  village: { color: '#ecc94b', symbol: '🏰', moveCost: 1, description: 'Your capital' },
+  
+  // Mixed terrains (middle zones)
+  forest: { color: '#276749', symbol: '🌲', moveCost: 2, description: 'Dense forest' },
+  hill: { color: '#a0855b', symbol: '⛰️', moveCost: 2, description: 'Rolling hills' },
+  water: { color: '#4299e1', symbol: '💧', moveCost: 99, description: 'Impassable water' },
+  
+  // Challenging terrains (outer zones)
+  mountain: { color: '#718096', symbol: '🏔️', moveCost: 4, description: 'Treacherous mountains' },
+  swamp: { color: '#4a5568', symbol: '🪵', moveCost: 3, description: 'Murky swampland' },
+  desert: { color: '#d69e2e', symbol: '🏜️', moveCost: 2, description: 'Arid desert' },
+  
+  // Special terrains
+  ruins: { color: '#805ad5', symbol: '🏚️', moveCost: 2, description: 'Ancient ruins' },
+  ore: { color: '#9f7aea', symbol: '⛏️', moveCost: 2, description: 'Rich ore deposits' }
 };
 
 function getTerrain(key) {
