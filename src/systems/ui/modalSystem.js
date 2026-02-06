@@ -1425,13 +1425,13 @@ class ModalSystem {
                                 <span class="btn-icon">📖</span>
                                 <span>Restart Tutorial</span>
                             </button>
-                            <button class="settings-btn settings-btn-legacy" onclick="window.modalSystem.showLegacyPanel()">
-                                <span class="btn-icon">🏛️</span>
-                                <span>Legacy</span>
+                            <button class="settings-btn settings-btn-endrun" onclick="window.modalSystem.endRun()">
+                                <span class="btn-icon">🔄</span>
+                                <span>End Run</span>
                             </button>
-                            <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.endDynasty()">
-                                <span class="btn-icon">👑</span>
-                                <span>End Dynasty</span>
+                            <button class="settings-btn settings-btn-reset" onclick="window.modalSystem.hardReset()">
+                                <span class="btn-icon">💥</span>
+                                <span>Hard Reset</span>
                             </button>
                         </div>
                     </div>
@@ -1730,16 +1730,106 @@ class ModalSystem {
     }
 
     /**
-     * End Dynasty - prestige mechanic with legacy rewards
+     * End Run - kills current run and lets you start fresh (preserves legacy data)
+     */
+    endRun() {
+        try {
+            this.showConfirmationModal(
+                'End Current Run',
+                '<p>This will end your current run and return you to the home screen.</p><p>Your <strong>legacy data</strong> and <strong>achievements</strong> will be preserved.</p><p>Are you sure?</p>',
+                'End Run',
+                'Cancel',
+                (confirmed) => {
+                    if (confirmed) {
+                        console.log('[ModalSystem] End Run confirmed - clearing run data only');
+                        
+                        // Keys to preserve (legacy and achievements)
+                        const preserveKeys = [
+                            'dynastyBuilder_legacy',
+                            'dynastyBuilder_achievements',
+                            'idleDynastyBuilder_achievements'
+                        ];
+                        
+                        // Store preserved data
+                        const preserved = {};
+                        preserveKeys.forEach(key => {
+                            const data = localStorage.getItem(key);
+                            if (data) preserved[key] = data;
+                        });
+                        
+                        // Clear all game-related localStorage
+                        const keysToRemove = [];
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const key = localStorage.key(i);
+                            if (key && (key.includes('dynasty') || key.includes('Dynasty') || 
+                                key === 'tutorialComplete' || key === 'dynastyName')) {
+                                if (!preserveKeys.includes(key)) {
+                                    keysToRemove.push(key);
+                                }
+                            }
+                        }
+                        keysToRemove.forEach(key => localStorage.removeItem(key));
+                        
+                        // Restore preserved data
+                        Object.entries(preserved).forEach(([key, value]) => {
+                            localStorage.setItem(key, value);
+                        });
+                        
+                        sessionStorage.clear();
+                        
+                        // Reload to home screen
+                        location.href = location.href.split('?')[0];
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('[ModalSystem] Error in endRun:', error);
+        }
+    }
+
+    /**
+     * Hard Reset - wipes ALL data including legacy and returns to home screen
+     */
+    hardReset() {
+        try {
+            this.showConfirmationModal(
+                '⚠️ Hard Reset',
+                '<p style="color: #e74c3c;"><strong>WARNING: This will delete ALL your data!</strong></p><p>This includes:</p><ul><li>Current game progress</li><li>Legacy points and upgrades</li><li>All achievements</li><li>Dynasty history</li></ul><p>This action <strong>cannot be undone</strong>.</p><p>Are you absolutely sure?</p>',
+                'Delete Everything',
+                'Cancel',
+                (confirmed) => {
+                    if (confirmed) {
+                        console.log('[ModalSystem] Hard Reset confirmed - wiping all data');
+                        
+                        // Clear everything
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        
+                        // Reload to home screen
+                        location.href = location.href.split('?')[0];
+                    }
+                }
+            );
+        } catch (error) {
+            console.error('[ModalSystem] Error in hardReset:', error);
+            // Emergency fallback
+            localStorage.clear();
+            sessionStorage.clear();
+            location.reload();
+        }
+    }
+
+    /**
+     * End Dynasty - prestige mechanic with legacy rewards (preserved for external calls)
      */
     endDynasty() {
         if (window.legacySystem && window.gameState) {
             const dynastyName = window.gameState.dynastyName || 'Unknown';
             window.legacySystem.showEndDynastyModal(window.gameState, dynastyName);
         } else {
-            // Fallback to regular reset if legacy system not available
-            console.warn('[ModalSystem] Legacy system not available, falling back to reset');
-            this.resetGame();
+            // Fallback to end run if legacy system not available
+            console.warn('[ModalSystem] Legacy system not available, falling back to endRun');
+            this.endRun();
         }
     }
 
