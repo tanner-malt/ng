@@ -156,6 +156,12 @@ const StorageManager = {
     hardReset(reload = true) {
         console.log('[StorageManager] ========== HARD RESET INITIATED ==========');
         this._hardResetInProgress = true;
+        
+        // Also set game's reset flag to prevent any saves during reset
+        if (window.game) {
+            window.game.isResetting = true;
+            console.log('[StorageManager] Set game.isResetting = true');
+        }
 
         try {
             // Step 1: Invalidate all in-memory state

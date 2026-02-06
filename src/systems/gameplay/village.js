@@ -811,18 +811,22 @@ class VillageManager {
             btn.classList.remove('selected');
         });
 
-        // Remove ghost preview
+        // Remove ghost preview and clean up event listeners
         const ghostBuildings = this.villageGrid.querySelectorAll('.ghost-building');
         ghostBuildings.forEach(ghost => ghost.remove());
+        this.cleanupBuildPreview();
 
         console.log('[Village] Build mode exited, cursor reset to default');
         console.log('[Village] Build mode class removed:', !this.villageGrid.classList.contains('build-mode'));
     }
 
     setupBuildPreview() {
+        // Clean up any existing preview handlers first to prevent stacking
+        this.cleanupBuildPreview();
+
         let ghostBuilding = null;
 
-        const mouseMoveHandler = (e) => {
+        this._previewMouseMoveHandler = (e) => {
             if (!this.gameState.buildMode) return;
 
             const rect = this.villageGrid.getBoundingClientRect();
@@ -850,23 +854,27 @@ class VillageManager {
             }
         };
 
-        const mouseLeaveHandler = () => {
+        this._previewMouseLeaveHandler = () => {
             if (ghostBuilding) {
                 ghostBuilding.remove();
                 ghostBuilding = null;
             }
         };
 
-        this.villageGrid.addEventListener('mousemove', mouseMoveHandler);
-        this.villageGrid.addEventListener('mouseleave', mouseLeaveHandler);
+        this.villageGrid.addEventListener('mousemove', this._previewMouseMoveHandler);
+        this.villageGrid.addEventListener('mouseleave', this._previewMouseLeaveHandler);
+    }
 
-        // Clean up listeners when exiting build mode
-        const originalExitBuildMode = this.exitBuildMode.bind(this);
-        this.exitBuildMode = () => {
-            this.villageGrid.removeEventListener('mousemove', mouseMoveHandler);
-            this.villageGrid.removeEventListener('mouseleave', mouseLeaveHandler);
-            originalExitBuildMode();
-        };
+    cleanupBuildPreview() {
+        // Remove preview event listeners if they exist
+        if (this._previewMouseMoveHandler) {
+            this.villageGrid.removeEventListener('mousemove', this._previewMouseMoveHandler);
+            this._previewMouseMoveHandler = null;
+        }
+        if (this._previewMouseLeaveHandler) {
+            this.villageGrid.removeEventListener('mouseleave', this._previewMouseLeaveHandler);
+            this._previewMouseLeaveHandler = null;
+        }
     }
 
     setupGridClick() {
@@ -4130,7 +4138,7 @@ class VillageManager {
 
         // Update displays
         this.renderBuildings();
-        this.gameState.updateResourcesDisplay();
+        this.gameState.updateUI();
 
         // Close modal and reopen to show new stats
         if (window.modalSystem) {

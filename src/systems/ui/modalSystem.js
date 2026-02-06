@@ -1994,6 +1994,12 @@ class ModalSystem {
             if (confirmed) {
                 console.log('[ModalSystem] Hard Reset confirmed - delegating to StorageManager');
                 
+                // Set game's reset flag to prevent beforeunload saves
+                if (window.game) {
+                    window.game.isResetting = true;
+                    console.log('[ModalSystem] Set game.isResetting = true');
+                }
+                
                 // Clear the modal queue as well
                 this.modalQueue = [];
                 

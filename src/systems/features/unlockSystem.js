@@ -360,18 +360,10 @@ class UnlockSystem {
                         b => b.type === condition.building && (b.level >= 1 || (b.built && !b.level)) && b.built
                     ).length;
                     const hasEnoughBuildings = buildingCount >= condition.count;
-                    // Only log when condition is met (to reduce spam)
-                    if (hasEnoughBuildings) {
-                        console.log(`[UnlockSystem] Building count met: ${condition.building} ${buildingCount}/${condition.count}`);
-                    }
                     return hasEnoughBuildings;
 
                 case 'resource':
                     const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
-                    // Only log when condition is met
-                    if (hasEnoughResource) {
-                        console.log(`[UnlockSystem] Resource met: ${condition.resource} ${this.gameState[condition.resource]}/${condition.amount}`);
-                    }
                     return hasEnoughResource;
 
                 case 'tutorial_step':
@@ -398,6 +390,14 @@ class UnlockSystem {
             return []; // Skip this check, too soon
         }
         this.lastCheckTime = now;
+        
+        // Don't trigger unlocks during tutorial/dynasty naming - the modal system
+        // will queue notifications, but it's cleaner to not trigger at all
+        if (window.modalSystem?.currentGameState === 'dynastyNaming' || 
+            window.modalSystem?.currentGameState === 'tutorial') {
+            console.log('[UnlockSystem] Skipping unlock check - tutorial/dynasty naming in progress');
+            return [];
+        }
         
         let newUnlocks = [];
 
