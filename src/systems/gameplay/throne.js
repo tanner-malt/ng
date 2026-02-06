@@ -762,28 +762,131 @@ class ThroneManager {
     
     updateDynastyStats() {
         const statsContainer = document.getElementById('dynasty-stats');
-        if (!statsContainer || !this.gameState.royalFamily) return;
+        if (!statsContainer) return;
         
-        const stats = this.gameState.royalFamily.getRoyalFamilyStats();
+        // Get legacy system stats if available
+        const legacyStats = window.legacySystem?.getStats?.() || null;
         
-        statsContainer.innerHTML = `
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-value">${stats.totalFamily}</div>
-                <div class="dynasty-stat-label">Family Members</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-value">${stats.heirs}</div>
-                <div class="dynasty-stat-label">Eligible Heirs</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-value">${stats.dynastyAge}</div>
-                <div class="dynasty-stat-label">Days of Reign</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-value">${this.gameState.dynastyGeneration || 1}</div>
-                <div class="dynasty-stat-label">Generation</div>
+        // Get royal family stats
+        let familyStats = { totalFamily: 0, heirs: 0, dynastyAge: 0 };
+        if (this.gameState.royalFamily) {
+            familyStats = this.gameState.royalFamily.getRoyalFamilyStats();
+        }
+        
+        // Build the stats display
+        let statsHtml = `
+            <div class="dynasty-stat-group">
+                <h4>👑 Current Dynasty</h4>
+                <div class="dynasty-stats-row">
+                    <div class="dynasty-stat">
+                        <div class="dynasty-stat-value">${familyStats.totalFamily}</div>
+                        <div class="dynasty-stat-label">Family Members</div>
+                    </div>
+                    <div class="dynasty-stat">
+                        <div class="dynasty-stat-value">${familyStats.heirs}</div>
+                        <div class="dynasty-stat-label">Eligible Heirs</div>
+                    </div>
+                    <div class="dynasty-stat">
+                        <div class="dynasty-stat-value">${familyStats.dynastyAge}</div>
+                        <div class="dynasty-stat-label">Days of Reign</div>
+                    </div>
+                    <div class="dynasty-stat">
+                        <div class="dynasty-stat-value">${this.gameState.dynastyGeneration || 1}</div>
+                        <div class="dynasty-stat-label">Generation</div>
+                    </div>
+                </div>
             </div>
         `;
+        
+        // Add legacy system stats if available
+        if (legacyStats) {
+            statsHtml += `
+                <div class="dynasty-stat-group legacy-stats">
+                    <h4>🏛️ Legacy</h4>
+                    <div class="dynasty-stats-row">
+                        <div class="dynasty-stat">
+                            <div class="dynasty-stat-value" style="color:#f39c12;">${legacyStats.totalPoints}</div>
+                            <div class="dynasty-stat-label">Legacy Points</div>
+                        </div>
+                        <div class="dynasty-stat">
+                            <div class="dynasty-stat-value">${legacyStats.dynastiesCompleted}</div>
+                            <div class="dynasty-stat-label">Dynasties Complete</div>
+                        </div>
+                        <div class="dynasty-stat">
+                            <div class="dynasty-stat-value">${legacyStats.highestDay}</div>
+                            <div class="dynasty-stat-label">Record: Days</div>
+                        </div>
+                        <div class="dynasty-stat">
+                            <div class="dynasty-stat-value">${legacyStats.highestPopulation}</div>
+                            <div class="dynasty-stat-label">Record: Population</div>
+                        </div>
+                    </div>
+            `;
+            
+            // Show titles if any
+            if (legacyStats.titles && legacyStats.titles.length > 0) {
+                statsHtml += `
+                    <div class="legacy-titles">
+                        <h5>🏆 Titles Earned</h5>
+                        <div class="title-badges">
+                            ${legacyStats.titles.map(t => `<span class="title-badge">${t}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show active bonuses if any
+            const bonuses = legacyStats.bonuses;
+            const activeBonuses = Object.entries(bonuses).filter(([k, v]) => v > 0);
+            if (activeBonuses.length > 0) {
+                statsHtml += `
+                    <div class="legacy-bonuses">
+                        <h5>✨ Active Bonuses</h5>
+                        <ul class="bonus-list">
+                            ${activeBonuses.map(([key, val]) => `<li>${this.formatBonusName(key)}: +${val}${key.includes('Bonus') ? '%' : ''}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            // Add End Dynasty button
+            statsHtml += `
+                </div>
+                <div class="dynasty-actions" style="margin-top: 20px; text-align: center;">
+                    <button id="end-dynasty-btn" class="dynasty-btn danger" onclick="window.legacySystem?.showEndDynastyModal(window.gameState, localStorage.getItem('dynastyName') || 'Your Dynasty')">
+                        🔄 End Dynasty (Prestige)
+                    </button>
+                    <p style="font-size: 0.85em; color: #7f8c8d; margin-top: 8px;">
+                        End your current dynasty to earn legacy points and start fresh with bonuses
+                    </p>
+                </div>
+            `;
+        } else {
+            // No legacy system available
+            statsHtml += `
+                <div class="dynasty-stat-group">
+                    <p style="color: #7f8c8d; text-align: center;">
+                        Legacy system will unlock after your first dynasty completion
+                    </p>
+                </div>
+            `;
+        }
+        
+        statsContainer.innerHTML = statsHtml;
+    }
+    
+    // Helper to format bonus names nicely
+    formatBonusName(key) {
+        const names = {
+            startingGold: 'Starting Gold',
+            startingFood: 'Starting Food',
+            startingPopulation: 'Starting Population',
+            productionBonus: 'Production',
+            buildSpeedBonus: 'Build Speed',
+            combatBonus: 'Combat',
+            explorationBonus: 'Exploration'
+        };
+        return names[key] || key;
     }
     
     showMarriageModal() {

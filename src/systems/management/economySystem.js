@@ -34,6 +34,12 @@ class EconomySystem {
         this.merchantPresent = false;
         this.merchantInventory = {};
         this.merchantTimer = 0;
+        
+        // Tax tracking for UI display
+        this.lastTaxIncome = 0;
+        this.lastTaxPopulation = 0;
+        this.lastTownCenterLevel = 0;
+        this.lastUpkeep = 0;
     }
     
     init() {
@@ -52,14 +58,24 @@ class EconomySystem {
     
     // Collect taxes based on population (1 gold per working-age citizen)
     processTaxCollection() {
-        // Need a Town Center to collect taxes
+        // Need a completed Town Center to collect taxes
         const buildings = this.gameState.buildings || [];
-        const hasTownCenter = buildings.some(b => b.type === 'townCenter');
-        if (!hasTownCenter) return;
+        const townCenter = buildings.find(b => b.type === 'townCenter' && b.built === true);
+        if (!townCenter) {
+            this.lastTaxIncome = 0;
+            this.lastTaxPopulation = 0;
+            return;
+        }
         
         // Get working-age population (ages 16-100)
         let workingAgeCount = 0;
-        if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
+        if (this.gameState.populationManager && typeof this.gameState.populationManager.getAll === 'function') {
+            const allPop = this.gameState.populationManager.getAll();
+            workingAgeCount = allPop.filter(p => {
+                const age = p.age || 0;
+                return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
+            }).length;
+        } else if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
             workingAgeCount = this.gameState.populationManager.population.filter(p => {
                 const age = p.age || 0;
                 return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
@@ -69,19 +85,25 @@ class EconomySystem {
             workingAgeCount = Math.max(0, (this.gameState.population || 0) - 2); // Rough estimate
         }
         
-        if (workingAgeCount <= 0) return;
+        if (workingAgeCount <= 0) {
+            this.lastTaxIncome = 0;
+            this.lastTaxPopulation = 0;
+            return;
+        }
         
         // Base tax: 1 gold per working citizen
         let taxIncome = workingAgeCount;
         
-        // Apply Town Center level bonus (+10% per level)
-        const townCenter = buildings.find(b => b.type === 'townCenter');
-        if (townCenter && townCenter.level > 1) {
-            taxIncome = Math.floor(taxIncome * (1 + (townCenter.level - 1) * 0.1));
+        // Apply Town Center level bonus (+10% per level beyond 1)
+        const townCenterLevel = townCenter.level || 1;
+        if (townCenterLevel > 1) {
+            taxIncome = Math.floor(taxIncome * (1 + (townCenterLevel - 1) * 0.1));
         }
         
         // Store last tax income for UI display
         this.lastTaxIncome = taxIncome;
+        this.lastTaxPopulation = workingAgeCount;
+        this.lastTownCenterLevel = townCenterLevel;
         
         if (taxIncome > 0 && this.gameState.resources) {
             // Cap gold at storage limit
@@ -96,6 +118,8 @@ class EconomySystem {
             if (effectiveGain < taxIncome) {
                 console.log(`[EconomySystem] Tax collection capped at storage limit ${goldCap}. Wasted: ${taxIncome - effectiveGain}`);
             }
+            
+            console.log(`[EconomySystem] Collected ${effectiveGain} gold in taxes from ${workingAgeCount} working citizens`);
             
             // Emit event for daily production display
             try {
@@ -329,15 +353,27 @@ class EconomySystem {
     // Get tax income summary for UI display
     getTaxSummary() {
         const buildings = this.gameState.buildings || [];
-        const hasTownCenter = buildings.some(b => b.type === 'townCenter');
+        const townCenter = buildings.find(b => b.type === 'townCenter' && b.built === true);
         
-        if (!hasTownCenter) {
+        // Check for Town Center under construction
+        const townCenterConstructing = buildings.find(b => b.type === 'townCenter' && !b.built);
+        
+        if (!townCenter) {
+            if (townCenterConstructing) {
+                return { income: 0, population: 0, enabled: false, reason: 'Town Center under construction' };
+            }
             return { income: 0, population: 0, enabled: false, reason: 'Build Town Center to collect taxes' };
         }
         
-        // Get working-age population
+        // Get working-age population using proper accessor
         let workingAgeCount = 0;
-        if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
+        if (this.gameState.populationManager && typeof this.gameState.populationManager.getAll === 'function') {
+            const allPop = this.gameState.populationManager.getAll();
+            workingAgeCount = allPop.filter(p => {
+                const age = p.age || 0;
+                return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
+            }).length;
+        } else if (this.gameState.populationManager && Array.isArray(this.gameState.populationManager.population)) {
             workingAgeCount = this.gameState.populationManager.population.filter(p => {
                 const age = p.age || 0;
                 return age >= 16 && age <= 100 && p.status !== 'dead' && p.status !== 'away';
@@ -347,8 +383,7 @@ class EconomySystem {
         let taxIncome = workingAgeCount;
         
         // Apply Town Center level bonus
-        const townCenter = buildings.find(b => b.type === 'townCenter');
-        const level = townCenter?.level || 1;
+        const level = townCenter.level || 1;
         if (level > 1) {
             taxIncome = Math.floor(taxIncome * (1 + (level - 1) * 0.1));
         }

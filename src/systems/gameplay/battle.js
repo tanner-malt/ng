@@ -188,6 +188,24 @@ class BattleManager {
     }
     
     watchBattle() {
+        // Use the new animated battle viewer if available
+        if (window.battleViewer && this.currentBattle) {
+            // Prepare armies for the viewer
+            const playerArmy = this.prepareArmyForViewer(this.gameState.army, 'player');
+            const enemyArmy = this.prepareArmyForViewer(this.enemyArmy, 'enemy');
+            
+            // Close the old modal
+            this.closeBattleModal();
+            
+            // Show animated battle
+            window.battleViewer.showBattle(playerArmy, enemyArmy, this.currentBattle.terrain || 'plains', (result) => {
+                // Handle battle result
+                this.handleBattleViewerResult(result);
+            });
+            return;
+        }
+        
+        // Fallback to old system
         this.isWatching = true;
         this.startBattleAnimation();
         
@@ -195,6 +213,93 @@ class BattleManager {
         document.getElementById('watch-battle-btn').style.display = 'none';
         document.getElementById('auto-resolve-btn').style.display = 'none';
         document.getElementById('pause-battle-btn').style.display = 'inline-block';
+    }
+    
+    /**
+     * Prepare army data for the battle viewer.
+     */
+    prepareArmyForViewer(army, side) {
+        const units = [];
+        
+        if (Array.isArray(army)) {
+            // If army is a list like [{type: 'infantry', count: 5}]
+            army.forEach(unit => {
+                for (let i = 0; i < (unit.count || 1); i++) {
+                    units.push({
+                        type: unit.type || 'infantry',
+                        hp: 30,
+                        maxHp: 30,
+                        attack: unit.attack || 5,
+                        defense: unit.defense || 3,
+                        alive: true
+                    });
+                }
+            });
+        } else if (army && army.units) {
+            // If army has a units property
+            army.units.forEach(unit => {
+                units.push({
+                    type: unit.type || 'infantry',
+                    hp: unit.hp || 30,
+                    maxHp: unit.maxHp || 30,
+                    attack: unit.attack || 5,
+                    defense: unit.defense || 3,
+                    alive: unit.alive !== false
+                });
+            });
+        }
+        
+        // Ensure at least some units
+        if (units.length === 0) {
+            for (let i = 0; i < 5; i++) {
+                units.push({
+                    type: 'infantry',
+                    hp: 30,
+                    maxHp: 30,
+                    attack: 5,
+                    defense: 3,
+                    alive: true
+                });
+            }
+        }
+        
+        return {
+            name: army?.name || (side === 'player' ? 'Your Army' : 'Raiders'),
+            units: units
+        };
+    }
+    
+    /**
+     * Handle the result from the battle viewer.
+     */
+    handleBattleViewerResult(result) {
+        if (!result) return;
+        
+        if (result.victory) {
+            this.logBattleEvent('🏆 Victory! Your army has defeated the enemy.');
+            this.handleVictory();
+        } else {
+            this.logBattleEvent('💀 Defeat! Your army has been routed.');
+            this.handleDefeat();
+        }
+        
+        // Update army with survivors
+        if (this.gameState.army && Array.isArray(this.gameState.army)) {
+            const survivorRatio = result.playerSurvivors / (result.playerSurvivors + result.playerLosses);
+            this.gameState.army.forEach(unit => {
+                unit.count = Math.floor(unit.count * survivorRatio);
+            });
+            this.gameState.army = this.gameState.army.filter(u => u.count > 0);
+        }
+        
+        // Clear current battle
+        if (this.currentBattle?.id) {
+            const battleManager = this.gameState.battleManager;
+            if (battleManager) {
+                battleManager.removeBattle(this.currentBattle.id);
+            }
+        }
+        this.currentBattle = null;
     }
     
     autoResolveBattle() {

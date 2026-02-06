@@ -306,7 +306,7 @@ class MapRenderer {
       });
     }
     
-    // scouts/expeditions
+    // scouts/expeditions (legacy)
     (this.world.expeditions || []).filter(e => e.status === 'stationed').forEach(exp => {
       const marker = document.createElement('div');
       marker.className = 'entity scout-marker';
@@ -315,7 +315,189 @@ class MapRenderer {
       this.entityLayer.appendChild(marker);
     });
     
+    // Render units from UnitManager (new system)
+    this.renderUnits();
+    
     console.log('[MapRenderer] updateEntities done');
+  }
+
+  /**
+   * Render units from UnitManager with allegiance-based styling
+   */
+  renderUnits() {
+    if (!window.unitManager) return;
+    
+    const visibleUnits = window.unitManager.getVisibleUnits();
+    
+    visibleUnits.forEach(unit => {
+      const marker = document.createElement('div');
+      marker.className = `entity unit-marker unit-${unit.allegiance} unit-mode-${unit.mode}`;
+      marker.dataset.unitId = unit.id;
+      
+      // Main icon
+      marker.textContent = unit.icon;
+      
+      // Position the marker
+      this.positionUnitMarker(marker, unit.row, unit.col, unit);
+      
+      // Apply allegiance-based styling
+      marker.style.background = this.getAllegianceBackground(unit.allegiance);
+      marker.style.borderColor = unit.color;
+      
+      // Mode indicator badge
+      if (unit.mode !== 'idle') {
+        const modeBadge = document.createElement('span');
+        modeBadge.className = 'unit-mode-badge';
+        modeBadge.textContent = unit.getModeIcon();
+        modeBadge.style.cssText = `
+          position: absolute;
+          top: -6px;
+          left: -6px;
+          font-size: 10px;
+          background: rgba(0,0,0,0.7);
+          border-radius: 50%;
+          padding: 2px;
+        `;
+        marker.appendChild(modeBadge);
+      }
+      
+      // Strength indicator for armies
+      if (unit.strength > 1) {
+        const strengthBadge = document.createElement('span');
+        strengthBadge.className = 'unit-strength-badge';
+        strengthBadge.textContent = unit.strength.toString();
+        strengthBadge.style.cssText = `
+          position: absolute;
+          bottom: -4px;
+          right: -4px;
+          font-size: 9px;
+          background: ${unit.color};
+          border-radius: 50%;
+          padding: 1px 4px;
+          color: white;
+          font-weight: bold;
+        `;
+        marker.appendChild(strengthBadge);
+      }
+      
+      // Travel indicator (direction arrow)
+      if (unit.mode === 'travel' && unit.travelPlan) {
+        const plan = unit.travelPlan;
+        if (plan.index < plan.path.length - 1) {
+          const next = plan.path[plan.index + 1];
+          const dirArrow = this.getDirectionArrow(unit.row, unit.col, next.row, next.col);
+          const travelBadge = document.createElement('span');
+          travelBadge.className = 'unit-travel-badge';
+          travelBadge.textContent = dirArrow;
+          travelBadge.style.cssText = `
+            position: absolute;
+            top: -8px;
+            right: -4px;
+            font-size: 12px;
+          `;
+          marker.appendChild(travelBadge);
+        }
+      }
+      
+      // Tooltip
+      marker.title = this.getUnitTooltip(unit);
+      
+      // Make player units clickable
+      if (unit.allegiance === 'player') {
+        marker.style.pointerEvents = 'auto';
+        marker.style.cursor = 'pointer';
+        marker.onclick = (e) => {
+          e.stopPropagation();
+          window.eventBus?.emit('unit_selected', { unit });
+        };
+      }
+      
+      this.entityLayer.appendChild(marker);
+    });
+  }
+
+  /**
+   * Get background color based on allegiance
+   */
+  getAllegianceBackground(allegiance) {
+    const backgrounds = {
+      'player': 'linear-gradient(135deg, #2980b9, #3498db)',
+      'ally': 'linear-gradient(135deg, #27ae60, #2ecc71)',
+      'neutral': 'linear-gradient(135deg, #d35400, #f39c12)',
+      'enemy': 'linear-gradient(135deg, #c0392b, #e74c3c)'
+    };
+    return backgrounds[allegiance] || 'rgba(0,0,0,0.5)';
+  }
+
+  /**
+   * Get direction arrow for travel indication
+   */
+  getDirectionArrow(fromRow, fromCol, toRow, toCol) {
+    const dRow = toRow - fromRow;
+    const dCol = toCol - fromCol;
+    
+    if (dRow < 0 && dCol === 0) return '↑';
+    if (dRow > 0 && dCol === 0) return '↓';
+    if (dRow === 0 && dCol < 0) return '←';
+    if (dRow === 0 && dCol > 0) return '→';
+    if (dRow < 0 && dCol < 0) return '↖';
+    if (dRow < 0 && dCol > 0) return '↗';
+    if (dRow > 0 && dCol < 0) return '↙';
+    if (dRow > 0 && dCol > 0) return '↘';
+    return '•';
+  }
+
+  /**
+   * Get tooltip text for unit
+   */
+  getUnitTooltip(unit) {
+    const info = unit.getDisplayInfo();
+    let tooltip = `${info.name}`;
+    tooltip += `\nType: ${unit.type.replace(/_/g, ' ')}`;
+    tooltip += `\nMode: ${info.mode} ${info.modeIcon}`;
+    tooltip += `\nStrength: ${info.strength}`;
+    if (info.morale < 100) {
+      tooltip += `\nMorale: ${info.morale}%`;
+    }
+    if (info.supplies.food > 0) {
+      tooltip += `\nFood: ${info.supplies.food}`;
+    }
+    if (info.isMoving) {
+      tooltip += `\n[Traveling]`;
+    }
+    return tooltip;
+  }
+
+  /**
+   * Position a unit marker with offset for multiple units
+   */
+  positionUnitMarker(el, row, col, unit) {
+    const size = this.currentTileSize || 60;
+    const gap = 6;
+    const padding = 32;
+    
+    // Get all units at this position to calculate offset
+    const unitsAtPos = window.unitManager?.getUnitsAt(row, col) || [unit];
+    const unitIndex = unitsAtPos.findIndex(u => u.id === unit.id);
+    const offsetAngle = (unitIndex / unitsAtPos.length) * Math.PI * 2;
+    const offsetDist = unitsAtPos.length > 1 ? size * 0.15 : 0;
+    
+    const baseLeft = padding / 2 + col * (size + gap) + size * 0.55;
+    const baseTop = padding / 2 + row * (size + gap) - size * 0.15;
+    
+    el.style.position = 'absolute';
+    el.style.width = size * 0.4 + 'px';
+    el.style.height = size * 0.4 + 'px';
+    el.style.left = (baseLeft + Math.cos(offsetAngle) * offsetDist) + 'px';
+    el.style.top = (baseTop + Math.sin(offsetAngle) * offsetDist) + 'px';
+    el.style.display = 'flex';
+    el.style.alignItems = 'center';
+    el.style.justifyContent = 'center';
+    el.style.border = '2px solid';
+    el.style.borderRadius = '50%';
+    el.style.fontSize = Math.max(12, size * 0.22) + 'px';
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)';
+    el.style.zIndex = '10';
   }
 
   positionEntity(el, row, col) {
@@ -360,6 +542,60 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
     }
     .threat-badge { text-shadow: 0 0 4px rgba(0,0,0,0.8); }
     .garrison-badge { font-weight: bold; text-shadow: 0 0 2px rgba(0,0,0,0.8); }
+    
+    /* Unit marker styles */
+    .unit-marker { 
+      color: #fff; 
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .unit-marker:hover {
+      transform: scale(1.15);
+      z-index: 20 !important;
+    }
+    .unit-player { 
+      animation: pulse-player 2s ease-in-out infinite;
+    }
+    .unit-ally {
+      animation: pulse-ally 2.5s ease-in-out infinite;
+    }
+    .unit-enemy { 
+      animation: pulse-enemy 1.5s ease-in-out infinite;
+    }
+    .unit-neutral {
+      opacity: 0.9;
+    }
+    .unit-mode-travel {
+      animation: unit-travel 0.8s ease-in-out infinite !important;
+    }
+    .unit-mode-scout {
+      box-shadow: 0 0 12px rgba(41, 128, 185, 0.6) !important;
+    }
+    .unit-mode-trade {
+      box-shadow: 0 0 8px rgba(243, 156, 18, 0.6) !important;
+    }
+    .unit-mode-battle {
+      box-shadow: 0 0 12px rgba(231, 76, 60, 0.8) !important;
+    }
+    @keyframes pulse-player {
+      0%, 100% { box-shadow: 0 0 8px rgba(52, 152, 219, 0.5); }
+      50% { box-shadow: 0 0 14px rgba(52, 152, 219, 0.8); }
+    }
+    @keyframes pulse-ally {
+      0%, 100% { box-shadow: 0 0 6px rgba(46, 204, 113, 0.4); }
+      50% { box-shadow: 0 0 10px rgba(46, 204, 113, 0.7); }
+    }
+    @keyframes pulse-enemy {
+      0%, 100% { box-shadow: 0 0 8px rgba(231, 76, 60, 0.6); }
+      50% { box-shadow: 0 0 16px rgba(231, 76, 60, 0.9); }
+    }
+    @keyframes unit-travel {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    .unit-mode-badge, .unit-strength-badge, .unit-travel-badge {
+      text-shadow: 0 0 3px rgba(0,0,0,0.9);
+      pointer-events: none;
+    }
   `;
   document.head.appendChild(s);
 }

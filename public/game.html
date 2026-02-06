@@ -51,6 +51,7 @@
     <script src="../src/systems/gameplay/throne.js"></script>
     <script src="../src/systems/gameplay/battle.js"></script>
     <script src="../src/systems/gameplay/strategicCombat.js"></script>
+    <script src="../src/systems/gameplay/battleViewer.js"></script>
     <script src="../src/systems/gameplay/quest.js"></script>
     <script src="../src/systems/gameplay/quests.js"></script>
     <script src="../src/systems/gameplay/monarch.js"></script>
@@ -59,6 +60,8 @@
     <!-- World map system (terrain, pathfinding, renderer must load before worldManager) -->
     <script src="../src/world/config/terrain.js"></script>
     <script src="../src/world/pathfinding.js"></script>
+    <script src="../src/world/Unit.js"></script>
+    <script src="../src/world/UnitManager.js"></script>
     <script src="../src/world/mapRenderer.js"></script>
     <script src="../src/systems/gameplay/worldManager.js"></script>
     <script src="../src/systems/gameplay/enemySpawnSystem.js"></script>
@@ -130,6 +133,11 @@
                         <button id="speed-4x-btn-nav" class="time-btn speed-btn" data-speed="500">4x</button>
                     </div>
                     <button id="end-day-btn-nav" class="end-day-button time-btn" title="Skip to next day">⏩ Next</button>
+                </div>
+
+                <!-- Version display -->
+                <div class="nav-section version-display" id="game-version-display" title="Game Version">
+                    <span id="version-text">v0.0.2.1</span>
                 </div>
 
                 <!-- Icon buttons -->
@@ -629,6 +637,24 @@
                         #view-navigation .icon-btn.achievements-incomplete:hover {
                             background: #c0392b;
                             border-color: #a93226;
+                        }
+
+                        /* Version Display */
+                        .version-display {
+                            display: flex;
+                            align-items: center;
+                            padding: 4px 10px;
+                            background: rgba(52, 73, 94, 0.6);
+                            border: 1px solid #4a5568;
+                            border-radius: 4px;
+                            margin-right: 8px;
+                        }
+
+                        .version-display #version-text {
+                            font-size: 11px;
+                            color: #95a5a6;
+                            font-family: monospace;
+                            letter-spacing: 0.5px;
                         }
 
                         .current-day-nav {
@@ -2301,6 +2327,95 @@
             color: #f1c40f;
             font-size: 1.5rem;
             font-weight: bold;
+        }
+
+        /* Legacy System Styles */
+        .dynasty-stat-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .dynasty-stat-group h4 {
+            color: #ecf0f1;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #34495e;
+        }
+
+        .dynasty-stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+        }
+
+        .legacy-stats {
+            background: linear-gradient(135deg, rgba(52, 73, 94, 0.3) 0%, rgba(44, 62, 80, 0.3) 100%);
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .legacy-titles {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #34495e;
+        }
+
+        .legacy-titles h5,
+        .legacy-bonuses h5 {
+            color: #bdc3c7;
+            font-size: 0.9em;
+            margin: 0 0 8px 0;
+        }
+
+        .title-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .title-badge {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .legacy-bonuses {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #34495e;
+        }
+
+        .bonus-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            color: #2ecc71;
+            font-size: 0.9em;
+        }
+
+        .bonus-list li {
+            padding: 4px 0;
+        }
+
+        .dynasty-btn.danger {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+
+        .dynasty-btn.danger:hover {
+            background: linear-gradient(135deg, #a93226 0%, #c0392b 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
         }
 
         /* Responsive Design */

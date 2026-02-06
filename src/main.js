@@ -9,7 +9,7 @@
 function loadGameVersion() {
     // Set a fallback version immediately
     if (!window.GAME_VERSION) {
-        window.GAME_VERSION = '0.0.1';
+        window.GAME_VERSION = '0.0.2.1';
     }
 
     // Try multiple possible paths for version.json
@@ -26,8 +26,9 @@ function loadGameVersion() {
                 const response = await fetch(path);
                 if (response.ok) {
                     const data = await response.json();
-                    window.GAME_VERSION = data.version || '0.0.1';
+                    window.GAME_VERSION = data.version || '0.0.2.1';
                     console.log('[Main] Game version loaded from', path, ':', window.GAME_VERSION);
+                    updateVersionDisplay();
                     return;
                 }
             } catch (error) {
@@ -35,9 +36,18 @@ function loadGameVersion() {
             }
         }
         console.log('[Main] Could not load version.json from any path, using fallback version:', window.GAME_VERSION);
+        updateVersionDisplay();
     }
 
     tryLoadVersion(possiblePaths);
+}
+
+// Update the version display in the UI
+function updateVersionDisplay() {
+    const versionEl = document.getElementById('version-text');
+    if (versionEl && window.GAME_VERSION) {
+        versionEl.textContent = 'v' + window.GAME_VERSION;
+    }
 }
 
 // Main game initialization function

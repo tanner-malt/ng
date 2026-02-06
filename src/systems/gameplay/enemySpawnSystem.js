@@ -1,10 +1,10 @@
-// Enemy Spawn System - Lairs, Outposts, and Escalating Threats
+// Enemy Spawn System - Raiders and Escalating Threats
 class EnemySpawnSystem {
     constructor(gameState, worldManager) {
         this.gameState = gameState;
         this.worldManager = worldManager;
         
-        // Enemy lairs at map edges
+        // Enemy camps at map edges
         this.lairs = [];
         this.enemyOutposts = [];
         this.enemyArmies = [];
@@ -14,85 +14,48 @@ class EnemySpawnSystem {
         this.lastSpawnDay = 0;
         this.spawnCooldown = 10; // Days between spawns
         
-        // Lair definitions
+        // Simplified: Only Raider Camps for now
         this.lairTypes = {
-            goblinDen: {
-                name: 'Goblin Den',
-                icon: '🕳️',
-                baseStrength: 5,
-                growthRate: 0.5, // Units per day
-                maxUnits: 20,
-                unitTypes: ['goblin_scout', 'goblin_warrior'],
-                color: '#4a5'
-            },
-            banditCamp: {
-                name: 'Bandit Camp',
+            raiderCamp: {
+                name: 'Raider Camp',
                 icon: '⚔️',
-                baseStrength: 8,
-                growthRate: 0.3,
-                maxUnits: 15,
-                unitTypes: ['bandit', 'bandit_archer'],
-                color: '#a54'
-            },
-            undeadCrypt: {
-                name: 'Undead Crypt',
-                icon: '💀',
-                baseStrength: 10,
-                growthRate: 0.2,
-                maxUnits: 30,
-                unitTypes: ['skeleton', 'zombie', 'wraith'],
-                color: '#666'
-            },
-            orcStronghold: {
-                name: 'Orc Stronghold',
-                icon: '🏰',
-                baseStrength: 15,
-                growthRate: 0.4,
-                maxUnits: 25,
-                unitTypes: ['orc_grunt', 'orc_berserker', 'orc_shaman'],
-                color: '#5a4'
-            },
-            dragonLair: {
-                name: 'Dragon Lair',
-                icon: '🐉',
-                baseStrength: 50,
-                growthRate: 0.1,
-                maxUnits: 5,
-                unitTypes: ['drake', 'wyvern', 'dragon'],
-                color: '#a22'
+                baseStrength: 5,
+                growthRate: 0.3, // Units per day
+                maxUnits: 20,
+                color: '#8b4513',
+                // Metadata about the faction
+                faction: 'raiders',
+                isHuman: true,
+                description: 'A camp of human raiders who prey on settlements'
             }
         };
         
-        // Unit stats for enemy types
+        // Simplified: All units are infantry for now
         this.unitStats = {
-            goblin_scout: { hp: 15, attack: 3, defense: 1, speed: 3 },
-            goblin_warrior: { hp: 25, attack: 5, defense: 2, speed: 2 },
-            bandit: { hp: 30, attack: 6, defense: 3, speed: 2 },
-            bandit_archer: { hp: 20, attack: 8, defense: 1, speed: 2 },
-            skeleton: { hp: 20, attack: 4, defense: 4, speed: 1 },
-            zombie: { hp: 40, attack: 3, defense: 2, speed: 1 },
-            wraith: { hp: 25, attack: 7, defense: 0, speed: 3 },
-            orc_grunt: { hp: 50, attack: 8, defense: 5, speed: 1 },
-            orc_berserker: { hp: 40, attack: 12, defense: 2, speed: 2 },
-            orc_shaman: { hp: 30, attack: 6, defense: 3, speed: 1, magic: true },
-            drake: { hp: 80, attack: 15, defense: 8, speed: 2 },
-            wyvern: { hp: 60, attack: 12, defense: 5, speed: 4 },
-            dragon: { hp: 200, attack: 30, defense: 15, speed: 2, fire: true }
+            infantry: { 
+                hp: 30, 
+                attack: 5, 
+                defense: 3, 
+                speed: 2,
+                // Metadata
+                isHuman: true,
+                name: 'Raider'
+            }
         };
     }
     
     init() {
         this.loadState();
         
-        // Spawn initial lairs at map edges if none exist
+        // Spawn initial raider camps at map edges if none exist
         if (this.lairs.length === 0) {
             this.spawnInitialLairs();
         }
         
-        console.log('[EnemySpawn] Initialized with', this.lairs.length, 'lairs');
+        console.log('[EnemySpawn] Initialized with', this.lairs.length, 'raider camps');
     }
     
-    // Spawn lairs at map edges during initialization
+    // Spawn raider camps at map edges during initialization
     spawnInitialLairs() {
         const mapWidth = this.worldManager.mapWidth;
         const mapHeight = this.worldManager.mapHeight;
@@ -132,37 +95,18 @@ class EnemySpawnSystem {
         return tiles;
     }
     
-    // Select appropriate lair type based on wave/threat level
+    // Select lair type - simplified to only raiderCamp for now
     selectLairTypeForWave(wave) {
-        const types = Object.keys(this.lairTypes);
-        
-        if (wave <= 2) {
-            return 'goblinDen';
-        } else if (wave <= 4) {
-            return Math.random() < 0.7 ? 'banditCamp' : 'goblinDen';
-        } else if (wave <= 6) {
-            const roll = Math.random();
-            if (roll < 0.4) return 'banditCamp';
-            if (roll < 0.7) return 'undeadCrypt';
-            return 'orcStronghold';
-        } else if (wave <= 10) {
-            const roll = Math.random();
-            if (roll < 0.3) return 'undeadCrypt';
-            if (roll < 0.7) return 'orcStronghold';
-            return 'dragonLair';
-        } else {
-            // Late game - mostly strong lairs
-            return Math.random() < 0.6 ? 'orcStronghold' : 'dragonLair';
-        }
+        // Future: Add more enemy types based on wave/threat level
+        return 'raiderCamp';
     }
     
-    // Create a new lair at position
+    // Create a new raider camp at position
     createLair(row, col, lairTypeKey) {
-        const lairType = this.lairTypes[lairTypeKey];
-        if (!lairType) return null;
+        const lairType = this.lairTypes[lairTypeKey] || this.lairTypes.raiderCamp;
         
         const lair = {
-            id: `lair_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: `camp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             type: lairTypeKey,
             name: lairType.name,
             icon: lairType.icon,
@@ -174,13 +118,16 @@ class EnemySpawnSystem {
             destroyed: false,
             createdDay: this.gameState.day || 1,
             lastGrowthDay: this.gameState.day || 1,
-            unitTypes: lairType.unitTypes,
-            threatContribution: lairType.baseStrength
+            threatContribution: lairType.baseStrength,
+            // Metadata
+            faction: lairType.faction || 'raiders',
+            isHuman: lairType.isHuman || true,
+            color: lairType.color
         };
         
         this.lairs.push(lair);
         
-        // Mark the hex as having a lair
+        // Mark the hex as having a camp
         if (this.worldManager.hexMap?.[row]?.[col]) {
             this.worldManager.hexMap[row][col].lair = lair.id;
             this.worldManager.hexMap[row][col].lairData = lair;
@@ -227,27 +174,31 @@ class EnemySpawnSystem {
         this.saveState();
     }
     
-    // Spawn an army from a lair to attack player
+    // Spawn a raider army from a camp to attack player
     spawnArmyFromLair(lair) {
         const unitsToSend = Math.floor(lair.currentUnits * 0.4); // Send 40% of units
         if (unitsToSend < 3) return; // Need at least 3 units
         
         lair.currentUnits -= unitsToSend;
         
-        // Create enemy army
+        // Create raider army
         const army = {
-            id: `enemy_army_${Date.now()}`,
-            name: `${lair.name} Raiders`,
+            id: `raider_army_${Date.now()}`,
+            name: 'Raiders',
             fromLair: lair.id,
             row: lair.row,
             col: lair.col,
             targetRow: this.worldManager.playerVillageHex.row,
             targetCol: this.worldManager.playerVillageHex.col,
-            units: this.generateUnitsFromLair(lair, unitsToSend),
+            units: this.generateInfantryUnits(unitsToSend),
             totalStrength: unitsToSend,
             movementSpeed: 1, // 1 tile per day
             hostile: true,
-            createdDay: this.gameState.day
+            createdDay: this.gameState.day,
+            // Metadata
+            faction: 'raiders',
+            isHuman: true,
+            color: lair.color || '#8b4513'
         };
         
         this.enemyArmies.push(army);
@@ -259,33 +210,38 @@ class EnemySpawnSystem {
         
         this.lastSpawnDay = this.gameState.day;
         
-        console.log(`[EnemySpawn] Army spawned from ${lair.name}: ${unitsToSend} units`);
-        window.showToast?.(`⚠️ ${army.name} spotted near ${lair.name}!`, { type: 'warning' });
+        console.log(`[EnemySpawn] Raiders spawned: ${unitsToSend} infantry`);
+        window.showToast?.(`⚠️ Raiders spotted heading toward your village!`, { type: 'warning' });
         
         return army;
     }
     
-    // Generate unit composition for army
-    generateUnitsFromLair(lair, count) {
+    // Generate infantry units for army (simplified - all infantry for now)
+    generateInfantryUnits(count) {
         const units = [];
-        const unitTypes = lair.unitTypes || ['goblin_scout'];
+        const stats = this.unitStats.infantry;
         
         for (let i = 0; i < count; i++) {
-            const typeKey = unitTypes[Math.floor(Math.random() * unitTypes.length)];
-            const stats = this.unitStats[typeKey] || { hp: 20, attack: 5, defense: 2, speed: 2 };
-            
             units.push({
-                type: typeKey,
+                id: `infantry_${Date.now()}_${i}`,
+                type: 'infantry',
+                name: 'Raider',
                 hp: stats.hp,
                 maxHp: stats.hp,
                 attack: stats.attack,
                 defense: stats.defense,
                 speed: stats.speed,
-                alive: true
+                alive: true,
+                isHuman: true
             });
         }
         
         return units;
+    }
+    
+    // Legacy method for compatibility
+    generateUnitsFromLair(lair, count) {
+        return this.generateInfantryUnits(count);
     }
     
     // Move enemy armies toward player village

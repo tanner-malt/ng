@@ -1003,8 +1003,37 @@ class AchievementSystem {
 
         // Check for "All Things End" ultimate achievement
         this.checkUltimateAchievement();
+        
+        // Check for "Become King" if not already unlocked
+        // This provides alternative paths beyond just tutorial completion
+        this.checkBecomeKingAchievement();
 
         this.isCheckingRequirements = false;
+    }
+    
+    // Check if player qualifies for "Become King" achievement
+    checkBecomeKingAchievement() {
+        if (this.isUnlocked('become_king')) return;
+        
+        const gs = window.gameState;
+        if (!gs) return;
+        
+        // Alternative conditions for becoming king:
+        // 1. Population 30+, Day 20+, built 5+ buildings
+        const pop = gs.populationManager?.getAll()?.length || gs.population || 0;
+        const day = gs.day || 0;
+        const buildings = gs.buildings?.length || 0;
+        
+        if (pop >= 30 && day >= 20 && buildings >= 5) {
+            console.log('[Achievements] Become King conditions met via gameplay progression');
+            this.triggerBecomeKing();
+        }
+        
+        // 2. Or has military_establishment + thriving_dynasty
+        if (this.isUnlocked('military_establishment') && this.isUnlocked('thriving_dynasty')) {
+            console.log('[Achievements] Become King conditions met via military + population');
+            this.triggerBecomeKing();
+        }
     }
 
     // Check if player qualifies for the ultimate achievement

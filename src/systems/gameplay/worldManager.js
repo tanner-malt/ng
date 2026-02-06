@@ -176,6 +176,19 @@ class WorldManager {
             } else {
                 this.renderHexMap();
             }
+            
+            // Initialize UnitManager for world map units
+            if (window.UnitManager) {
+                try {
+                    this.unitManager = new window.UnitManager(this, this.gameState);
+                    window.unitManager = this.unitManager;
+                    this.unitManager.init();
+                    console.log('[World] UnitManager initialized');
+                } catch (e) {
+                    console.warn('[World] UnitManager init failed:', e);
+                }
+            }
+            
             this.setupHexInteraction();
 
             console.log('[World] World map initialization complete');
@@ -650,9 +663,21 @@ class WorldManager {
                 } catch (e) {
                     console.warn('[World] Expedition daily update error:', e);
                 }
+                // Process UnitManager daily updates
+                try {
+                    if (this.unitManager) {
+                        this.unitManager.processDaily();
+                    }
+                } catch (e) {
+                    console.warn('[World] UnitManager daily update error:', e);
+                }
                 // Refresh UI panels
                 this.updateExpeditionsList();
                 this.updateArmyDisplays();
+                // Refresh map entities to show unit updates
+                if (this.mapRenderer) {
+                    this.mapRenderer.updateEntities();
+                }
             });
         }
 
@@ -4327,6 +4352,115 @@ class WorldManager {
         }
         
         console.log('[World] Loaded world save data');
+    }
+    
+    // ==========================================
+    // Unit System Integration Methods
+    // ==========================================
+    
+    /**
+     * Create a player army unit on the map
+     */
+    createPlayerUnit(config) {
+        if (!this.unitManager) {
+            console.warn('[World] UnitManager not available');
+            return null;
+        }
+        return this.unitManager.createPlayerArmy({
+            row: config.row ?? this.playerVillageHex.row,
+            col: config.col ?? this.playerVillageHex.col,
+            ...config
+        });
+    }
+    
+    /**
+     * Create a scout party
+     */
+    createScoutUnit(config) {
+        if (!this.unitManager) {
+            console.warn('[World] UnitManager not available');
+            return null;
+        }
+        return this.unitManager.createScoutParty({
+            row: config.row ?? this.playerVillageHex.row,
+            col: config.col ?? this.playerVillageHex.col,
+            ...config
+        });
+    }
+    
+    /**
+     * Create a trade caravan
+     */
+    createTradeCaravan(config) {
+        if (!this.unitManager) {
+            console.warn('[World] UnitManager not available');
+            return null;
+        }
+        return this.unitManager.createTradeCaravan({
+            row: config.row ?? this.playerVillageHex.row,
+            col: config.col ?? this.playerVillageHex.col,
+            ...config
+        });
+    }
+    
+    /**
+     * Spawn an enemy raider band
+     */
+    spawnEnemyRaiders(config) {
+        if (!this.unitManager) {
+            console.warn('[World] UnitManager not available');
+            return null;
+        }
+        return this.unitManager.createRaiderBand(config);
+    }
+    
+    /**
+     * Spawn a neutral merchant
+     */
+    spawnMerchant(config) {
+        if (!this.unitManager) {
+            console.warn('[World] UnitManager not available');
+            return null;
+        }
+        return this.unitManager.createWanderingMerchant(config);
+    }
+    
+    /**
+     * Get all units at a specific hex
+     */
+    getUnitsAtHex(row, col) {
+        if (!this.unitManager) return [];
+        return this.unitManager.getUnitsAt(row, col);
+    }
+    
+    /**
+     * Command a unit to travel to a destination
+     */
+    commandUnitTravel(unitId, destRow, destCol) {
+        if (!this.unitManager) return false;
+        
+        const unit = this.unitManager.getUnit(unitId);
+        if (!unit) {
+            console.warn('[World] Unit not found:', unitId);
+            return false;
+        }
+        
+        // Calculate path using pathfinding
+        const path = this.findPath(unit.row, unit.col, destRow, destCol);
+        if (!path || path.length === 0) {
+            window.showToast?.('No path to destination!', { type: 'error' });
+            return false;
+        }
+        
+        return this.unitManager.startUnitTravel(unitId, path, { row: destRow, col: destCol });
+    }
+    
+    /**
+     * Get summary of all units for UI
+     */
+    getUnitSummary() {
+        if (!this.unitManager) return null;
+        return this.unitManager.getSummary();
     }
 }
 // Inject hex-button CSS for flat-top hexagon styling
