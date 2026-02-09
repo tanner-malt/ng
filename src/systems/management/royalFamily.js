@@ -240,6 +240,9 @@ class RoyalFamilyManager {
             );
         }
 
+        // Dynasty founder achievement - unlocked on first succession
+        try { window.achievementSystem?.triggerDynastySuccession?.(); } catch (_) { }
+
         try { this.gameState.save?.(); } catch (_) { }
         return newMonarch;
     }

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Note: The full tutorial.js contains non-ASCII mojibake sequences that upset Vite/Node
 // import analysis in tests. To keep coverage on the flow, we simulate the contract:
-// - If dynastyName exists at load and achievement not unlocked, triggerDynastyNamed(name)
-// - Submitting the dynasty modal with a valid name saves to localStorage and triggers achievement
+// - triggerDynastyNamed() is a no-op — naming does NOT unlock dynasty_founder
+// - triggerDynastySuccession() unlocks dynasty_founder on actual succession
+// - Submitting the dynasty modal with a valid name saves to localStorage
 
 describe('Dynasty naming flow', () => {
   beforeEach(() => {
@@ -22,46 +23,69 @@ describe('Dynasty naming flow', () => {
     delete window.achievementSystem;
   });
 
-  it('auto-unlocks Dynasty Founder when dynasty name exists on load', async () => {
+  it('does NOT auto-unlock Dynasty Founder when dynasty name exists on load', async () => {
     vi.useFakeTimers();
 
     // Arrange: put a dynasty name in storage
     localStorage.setItem('dynastyName', 'House Test');
 
-    // Stub achievement system with isUnlocked check and trigger capture
-    const triggerSpy = vi.fn();
+    // Stub achievement system — triggerDynastyNamed is a no-op
     const unlockedSet = new Set();
     window.achievementSystem = {
       isUnlocked: (id) => unlockedSet.has(id),
-      triggerDynastyNamed: (name) => {
-        triggerSpy(name);
+      triggerDynastyNamed: () => {
+        // no-op — naming does not unlock dynasty_founder
+      },
+      triggerDynastySuccession: () => {
         unlockedSet.add('dynasty_founder');
       },
     };
 
-    // Act: simulate verify-on-load contract
+    // Act: simulate verify-on-load contract (no longer triggers achievement)
     const dynastyName = (localStorage.getItem('dynastyName') || '').trim();
-    if (dynastyName && !window.achievementSystem.isUnlocked('dynasty_founder')) {
+    if (dynastyName) {
       window.achievementSystem.triggerDynastyNamed(dynastyName);
     }
 
-    // Assert
-    expect(triggerSpy).toHaveBeenCalledTimes(1);
-    expect(triggerSpy).toHaveBeenCalledWith('House Test');
+    // Assert: dynasty_founder should NOT be unlocked from naming alone
+    expect(unlockedSet.has('dynasty_founder')).toBe(false);
 
     vi.useRealTimers();
   });
 
-  it('dynasty name modal OK submits name and triggers achievement', async () => {
+  it('dynasty_founder unlocks on succession, not on naming', async () => {
+    vi.useFakeTimers();
+
+    const unlockedSet = new Set();
+    window.achievementSystem = {
+      isUnlocked: (id) => unlockedSet.has(id),
+      triggerDynastyNamed: () => { /* no-op */ },
+      triggerDynastySuccession: () => {
+        unlockedSet.add('dynasty_founder');
+      },
+    };
+
+    // Naming does not unlock
+    window.achievementSystem.triggerDynastyNamed('Stormwind');
+    expect(unlockedSet.has('dynasty_founder')).toBe(false);
+
+    // Succession does unlock
+    window.achievementSystem.triggerDynastySuccession();
+    expect(unlockedSet.has('dynasty_founder')).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('dynasty name modal OK submits name to localStorage', async () => {
     vi.useFakeTimers();
 
     // No existing dynasty name
     expect(localStorage.getItem('dynastyName')).toBeNull();
 
     // Stub achievement system
-    const triggerSpy = vi.fn();
     window.achievementSystem = {
-      triggerDynastyNamed: triggerSpy,
+      triggerDynastyNamed: () => { /* no-op */ },
+      triggerDynastySuccession: vi.fn(),
       isUnlocked: () => false,
     };
 
@@ -85,6 +109,7 @@ describe('Dynasty naming flow', () => {
       const name = input.value.trim();
       if (name && name.length >= 2) {
         localStorage.setItem('dynastyName', name);
+        // triggerDynastyNamed is a no-op now
         window.achievementSystem.triggerDynastyNamed(name);
         overlay.remove();
       }
@@ -93,8 +118,6 @@ describe('Dynasty naming flow', () => {
 
     // Assertions
     expect(localStorage.getItem('dynastyName')).toBe('Stormwind');
-    expect(triggerSpy).toHaveBeenCalledTimes(1);
-    expect(triggerSpy).toHaveBeenCalledWith('Stormwind');
 
     // Modal should be closed
     expect(document.querySelector('.modal-overlay')).toBeNull();

@@ -423,9 +423,17 @@ class AchievementSystem {
         console.log('[Achievements] Initialized', Object.keys(this.achievements).length, 'achievements');
     }
 
-    // Trigger achievement for dynasty naming
+    // Trigger achievement for dynasty naming (called on dynasty succession, not initial naming)
     triggerDynastyNamed(dynastyName) {
+        // Only unlock if this is a succession (dynasty already existed before)
+        // Initial naming during tutorial should NOT trigger this
+        console.log('[Achievements] triggerDynastyNamed called - checking if succession');
+    }
+
+    // Trigger achievement for actual dynasty succession (monarch death + heir takes over)
+    triggerDynastySuccession() {
         this.unlock('dynasty_founder');
+        console.log('[Achievements] Dynasty founder unlocked via succession');
     }
 
     // Trigger tracking for building placement (stats are NOT updated here - only on completion)

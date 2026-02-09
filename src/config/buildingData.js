@@ -72,7 +72,7 @@ const BUILDING_DATA = {
         },
         
         unlockConditions: [
-            { type: 'achievement', achievement: 'sheltering_citizens' }
+            { type: 'building_count', building: 'house', count: 1 }
         ],
         autoUnlock: true
     },
