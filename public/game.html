@@ -15,20 +15,6 @@
     <script src="../src/config/buildingData.js"></script>
     <script src="../src/config/resourceData.js"></script>
     <script src="../src/config/jobData.js"></script>
-    <script>
-        // Load the generated wikiData from public folder (built by scripts/build-wiki.js)
-        (function loadWikiData() {
-            const script = document.createElement('script');
-            script.src = './wikiData.js';
-            script.onload = function () {
-                console.log('[WikiData] Loaded ./wikiData.js');
-            };
-            script.onerror = function () {
-                console.error('[WikiData] Failed to load ./wikiData.js');
-            };
-            document.head.appendChild(script);
-        })();
-    </script>
     <script src="../src/systems/core/eventBus.js"></script>
     <!-- Reactive Data Model System -->
     <script src="../src/systems/core/dataModel.js"></script>

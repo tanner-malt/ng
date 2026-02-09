@@ -5,10 +5,7 @@
   "scripts": {
     "start": "npx serve . -l 8000",
     "dev": "npx serve . -l 8000 --no-clipboard",
-    "build:wiki": "node scripts/build-wiki.js",
-    "watch:wiki": "nodemon --watch docs/wiki --ext md --exec \"npm run build:wiki\"",
-    "prebuild": "npm run build:wiki",
-    "build": "npm run build:wiki && node scripts/update-version-json.js",
+    "build": "node scripts/update-version-json.js",
     "test": "vitest",
     "test:run": "vitest --run",
     "predeploy": "npm run build",
