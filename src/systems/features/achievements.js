@@ -61,7 +61,7 @@ class AchievementSystem {
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            reward: { wood: 100, stone: 200, food: 100 }
+            reward: { wood: 50, stone: 200, food: 100 }
         });
 
         this.defineAchievement('sheltering_citizens', {

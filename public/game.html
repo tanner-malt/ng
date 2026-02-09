@@ -535,6 +535,7 @@
                         #view-navigation {
                             width: 100%;
                             padding: 0 1rem 1rem 1rem;
+                            overflow: hidden;
                         }
 
                         .nav-container {
@@ -542,24 +543,22 @@
                             align-items: center;
                             width: 100%;
                             min-height: 40px;
-                            gap: 1rem;
+                            gap: 0.75rem;
                             position: relative;
                         }
 
                         .nav-section {
                             display: flex;
                             align-items: center;
-                            gap: 8px;
+                            gap: 6px;
+                            flex-shrink: 0;
                         }
 
                         .version-display {
-                            flex: 0 0 auto;
                             order: 0;
                         }
 
                         .nav-left {
-                            /* View buttons stay on left */
-                            flex: 0 0 auto;
                             order: 1;
                         }
 
@@ -586,16 +585,16 @@
                         }
 
                         .time-controls-nav {
-                            /* Time controls pushed right */
-                            flex: 0 0 auto;
                             order: 2;
                             margin-left: auto;
+                            flex-shrink: 1;
+                            min-width: 0;
                         }
 
                         .nav-right {
-                            /* Icons on far right */
-                            flex: 0 0 auto;
                             order: 3;
+                            flex-shrink: 1;
+                            min-width: 0;
                         }
 
                         /* Responsive behavior to prevent overlaps */

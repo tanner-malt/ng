@@ -23,7 +23,7 @@ const GameData = {
     buildingCosts: {
         // Essential Buildings
         townCenter: { wood: 50 },
-        house: { wood: 25 },
+        house: { wood: 15 },
         farm: { wood: 20 },
         buildersHut: { wood: 30, stone: 15 }, // Professional building for builders
         storehouse: { wood: 40, stone: 20 },
