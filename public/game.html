@@ -564,13 +564,14 @@
                         }
 
                         .nav-crown {
-                            /* Crown emblem - grows to center itself */
-                            flex: 1 1 0;
+                            /* Crown emblem absolutely centered over the nav */
+                            position: absolute;
+                            left: 50%;
+                            transform: translateX(-50%);
                             display: flex;
-                            justify-content: center;
                             align-items: center;
-                            order: 2;
-                            min-width: 60px;
+                            z-index: 1;
+                            pointer-events: none;
                         }
 
                         .crown-emblem {
@@ -585,15 +586,16 @@
                         }
 
                         .time-controls-nav {
-                            /* Time controls to the right of crown */
-                            flex: 0 1 auto;
-                            order: 3;
+                            /* Time controls pushed right */
+                            flex: 0 0 auto;
+                            order: 2;
+                            margin-left: auto;
                         }
 
                         .nav-right {
                             /* Icons on far right */
-                            flex: 0 1 auto;
-                            order: 4;
+                            flex: 0 0 auto;
+                            order: 3;
                         }
 
                         /* Responsive behavior to prevent overlaps */
