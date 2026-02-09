@@ -89,14 +89,8 @@
     <!-- Popup panels for top-right buttons -->
 
 
-    <!-- Tutorial Highlight Overlay -->
-    <div id="tutorial-highlight-overlay"
-        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
-        <div id="tutorial-pointer"
-            style="display: none; position: absolute; color: #f39c12; font-size: 30px; animation: bounce 1s infinite;">
-            👆
-        </div>
-    </div>
+    <!-- Tutorial Highlight Overlay (legacy, hidden) -->
+    <div id="tutorial-highlight-overlay" style="display: none;"></div>
 
     <!-- Notification overlay and container for tutorial/milestone notifications -->
     <div id="notification-overlay" style="display:none;"></div>
@@ -1765,23 +1759,9 @@
 
         .tutorial-highlight {
             position: relative;
-            box-shadow: 0 0 20px #f39c12 !important;
-            border: 3px solid #f39c12 !important;
-            background: rgba(243, 156, 18, 0.1) !important;
-            z-index: 9998 !important;
-        }
-
-        .tutorial-highlight::after {
-            content: '';
-            position: absolute;
-            top: -5px;
-            left: -5px;
-            right: -5px;
-            bottom: -5px;
-            background: transparent;
-            border: 2px dashed #f39c12;
-            border-radius: inherit;
-            animation: pulse 2s infinite;
+            box-shadow: 0 0 8px rgba(243, 156, 18, 0.4) !important;
+            border: 2px solid #f39c12 !important;
+            background: rgba(243, 156, 18, 0.08) !important;
         }
 
         /* Locked building button styles */

@@ -1474,8 +1474,8 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
     display: none;
     justify-content: center;
     align-items: center;
@@ -1484,7 +1484,7 @@ body {
 
 .modal-overlay.show {
     display: flex;
-    animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: modalFadeIn 0.25s ease-out forwards;
 }
 
 @keyframes modalFadeIn {
@@ -1495,7 +1495,7 @@ body {
 
     to {
         opacity: 1;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(3px);
     }
 }
 
@@ -1510,13 +1510,13 @@ body {
     overflow: hidden;
     color: var(--text-primary);
     position: relative;
-    animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: modalSlideIn 0.3s ease-out forwards;
 }
 
 @keyframes modalSlideIn {
     from {
         opacity: 0;
-        transform: scale(0.7) translateY(-50px);
+        transform: scale(0.95) translateY(-15px);
     }
 
     to {
@@ -3795,8 +3795,8 @@ html {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(20, 35, 50, 0.9));
-    backdrop-filter: blur(8px);
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(20, 35, 50, 0.6));
+    backdrop-filter: blur(3px);
     display: none;
     justify-content: center;
     align-items: center;
@@ -3814,7 +3814,7 @@ html {
 
 .modal-overlay.show {
     display: flex;
-    animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: fadeIn 0.25s ease-out forwards;
 }
 
 @keyframes fadeIn {
@@ -3825,26 +3825,25 @@ html {
 
     to {
         opacity: 1;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(3px);
     }
 }
 
 .modal-content {
     background: linear-gradient(145deg, #1a252f, #2c3e50);
-    border: 3px solid #3498db;
-    border-radius: 25px;
+    border: 2px solid #3498db;
+    border-radius: 16px;
     box-shadow:
-        0 25px 80px rgba(0, 0, 0, 0.9),
-        0 0 60px rgba(52, 152, 219, 0.4),
-        inset 0 2px 0 rgba(255, 255, 255, 0.1),
-        inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+        0 15px 40px rgba(0, 0, 0, 0.6),
+        0 0 20px rgba(52, 152, 219, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     max-width: 750px;
     width: 92%;
     max-height: 85vh;
     overflow: hidden;
     color: #ecf0f1;
     position: relative;
-    animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: modalSlideIn 0.3s ease-out forwards;
 }
 
 @keyframes modalSlideIn {
@@ -5003,6 +5002,30 @@ html {
     line-height: 1.3;
 }
 
+/* Unlock toast — more prominent than a normal toast */
+.toast-unlock .unlock-toast-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.toast-unlock .unlock-toast-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.toast-unlock .unlock-toast-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #2ecc71;
+    margin-bottom: 2px;
+}
+
+.toast-unlock .unlock-toast-desc {
+    font-size: 13px;
+    opacity: 0.85;
+    line-height: 1.3;
+}
+
 /* Legacy notification styles (keeping for compatibility) */
 .notification-container {
     position: fixed;
@@ -5251,12 +5274,12 @@ html {
 
 /* Story-driven tutorial styles */
 .story-panel {
-    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(52, 73, 94, 0.95));
-    border: 2px solid #3498db;
-    border-radius: 12px;
-    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.9), rgba(52, 73, 94, 0.9));
+    border: 1px solid rgba(52, 152, 219, 0.5);
+    border-radius: 10px;
+    padding: 1.25rem;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .story-panel p {
@@ -5307,46 +5330,27 @@ html {
     margin-bottom: 0.5rem;
 }
 
-/* Enhanced highlight animation */
+/* Highlight animation */
 @keyframes tutorial-pulse {
     0% {
-        box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.7);
-        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4);
     }
 
     50% {
-        box-shadow: 0 0 0 10px rgba(241, 196, 15, 0.3);
-        transform: scale(1.05);
+        box-shadow: 0 0 0 6px rgba(241, 196, 15, 0.15);
     }
 
     100% {
         box-shadow: 0 0 0 0 rgba(241, 196, 15, 0);
-        transform: scale(1);
     }
 }
 
 .tutorial-highlight {
-    border: 3px solid #f1c40f !important;
-    background: rgba(241, 196, 15, 0.2) !important;
+    border: 2px solid #f1c40f !important;
+    background: rgba(241, 196, 15, 0.1) !important;
     position: relative;
-    z-index: 1000;
-    animation: tutorial-pulse 2s infinite;
-    box-shadow: 0 0 20px rgba(241, 196, 15, 0.6) !important;
-}
-
-@keyframes tutorial-pulse {
-    0% {
-        box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
-    }
-
-    50% {
-        box-shadow: 0 0 30px rgba(241, 196, 15, 0.9);
-        transform: scale(1.02);
-    }
-
-    100% {
-        box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
-    }
+    animation: tutorial-pulse 2.5s infinite;
+    box-shadow: 0 0 8px rgba(241, 196, 15, 0.3) !important;
 }
 
 .tutorial-section {
@@ -5401,9 +5405,9 @@ html {
 /* Settings Modal Styles */
 .settings-modal {
     background: linear-gradient(145deg, #1a252f, #2c3e50);
-    border: 3px solid #3498db;
-    border-radius: 18px;
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(52, 152, 219, 0.2);
+    border: 2px solid #3498db;
+    border-radius: 14px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 15px rgba(52, 152, 219, 0.1);
     max-width: 600px;
     width: 95vw;
     max-height: 80vh;
@@ -5411,7 +5415,7 @@ html {
     position: relative;
     display: flex;
     flex-direction: column;
-    animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: modalSlideIn 0.3s ease-out forwards;
     padding: 0;
     overflow: hidden;
 }

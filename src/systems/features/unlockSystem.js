@@ -747,32 +747,12 @@ class UnlockSystem {
             );
         }
 
-        // Show notification for unlocks - uses 'notification' type to queue behind blocking modals
-        if (window.modalSystem) {
+        // Show as a prominent toast — non-blocking, doesn't interrupt gameplay or tutorials
+        if (window.showUnlockToast) {
             const icon = this.getUnlockIcon(config);
-            window.modalSystem.showModal({
-                id: 'unlock-notification-' + Date.now(),
-                title: title,
-                content: `
-                    <div class="unlock-notification-content" style="text-align: center; padding: 20px;">
-                        <div class="unlock-icon" style="font-size: 64px; margin-bottom: 15px;">${icon}</div>
-                        <div class="unlock-message">
-                            <p style="font-size: 16px; margin-bottom: 10px;">${message}</p>
-                            <p style="color: #27ae60; font-weight: bold;">You can now build this!</p>
-                        </div>
-                    </div>
-                `,
-                width: '400px',
-                height: 'auto',
-                className: 'unlock-modal',
-                modalType: 'notification',  // This ensures it queues behind blocking modals like tutorial/dynasty
-                closable: true,
-                showCloseButton: true,
-                autoClose: 5000 // Auto-close after 5 seconds
-            });
+            window.showUnlockToast(config.name, message, icon);
         } else if (window.showToast) {
-            // Fallback to toast if modal not available
-            window.showToast(`${title} - ${message}`, { type: 'success', timeout: 5000 });
+            window.showToast(`${title}`, { type: 'success', icon: '🔓', timeout: 4000 });
         } else {
             console.log(`[UnlockSystem] ${title} - ${message}`);
         }

@@ -552,7 +552,54 @@ function showBuildingComplete(buildingType) {
     });
 }
 
+// ===== UNLOCK TOAST =====
+// Prominent but non-blocking notification for unlocks (bigger than a normal toast, not a modal)
+function showUnlockToast(name, description, icon = '🔓') {
+    const container = document.getElementById('notification-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification toast-unlock';
+    toast.innerHTML = `
+        <span class="unlock-toast-icon">${icon}</span>
+        <div class="unlock-toast-body">
+            <div class="unlock-toast-title">🔓 ${name} Unlocked!</div>
+            <div class="unlock-toast-desc">${description || 'You can now build this!'}</div>
+        </div>
+    `;
+    toast.style.cssText = `
+        position: relative;
+        background: linear-gradient(135deg, #1a3a2a, #2c4a3c);
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        border-left: 4px solid #27ae60;
+        transform: translateX(100%);
+        opacity: 0;
+        transition: all 0.35s ease-out;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #ecf0f1;
+        max-width: 340px;
+        z-index: 1100;
+    `;
+
+    toast.onclick = () => dismissToast(toast);
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+        toast.style.transform = 'translateX(0)';
+        toast.style.opacity = '1';
+    });
+
+    setTimeout(() => dismissToast(toast), 5000);
+}
+
 // Attach to window
 window.showMiniToast = showMiniToast;
 window.showResourceChange = showResourceChange;
 window.showBuildingComplete = showBuildingComplete;
+window.showUnlockToast = showUnlockToast;
