@@ -112,10 +112,8 @@ const BUILDING_DATA = {
             jobs: { gatherer: 1 }
         },
         
-        unlockConditions: [
-            { type: 'building_count', building: 'townCenter', count: 1 }
-        ],
-        autoUnlock: true
+        unlockConditions: [],
+        startsUnlocked: true
     },
 
     // =========================================

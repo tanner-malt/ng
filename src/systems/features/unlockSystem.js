@@ -22,6 +22,7 @@ class UnlockSystem {
         // Start with basic content unlocked
         // Town center and village view available at start
         this.unlockedContent.add('townCenter'); // Town center unlocked from start
+        this.unlockedContent.add('storehouse'); // Storehouse unlocked from start (essential building)
         this.unlockedContent.add('village_view'); // Village view always available
 
         this.initializeUnlockConditions();
