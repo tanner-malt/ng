@@ -47,7 +47,7 @@ class UnlockSystem {
             name: 'Farm',
             description: 'Produces food for your settlement',
             conditions: [
-                { type: 'achievement', achievement: 'sheltering_citizens' }
+                { type: 'building_count', building: 'house', count: 1 }
             ],
             autoUnlock: true
         });

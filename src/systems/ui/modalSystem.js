@@ -399,6 +399,11 @@ class ModalSystem {
         // Show overlay and modal
         const overlay = document.getElementById('modal-overlay');
 
+        // Hide all existing modal children so only the new (top) modal is visible
+        Array.from(overlay.querySelectorAll('.modal-content')).forEach(existing => {
+            existing.style.display = 'none';
+        });
+
         overlay.appendChild(modal);
 
         overlay.style.display = 'flex';
@@ -490,6 +495,11 @@ class ModalSystem {
 
                 const overlay = document.getElementById('modal-overlay');
                 overlay.style.zIndex = finalZIndex;
+
+                // Show the new top modal (was hidden when a higher modal was opened)
+                if (topModal.element) {
+                    topModal.element.style.display = '';
+                }
             }
             
             // Process any queued modals after this one closes

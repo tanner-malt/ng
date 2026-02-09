@@ -56,15 +56,6 @@ class AchievementSystem {
             reward: { wood: 75 }
         });
 
-        this.defineAchievement('first_settlement', {
-            title: 'Settlement Founder',
-            description: 'Built your first House - establishing your settlement',
-            icon: '🏘️',
-            type: 'building',
-            requirement: { houses_built: 1 }, // Requires 1 house built
-            reward: { wood: 50, stone: 25 }
-        });
-
         this.defineAchievement('town_center_built', {
             title: 'Administrative Center',
             description: 'Built your first Town Center',
@@ -481,9 +472,6 @@ class AchievementSystem {
         }
 
         // Check houses requirements for house-related achievements
-        if (this.stats.houses_built >= 1 && !this.isUnlocked('first_settlement')) {
-            this.unlock('first_settlement');
-        }
         if (this.stats.houses_built >= 3 && !this.isUnlocked('sheltering_citizens')) {
             this.unlock('sheltering_citizens');
         }

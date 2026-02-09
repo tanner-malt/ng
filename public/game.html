@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Idle: Dynasty Builder</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="game.css">
     <link rel="stylesheet" href="progress-icons.css">
 
@@ -108,6 +109,11 @@
         <nav id="view-navigation">
             <!-- All navigation elements in one flexible container -->
             <div class="nav-container">
+                <!-- Version display -->
+                <div class="nav-section version-display" id="game-version-display" title="Game Version">
+                    <span id="version-text">v0.0.2.1</span>
+                </div>
+
                 <!-- View buttons -->
                 <div class="nav-section nav-left">
                     <button class="nav-btn active" data-view="village">Village</button>
@@ -116,8 +122,35 @@
                     <button class="nav-btn locked" data-view="throne">Throne</button>
                 </div>
 
+                <!-- Crown emblem center -->
+                <div class="nav-section nav-crown">
+                    <svg class="crown-emblem" viewBox="0 0 80 52" width="60" height="39" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Crown base -->
+                        <rect x="12" y="36" width="56" height="10" rx="3" fill="url(#crownGold)" stroke="#b8860b" stroke-width="1"/>
+                        <!-- Crown body -->
+                        <path d="M12,36 L8,14 L24,24 L40,6 L56,24 L72,14 L68,36 Z" fill="url(#crownGold)" stroke="#b8860b" stroke-width="1.5"/>
+                        <!-- Jewels -->
+                        <circle cx="40" cy="22" r="4" fill="#e74c3c" stroke="#c0392b" stroke-width="0.8"/>
+                        <circle cx="26" cy="27" r="3" fill="#3498db" stroke="#2980b9" stroke-width="0.8"/>
+                        <circle cx="54" cy="27" r="3" fill="#2ecc71" stroke="#27ae60" stroke-width="0.8"/>
+                        <!-- Crown tips -->
+                        <circle cx="40" cy="6" r="2.5" fill="url(#crownGold)" stroke="#b8860b" stroke-width="0.8"/>
+                        <circle cx="8" cy="14" r="2" fill="url(#crownGold)" stroke="#b8860b" stroke-width="0.8"/>
+                        <circle cx="72" cy="14" r="2" fill="url(#crownGold)" stroke="#b8860b" stroke-width="0.8"/>
+                        <!-- Base trim line -->
+                        <line x1="16" y1="38" x2="64" y2="38" stroke="#b8860b" stroke-width="0.5" opacity="0.6"/>
+                        <defs>
+                            <linearGradient id="crownGold" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#f1c40f"/>
+                                <stop offset="40%" stop-color="#f39c12"/>
+                                <stop offset="100%" stop-color="#d4a017"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+
                 <!-- Time controls -->
-                <div class="nav-section nav-center time-controls-nav" id="global-time-controls">
+                <div class="nav-section time-controls-nav" id="global-time-controls">
                     <div class="current-day-nav">
                         <div class="season-info">
                             <span id="current-season-nav">Spring</span>
@@ -137,11 +170,6 @@
                         <button id="speed-4x-btn-nav" class="time-btn speed-btn" data-speed="500">4x</button>
                     </div>
                     <button id="end-day-btn-nav" class="end-day-button time-btn" title="Skip to next day">⏩ Next</button>
-                </div>
-
-                <!-- Version display -->
-                <div class="nav-section version-display" id="game-version-display" title="Game Version">
-                    <span id="version-text">v0.0.2.1</span>
                 </div>
 
                 <!-- Icon buttons -->
@@ -524,28 +552,47 @@
                             gap: 8px;
                         }
 
+                        .version-display {
+                            flex: 0 0 auto;
+                            order: 0;
+                        }
+
                         .nav-left {
                             /* View buttons stay on left */
                             flex: 0 0 auto;
                             order: 1;
                         }
 
-                        .nav-center {
-                            /* Time controls absolutely centered */
-                            position: absolute;
-                            left: 50%;
-                            transform: translateX(-50%);
+                        .nav-crown {
+                            /* Crown emblem centered */
+                            flex: 1 1 auto;
                             display: flex;
+                            justify-content: center;
                             align-items: center;
-                            gap: 10px;
-                            z-index: 1;
+                            order: 2;
+                        }
+
+                        .crown-emblem {
+                            filter: drop-shadow(0 0 6px rgba(241, 196, 15, 0.4));
+                            opacity: 0.9;
+                            transition: opacity 0.3s, filter 0.3s;
+                        }
+
+                        .crown-emblem:hover {
+                            opacity: 1;
+                            filter: drop-shadow(0 0 10px rgba(241, 196, 15, 0.7));
+                        }
+
+                        .time-controls-nav {
+                            /* Time controls to the right */
+                            flex: 0 0 auto;
+                            order: 3;
                         }
 
                         .nav-right {
                             /* Icons on right */
                             flex: 0 0 auto;
-                            order: 3;
-                            margin-left: auto;
+                            order: 4;
                         }
 
                         /* Responsive behavior to prevent overlaps */
@@ -558,13 +605,9 @@
                                 gap: 4px;
                             }
 
-                            /* On smaller screens, fall back to flex layout */
-                            .nav-center {
-                                position: static;
-                                transform: none;
-                                flex: 1 1 auto;
-                                justify-content: center;
-                                order: 2;
+                            /* On smaller screens, hide crown and tighten layout */
+                            .nav-crown {
+                                display: none;
                             }
 
                             .nav-container {

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="8" fill="#a8d8ea"/>
+  <text x="8" y="26" font-family="Georgia, serif" font-weight="bold" font-size="22" fill="#d4a017" stroke="#b8860b" stroke-width="0.5">I</text>
+  <text x="22" y="36" font-family="Georgia, serif" font-weight="bold" font-size="22" fill="#d4a017" stroke="#b8860b" stroke-width="0.5">D</text>
+  <text x="38" y="46" font-family="Georgia, serif" font-weight="bold" font-size="22" fill="#d4a017" stroke="#b8860b" stroke-width="0.5">B</text>
+</svg>
