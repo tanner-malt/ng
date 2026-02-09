@@ -2821,7 +2821,7 @@ body {
     .time-controls-nav {
         flex-wrap: wrap;
         font-size: 0.85rem;
-        min-width: 200px;
+        min-width: 0;
     }
 
     .current-day-nav {
@@ -2854,10 +2854,9 @@ body {
     }
 
     .time-controls-nav {
-        order: -1;
-        width: 100%;
-        justify-content: center;
-        margin-left: 0;
+        flex-wrap: nowrap;
+        font-size: 0.8rem;
+        min-width: 0;
     }
 
     .village-content,
@@ -5714,9 +5713,11 @@ html {
     position: relative;
     width: 36px;
     min-width: 36px;
+    max-width: 36px;
     height: 20px;
     cursor: pointer;
     flex-shrink: 0;
+    flex-grow: 0;
 }
 
 .toggle-switch input {
