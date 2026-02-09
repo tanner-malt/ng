@@ -375,25 +375,13 @@ body {
     white-space: nowrap;
 }
 
-/* FIX: nav-left must grow (flex: 1) to fill the space between view
-   buttons and time controls. This naturally pushes time-controls and
-   nav-right to the right edge WITHOUT margin-left:auto, which was
-   eating free space and preventing proper flex-wrap behaviour.
-   Previous implementation had flex-shrink:1 but no flex-grow, so
-   nav-left stayed at its content width and everything piled up
-   on the right side, causing time-controls to overlap the icon
-   buttons on desktop monitors. */
+/* nav-left grows to fill space, pushing time-controls & nav-right right */
 .nav-left {
     order: 1;
     flex: 1 1 auto;
     min-width: 0;
 }
 
-/* FIX: Removed margin-left:auto — nav-left's flex-grow now handles
-   pushing this section rightward.  Changed flex from 0 1 auto
-   (could shrink) to 0 0 auto (never shrink).  When flex-shrink
-   was 1 the time-control buttons shrank below their natural size
-   and overlapped the adjacent icon buttons on desktop. */
 .time-controls-nav {
     order: 2;
     flex: 0 0 auto;
@@ -403,13 +391,6 @@ body {
     gap: 3px;
 }
 
-/* FIX: Changed flex from 0 1 auto to 0 0 auto.  The old
-   flex-shrink:1 let this container shrink, but the icon buttons
-   inside have fixed 30px widths, so shrinking the container just
-   caused them to overflow and visually overlap the time controls.
-   With flex-shrink:0, the container keeps its natural width and
-   flex-wrap on .nav-container will move it to a new line instead
-   of forcing an overlap. */
 .nav-right {
     order: 3;
     flex: 0 0 auto;
@@ -427,9 +408,6 @@ body {
         gap: 0.25rem;
     }
     .nav-section { gap: 2px; }
-    /* On mobile, let nav-left wrap and time-controls can grow to
-       fill the row it wraps onto, but never re-enable flex-shrink
-       on nav-right — that caused the original desktop overlap. */
     .nav-left { flex-basis: auto; }
     .time-controls-nav {
         flex: 1 1 auto;
@@ -618,6 +596,10 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    position: relative; /* override any position:fixed from legacy CSS */
+    top: auto;
+    right: auto;
+    z-index: auto;
 }
 
 #view-navigation .icon-btn {
