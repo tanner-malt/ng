@@ -389,27 +389,6 @@ body {
     min-width: 0;
 }
 
-.nav-crown {
-    position: absolute;
-    left: 35%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    z-index: 1;
-    pointer-events: none;
-}
-
-.crown-emblem {
-    filter: drop-shadow(0 0 6px rgba(241, 196, 15, 0.4));
-    opacity: 0.9;
-    transition: opacity 0.3s, filter 0.3s;
-}
-
-.crown-emblem:hover {
-    opacity: 1;
-    filter: drop-shadow(0 0 10px rgba(241, 196, 15, 0.7));
-}
-
 /* FIX: Removed margin-left:auto — nav-left's flex-grow now handles
    pushing this section rightward.  Changed flex from 0 1 auto
    (could shrink) to 0 0 auto (never shrink).  When flex-shrink
@@ -440,7 +419,6 @@ body {
 /* --- Responsive --- */
 @media (max-width: 1200px) {
     .nav-container { gap: 0.3rem; }
-    .nav-crown { display: none; }
 }
 
 @media (max-width: 900px) {
