@@ -338,7 +338,7 @@ body {
 }
 
 .nav-btn {
-    padding: var(--space-sm) var(--space-lg);
+    padding: 0.3rem 0.6rem;
     background: var(--surface-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-primary);
@@ -346,7 +346,7 @@ body {
     cursor: pointer;
     transition: all var(--transition-medium);
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     position: relative;
     overflow: hidden;
 }
