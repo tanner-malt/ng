@@ -86,7 +86,7 @@ class AchievementSystem {
             description: 'Built your first Barracks',
             icon: '⚔️',
             type: 'building',
-            reward: { refugee_families: 2 }
+            reward: { population: 8 }
         });
 
         this.defineAchievement('tutorial_complete', {
@@ -113,7 +113,7 @@ class AchievementSystem {
             icon: '🏗️',
             type: 'building',
             requirement: { buildings_built: 10 },
-            reward: { gold: 200, prestige: 50 }
+            reward: { population: 3 }
         });
 
         this.defineAchievement('build_and_they_will_come', {
@@ -336,7 +336,7 @@ class AchievementSystem {
             icon: '🏗️',
             type: 'building',
             requirement: { building_types_built: 10 },
-            reward: { stone: 1000, wood: 1000, gold: 500 }
+            reward: { population: 3 }
         });
 
         this.defineAchievement('population_boom', {
@@ -660,6 +660,11 @@ class AchievementSystem {
             }, 100);
         }
 
+        // Emit achievement:earned so BuildingRegistry can update unlock states
+        if (window.eventBus) {
+            window.eventBus.emit('achievement:earned', { achievementId, achievement });
+        }
+
         this.saveToStorage();
         return true;
     }
@@ -823,7 +828,8 @@ class AchievementSystem {
                 wood: '🌲',
                 influence: '👑',
                 prestige: '⭐',
-                military_exp: '⚔️'
+                military_exp: '⚔️',
+                population: '👤'
             };
             const icon = icons[resource] || '📊';
             const name = resource.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());

@@ -86,7 +86,7 @@ const JOB_DATA = {
         buildingType: 'farm',
         
         production: {
-            food: 3.5
+            food: 3.75
         },
         consumption: {},
         

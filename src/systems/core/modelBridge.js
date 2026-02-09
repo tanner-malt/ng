@@ -85,12 +85,18 @@ class ModelBridge {
         };
 
         /**
-         * Enhanced isBuildingUnlocked that uses BuildingRegistry
+         * Enhanced isBuildingUnlocked that checks UnlockSystem first (authoritative),
+         * then BuildingRegistry, then legacy fallbacks.
          */
         const originalIsBuildingUnlocked = gameState.isBuildingUnlocked?.bind(gameState);
         
         gameState.isBuildingUnlocked = function(buildingType) {
-            // Try new model system first
+            // UnlockSystem is the authoritative source for runtime unlock state
+            if (window.unlockSystem) {
+                return window.unlockSystem.isUnlocked(buildingType);
+            }
+            
+            // Try new model system
             const definition = window.BuildingRegistry?.getDefinition(buildingType);
             if (definition) {
                 return definition.get('isUnlocked') || definition.get('startsUnlocked');

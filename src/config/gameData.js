@@ -68,7 +68,7 @@ const GameData = {
             // Tax collection is handled by economySystem based on population
         },
         house: {
-            populationCapacity: 6 // Each house provides capacity for 6 population; 0 jobs
+            populationCapacity: 9 // Each house provides capacity for 9 population; 0 jobs
         },
         farm: {
             jobs: {
@@ -234,13 +234,13 @@ const GameData = {
             icon: '🏠',
             name: 'House',
             description: 'Cozy homes for your growing population. More houses = more workers!',
-            effects: '+6 housing capacity per house'
+            effects: '+9 housing capacity per house'
         },
         farm: {
             icon: '🌾',
             name: 'Farm',
             description: 'Grows crops to feed your people. Production varies by season!',
-            effects: '2 Farmer jobs • +3.5🍖 food/farmer/day • Spring/Summer bonus, Winter penalty'
+            effects: '2 Farmer jobs • +3.75🍖 food/farmer/day • Spring/Summer bonus, Winter penalty'
         },
         buildersHut: {
             icon: '🔨',
@@ -395,7 +395,7 @@ const GameData = {
     // Note: Starting population is handled by PopulationManager (1 royal + 4 villagers = 5)
     startingResources: {
         food: 10, // Small food supply to survive first few days
-        wood: 25, // Enough wood for early construction
+        wood: 50, // Enough wood for early construction
         stone: 5, // Minimal stone for basic needs
         metal: 0,  // Metal will be given through tutorial achievement
         planks: 0, // Planks produced by lumber mill from wood

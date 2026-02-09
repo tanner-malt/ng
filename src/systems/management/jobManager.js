@@ -25,7 +25,7 @@ class JobManager {
         // Base efficiency rates for different job types
         // Each worker in these jobs produces these amounts per day
         // Farmers baseline food per day
-        this.jobEfficiency.set('farmer', { food: 3.5 }); // From farms (was 3)
+        this.jobEfficiency.set('farmer', { food: 3.75 }); // From farms (was 3.5)
         this.jobEfficiency.set('woodcutter', { wood: 3 }); // From woodcutter lodges
         this.jobEfficiency.set('builder', { construction: 1 }); // From builder huts
         // Gatherers now produce a random basic resource each day (food OR wood OR stone)

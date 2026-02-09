@@ -122,7 +122,8 @@ class BuildingDefinition extends DataModel {
     _checkCondition(condition, gameState) {
         switch (condition.type) {
             case 'achievement':
-                return gameState.achievements?.has(condition.achievement) ||
+                return window.achievementSystem?.isUnlocked?.(condition.achievement) ||
+                       gameState.achievements?.isUnlocked?.(condition.achievement) ||
                        gameState.earnedAchievements?.includes(condition.achievement);
 
             case 'building_count':

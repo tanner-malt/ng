@@ -729,10 +729,9 @@ class UnlockSystem {
             }
         });
         
-        // Trigger village manager to regenerate buttons if available
-        if (window.villageManager && typeof window.villageManager.generateBuildingButtons === 'function') {
-            window.villageManager.generateBuildingButtons();
-        }
+        // Note: Full regeneration + handler re-attachment is handled by app.js
+        // on the 'content_unlocked' event. Do NOT call generateBuildingButtons()
+        // here — it would destroy click handlers set up by setupBuildingButtons().
     }
 
     notifyUnlock(config) {

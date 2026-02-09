@@ -40,14 +40,14 @@ const BUILDING_DATA = {
         name: 'House',
         icon: '🏠',
         description: 'Cozy homes for your growing population. More houses = more workers!',
-        effects: '+6 housing capacity per house',
+        effects: '+9 housing capacity per house',
         category: 'essential',
         
         costs: { wood: 15 },
         constructionPoints: 5,
         
         production: {
-            populationCapacity: 6,
+            populationCapacity: 9,
             jobs: {}
         },
         
