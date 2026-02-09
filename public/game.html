@@ -514,7 +514,7 @@
                             min-height: 32px;
                             gap: 0.4rem;
                             position: relative;
-                            flex-wrap: nowrap;
+                            flex-wrap: wrap;
                         }
 
                         /* Base — no flex-shrink here so each section controls its own */
@@ -577,7 +577,7 @@
                             min-width: 0;
                             display: flex;
                             align-items: center;
-                            gap: 4px;
+                            gap: 3px;
                         }
 
                         .nav-right {
@@ -633,10 +633,10 @@
                         /* ===== Time Controls ===== */
                         .time-btn-group {
                             display: flex;
-                            gap: 2px;
+                            gap: 1px;
                             background: var(--surface-primary, #2c3e50);
-                            border-radius: 4px;
-                            padding: 2px;
+                            border-radius: 3px;
+                            padding: 1px;
                             border: 1px solid var(--border-primary, #34495e);
                         }
 
@@ -644,21 +644,21 @@
                             display: flex;
                             flex-direction: column;
                             align-items: center;
-                            font-size: 0.7em;
+                            font-size: 0.65em;
                             color: #e2e8f0;
-                            min-width: 90px;
+                            min-width: 80px;
                             background: linear-gradient(145deg, #2d3748 0%, #1a202c 100%);
                             border: 1px solid #4a5568;
-                            border-radius: 5px;
-                            padding: 4px 8px;
+                            border-radius: 4px;
+                            padding: 3px 6px;
                             box-shadow:
                                 0 2px 4px rgba(0, 0, 0, 0.3),
                                 inset 0 1px 0 rgba(255, 255, 255, 0.1),
                                 inset 0 -1px 0 rgba(0, 0, 0, 0.2);
                             position: relative;
                             overflow: hidden;
-                            gap: 2px;
-                            height: 30px;
+                            gap: 1px;
+                            height: 26px;
                             justify-content: center;
                         }
 
@@ -698,15 +698,15 @@
                             background: linear-gradient(145deg, #4a5568 0%, #2d3748 50%, #1a202c 100%);
                             color: #e2e8f0;
                             border: 1px solid #4a5568;
-                            border-radius: 5px;
+                            border-radius: 4px;
                             font-weight: 700;
                             cursor: pointer;
-                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                            transition: all 0.2s ease;
                             outline: none;
-                            font-size: 0.75em;
-                            padding: 4px 8px;
-                            min-width: 38px;
-                            height: 30px;
+                            font-size: 0.7em;
+                            padding: 2px 6px;
+                            min-width: 28px;
+                            height: 26px;
                             display: flex;
                             align-items: center;
                             justify-content: center;
@@ -758,7 +758,7 @@
                         }
 
                         .time-controls-nav .end-day-button {
-                            min-width: 65px;
+                            min-width: 55px;
                         }
 
                         .time-controls-nav .auto-play-button.auto-play-active {
