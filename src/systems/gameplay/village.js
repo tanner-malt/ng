@@ -1142,15 +1142,6 @@ class VillageManager {
             }, 100);
         }
 
-        // Show brief feedback (use toast instead of notification for less intrusion)
-        const buildingName = GameData.getBuildingName(type) || type;
-        if (window.showToast) {
-            window.showToast(`🏗️ ${buildingName} placed! Construction in progress...`, {
-                type: 'success',
-                timeout: 2000
-            });
-        }
-
         // Re-render to show build queue marker
         this.renderBuildings();
 

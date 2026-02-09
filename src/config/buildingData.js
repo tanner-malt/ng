@@ -43,7 +43,7 @@ const BUILDING_DATA = {
         effects: '+6 housing capacity per house',
         category: 'essential',
         
-        costs: { wood: 25 },
+        costs: { wood: 15 },
         constructionPoints: 5,
         
         production: {

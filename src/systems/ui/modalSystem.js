@@ -1951,39 +1951,45 @@ class ModalSystem {
         // Close settings modal first  
         this.closeAllModals();
         
-        // Use native confirm for reliability
         setTimeout(() => {
-            const confirmed = confirm('End Current Run?\n\nThis will end your current run and return you to the home screen.\n\nYour legacy data and achievements will be preserved.');
-            
-            if (confirmed) {
-                console.log('[ModalSystem] End Run confirmed - clearing run data only');
-                
-                // Keys to preserve (legacy and achievements)
-                const preserveKeys = [
-                    'dynastyBuilder_legacy',
-                    'dynastyBuilder_achievements',
-                    'idleDynastyBuilder_achievements'
-                ];
-                
-                // Store preserved data
-                const preserved = {};
-                preserveKeys.forEach(key => {
-                    const data = localStorage.getItem(key);
-                    if (data) preserved[key] = data;
-                });
-                
-                // Clear all localStorage
-                localStorage.clear();
-                sessionStorage.clear();
-                
-                // Restore preserved data
-                Object.entries(preserved).forEach(([key, value]) => {
-                    localStorage.setItem(key, value);
-                });
-                
-                // Force reload to home screen
-                window.location.href = window.location.origin + window.location.pathname;
-            }
+            this.showConfirmation(
+                '<p>This will end your current run and return you to the home screen.</p><p>Your legacy data and achievements will be preserved.</p>',
+                {
+                    title: '🔄 End Current Run?',
+                    confirmText: 'End Run',
+                    cancelText: 'Cancel',
+                    type: 'warning',
+                    onConfirm: () => {
+                        console.log('[ModalSystem] End Run confirmed - clearing run data only');
+                        
+                        // Keys to preserve (legacy and achievements)
+                        const preserveKeys = [
+                            'dynastyBuilder_legacy',
+                            'dynastyBuilder_achievements',
+                            'idleDynastyBuilder_achievements'
+                        ];
+                        
+                        // Store preserved data
+                        const preserved = {};
+                        preserveKeys.forEach(key => {
+                            const data = localStorage.getItem(key);
+                            if (data) preserved[key] = data;
+                        });
+                        
+                        // Clear all localStorage
+                        localStorage.clear();
+                        sessionStorage.clear();
+                        
+                        // Restore preserved data
+                        Object.entries(preserved).forEach(([key, value]) => {
+                            localStorage.setItem(key, value);
+                        });
+                        
+                        // Force reload to home screen
+                        window.location.href = window.location.origin + window.location.pathname;
+                    }
+                }
+            );
         }, 150);
     }
 
@@ -1994,44 +2000,59 @@ class ModalSystem {
         // Close settings modal first
         this.closeAllModals();
         
-        // Set game state to prevent any new modals
-        this.setGameState('hardReset');
-        
-        // Use native confirm for reliability
         setTimeout(() => {
-            const confirmed = confirm('⚠️ HARD RESET ⚠️\n\nWARNING: This will delete ALL your data!\n\nThis includes:\n• Current game progress\n• Legacy points and upgrades\n• All achievements\n• Dynasty history\n\nThis action CANNOT be undone.\n\nAre you absolutely sure?');
-            
-            if (confirmed) {
-                console.log('[ModalSystem] Hard Reset confirmed - delegating to StorageManager');
-                
-                // Set game's reset flag to prevent beforeunload saves
-                if (window.game) {
-                    window.game.isResetting = true;
-                    console.log('[ModalSystem] Set game.isResetting = true');
-                }
-                
-                // Clear the modal queue as well
-                this.modalQueue = [];
-                
-                // Use StorageManager for reliable reset
-                if (window.StorageManager) {
-                    window.StorageManager.hardReset(true);
-                } else {
-                    // Fallback if StorageManager not loaded
-                    console.warn('[ModalSystem] StorageManager not available, using fallback');
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    
-                    if (window.gameState) {
-                        window.gameState = null;
+            this.showConfirmation(
+                `<p style="color: #ff6b6b; font-weight: bold;">WARNING: This will delete ALL your data!</p>
+                 <p>This includes:</p>
+                 <ul style="text-align: left; margin: 0.5em auto; max-width: 280px;">
+                     <li>Current game progress</li>
+                     <li>Legacy points and upgrades</li>
+                     <li>All achievements</li>
+                     <li>Dynasty history</li>
+                 </ul>
+                 <p style="color: #ff6b6b;">This action CANNOT be undone.</p>`,
+                {
+                    title: '⚠️ Hard Reset ⚠️',
+                    confirmText: 'Delete Everything',
+                    cancelText: 'Cancel',
+                    type: 'warning',
+                    onConfirm: () => {
+                        console.log('[ModalSystem] Hard Reset confirmed - delegating to StorageManager');
+                        
+                        // Set game state to prevent any new modals
+                        this.setGameState('hardReset');
+                        
+                        // Set game's reset flag to prevent beforeunload saves
+                        if (window.game) {
+                            window.game.isResetting = true;
+                            console.log('[ModalSystem] Set game.isResetting = true');
+                        }
+                        
+                        // Clear the modal queue as well
+                        this.modalQueue = [];
+                        
+                        // Use StorageManager for reliable reset
+                        if (window.StorageManager) {
+                            window.StorageManager.hardReset(true);
+                        } else {
+                            // Fallback if StorageManager not loaded
+                            console.warn('[ModalSystem] StorageManager not available, using fallback');
+                            localStorage.clear();
+                            sessionStorage.clear();
+                            
+                            if (window.gameState) {
+                                window.gameState = null;
+                            }
+                            
+                            window.location.href = window.location.origin + window.location.pathname;
+                        }
+                    },
+                    onCancel: () => {
+                        // User cancelled, restore game state
+                        this.setGameState(null);
                     }
-                    
-                    window.location.href = window.location.origin + window.location.pathname;
                 }
-            } else {
-                // User cancelled, restore game state
-                this.setGameState(null);
-            }
+            );
         }, 150);
     }
 

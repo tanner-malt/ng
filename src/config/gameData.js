@@ -23,7 +23,7 @@ const GameData = {
     buildingCosts: {
         // Essential Buildings
         townCenter: { wood: 50 },
-        house: { wood: 25 },
+        house: { wood: 15 },
         farm: { wood: 20 },
         buildersHut: { wood: 30, stone: 15 }, // Professional building for builders
         storehouse: { wood: 40, stone: 20 },
@@ -406,7 +406,7 @@ const GameData = {
     // Resource caps (base storage capacity)
     resourceCaps: {
         food: 50,    // Base limit of 50 for each resource
-        wood: 50,
+        wood: 100,
         stone: 50,
         metal: 50,
         planks: 50,

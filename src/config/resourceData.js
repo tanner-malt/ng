@@ -22,8 +22,8 @@ const RESOURCE_DATA = {
         displayName: 'Wood',
         icon: '🪵',
         category: 'basic',
-        baseCapacity: 50,
-        startingAmount: 25,
+        baseCapacity: 100,
+        startingAmount: 50,
         description: 'Basic building material gathered from forests.'
     },
 
