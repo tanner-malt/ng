@@ -1404,6 +1404,158 @@ class PopulationManager {
     }
 
     /**
+     * Trigger a refugee arrival event. Shows a modal prompting the player to accept refugees.
+     * @param {number} count - Number of refugees (1-3)
+     * @param {object} options - { isTutorial: bool } if triggered from tutorial step
+     */
+    triggerRefugeeEvent(count = null, options = {}) {
+        const { isTutorial = false } = options;
+
+        // Determine refugee count (1-3)
+        if (count === null) {
+            count = Math.floor(Math.random() * 3) + 1;
+        }
+        count = Math.max(1, Math.min(3, count));
+
+        // Check current population vs cap
+        const cap = window.gameState?.getPopulationCap?.() || 0;
+        const current = this.population.length;
+        const available = Math.max(0, cap - current);
+
+        // Clamp to available capacity
+        const actualCount = Math.min(count, available);
+
+        if (actualCount <= 0 && !isTutorial) {
+            console.log('[PopulationManager] Refugee event skipped — no housing capacity');
+            return;
+        }
+
+        const refugeeWord = actualCount === 1 ? 'refugee' : 'refugees';
+        const arrivalCount = actualCount > 0 ? actualCount : count;
+        const noRoom = actualCount <= 0;
+
+        let storyHtml;
+        if (noRoom) {
+            storyHtml = `
+                <div class="story-panel">
+                    <p>Weary travelers approach your settlement seeking shelter, but you have <strong>no housing available</strong>.</p>
+                    <p>Build more <span class="highlight">Houses</span> to welcome future refugees.</p>
+                </div>`;
+        } else {
+            storyHtml = `
+                <div class="story-panel">
+                    <p>${arrivalCount} weary ${refugeeWord} ${actualCount === 1 ? 'has' : 'have'} arrived at your gates, seeking shelter from the dangers of the wilderness.</p>
+                    <p>They are willing to work and contribute to your settlement.</p>
+                    ${isTutorial ? '<p><em>Accepting refugees is a great way to grow your population quickly!</em></p>' : ''}
+                </div>`;
+        }
+
+        const modalContent = storyHtml;
+
+        if (window.showModal) {
+            const buttons = noRoom
+                ? `<button class="modal-btn btn-primary" data-action="dismiss">Understood</button>`
+                : `<button class="modal-btn btn-primary" data-action="accept">Welcome ${arrivalCount} ${refugeeWord}</button>
+                   <button class="modal-btn btn-secondary" data-action="decline">Turn them away</button>`;
+
+            window.modalSystem.showModal({
+                title: `🏕️ Refugees Arrive!`,
+                content: modalContent + `<div class="modal-actions" style="margin-top: 1rem; display:flex; gap:0.5rem; justify-content:center;">${buttons}</div>`,
+                modalType: 'refugee-event',
+                closable: false,
+                showCloseButton: false
+            }).then(() => {
+                // Modal closed without action — treat as decline
+                if (!this._refugeeHandled) {
+                    console.log('[PopulationManager] Refugee modal closed without action');
+                }
+                this._refugeeHandled = false;
+            });
+
+            // Attach button handlers after a tick (modal needs to render)
+            setTimeout(() => {
+                this._refugeeHandled = false;
+                const acceptBtn = document.querySelector('[data-action="accept"]');
+                const declineBtn = document.querySelector('[data-action="decline"]');
+                const dismissBtn = document.querySelector('[data-action="dismiss"]');
+
+                if (acceptBtn) {
+                    acceptBtn.addEventListener('click', () => {
+                        this._refugeeHandled = true;
+                        this._acceptRefugees(actualCount);
+                        window.modalSystem.closeTopModal();
+                    });
+                }
+                if (declineBtn) {
+                    declineBtn.addEventListener('click', () => {
+                        this._refugeeHandled = true;
+                        this._declineRefugees();
+                        window.modalSystem.closeTopModal();
+                    });
+                }
+                if (dismissBtn) {
+                    dismissBtn.addEventListener('click', () => {
+                        this._refugeeHandled = true;
+                        window.modalSystem.closeTopModal();
+                    });
+                }
+            }, 100);
+        } else {
+            // Fallback: auto-accept if no modal system
+            if (actualCount > 0) {
+                this._acceptRefugees(actualCount);
+            }
+        }
+    }
+
+    /**
+     * Accept refugees — add them to the population
+     * @param {number} count
+     */
+    _acceptRefugees(count) {
+        const added = [];
+        for (let i = 0; i < count; i++) {
+            const age = 18 + Math.floor(Math.random() * 22); // Age 18-39
+            const gender = Math.random() < 0.5 ? 'male' : 'female';
+            const name = this.generateRandomName();
+            const refugee = this.addInhabitant({
+                name: name,
+                age: age,
+                gender: gender,
+                role: 'peasant',
+                status: 'idle',
+                traits: ['refugee']
+            });
+            if (refugee) added.push(refugee);
+        }
+
+        const actualAdded = added.length;
+        if (actualAdded > 0) {
+            const word = actualAdded === 1 ? 'refugee has' : 'refugees have';
+            window.showToast?.(`${actualAdded} ${word} joined your settlement!`, {
+                icon: '🏕️', type: 'success', timeout: 4000
+            });
+
+            window.eventBus?.emit?.('refugees_accepted', { count: actualAdded, refugees: added });
+            window.eventBus?.emit?.('population_gained', { amount: actualAdded });
+        }
+
+        console.log(`[PopulationManager] Accepted ${actualAdded} refugees`);
+        return added;
+    }
+
+    /**
+     * Decline refugees
+     */
+    _declineRefugees() {
+        window.showToast?.('The refugees move on...', {
+            icon: '🚶', type: 'info', timeout: 3000
+        });
+        window.eventBus?.emit?.('refugees_declined');
+        console.log('[PopulationManager] Refugees declined');
+    }
+
+    /**
      * Debug function to manually test aging system
      */
     debugAging() {

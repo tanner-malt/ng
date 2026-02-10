@@ -145,27 +145,15 @@ class EventBusIntegrations {
     }
 
     /**
-     * When a building finishes construction, show what new content was unlocked
+     * When a building finishes construction, trigger unlock re-evaluation.
+     * Actual unlock toasts are handled by unlockSystem.notifyUnlock().
      */
     handleBuildingCompleted(data) {
         if (!data || !data.buildingType) return;
 
-        // Use the unlock system to find what this building unlocks
-        if (window.unlockSystem && window.unlockSystem.getUnlocksTriggeredBy) {
-            const potentialUnlocks = window.unlockSystem.getUnlocksTriggeredBy(data.buildingType);
-            
-            if (potentialUnlocks.length > 0) {
-                const names = potentialUnlocks.map(u => u.name).join(', ');
-                
-                // Show a delayed toast so it doesn't overlap the "construction complete" toast
-                setTimeout(() => {
-                    window.showToast?.(`New buildings available: ${names}`, {
-                        icon: '🔓',
-                        type: 'info',
-                        timeout: 5000
-                    });
-                }, 1500);
-            }
+        // Trigger unlock check — unlockSystem.notifyUnlock() handles its own toasts
+        if (window.unlockSystem && window.unlockSystem.checkAllUnlocks) {
+            window.unlockSystem.checkAllUnlocks();
         }
     }
 

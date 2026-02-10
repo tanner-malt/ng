@@ -558,8 +558,9 @@ class ConstructionManager {
 
         // Show completion notification
         if (window.showToast) {
+            const displayName = window.GameData?.getBuildingName?.(site.buildingType) || site.buildingType;
             window.showToast(
-                `${site.buildingType} (Level ${site.buildingLevel}) is now operational`,
+                `${displayName} (Level ${site.buildingLevel}) is now operational`,
                 { title: '🏗️ Construction Complete!', timeout: 5000, icon: '✅', type: 'success' }
             );
         }
