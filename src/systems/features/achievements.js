@@ -639,9 +639,10 @@ class AchievementSystem {
         }
 
         // Trigger unlock system check (delayed to avoid recursive calls)
+        // Force bypass throttle so achievement-gated unlocks (e.g. world_view) evaluate immediately
         if (window.unlockSystem) {
             setTimeout(() => {
-                window.unlockSystem.checkAllUnlocks();
+                window.unlockSystem.checkAllUnlocks(true);
             }, 100);
         }
 

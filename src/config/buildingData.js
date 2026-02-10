@@ -21,14 +21,14 @@ const BUILDING_DATA = {
         name: 'Town Center',
         icon: '🏛️',
         description: 'The heart of your settlement. Enables tax collection from all working citizens',
-        effects: '+200 storage • Taxes: 1💰/citizen/day • +10% per level',
+        effects: '+200 storage • +2000💰 gold storage • Taxes: 1💰/citizen/day • +10% per level',
         category: 'essential',
         
         costs: { wood: 50 },
         constructionPoints: 10,
         
         production: {
-            storage: { all: 200 },
+            storage: { all: 200, gold: 2000 },
             jobs: { gatherer: 2 }
             // Tax collection handled by economySystem
         },
@@ -41,7 +41,7 @@ const BUILDING_DATA = {
         name: 'House',
         icon: '🏠',
         description: 'Cozy homes for your growing population. More houses = more workers!',
-        effects: '+9 housing capacity per house',
+        effects: '+9 housing capacity • 1 Gatherer job per house',
         category: 'essential',
         
         costs: { wood: 15 },
@@ -49,7 +49,7 @@ const BUILDING_DATA = {
         
         production: {
             populationCapacity: 9,
-            jobs: {}
+            jobs: { gatherer: 1 }
         },
         
         unlockConditions: [

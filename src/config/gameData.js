@@ -64,12 +64,13 @@ const GameData = {
         // Essential Buildings
         townCenter: {
             // Storage contribution for all resources
-            storage: { all: 200 },
+            storage: { all: 200, gold: 2000 },
             jobs: { gatherer: 2 }
             // Tax collection is handled by economySystem based on population
         },
         house: {
-            populationCapacity: 9 // Each house provides capacity for 9 population; 0 jobs
+            populationCapacity: 9,
+            jobs: { gatherer: 1 }
         },
         farm: {
             jobs: {

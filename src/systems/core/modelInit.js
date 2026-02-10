@@ -133,13 +133,9 @@ class ModelInitializer {
             window.eventBus.emit('ui:update:affordability');
         });
 
-        // When a building is unlocked, notify UI
+        // When a building is unlocked, update UI (toast handled by unlockSystem.notifyUnlock)
         window.eventBus.on('building:unlocked', (data) => {
             console.log(`[ModelInit] Building unlocked: ${data.buildingId}`);
-            if (window.showToast) {
-                const def = data.definition;
-                window.showToast(`🔓 New building unlocked: ${def.get('name')}!`, { type: 'success' });
-            }
         });
 
         console.log('[ModelInit] Event listeners established');
