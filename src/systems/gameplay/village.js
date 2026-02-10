@@ -1294,7 +1294,7 @@ class VillageManager {
                 </div>
                 
                 <div style="margin-top: 20px; text-align: center;">
-                    <button onclick="window.modalSystem.closeModal()" 
+                    <button onclick="window.modalSystem.closeTopModal()" 
                             style="padding: 10px 20px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">
                         Close
                     </button>
@@ -4070,7 +4070,7 @@ class VillageManager {
 
         // Close modal and reopen to show new stats
         if (window.modalSystem) {
-            window.modalSystem.closeModal();
+            window.modalSystem.closeTopModal();
         }
 
         // Find building and reopen management
@@ -4159,7 +4159,7 @@ class VillageManager {
 
             // Close modal and return to building management
             if (window.modalSystem) {
-                window.modalSystem.closeModal();
+                window.modalSystem.closeTopModal();
             }
 
             const building = this.gameState.buildings.find(b =>
@@ -4209,7 +4209,7 @@ class VillageManager {
 
         // Close modal
         if (window.modalSystem) {
-            window.modalSystem.closeModal();
+            window.modalSystem.closeTopModal();
         }
     }
 

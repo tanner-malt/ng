@@ -349,7 +349,7 @@ class LegacySystem {
                     this.confirmEndDynasty(gameState, dynastyName);
                 });
                 document.getElementById('cancel-end-dynasty')?.addEventListener('click', () => {
-                    window.modalSystem?.closeModal();
+                    window.modalSystem?.closeTopModal();
                 });
             }, 50);
         }
@@ -363,7 +363,7 @@ class LegacySystem {
         const result = this.endDynasty(gameState, dynastyName);
         
         // Close the modal
-        window.modalSystem?.closeModal();
+        window.modalSystem?.closeTopModal();
         
         // Show success message
         setTimeout(() => {

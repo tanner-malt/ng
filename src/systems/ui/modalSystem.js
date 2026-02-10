@@ -460,7 +460,11 @@ class ModalSystem {
 
         // Call onClose callback
         if (modalData.onClose) {
-            modalData.onClose();
+            try {
+                modalData.onClose();
+            } catch (e) {
+                console.error('[ModalSystem] onClose callback error:', e);
+            }
         }
 
         // Remove from stack and active set
@@ -555,12 +559,7 @@ class ModalSystem {
         }
     }
 
-    // Close all modals
-    closeAllModals() {
-        while (this.modalStack.length > 0) {
-            this.closeTopModal();
-        }
-    }
+
 
     // Show simple message modal
     showMessage(title, message, options = {}) {
@@ -587,7 +586,7 @@ class ModalSystem {
             </div>
         `;
 
-        const modalId = this.showModal({
+        const modalPromise = this.showModal({
             title,
             content,
             className: `message-modal-${type}`,
@@ -596,18 +595,21 @@ class ModalSystem {
             showCloseButton: true
         });
 
-        // Setup confirm button
-        setTimeout(() => {
-            const confirmBtn = document.querySelector('.message-confirm');
+        // Setup confirm button after modal is created
+        modalPromise.then((modalId) => {
+            if (!modalId) return;
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            const confirmBtn = modal.querySelector('.message-confirm');
             if (confirmBtn) {
                 confirmBtn.addEventListener('click', () => {
                     if (onConfirm) onConfirm();
                     this.closeModal(modalId);
                 });
             }
-        }, 100);
+        });
 
-        return modalId;
+        return modalPromise;
     }
 
     // Show notification
@@ -781,7 +783,7 @@ class ModalSystem {
                 </div>
 
                 <div class="tutorial-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('tutorial')">Got it!</button>
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeTopModal()">Got it!</button>
                 </div>
             </div>
         `;
@@ -1265,7 +1267,7 @@ class ModalSystem {
                 </div>
 
                 <div class="progression-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('progression')">Close</button>
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeTopModal()">Close</button>
                 </div>
             </div>
         `;
@@ -1794,7 +1796,7 @@ class ModalSystem {
                     <p class="requirement-text">${requirement}</p>
                 </div>
                 <div class="unlock-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('unlock-requirement')">Got it!</button>
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeTopModal()">Got it!</button>
                 </div>
             </div>
         `;
@@ -1854,7 +1856,7 @@ class ModalSystem {
                     </div>
                 </div>
                 <div class="construction-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('construction-queued')">Got it!</button>
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeTopModal()">Got it!</button>
                 </div>
             </div>
         `;
@@ -1973,7 +1975,7 @@ class ModalSystem {
                 </div>
                 
                 <div class="death-report-actions">
-                    <button class="btn btn-primary" onclick="window.modalSystem.closeModal('death-report-modal')">Close Report</button>
+                    <button class="btn btn-primary" onclick="window.modalSystem.closeTopModal()">Close Report</button>
                 </div>
             </div>
         `;

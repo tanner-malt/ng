@@ -872,7 +872,7 @@ class AchievementSystem {
         setTimeout(() => {
             const btn = document.getElementById('ach-modal-close-btn');
             if (btn) btn.onclick = () => {
-                if (window.closeModal) window.closeModal();
+                if (window.modalSystem) window.modalSystem.closeTopModal();
             };
         }, 50);
     }

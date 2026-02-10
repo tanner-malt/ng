@@ -337,10 +337,10 @@ class WorldManager {
         </div>`;
         html += `<div class="modal-buttons" style="margin-top:12px;">
             <button class="btn-primary" onclick="window.worldManager.confirmDraft()">Confirm Draft</button>
-            <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
+            <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
         </div>`;
 
-        window.modalSystem?.showModal(html);
+        window.modalSystem?.showModal({ title: '⚔️ Draft Army', content: html });
     }
 
     confirmDraft() {
@@ -402,7 +402,7 @@ class WorldManager {
         this.gameState.population = this.gameState.populationManager.getAll()
             .filter(v => v.status !== 'drafted').length;
 
-        window.modalSystem?.closeModal();
+        window.modalSystem?.closeTopModal();
         window.showToast?.(`${armyName} formed with ${units.length} soldiers!`, { type: 'success' });
         window.eventBus?.emit('army_drafted', { army });
 
@@ -430,10 +430,10 @@ class WorldManager {
                     </button>`;
         });
         html += `<div class="modal-buttons" style="margin-top:12px;">
-            <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
+            <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
         </div>`;
 
-        window.modalSystem?.showModal(html);
+        window.modalSystem?.showModal({ title: '🚶 Move Army', content: html });
     }
 
     moveArmy(armyId, targetRow, targetCol) {
@@ -465,7 +465,7 @@ class WorldManager {
         };
         army.status = 'traveling';
 
-        window.modalSystem?.closeModal();
+        window.modalSystem?.closeTopModal();
         window.showToast?.(`${army.name} is moving to ${this.formatCoords(targetRow, targetCol)}`, { type: 'info' });
         this.refreshUI();
     }
@@ -546,14 +546,16 @@ class WorldManager {
         const army = this.gameState.getArmy?.(armyId);
         if (!army) return;
 
-        window.modalSystem?.showModal(`
-            <h2>Disband ${army.name}?</h2>
-            <p>Soldiers will return to village life.</p>
-            <div class="modal-buttons">
-                <button class="btn-primary" onclick="window.worldManager.performDisband('${armyId}')">Confirm</button>
-                <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
-            </div>
-        `);
+        window.modalSystem?.showModal({
+            title: `Disband ${army.name}?`,
+            content: `
+                <p>Soldiers will return to village life.</p>
+                <div class="modal-buttons">
+                    <button class="btn-primary" onclick="window.worldManager.performDisband('${armyId}')">Confirm</button>
+                    <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
+                </div>
+            `
+        });
     }
 
     performDisband(armyId) {
@@ -588,7 +590,7 @@ class WorldManager {
             ? this.gameState.populationManager.getAll().filter(v => v.status !== 'drafted').length
             : this.gameState.population;
 
-        window.modalSystem?.closeModal();
+        window.modalSystem?.closeTopModal();
         window.showToast?.(`Army has been disbanded.`, { type: 'info' });
         window.eventBus?.emit('army_disbanded', { armyId });
 
