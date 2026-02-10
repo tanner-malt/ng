@@ -249,11 +249,16 @@ class WorldManager {
 
         let html = '';
 
-        // Draft army button (always available)
-        const canDraft = this.getAvailableForDraft().length >= 1;
-        html += `<button class="world-btn" onclick="window.worldManager.showDraftModal()" 
-                    ${canDraft ? '' : 'disabled'}>
-                    ⚔️ Draft Army</button>`;
+        // Draft army button (only when selected tile is the capital / city)
+        const isCapitalSelected = this.selectedHex &&
+            this.selectedHex.row === this.capitalRow &&
+            this.selectedHex.col === this.capitalCol;
+        const canDraft = isCapitalSelected && this.getAvailableForDraft().length >= 1;
+        if (isCapitalSelected) {
+            html += `<button class="world-btn" onclick="window.worldManager.showDraftModal()" 
+                        ${canDraft ? '' : 'disabled'}>
+                        ⚔️ Draft Army</button>`;
+        }
 
         // Context-sensitive buttons based on selection
         if (this.selectedHex) {
@@ -471,14 +476,18 @@ class WorldManager {
     }
 
     buildSimplePath(fromRow, fromCol, toRow, toCol) {
-        // Step-by-step path for when A* isn't available
+        // Step-by-step path — one tile at a time (no diagonals)
         const path = [{ row: fromRow, col: fromCol }];
         let r = fromRow, c = fromCol;
         while (r !== toRow || c !== toCol) {
-            if (r < toRow) r++;
-            else if (r > toRow) r--;
-            if (c < toCol) c++;
-            else if (c > toCol) c--;
+            // Move one axis per step, prefer the axis with larger distance
+            const dr = toRow - r;
+            const dc = toCol - c;
+            if (Math.abs(dr) >= Math.abs(dc) && dr !== 0) {
+                r += dr > 0 ? 1 : -1;
+            } else if (dc !== 0) {
+                c += dc > 0 ? 1 : -1;
+            }
             path.push({ row: r, col: c });
         }
         return path;
@@ -697,11 +706,30 @@ class WorldManager {
 
     advanceEnemies() {
         const pathfind = window.findPath || window.pathfinding?.findPath;
+        const armies = this.gameState.getAllArmies?.() || [];
+
+        // Build a set of tiles occupied by player armies for blocking checks
+        const playerOccupied = new Set();
+        armies.forEach(a => {
+            playerOccupied.add(`${a.position.y},${a.position.x}`);
+        });
 
         this.enemies.forEach(enemy => {
             if (enemy.status !== 'advancing') return;
 
-            // Move 1 tile toward the village capital
+            // Check if enemy is ALREADY on the same tile as a player army (combat)
+            const currentKey = `${enemy.position.row},${enemy.position.col}`;
+            const blockingArmy = armies.find(a =>
+                a.position.y === enemy.position.row &&
+                a.position.x === enemy.position.col
+            );
+            if (blockingArmy) {
+                // Fight the blocking army instead of moving
+                this.resolveCombat(blockingArmy, enemy);
+                return; // Don't move this turn — fighting uses the day
+            }
+
+            // Calculate next step toward capital
             const from = enemy.position;
             let nextRow = from.row;
             let nextCol = from.col;
@@ -722,6 +750,22 @@ class WorldManager {
                 else if (from.row > this.capitalRow) nextRow--;
                 if (from.col < this.capitalCol) nextCol++;
                 else if (from.col > this.capitalCol) nextCol--;
+            }
+
+            // Check if next tile is blocked by a player army
+            const nextKey = `${nextRow},${nextCol}`;
+            if (playerOccupied.has(nextKey)) {
+                // Blocked — don't move, combat will happen next day when
+                // enemy steps onto that tile, or we can initiate it now
+                const blocker = armies.find(a =>
+                    a.position.y === nextRow && a.position.x === nextCol
+                );
+                if (blocker) {
+                    // Move onto the tile and fight
+                    enemy.position = { row: nextRow, col: nextCol };
+                    this.resolveCombat(blocker, enemy);
+                    return;
+                }
             }
 
             enemy.position = { row: nextRow, col: nextCol };

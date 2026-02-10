@@ -284,11 +284,13 @@ class MapRenderer {
     const size = this.currentTileSize || 60;
     const gap = 4;
     const padding = 32;
+    const markerSize = size * 0.4;
     el.style.position = 'absolute';
-    el.style.width = size * 0.4 + 'px';
-    el.style.height = size * 0.4 + 'px';
-    el.style.left = (padding / 2 + col * (size + gap) + size * 0.55) + 'px';
-    el.style.top = (padding / 2 + row * (size + gap) - size * 0.12) + 'px';
+    el.style.width = markerSize + 'px';
+    el.style.height = markerSize + 'px';
+    // Center the marker on the tile
+    el.style.left = (padding / 2 + col * (size + gap) + (size - markerSize) / 2) + 'px';
+    el.style.top = (padding / 2 + row * (size + gap) + (size - markerSize) / 2) + 'px';
     el.style.display = 'flex';
     el.style.alignItems = 'center';
     el.style.justifyContent = 'center';
@@ -297,6 +299,7 @@ class MapRenderer {
     el.style.borderRadius = '50%';
     el.style.fontSize = Math.max(10, size * 0.22) + 'px';
     el.style.boxShadow = '0 1px 4px rgba(42,31,20,0.4)';
+    el.style.zIndex = '20';
   }
 }
 
@@ -306,8 +309,8 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
   s.id = 'map-renderer-style';
   s.textContent = `
     .world-grid { position: absolute; inset:0; }
-    .world-grid .tile-layer { position:absolute; inset:0; }
-    .world-grid .entity-layer { position:absolute; inset:0; }
+    .world-grid .tile-layer { position:absolute; inset:0; z-index: 1; }
+    .world-grid .entity-layer { position:absolute; inset:0; z-index: 10; pointer-events: none; }
     .world-grid .tile:hover { transform: scale(1.05); z-index:5; }
     .world-grid .tile.selected { outline:none; }
     .world-grid .entity { pointer-events:none; }
