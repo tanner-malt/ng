@@ -151,9 +151,10 @@ class EventBusIntegrations {
     handleBuildingCompleted(data) {
         if (!data || !data.buildingType) return;
 
-        // Trigger unlock check — unlockSystem.notifyUnlock() handles its own toasts
+        // Trigger unlock check — force bypass throttle so construction-dependent
+        // unlocks (e.g. world_view gated on barracks achievement) evaluate immediately
         if (window.unlockSystem && window.unlockSystem.checkAllUnlocks) {
-            window.unlockSystem.checkAllUnlocks();
+            window.unlockSystem.checkAllUnlocks(true);
         }
     }
 

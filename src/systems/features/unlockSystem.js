@@ -1037,6 +1037,11 @@ document.addEventListener('DOMContentLoaded', () => {
             typeof window.achievementSystem.isUnlocked === 'function') {
             window.unlockSystem = new UnlockSystem(window.gameState);
 
+            // Sync view unlock state with Game (callbacks don't replay on page reload)
+            if (window.game && window.game.updateTabLocks) {
+                window.game.updateTabLocks();
+            }
+
             // Check for unlocks periodically, but with error handling
             const unlockCheckInterval = setInterval(() => {
                 try {
