@@ -432,12 +432,27 @@ class VillageManager {
                     const nameDiv = document.createElement('div');
                     nameDiv.className = 'building-name';
                     const description = GameData.getBuildingDescription(buildingType);
+                    
+                    // For locked buildings, show a short unlock requirement inline
+                    let unlockHint = '';
+                    if (!isUnlocked && window.unlockSystem) {
+                        const reqs = window.unlockSystem.getUnlockRequirements(buildingType);
+                        if (reqs && reqs.length > 0) {
+                            const reqTexts = reqs.map(r => {
+                                const status = r.completed ? '✅' : '❌';
+                                return `${status} ${r.description}`;
+                            });
+                            unlockHint = `<div class="building-unlock-hint">Requires: ${reqTexts.join(' · ')}</div>`;
+                        }
+                    }
+                    
                     nameDiv.innerHTML = `
                         <div class="building-name-row">
                             <span class="building-icon">${GameData.getBuildingIcon(buildingType)}</span>
                             <span class="building-title">${lockIcon}${GameData.getBuildingName(buildingType)}</span>
                         </div>
                         <div class="building-description">${description}</div>
+                        ${unlockHint}
                     `;
 
                     // Resources column

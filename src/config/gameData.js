@@ -191,7 +191,7 @@ const GameData = {
         storehouse: 10,
 
         // Production Buildings
-        woodcutterLodge: 45,
+        woodcutterLodge: 15,
         quarry: 60,
         lumberMill: 55,
         mine: 75,

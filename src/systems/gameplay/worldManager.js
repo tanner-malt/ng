@@ -39,8 +39,7 @@ class WorldManager {
         this.initialized = false;
         this.renderer = null;
 
-        // Subscribe to day-end
-        window.eventBus?.on('dayEnded', () => this.onDayEnded());
+        // Subscribe to day-end (canonical event name is 'day-ended')
         window.eventBus?.on('day-ended', () => this.onDayEnded());
 
         console.log('[WorldManager] Constructed — grid', this.mapWidth, 'x', this.mapHeight);
@@ -214,7 +213,7 @@ class WorldManager {
         if (hex.visibility === 'hidden') {
             html += `<p>Unexplored territory</p>`;
         } else if (hex.visibility === 'scoutable') {
-            html += `<p>Visible but unexplored — send an army to scout</p>`;
+            html += `<p>Fog of war — armies auto-explore as they move through adjacent tiles.</p>`;
         } else {
             html += `<p>${terrainDef.description || ''}</p>`;
             html += `<p>Move cost: ${terrainDef.moveCost || 1}</p>`;
@@ -277,7 +276,8 @@ class WorldManager {
                 });
                 if (armiesOnAdj.length > 0) {
                     html += `<button class="world-btn" onclick="window.worldManager.scoutTile(${row}, ${col})">
-                                🔭 Scout This Tile</button>`;
+                                🔭 Scout This Tile
+                                <small style="display:block;opacity:0.7;font-size:0.75em;">Armies also auto-explore while moving</small></button>`;
                 }
             }
         }
@@ -448,11 +448,9 @@ class WorldManager {
         let path;
         if (pathfind) {
             path = pathfind(
-                { row: fromRow, col: fromCol },
-                { row: targetRow, col: targetCol },
                 this.hexMap,
-                this.mapWidth,
-                this.mapHeight
+                { row: fromRow, col: fromCol },
+                { row: targetRow, col: targetCol }
             );
         }
 
@@ -708,11 +706,9 @@ class WorldManager {
 
             if (pathfind) {
                 const path = pathfind(
-                    { row: from.row, col: from.col },
-                    { row: this.capitalRow, col: this.capitalCol },
                     this.hexMap,
-                    this.mapWidth,
-                    this.mapHeight
+                    { row: from.row, col: from.col },
+                    { row: this.capitalRow, col: this.capitalCol }
                 );
                 if (path && path.length >= 2) {
                     nextRow = path[1].row;
@@ -900,18 +896,38 @@ class WorldManager {
     // ===================================================================
 
     saveWorldData() {
-        try {
-            const data = {
-                hexMap: this.hexMap,
-                enemies: this.enemies
-            };
-            localStorage.setItem('worldMapData', JSON.stringify(data));
-        } catch (e) {
-            console.warn('[WorldManager] Save failed:', e);
+        // World data is now saved through gameState.toSerializable()
+        // Trigger a gameState save which calls getWorldSaveData()
+        this.gameState.save?.();
+    }
+
+    getWorldSaveData() {
+        return {
+            hexMap: this.hexMap,
+            enemies: this.enemies
+        };
+    }
+
+    loadWorldSaveData(data) {
+        if (data && data.hexMap && data.hexMap.length === this.mapHeight) {
+            this.hexMap = data.hexMap;
+            this.enemies = data.enemies || [];
+            console.log('[WorldManager] Restored from gameState save data');
+            if (this.initialized) {
+                this.refreshUI();
+            }
         }
     }
 
     restoreFromSave() {
+        // Try gameState save data first (new system)
+        // gameState.load() calls loadWorldSaveData() asynchronously,
+        // but on first init the data may already be loaded.
+        if (this.hexMap && this.hexMap.length === this.mapHeight && this.hexMap[0]?.length > 0) {
+            // Already populated by loadWorldSaveData
+            return true;
+        }
+        // Fallback: try legacy standalone localStorage key
         try {
             const raw = localStorage.getItem('worldMapData');
             if (!raw) return false;
@@ -919,11 +935,13 @@ class WorldManager {
             if (data.hexMap && data.hexMap.length === this.mapHeight) {
                 this.hexMap = data.hexMap;
                 this.enemies = data.enemies || [];
-                console.log('[WorldManager] Restored from save');
+                // Migrate: remove standalone key now that gameState handles saves
+                localStorage.removeItem('worldMapData');
+                console.log('[WorldManager] Migrated from standalone save to gameState');
                 return true;
             }
         } catch (e) {
-            console.warn('[WorldManager] Restore failed:', e);
+            console.warn('[WorldManager] Legacy restore failed:', e);
         }
         return false;
     }
@@ -957,9 +975,11 @@ class WorldManager {
         const container = document.getElementById('world-view');
         if (!container) return;
 
-        // Preserve battle-modal if it exists
+        // Preserve battle-modal DOM node (not just HTML) to keep event listeners
         const battleModal = document.getElementById('battle-modal');
-        const battleModalHTML = battleModal ? battleModal.outerHTML : '';
+        if (battleModal && battleModal.parentNode) {
+            battleModal.parentNode.removeChild(battleModal);
+        }
 
         container.innerHTML = `
             <div class="world-layout">
@@ -972,8 +992,12 @@ class WorldManager {
                 <div class="world-sidebar world-sidebar-right" id="world-actions">
                 </div>
             </div>
-            ${battleModalHTML}
         `;
+
+        // Re-attach the original battle-modal node (preserves event listeners)
+        if (battleModal) {
+            container.appendChild(battleModal);
+        }
 
         console.log('[WorldManager] UI built');
     }

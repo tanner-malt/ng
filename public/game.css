@@ -715,16 +715,11 @@ body {
 /* Remove padding from world view to eliminate black space */
 #world-view.game-view {
     padding: 0;
-    background: var(--primary-dark);
-    /* Use theme background color */
+    background: #2a1f14;
     height: 100%;
-    /* Ensure world view fills full height */
     width: 100%;
-    /* Ensure world view fills full width */
     min-height: 500px;
-    /* Ensure minimum height for proper rendering */
     min-width: 600px;
-    /* Ensure minimum width for proper rendering */
 }
 
 .game-view.active {
@@ -6614,31 +6609,41 @@ html {
     cursor: pointer;
 }
 
-/* World Map Layout */
+/* World Map Layout — Parchment Theme */
 .world-layout {
     display: flex;
-    gap: 1rem;
+    gap: 0;
     height: 100%;
-    padding: 1rem;
+    padding: 0;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
 }
 
 .world-map-area {
     flex: 1;
     position: relative;
     min-height: 400px;
-    background: #1a252f;
-    border-radius: 8px;
-    border: 1px solid #4a5568;
+    /* Parchment base with layered noise */
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(210,180,140,0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 30%, rgba(180,150,110,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(160,130,100,0.10) 0%, transparent 60%),
+        linear-gradient(135deg, #d4b896 0%, #c4a87a 25%, #dcc9a8 50%, #c9b38e 75%, #d4b896 100%);
+    border-left: 3px solid #8b7355;
+    border-right: 3px solid #8b7355;
+    box-shadow:
+        inset 0 0 60px rgba(80, 50, 20, 0.3),
+        inset 0 0 120px rgba(60, 40, 15, 0.15);
 }
 
 .hex-overlay {
     position: absolute;
-    top: 1rem;
-    left: 1rem;
-    right: 1rem;
-    bottom: 1rem;
+    top: 1.5rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    bottom: 1.5rem;
     pointer-events: auto;
-    border-radius: 5px;
+    border-radius: 4px;
+    filter: sepia(0.08);
 }
 
 .world-sidebar {
@@ -6648,32 +6653,42 @@ html {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    background: #2c3e50;
-    border-radius: 8px;
+    background:
+        linear-gradient(180deg, #3d2b1a 0%, #2e1f10 50%, #3d2b1a 100%);
     padding: 0.75rem;
     overflow-y: auto;
     font-size: 0.9rem;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
+    border-top: 2px solid #5a4230;
+    border-bottom: 2px solid #5a4230;
+    color: #d4c4a8;
 }
 
 .world-sidebar h3 {
     margin: 0 0 0.5rem 0;
-    font-size: 1rem;
-    color: #ecf0f1;
+    font-size: 1.05rem;
+    color: #e8d5b0;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #5a4230;
+    padding-bottom: 0.4rem;
 }
 
 .world-sidebar h4 {
     margin: 0.5rem 0 0.25rem 0;
     font-size: 0.85rem;
-    color: #bdc3c7;
+    color: #c4a87a;
+    letter-spacing: 0.3px;
 }
 
 .world-sidebar p {
     margin: 0.25rem 0;
+    color: #d4c4a8;
 }
 
 .world-sidebar hr {
     border: none;
-    border-top: 1px solid #4a5568;
+    border-top: 1px solid #5a4230;
     margin: 0.5rem 0;
 }
 
@@ -6682,39 +6697,42 @@ html {
     width: 100%;
     padding: 8px 12px;
     margin: 4px 0;
-    background: #34495e;
-    color: #ecf0f1;
-    border: 1px solid #4a5568;
-    border-radius: 6px;
+    background: linear-gradient(180deg, #5a4230 0%, #4a3525 100%);
+    color: #e8d5b0;
+    border: 1px solid #7a6345;
+    border-radius: 4px;
     cursor: pointer;
     font-size: 0.85rem;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
     text-align: left;
-    transition: background 0.2s;
+    letter-spacing: 0.3px;
+    transition: background 0.2s, border-color 0.2s;
 }
 
 .world-btn:hover:not(:disabled) {
-    background: #4a6785;
+    background: linear-gradient(180deg, #6b5340 0%, #5a4230 100%);
+    border-color: #a08060;
 }
 
 .world-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
 }
 
 .world-btn-sm {
     display: inline-block;
     padding: 3px 8px;
-    background: #34495e;
-    color: #ecf0f1;
-    border: 1px solid #4a5568;
-    border-radius: 4px;
+    background: #4a3525;
+    color: #e8d5b0;
+    border: 1px solid #6b5340;
+    border-radius: 3px;
     cursor: pointer;
     font-size: 0.8rem;
     transition: background 0.2s;
 }
 
 .world-btn-sm:hover {
-    background: #4a6785;
+    background: #5a4230;
 }
 
 .army-list-item {
@@ -6723,6 +6741,7 @@ html {
     gap: 6px;
     padding: 4px 0;
     font-size: 0.85rem;
+    color: #d4c4a8;
 }
 
 .army-list-item span {
@@ -6730,13 +6749,16 @@ html {
 }
 
 .info-placeholder {
-    color: #7f8c8d;
+    color: #8b7355;
     font-style: italic;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
 }
 
 .hex-coords {
-    color: #95a5a6;
+    color: #a08060;
     font-size: 0.8rem;
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, 'Georgia', serif;
+    letter-spacing: 0.5px;
 }
 
 .draft-option {
@@ -9329,6 +9351,15 @@ html {
     margin-top: 2px;
     line-height: 1.3;
     opacity: 0.8;
+}
+
+.building-row .building-unlock-hint {
+    font-size: 0.7rem;
+    color: #f39c12;
+    margin-top: 3px;
+    line-height: 1.3;
+    opacity: 0.9;
+    font-style: italic;
 }
 
 .build-btn {

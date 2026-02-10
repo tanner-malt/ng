@@ -41,6 +41,11 @@ class EventBusIntegrations {
             this.handleBuildingPlaced(data);
         });
 
+        // Building completion — show what was unlocked
+        window.eventBus.on('buildingCompleted', (data) => {
+            this.handleBuildingCompleted(data);
+        });
+
         // Achievement events
         window.eventBus.on('achievement-unlocked', (data) => {
             this.handleAchievementUnlocked(data);
@@ -137,6 +142,31 @@ class EventBusIntegrations {
         
         // Emit UI update
         window.eventBus.emit('ui-update-needed');
+    }
+
+    /**
+     * When a building finishes construction, show what new content was unlocked
+     */
+    handleBuildingCompleted(data) {
+        if (!data || !data.buildingType) return;
+
+        // Use the unlock system to find what this building unlocks
+        if (window.unlockSystem && window.unlockSystem.getUnlocksTriggeredBy) {
+            const potentialUnlocks = window.unlockSystem.getUnlocksTriggeredBy(data.buildingType);
+            
+            if (potentialUnlocks.length > 0) {
+                const names = potentialUnlocks.map(u => u.name).join(', ');
+                
+                // Show a delayed toast so it doesn't overlap the "construction complete" toast
+                setTimeout(() => {
+                    window.showToast?.(`New buildings available: ${names}`, {
+                        icon: '🔓',
+                        type: 'info',
+                        timeout: 5000
+                    });
+                }, 1500);
+            }
+        }
     }
 
     handleTutorialStep(data) {

@@ -502,6 +502,54 @@ class UnlockSystem {
         return next.sort((a, b) => b.progress - a.progress);
     }
 
+    /**
+     * Get building/feature IDs that would be unlocked by completing a given building type.
+     * Checks which registered unlocks have a building_count condition referencing the given type,
+     * or an achievement condition linked to the given building.
+     * @param {string} buildingType - The building type that was just completed
+     * @returns {Array<{id: string, name: string, type: string}>} - List of unlockable content
+     */
+    getUnlocksTriggeredBy(buildingType) {
+        const result = [];
+        
+        // Map of building types to their associated achievements
+        const buildingAchievementMap = {
+            townCenter: 'town_center_built',
+            farm: 'feeding_people',
+            barracks: 'military_establishment',
+            buildersHut: 'build_and_they_will_come'
+        };
+        
+        const relatedAchievement = buildingAchievementMap[buildingType];
+        
+        this.unlockConditions.forEach((config, unlockId) => {
+            // Skip already unlocked content
+            if (this.isUnlocked(unlockId)) return;
+            
+            const matchesCondition = config.conditions.some(cond => {
+                // Check building_count conditions
+                if (cond.type === 'building_count' && cond.building === buildingType) {
+                    return true;
+                }
+                // Check achievement conditions linked to this building
+                if (cond.type === 'achievement' && cond.achievement === relatedAchievement) {
+                    return true;
+                }
+                return false;
+            });
+            
+            if (matchesCondition) {
+                result.push({
+                    id: unlockId,
+                    name: config.name,
+                    type: config.type
+                });
+            }
+        });
+        
+        return result;
+    }
+
     getUnlockProgress(unlockId) {
         const config = this.unlockConditions.get(unlockId);
         if (!config) return 0;
@@ -669,6 +717,11 @@ class UnlockSystem {
         // Call the game's unlockView method if available
         if (window.game && window.game.unlockView) {
             window.game.unlockView(viewName);
+        } else {
+            // Game not ready yet — store for later sync
+            if (!window._pendingViewUnlocks) window._pendingViewUnlocks = [];
+            window._pendingViewUnlocks.push(viewName);
+            console.log(`[UnlockSystem] Game not ready, queued view unlock: ${viewName}`);
         }
     }
 

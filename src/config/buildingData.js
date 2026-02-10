@@ -127,7 +127,7 @@ const BUILDING_DATA = {
         category: 'production',
         
         costs: { wood: 20, stone: 40 },
-        constructionPoints: 45,
+        constructionPoints: 15,
         
         production: {
             jobs: { woodcutter: 3 }

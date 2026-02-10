@@ -14,7 +14,6 @@ class MapRenderer {
 
   init() {
     this.container = document.getElementById('hex-overlay');
-    console.log('[MapRenderer] init(): container found?', !!this.container);
     if (!this.container) return false;
     this.container.innerHTML = '';
     this.container.classList.add('world-grid');
@@ -30,11 +29,9 @@ class MapRenderer {
     this.container.appendChild(entityLayer);
     this.entityLayer = entityLayer;
 
-    console.log('[MapRenderer] Building persistent tiles');
     this.buildPersistentTiles(tileLayer);
     this.observeResize();
     this.ready = true;
-    console.log('[MapRenderer] init complete. Tiles:', this.tileElements.size);
     return true;
   }
 
@@ -46,7 +43,6 @@ class MapRenderer {
 
   buildPersistentTiles(layer) {
     const { mapHeight, mapWidth } = this.world;
-    console.log(`[MapRenderer] buildPersistentTiles: size ${mapWidth}x${mapHeight}`);
     for (let r = 0; r < mapHeight; r++) {
       for (let c = 0; c < mapWidth; c++) {
         const tile = document.createElement('button');
@@ -64,8 +60,6 @@ class MapRenderer {
       this.layout();
       this.fullTileStyleRefresh();
     }, 100);
-    
-    console.log('[MapRenderer] buildPersistentTiles finished. Total tiles:', this.tileElements.size);
   }
 
   layout() {
@@ -77,7 +71,7 @@ class MapRenderer {
     const availableH = rect.height - padding;
 
     // simple square grid
-    const gap = 6;
+    const gap = 4;
     const tileSize = Math.min(
       Math.floor((availableW - gap * (mapWidth - 1)) / mapWidth),
       Math.floor((availableH - gap * (mapHeight - 1)) / mapHeight),
@@ -87,8 +81,6 @@ class MapRenderer {
     // Ensure minimum tile size for visibility
     this.currentTileSize = Math.max(tileSize, 60);
 
-    console.log('[MapRenderer] layout(): rect', rect.width, rect.height, 'computed tileSize', this.currentTileSize, 'tiles', this.tileElements.size);
-
     for (let [key, el] of this.tileElements.entries()) {
       const [r, c] = key.split(',').map(Number);
       el.style.position = 'absolute';
@@ -96,20 +88,19 @@ class MapRenderer {
       el.style.height = this.currentTileSize + 'px';
       el.style.left = (padding / 2 + c * (this.currentTileSize + gap)) + 'px';
       el.style.top = (padding / 2 + r * (this.currentTileSize + gap)) + 'px';
-      el.style.borderRadius = '10px';
+      el.style.borderRadius = '3px';
       el.style.display = 'flex';
+      el.style.flexDirection = 'column';
       el.style.alignItems = 'center';
       el.style.justifyContent = 'center';
-      el.style.fontSize = Math.max(16, this.currentTileSize * 0.4) + 'px';
+      el.style.fontSize = Math.max(16, this.currentTileSize * 0.35) + 'px';
       el.style.cursor = 'pointer';
       el.style.transition = 'transform 0.15s, box-shadow 0.15s, background 0.25s';
-      el.style.border = '2px solid rgba(255,255,255,0.3)';
-      el.style.background = '#444'; // temporary fallback color
+      el.style.fontFamily = "'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif";
     }
   }
 
   fullTileStyleRefresh() {
-    console.log('[MapRenderer] fullTileStyleRefresh start');
     const { hexMap } = this.world;
     for (let [key, el] of this.tileElements.entries()) {
       const [r, c] = key.split(',').map(Number);
@@ -118,74 +109,96 @@ class MapRenderer {
         this.applyTileState(el, data, r, c);
       }
     }
-    console.log('[MapRenderer] fullTileStyleRefresh done');
   }
 
+  // Parchment-themed terrain colors (earthy, muted)
+  static TERRAIN_COLORS = {
+    grass:    { bg: 'linear-gradient(145deg, #7a9955, #6b8a48)', border: '#5e7a3a', label: 'Grassland' },
+    plains:   { bg: 'linear-gradient(145deg, #c8b478, #b5a168)', border: '#8b7d4a', label: 'Plains' },
+    village:  { bg: 'linear-gradient(145deg, #c9a84c, #b8943e)', border: '#8b6914', label: 'Capital' },
+    forest:   { bg: 'linear-gradient(145deg, #4a6b3a, #3d5a30)', border: '#2e4424', label: 'Forest' },
+    hill:     { bg: 'linear-gradient(145deg, #9a8a6a, #887858)', border: '#6b5d45', label: 'Hills' },
+    mountain: { bg: 'linear-gradient(145deg, #6b6b6b, #555555)', border: '#3a3a3a', label: 'Mountains' },
+    swamp:    { bg: 'linear-gradient(145deg, #5a6b4a, #4a5a3a)', border: '#384830', label: 'Swamp' },
+    desert:   { bg: 'linear-gradient(145deg, #d4b87a, #c4a86a)', border: '#a08050', label: 'Desert' },
+    ruins:    { bg: 'linear-gradient(145deg, #7a6a5a, #6a5a4a)', border: '#4a3e32', label: 'Ruins' }
+  };
+
   applyTileState(el, data, r, c) {
-    // Use global getTerrain function
     const getTerrainFn = window.getTerrain || function(key) { 
       return { color: '#444', symbol: '?' }; 
     };
     const terrain = getTerrainFn(data.terrain);
+    const colors = MapRenderer.TERRAIN_COLORS[data.terrain] || { bg: '#6b5d45', border: '#4a3e32', label: data.terrain };
     
-    // Always ensure tile is visible first
     el.style.display = 'flex';
     el.style.position = 'absolute';
     
-    // Use new visibility model with fallback for legacy
     const visibility = data.visibility || (data.discovered ? 'explored' : data.scoutable ? 'scoutable' : 'hidden');
-    
-    // Format coordinates relative to capital
     const coordLabel = this.world.formatCoords?.(r, c) || `(${r}, ${c})`;
     
+    // Reset common properties
+    el.style.textShadow = 'none';
+    el.style.boxShadow = 'none';
+    el.style.backgroundImage = 'none';
+    el.innerHTML = '';
+    
     if (visibility === 'hidden') {
-      // True fog of war - unexplored
-      el.textContent = '?';
-      el.style.background = 'linear-gradient(135deg,#1a252f,#2c3e50)';
-      el.style.border = '2px solid #4a5568';
-      el.style.opacity = '0.5';
-      el.style.color = '#718096';
-      el.title = `${coordLabel} - Unexplored`;
+      // Fog of war — aged parchment with cross-hatch pattern
+      el.style.background = '#b8a88a';
+      el.style.backgroundImage = `
+        repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(90,66,48,0.12) 4px, rgba(90,66,48,0.12) 5px),
+        repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(90,66,48,0.08) 4px, rgba(90,66,48,0.08) 5px)`;
+      el.style.border = '1px solid #9a8a6a';
+      el.style.opacity = '0.6';
+      el.style.color = '#6b5540';
+      el.innerHTML = '<span style="font-size:1.1em;opacity:0.6">?</span>';
+      el.title = `${coordLabel} — Terra Incognita`;
     } else if (visibility === 'scoutable') {
-      // Scoutable - adjacent to explored tiles
-      el.textContent = '👁️';
-      el.style.background = 'linear-gradient(135deg,#2c5282,#2b6cb0)';
-      el.style.border = '2px dashed #4299e1';
+      // Scoutable — parchment with compass markings
+      el.style.background = '#c8b898';
+      el.style.backgroundImage = `
+        radial-gradient(circle at 50% 50%, rgba(180,150,100,0.3) 0%, transparent 70%)`;
+      el.style.border = '2px dashed #8b7355';
       el.style.opacity = '0.85';
-      el.style.color = '#bee3f8';
-      el.title = `${coordLabel} - Send scouts to explore`;
+      el.style.color = '#5a4230';
+      el.innerHTML = '<span style="font-size:1.1em">🧭</span>';
+      el.title = `${coordLabel} — Uncharted (armies auto-explore)`;
     } else if (data.isPlayerVillage) {
-      // Player village - special styling
+      // Player capital — golden seal on parchment
       el.style.opacity = '1';
-      el.style.background = `linear-gradient(145deg, #f6e05e, #d69e2e)`;
-      el.style.border = '3px solid #f1c40f';
-      el.style.boxShadow = '0 0 12px rgba(241,196,15,0.5)';
-      el.style.color = '#fff';
-      el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
-      el.textContent = '🏰';
-      el.title = `${coordLabel} - Your Capital`;
+      el.style.background = colors.bg;
+      el.style.border = '3px solid #8b6914';
+      el.style.boxShadow = '0 0 10px rgba(180,140,50,0.5), inset 0 0 8px rgba(255,220,100,0.2)';
+      el.style.color = '#3a2e1f';
+      el.style.textShadow = '0 1px 2px rgba(255,220,100,0.3)';
+      el.innerHTML = '<span style="font-size:1.2em">🏰</span><span style="font-size:0.5em;color:#5a4230;margin-top:1px">Capital</span>';
+      el.title = `${coordLabel} — Your Capital City`;
     } else {
-      // Explored - show terrain
-      el.style.opacity = data.hasPlayerUnit ? '1' : '0.9';
-      el.style.background = terrain.color;
-      el.style.border = '2px solid rgba(255,255,255,0.25)';
-      el.style.boxShadow = 'none';
-      el.style.color = '#fff';
-      el.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
-      el.textContent = terrain.symbol;
-      el.title = `${coordLabel} - ${data.terrain}`;
+      // Explored terrain — earthy map colors
+      el.style.opacity = data.hasPlayerUnit ? '1' : '0.92';
+      el.style.background = colors.bg;
+      el.style.border = `2px solid ${colors.border}`;
+      el.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.15)';
+      el.style.color = '#2a1f14';
+      el.style.textShadow = '0 1px 1px rgba(255,255,255,0.2)';
+      const symbolSpan = `<span style="font-size:1em">${terrain.symbol}</span>`;
+      const labelSpan = `<span style="font-size:0.45em;color:${colors.border};margin-top:1px;letter-spacing:0.5px">${colors.label}</span>`;
+      el.innerHTML = symbolSpan + labelSpan;
+      el.title = `${coordLabel} — ${colors.label}`;
     }
 
-    // selection highlight
+    // Selection highlight — ink-circled look
     if (this.world.selectedHex && this.world.selectedHex.row === r && this.world.selectedHex.col === c) {
       el.classList.add('selected');
-      el.style.transform = 'scale(1.07)';
+      el.style.transform = 'scale(1.08)';
       el.style.zIndex = 10;
-      el.style.boxShadow = '0 0 14px rgba(255,255,255,0.65)';
+      el.style.boxShadow = '0 0 0 3px #3a2e1f, 0 0 12px rgba(58,46,31,0.5)';
+      el.style.border = '2px solid #2a1f14';
     } else {
       el.classList.remove('selected');
       el.style.transform = 'scale(1)';
-      if (!data.isPlayerVillage) el.style.boxShadow = 'none';
+      if (!data.isPlayerVillage) el.style.boxShadow = visibility === 'explored' ? 'inset 0 1px 3px rgba(0,0,0,0.15)' : 'none';
       el.style.zIndex = 1;
     }
   }
@@ -200,7 +213,6 @@ class MapRenderer {
   }
 
   updateEntities() {
-    console.log('[MapRenderer] updateEntities start');
     if (!this.entityLayer) return;
     this.entityLayer.innerHTML = '';
     
@@ -211,10 +223,10 @@ class MapRenderer {
         marker.className = 'entity path-step';
         marker.textContent = '•';
         this.positionEntity(marker, step.row, step.col);
-        marker.style.background = 'rgba(255,255,255,0.15)';
-        marker.style.border = '1px solid #fff';
-        marker.style.width = (this.currentTileSize*0.25)+'px';
-        marker.style.height = (this.currentTileSize*0.25)+'px';
+        marker.style.background = 'rgba(90,66,48,0.3)';
+        marker.style.border = '1px solid #5a4230';
+        marker.style.width = (this.currentTileSize*0.2)+'px';
+        marker.style.height = (this.currentTileSize*0.2)+'px';
         this.entityLayer.appendChild(marker);
       });
     }
@@ -226,7 +238,7 @@ class MapRenderer {
         const marker = document.createElement('div');
         marker.className = 'entity army-marker';
         marker.textContent = '⚔';
-        marker.title = `${a.name} (${a.units?.length || 0} units) - ${a.status || 'idle'}`;
+        marker.title = `${a.name} (${a.units?.length || 0} units) — ${a.status || 'idle'}`;
         this.positionEntity(marker, a.position.y, a.position.x);
         this.entityLayer.appendChild(marker);
       });
@@ -236,57 +248,55 @@ class MapRenderer {
     if (this.world.enemies) {
       this.world.enemies.forEach(enemy => {
         if (enemy.status !== 'advancing') return;
-        // Only render if visible to player
         if (!this.world.isEnemyVisible?.(enemy)) return;
         
-        const typeInfo = this.world.getEnemyTypeInfo?.(enemy) || { icon: '⚔️', color: '#e74c3c' };
+        const typeInfo = this.world.getEnemyTypeInfo?.(enemy) || { icon: '⚔️', color: '#8b2020' };
         const marker = document.createElement('div');
         marker.className = 'entity enemy-army-marker';
         marker.textContent = typeInfo.icon;
         this.positionEntity(marker, enemy.position.row, enemy.position.col);
-        marker.style.background = typeInfo.color;
-        marker.title = `${enemy.name} - ${enemy.units.length} units`;
+        marker.style.background = 'linear-gradient(135deg, #6b1a1a, #8b2020)';
+        marker.title = `${enemy.name} — ${enemy.units.length} units`;
         // Strength badge
         if (enemy.units.length > 1) {
           const badge = document.createElement('span');
           badge.className = 'threat-badge';
           badge.textContent = enemy.units.length.toString();
           badge.style.position = 'absolute';
-          badge.style.top = '-6px';
-          badge.style.right = '-6px';
-          badge.style.fontSize = '10px';
-          badge.style.background = '#c0392b';
+          badge.style.top = '-5px';
+          badge.style.right = '-5px';
+          badge.style.fontSize = '9px';
+          badge.style.background = '#8b2020';
           badge.style.borderRadius = '50%';
           badge.style.padding = '1px 4px';
-          badge.style.color = 'white';
+          badge.style.color = '#e8d5b0';
           badge.style.fontWeight = 'bold';
+          badge.style.border = '1px solid #5a1010';
           marker.appendChild(badge);
         }
         
         this.entityLayer.appendChild(marker);
       });
     }
-    
-    console.log('[MapRenderer] updateEntities done');
   }
 
   positionEntity(el, row, col) {
     const size = this.currentTileSize || 60;
-    const gap = 6;
+    const gap = 4;
     const padding = 32;
     el.style.position = 'absolute';
-    el.style.width = size * 0.45 + 'px';
-    el.style.height = size * 0.45 + 'px';
+    el.style.width = size * 0.4 + 'px';
+    el.style.height = size * 0.4 + 'px';
     el.style.left = (padding / 2 + col * (size + gap) + size * 0.55) + 'px';
-    el.style.top = (padding / 2 + row * (size + gap) - size * 0.15) + 'px';
+    el.style.top = (padding / 2 + row * (size + gap) - size * 0.12) + 'px';
     el.style.display = 'flex';
     el.style.alignItems = 'center';
     el.style.justifyContent = 'center';
-    el.style.background = 'rgba(0,0,0,0.35)';
-    el.style.border = '2px solid #fff';
+    el.style.background = 'rgba(42,31,20,0.4)';
+    el.style.border = '2px solid #5a4230';
     el.style.borderRadius = '50%';
-    el.style.fontSize = Math.max(10, size * 0.25) + 'px';
-    el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4)';
+    el.style.fontSize = Math.max(10, size * 0.22) + 'px';
+    el.style.boxShadow = '0 1px 4px rgba(42,31,20,0.4)';
   }
 }
 
@@ -298,17 +308,27 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
     .world-grid { position: absolute; inset:0; }
     .world-grid .tile-layer { position:absolute; inset:0; }
     .world-grid .entity-layer { position:absolute; inset:0; }
-    .world-grid .tile:hover { transform: scale(1.04); z-index:5; }
+    .world-grid .tile:hover { transform: scale(1.05); z-index:5; }
     .world-grid .tile.selected { outline:none; }
     .world-grid .entity { pointer-events:none; }
-    .army-marker { color:#fff; background:linear-gradient(135deg, #2980b9, #3498db) !important; }
-    .enemy-army-marker { color:#fff; animation: pulse-threat 1.5s infinite; border-radius: 50%; }
-    .path-step { font-size:10px; color:#fff; }
-    @keyframes pulse-threat {
-      0%, 100% { box-shadow: 0 0 8px rgba(231, 76, 60, 0.6); }
-      50% { box-shadow: 0 0 16px rgba(231, 76, 60, 0.9); }
+    .army-marker {
+      color: #e8d5b0;
+      background: linear-gradient(135deg, #8b6914, #a07828) !important;
+      border-color: #5a4230 !important;
+      font-weight: bold;
     }
-    .threat-badge { text-shadow: 0 0 4px rgba(0,0,0,0.8); font-weight: bold; }
+    .enemy-army-marker {
+      color: #e8d5b0;
+      animation: pulse-threat 2s infinite;
+      border-radius: 50%;
+      border-color: #5a1010 !important;
+    }
+    .path-step { font-size:10px; color: #5a4230; }
+    @keyframes pulse-threat {
+      0%, 100% { box-shadow: 0 0 6px rgba(139, 32, 32, 0.5); }
+      50% { box-shadow: 0 0 14px rgba(139, 32, 32, 0.8); }
+    }
+    .threat-badge { text-shadow: 0 0 3px rgba(0,0,0,0.8); font-weight: bold; }
   `;
   document.head.appendChild(s);
 }
