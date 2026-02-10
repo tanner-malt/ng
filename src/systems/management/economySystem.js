@@ -143,6 +143,7 @@ class EconomySystem {
         });
         
         // Count village guards
+        const guards = this.countVillageGuards();
         totalUpkeep += guards * (this.upkeepCosts.guard || 2);
         
         // Apply logistics tech bonus

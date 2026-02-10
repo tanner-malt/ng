@@ -182,7 +182,7 @@ class ResourceManager_Model {
 
         // Subscribe to day end for production/consumption
         if (window.eventBus) {
-            window.eventBus.on('dayEnded', () => this.processDailyRates());
+            window.eventBus.on('day-ended', () => this.processDailyRates());
         }
     }
 

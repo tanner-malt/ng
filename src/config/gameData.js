@@ -55,7 +55,8 @@ const GameData = {
         // Advanced Buildings (Planks-heavy)
         magicalTower: { gold: 200, stone: 100, wood: 75, metal: 50, planks: 80 },
         grandLibrary: { gold: 150, wood: 100, stone: 75, planks: 60 },
-        university: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 }
+        university: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 },
+        temple: { stone: 50, gold: 30, wood: 40 }
     },
 
     // Building production - capabilities per building (no direct resource outputs)
@@ -179,6 +180,11 @@ const GameData = {
             jobs: {
                 scholar: 10
             }
+        },
+        temple: {
+            jobs: {
+                priest: 1
+            }
         }
     },
 
@@ -216,6 +222,7 @@ const GameData = {
         // Advanced Buildings
         magicalTower: 120,
         grandLibrary: 110,
+        temple: 60,
 
         // Special Buildings
         buildersHut: 15 // Quick to build - helps scale up construction
@@ -365,6 +372,12 @@ const GameData = {
             name: 'Grand Library',
             description: 'A repository of all knowledge accumulated across generations',
             effects: '10 Scholar jobs • Preserves dynasty history • Research bonus'
+        },
+        temple: {
+            icon: '⛪',
+            name: 'Temple',
+            description: 'A place of worship and spiritual guidance',
+            effects: '1 Priest job • +5 happiness • Religious ceremonies'
         }
     },
 
@@ -377,7 +390,7 @@ const GameData = {
         military: ['barracks', 'fortifications', 'militaryAcademy', 'castle'],
         royal: ['keep', 'monument'],
         knowledge: ['academy', 'university'],
-        advanced: ['magicalTower', 'grandLibrary']
+        advanced: ['magicalTower', 'grandLibrary', 'temple']
     },
 
     // Category descriptions for tooltips/help

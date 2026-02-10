@@ -316,7 +316,7 @@ class BuildingRegistry {
 
         // Subscribe to game events
         if (window.eventBus) {
-            window.eventBus.on('dayEnded', () => this.updateUnlockStates());
+            window.eventBus.on('day-ended', () => this.updateUnlockStates());
             window.eventBus.on('building:completed', () => this.updateUnlockStates());
             window.eventBus.on('achievement:earned', () => this.updateUnlockStates());
         }

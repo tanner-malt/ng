@@ -228,7 +228,7 @@ class ModelBridge {
                 this.syncResourcesFromGameState();
             });
 
-            window.eventBus.on('dayEnded', () => {
+            window.eventBus.on('day-ended', () => {
                 this.syncResourcesFromGameState();
                 this.syncUnlockStates();
             });

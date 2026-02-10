@@ -37,17 +37,18 @@ class JobManager {
         this.jobEfficiency.set('foreman', {}); // Boost applied in ConstructionManager
         this.jobEfficiency.set('miner', { stone: 2, metal: 1 }); // From mines
         this.jobEfficiency.set('rockcutter', { stone: 3 }); // From quarries
-        // Engineers now produce more production
-        this.jobEfficiency.set('engineer', { production: 3 }); // From workshops
-        this.jobEfficiency.set('trader', { gold: 2 }); // From markets
+        // Engineers now produce production and tools, consuming metal
+        this.jobEfficiency.set('engineer', { production: 3, tools: 1, metal: -0.5 }); // From workshops
+        this.jobEfficiency.set('trader', {}); // Gold production handled by economySystem.processMarketIncome()
         // Blacksmith produces weapons and tools from metal
         this.jobEfficiency.set('blacksmith', { weapons: 1, tools: 2, metal: -1 });
         // Removed production from military/academic support roles
         this.jobEfficiency.set('drillInstructor', {}); // Organizational value (no direct resource)
         this.jobEfficiency.set('militaryTheorist', {}); // Planning value (no direct resource)
-        this.jobEfficiency.set('professor', {}); // Research value (no direct resource)
-        this.jobEfficiency.set('scholar', {}); // Research value (no direct resource)
-        this.jobEfficiency.set('wizard', { production: 0 }); // Placeholder until magic systems
+        this.jobEfficiency.set('professor', {}); // Research via techTree.generateResearchPoints()
+        this.jobEfficiency.set('scholar', {}); // Research via techTree.generateResearchPoints()
+        this.jobEfficiency.set('wizard', {}); // Placeholder until magic systems
+        this.jobEfficiency.set('priest', {}); // Happiness bonus via building effects
     }
 
     // Update available jobs based on current buildings
@@ -164,6 +165,31 @@ class JobManager {
             // case 'quadratic': return Math.max(0, Math.floor(baseSlots * level * level));
             // case 'custom': if (typeof window.GameData?.computeJobSlots === 'function') return Math.max(0, Math.floor(window.GameData.computeJobSlots(baseSlots, level, building)));
         }
+    }
+
+    /**
+     * Sync building.workers arrays from jobAssignments so that external systems
+     * (techTree, economySystem, villageDefense) can count workers per building
+     * via building.workers.length.
+     */
+    syncBuildingWorkers() {
+        const buildings = this.gameState?.buildings;
+        if (!buildings) return;
+
+        // Clear all building.workers first
+        buildings.forEach(b => { b.workers = []; });
+
+        // Populate from jobAssignments
+        this.jobAssignments.forEach((jobTypes, buildingId) => {
+            if (buildingId === 'global') return; // global jobs don't belong to a building
+            const building = buildings.find(b => b.id === buildingId);
+            if (!building) return;
+            const workerIds = [];
+            Object.values(jobTypes).forEach(ids => {
+                ids.forEach(id => workerIds.push(id));
+            });
+            building.workers = workerIds;
+        });
     }
 
     // Assign worker to a specific job
@@ -305,6 +331,7 @@ class JobManager {
             planks: 0,
             weapons: 0,
             tools: 0,
+            gold: 0,
             production: 0
         };
 
@@ -398,6 +425,7 @@ class JobManager {
             planks: 0,
             weapons: 0,
             tools: 0,
+            gold: 0,
             production: 0
         };
 
@@ -409,6 +437,7 @@ class JobManager {
             planks: [],
             weapons: [],
             tools: [],
+            gold: [],
             production: []
         };
 
@@ -421,6 +450,7 @@ class JobManager {
             planks: { income: [], expense: [] },
             weapons: { income: [], expense: [] },
             tools: { income: [], expense: [] },
+            gold: { income: [], expense: [] },
             production: { income: [], expense: [] }
         };
 
@@ -437,6 +467,7 @@ class JobManager {
             planks: 0,
             weapons: 0,
             tools: 0,
+            gold: 0,
             production: 0
         };
 
