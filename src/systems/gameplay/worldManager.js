@@ -1,4493 +1,1005 @@
-// World map management with grid-based exploration system
+/**
+ * WorldManager — World Map System (rewrite)
+ *
+ * Manages the 5×5 world grid: terrain generation, fog-of-war, exploration,
+ * army drafting/movement/combat, enemy spawning & advancing, and the UI
+ * (3-column layout with map + info panel + action panel).
+ *
+ * Single source of truth for:
+ *   - hexMap[][]      (terrain, visibility)
+ *   - enemies[]       (spawned enemy groups, advancing toward village)
+ *   - gameState.armies[] (player armies — core army data)
+ *
+ * Population bridge:
+ *   Draft:   populationManager.updateStatus(id, 'drafted')
+ *   Disband: populationManager.updateStatus(id, originalStatus)
+ */
+
 class WorldManager {
     constructor(gameState, game) {
         this.gameState = gameState;
         this.game = game;
-        
-        // Set global reference once in constructor
-        window.worldManager = this;
-        console.log('[World] WorldManager instance set globally');
 
-        this.mapWidth = 7; // 7x7 grid for exploration
-        this.mapHeight = 7;
-        this.selectedHex = null;
-        this.playerVillageHex = { row: 3, col: 3 }; // Center of 7x7 grid
-        this.selectedArmy = null;
-        
-        // Optional renderer and path preview state
-        this.mapRenderer = null;
-        this.pendingPath = null; // array of {row,col}
-        this.pendingMoveTarget = null; // {row,col}
+        // Map dimensions from config
+        const cfg = window.WORLD_DATA?.mapConfig || { width: 5, height: 5, capitalPosition: { row: 2, col: 2 } };
+        this.mapWidth = cfg.width;
+        this.mapHeight = cfg.height;
+        this.capitalRow = cfg.capitalPosition.row;
+        this.capitalCol = cfg.capitalPosition.col;
 
-        // Exploration system
-        this.explorationRadius = 1; // How far scouts can see from explored areas
-        this.discoveredTiles = new Set();
-        this.scoutableTiles = new Set();
-
-        // Hex map data structure
+        // Grid data: hexMap[row][col] = { terrain, visibility, isPlayerVillage }
         this.hexMap = [];
-        this.initializeHexMap();
 
-        // Parties and expedition management
-        this.parties = {
-            expeditions: [],
-            quests: [],
-            battles: []
-        };
+        // Enemy groups advancing toward the village
+        this.enemies = [];
 
-        // Exploration tutorial state
-        this.tutorialMode = true;
+        // UI state
+        this.selectedHex = null;
+        this.pendingPath = null;
+        this.initialized = false;
+        this.renderer = null;
 
-        // Enemy presence and Zone of Control (ZOC)
-        this.enemyUnits = new Map(); // id -> {row,col,type,strength,name}
-        this._enemyZOC = new Set(); // 'row,col' strings
-        this._toastCooldowns = new Map(); // armyId -> { lastNoFoodDay, lastLowFoodDay }
-        this._eventCooldowns = new Map(); // armyId -> lastEventDay
-        this.showZOCOverlay = false; // toggleable ZOC shading
-        this._skipTravelToday = new Set(); // armyId set for weather/incident delays
-        
-        // Enemy system configuration
-        this.enemyFactions = {
-            bandits: { icon: '🏴', color: '#e74c3c', aggression: 0.3, name: 'Bandits' },
-            goblins: { icon: '👺', color: '#27ae60', aggression: 0.5, name: 'Goblins' },
-            orcs: { icon: '👹', color: '#8e44ad', aggression: 0.7, name: 'Orcs' },
-            undead: { icon: '💀', color: '#2c3e50', aggression: 0.4, name: 'Undead' }
-        };
-        this._lastEnemySpawnDay = 0;
-        this._enemyIdCounter = 0
+        // Subscribe to day-end
+        window.eventBus?.on('dayEnded', () => this.onDayEnded());
+        window.eventBus?.on('day-ended', () => this.onDayEnded());
 
-        // Add safe world manager call function
-        window.safeWorldManagerCall = (methodName, ...args) => {
-            try {
-                if (window.worldManager && typeof window.worldManager[methodName] === 'function') {
-                    return window.worldManager[methodName](...args);
-                } else {
-                    console.error(`[World] WorldManager method ${methodName} not available`);
-                    window.showToast?.(`⚠️ Feature temporarily unavailable: ${methodName}`, { type: 'warning' });
-                    return false;
-                }
-            } catch (error) {
-                console.error(`[World] Error calling ${methodName}:`, error);
-                window.showToast?.(`❌ Error: ${error.message}`, { type: 'error' });
-                return false;
-            }
-        };
+        console.log('[WorldManager] Constructed — grid', this.mapWidth, 'x', this.mapHeight);
     }
 
-    // Utility to brighten a hex color
-    _brightenColor(color, amount = 0.2) {
-        if (color[0] === '#') {
-            let num = parseInt(color.slice(1), 16);
-            let r = (num >> 16) & 0xff;
-            let g = (num >> 8) & 0xff;
-            let b = num & 0xff;
-            r = Math.min(255, Math.floor(r + (255 - r) * amount));
-            g = Math.min(255, Math.floor(g + (255 - g) * amount));
-            b = Math.min(255, Math.floor(b + (255 - b) * amount));
-            return `rgb(${r},${g},${b})`;
-        }
-        return color;
-    }
-
-    // Lightweight Oregon Trail-style daily events during travel
-    processArmyDailyEvents() {
-        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
-        const today = this.gameState?.currentDay ?? 0;
-        this.parties.expeditions.forEach(army => {
-            const traveling = !!(army.travelPlan && army.travelPlan.path && army.travelPlan.index < army.travelPlan.path.length - 1);
-            if (!traveling) return;
-            const last = this._eventCooldowns.get(army.id) || -10;
-            if (today - last < 3) return; // 3-day cooldown between events per army
-
-            const nextIdx = Math.min(army.travelPlan.index + 1, army.travelPlan.path.length - 1);
-            const next = army.travelPlan.path[nextIdx];
-            const terrain = this.hexMap?.[next.row]?.[next.col]?.terrain || 'grass';
-            const inZoc = this.isInEnemyZOC?.(next.row, next.col) || false;
-            let chance = 0.2 + (inZoc ? 0.1 : 0);
-            if (terrain === 'swamp' || terrain === 'mountain' || terrain === 'desert') chance += 0.1;
-            if (Math.random() > chance) return;
-
-            const roll = Math.random();
-            if (roll < 0.2) {
-                const people = Math.max(army.members?.length || 1, 1);
-                const gainPD = Math.max(1, Math.floor(people * 0.5));
-                army.supplies.food = (army.supplies.food || 0) + gainPD;
-                window.showToast?.(`🌿 ${army.name} foraged supplies (+${gainPD} PD).`, { type: 'success', timeout: 2500 });
-            } else if (roll < 0.45) {
-                army.morale = Math.max(0, (army.morale ?? 100) - 5);
-                window.showToast?.(`🤒 Sickness in ${army.name} (−5 morale).`, { type: 'warning', timeout: 2500 });
-            } else if (roll < 0.65) {
-                this._skipTravelToday.add(army.id);
-                window.showToast?.(`🌧️ Bad weather delays ${army.name} for a day.`, { type: 'info', timeout: 2500 });
-            } else if (roll < 0.8) {
-                const lose = Math.max(1, Math.floor((army.supplies.food || 0) * 0.1));
-                army.supplies.food = Math.max(0, (army.supplies.food || 0) - lose);
-                window.showToast?.(`🪓 Equipment issues cost ${army.name} ${lose} PD.`, { type: 'warning', timeout: 2500 });
-            } else if (roll < 0.95 && inZoc) {
-                army.morale = Math.max(0, (army.morale ?? 100) - 8);
-                this._skipTravelToday.add(army.id);
-                window.showToast?.(`⚠️ Ambush in hostile territory! ${army.name} loses morale and time.`, { type: 'error', timeout: 3000 });
-            } else {
-                const r = next.row, c = next.col;
-                const nRow = Math.max(0, Math.min(this.mapHeight - 1, r + (Math.random() < 0.5 ? 1 : -1)));
-                const nCol = Math.max(0, Math.min(this.mapWidth - 1, c + (Math.random() < 0.5 ? 1 : -1)));
-                this.revealHex?.(nRow, nCol);
-                window.showToast?.(`🔎 ${army.name} discovered something nearby.`, { type: 'info', timeout: 2500 });
-            }
-            this._eventCooldowns.set(army.id, today);
-        });
-    }
+    // ===================================================================
+    // INITIALIZATION (called on first view switch; idempotent)
+    // ===================================================================
 
     init() {
-        try {
-            // Prevent multiple simultaneous initializations
-            if (this.isInitializing) {
-                console.log('[World] Already initializing, skipping duplicate init call');
-                return;
-            }
-            this.isInitializing = true;
-
-            this.worldGrid = document.getElementById('world-view');
-            if (!this.worldGrid) {
-                console.error('[World] world-view element not found');
-                this.isInitializing = false;
-                return;
-            }
-
-            console.log('[World] Initializing world map...');
-            this.setupWorldUI();
-            this.applyVisualsToAllTerrain();
-            this.placeTutorialElements();
-            
-            // Prefer MapRenderer (persistent grid + entities) if available
-            if (window.MapRenderer) {
-                try {
-                    this.mapRenderer = new window.MapRenderer(this);
-                    const ok = this.mapRenderer.init();
-                    if (ok) {
-                        this.mapRenderer.updateEntities();
-                    } else {
-                        this.renderHexMap();
-                    }
-                } catch (e) {
-                    console.warn('[World] MapRenderer init failed, using legacy render', e);
-                    this.renderHexMap();
-                }
-            } else {
-                this.renderHexMap();
-            }
-            
-            // Initialize UnitManager for world map units
-            if (window.UnitManager) {
-                try {
-                    this.unitManager = new window.UnitManager(this, this.gameState);
-                    window.unitManager = this.unitManager;
-                    this.unitManager.init();
-                    console.log('[World] UnitManager initialized');
-                } catch (e) {
-                    console.warn('[World] UnitManager init failed:', e);
-                }
-            }
-            
-            this.setupHexInteraction();
-
-            console.log('[World] World map initialization complete');
-            this.isInitializing = false;
-
-            // Spawn initial enemies if none exist
-            if (this.enemyUnits.size === 0) {
-                this.spawnInitialEnemies();
-            }
-
-            // Rebuild legacy army list from core armies on load
-            this.rebuildLegacyArmiesFromCore();
-            // Subscribe to future army creation to keep legacy list in sync
-            if (window.eventBus && typeof window.eventBus.on === 'function') {
-                window.eventBus.on('army_created', ({ army }) => {
-                    this.addLegacyArmyFromCore(army);
-                    this.updateExpeditionsList();
-                    this.updateArmyDisplays();
-                });
-            }
-        } catch (err) {
-            console.error('[World] Error during world initialization:', err);
-            this.isInitializing = false;
+        if (this.initialized) {
+            // Just refresh the renderer when switching back to world view
+            this.refreshUI();
+            return;
         }
+
+        console.log('[WorldManager] First init — building map');
+
+        // Build hexMap (or restore from save)
+        if (!this.restoreFromSave()) {
+            this.generateMap();
+        }
+
+        // Build DOM
+        this.setupWorldUI();
+
+        // Create MapRenderer on the hex-overlay container
+        this.renderer = new (window.MapRenderer || MapRenderer)(this);
+        this.renderer.init();
+
+        this.initialized = true;
+        this.refreshUI();
+        console.log('[WorldManager] Init complete');
     }
 
-    initializeHexMap() {
-        // Create 7x7 grid with zone-based terrain generation
-        // Capital is at center (3,3) but displayed as (0,0)
-        const centerRow = this.playerVillageHex.row;
-        const centerCol = this.playerVillageHex.col;
-        
-        for (let row = 0; row < this.mapHeight; row++) {
-            this.hexMap[row] = [];
-            for (let col = 0; col < this.mapWidth; col++) {
-                const isPlayerVillage = row === centerRow && col === centerCol;
-                const isAdjacent = this.isAdjacent(row, col, centerRow, centerCol);
-                const distance = this.getDistanceFromCapital(row, col);
+    // ===================================================================
+    // TERRAIN GENERATION
+    // ===================================================================
 
-                // Generate terrain using zone-based algorithm
-                const terrain = this.generateTerrain(row, col);
-                const zone = this.getTerrainZone(distance);
+    generateMap() {
+        const terrainPool = this.buildTerrainPool();
 
-                // Unified visibility state: 'hidden' | 'scoutable' | 'explored'
-                let visibility = 'hidden';
-                if (isPlayerVillage) visibility = 'explored';
-                else if (isAdjacent) visibility = 'scoutable';
+        this.hexMap = [];
+        for (let r = 0; r < this.mapHeight; r++) {
+            this.hexMap[r] = [];
+            for (let c = 0; c < this.mapWidth; c++) {
+                const dist = Math.abs(r - this.capitalRow) + Math.abs(c - this.capitalCol);
+                const isCapital = (r === this.capitalRow && c === this.capitalCol);
 
-                this.hexMap[row][col] = {
-                    // Core position (grid coordinates)
-                    row,
-                    col,
-                    // Display coordinates (offset from capital)
-                    displayX: col - centerCol,
-                    displayY: row - centerRow,
-                    
-                    // Unified visibility state
-                    visibility: visibility,
-                    // Legacy compat - derive from visibility
-                    get discovered() { return this.visibility === 'explored'; },
-                    get fogOfWar() { return this.visibility === 'hidden'; },
-                    get scoutable() { return this.visibility === 'scoutable' || this.visibility === 'explored'; },
-                    
-                    // Terrain and zone
-                    terrain: terrain,
-                    zone: zone, // 'core' | 'inner' | 'middle' | 'outer' | 'frontier'
-                    biome: this.generateBiomeForTerrain(terrain),
-                    elevation: this.generateElevation(row, col),
-                    
-                    // Features
-                    isPlayerVillage: isPlayerVillage,
-                    buildings: isPlayerVillage ? ['village'] : [],
-                    resources: this.generateResources(row, col),
-                    landmarks: this.generateLandmarks(row, col),
-                    explorationValue: this.generateExplorationValue(row, col),
-                    
-                    // Dynamic state
-                    units: [],
-                    weather: 'clear'
+                this.hexMap[r][c] = {
+                    terrain: isCapital ? 'village' : this.pickTerrain(dist, terrainPool),
+                    visibility: isCapital ? 'explored' : 'hidden',
+                    isPlayerVillage: isCapital
                 };
             }
         }
 
-        // Initialize discovered tiles set
-        this.discoveredTiles.add(`${centerRow},${centerCol}`);
-        this.updateScoutableTiles();
+        // Reveal tiles adjacent to capital (exploration radius 1)
+        this.revealAround(this.capitalRow, this.capitalCol, 1);
 
-        // Initialize expeditions array (scouts separate from armies)
-        this.expeditions = [];
+        console.log('[WorldManager] Map generated');
     }
 
-    // Get Chebyshev distance from capital
-    getDistanceFromCapital(row, col) {
-        return Math.max(
-            Math.abs(row - this.playerVillageHex.row),
-            Math.abs(col - this.playerVillageHex.col)
-        );
-    }
-
-    // Get terrain zone based on distance from capital
-    getTerrainZone(distance) {
-        if (distance === 0) return 'core';      // Capital tile
-        if (distance === 1) return 'inner';     // Adjacent to capital
-        if (distance === 2) return 'middle';    // Second ring
-        if (distance === 3) return 'outer';     // Edge of known world
-        return 'frontier';                       // Beyond (for future expansion)
-    }
-
-    // Format coordinates for display (relative to capital)
-    formatCoords(row, col) {
-        const x = col - this.playerVillageHex.col;
-        const y = row - this.playerVillageHex.row;
-        // Format with direction indicators
-        const xDir = x > 0 ? 'E' : x < 0 ? 'W' : '';
-        const yDir = y > 0 ? 'S' : y < 0 ? 'N' : '';
-        if (x === 0 && y === 0) return '(Capital)';
-        return `(${Math.abs(x)}${xDir}, ${Math.abs(y)}${yDir})`;
-    }
-
-    // Helper method to check if two tiles are adjacent
-    isAdjacent(row1, col1, row2, col2) {
-        const rowDiff = Math.abs(row1 - row2);
-        const colDiff = Math.abs(col1 - col2);
-        return (rowDiff <= 1 && colDiff <= 1) && !(rowDiff === 0 && colDiff === 0);
-    }
-
-    // Zone-based terrain generation for coherent world building
-    generateTerrain(row, col) {
-        const centerRow = this.playerVillageHex.row;
-        const centerCol = this.playerVillageHex.col;
-        const distance = this.getDistanceFromCapital(row, col);
-
-        // Capital is always a village/grass tile
-        if (distance === 0) return 'grass';
-
-        // Create a seeded random for deterministic terrain
-        const seed = (row * 1000 + col * 7) ^ 0xDEADBEEF;
-        const seededRand = () => {
-            const x = Math.sin(seed + row * 17 + col * 31) * 10000;
-            return x - Math.floor(x);
-        };
-        const rand = seededRand();
-
-        // Zone-based terrain pools
-        // Core (distance 0): Capital - handled above
-        // Inner ring (distance 1): Fertile farmland - grass, plains, light forest
-        // Middle ring (distance 2): Mixed terrain - forests, hills, some water
-        // Outer ring (distance 3): Challenging terrain - mountains, swamps, deserts
-        
-        // Direction-based biome coherence (NW = cold, SE = warm, etc.)
-        const dirX = col - centerCol; // Positive = East
-        const dirY = row - centerRow; // Positive = South
-
-        if (distance === 1) {
-            // Inner ring: 70% fertile (grass/plains), 20% light forest, 10% hill
-            if (rand < 0.40) return 'grass';
-            if (rand < 0.70) return 'plains';
-            if (rand < 0.90) return 'forest';
-            return 'hill';
-        }
-
-        if (distance === 2) {
-            // Middle ring: Directional biomes + mixed terrain
-            if (dirY < 0) {
-                // North: Colder - more forest/hills
-                if (rand < 0.35) return 'forest';
-                if (rand < 0.60) return 'hill';
-                if (rand < 0.80) return 'plains';
-                return 'mountain';
-            } else if (dirY > 0) {
-                // South: Warmer - more plains/desert potential
-                if (rand < 0.30) return 'plains';
-                if (rand < 0.55) return 'grass';
-                if (rand < 0.75) return 'forest';
-                if (rand < 0.90) return 'desert';
-                return 'swamp';
-            } else {
-                // East/West: Temperate mix
-                if (rand < 0.25) return 'forest';
-                if (rand < 0.50) return 'plains';
-                if (rand < 0.70) return 'hill';
-                if (rand < 0.85) return 'grass';
-                return rand < 0.93 ? 'water' : 'swamp';
-            }
-        }
-
-        // Outer ring (distance 3+): Challenging frontier terrain
-        // More extreme based on direction
-        if (dirY < 0 && dirX <= 0) {
-            // Northwest: Mountains and tundra
-            if (rand < 0.45) return 'mountain';
-            if (rand < 0.70) return 'hill';
-            if (rand < 0.85) return 'forest';
-            return 'plains';
-        } else if (dirY < 0 && dirX > 0) {
-            // Northeast: Dense forests and hills
-            if (rand < 0.40) return 'forest';
-            if (rand < 0.65) return 'hill';
-            if (rand < 0.80) return 'mountain';
-            return 'swamp';
-        } else if (dirY >= 0 && dirX <= 0) {
-            // Southwest: Swamps and water
-            if (rand < 0.35) return 'swamp';
-            if (rand < 0.55) return 'water';
-            if (rand < 0.75) return 'plains';
-            return 'forest';
-        } else {
-            // Southeast: Deserts and arid lands
-            if (rand < 0.40) return 'desert';
-            if (rand < 0.65) return 'plains';
-            if (rand < 0.80) return 'hill';
-            return 'grass';
-        }
-    }
-
-    // Generate elevation for terrain
-    generateElevation(row, col) {
-        const centerRow = this.playerVillageHex.row;
-        const centerCol = this.playerVillageHex.col;
-        const distance = Math.abs(row - centerRow) + Math.abs(col - centerCol);
-        const seed = row * 13 + col * 7;
-        const random = Math.abs(Math.sin(seed)) * 100;
-
-        // Generally higher elevation further from center
-        return Math.floor(random + distance * 20);
-    }
-
-    // Generate biomes for richer world
-    generateBiomeForTerrain(terrain) {
-        const biomes = {
-            grass: ['temperate_grassland', 'meadow', 'prairie'],
-            forest: ['deciduous_forest', 'coniferous_forest', 'mixed_forest'],
-            hills: ['rolling_hills', 'rocky_hills', 'grassy_hills'],
-            mountains: ['snow_peaks', 'rocky_mountains', 'volcanic_peaks'],
-            swamp: ['marshland', 'bog', 'wetlands'],
-            desert: ['sand_dunes', 'rocky_desert', 'oasis'],
-            plains: ['open_plains', 'steppes', 'savanna'],
-            river: ['flowing_river', 'wide_river', 'stream']
-        };
-
-        const options = biomes[terrain] || ['unknown'];
-        const seed = terrain.length; // Simple seed based on terrain name length
-        const random = Math.abs(Math.sin(seed)) * 100;
-        return options[Math.floor(random % options.length)];
-    }
-
-    // Generate resources for exploration rewards
-    generateResources(row, col) {
-        const seed = row * 17 + col * 23;
-        const random = Math.abs(Math.sin(seed)) * 100;
-
-        // 30% chance of having explorable resources
-        if (random < 30) {
-            const resourceTypes = ['iron_deposit', 'gold_vein', 'rare_herbs', 'ancient_ruins', 'stone_quarry', 'fertile_soil'];
-            const resourceIndex = Math.floor(random % resourceTypes.length);
-            return {
-                type: resourceTypes[resourceIndex],
-                abundance: Math.floor(random % 5) + 1, // 1-5 abundance
-                discovered: false
-            };
-        }
-        return null;
-    }
-
-    // Generate exploration value (what scouts discover)
-    generateExplorationValue(row, col) {
-        const seed = row * 19 + col * 29;
-        const random = Math.abs(Math.sin(seed)) * 100;
-
+    buildTerrainPool() {
+        // Zone-weighted pools based on distance from capital
         return {
-            intel: Math.floor(random % 50) + 10, // 10-60 intel points
-            secrets: random < 20 ? Math.floor(random % 3) + 1 : 0, // 0-3 secrets
-            tradingPosts: random < 15 ? true : false,
-            dangerLevel: Math.floor(random % 5) + 1 // 1-5 danger
+            inner: ['grass', 'plains', 'grass', 'plains', 'forest', 'hill'],
+            outer: ['forest', 'hill', 'mountain', 'swamp', 'desert', 'ruins', 'forest', 'hill']
         };
     }
 
-    // Generate landmarks for interesting exploration
-    generateLandmarks(row, col) {
-        const seed = row * 31 + col * 37;
-        const random = Math.abs(Math.sin(seed)) * 100;
-
-        if (random < 25) { // 25% chance of landmark
-            const landmarks = [
-                'ancient_tower', 'abandoned_settlement', 'mysterious_cave',
-                'old_battlefield', 'sacred_grove', 'crystal_formation',
-                'forgotten_temple', 'trader_camp', 'bandit_hideout'
-            ];
-            const landmarkIndex = Math.floor(random % landmarks.length);
-            return landmarks[landmarkIndex];
+    pickTerrain(dist, pool) {
+        // dist 1 = inner, dist 2+ = mix, dist 3+ = mostly outer
+        let choices;
+        if (dist <= 1) {
+            choices = pool.inner;
+        } else if (dist <= 2) {
+            choices = [...pool.inner, ...pool.outer];
+        } else {
+            choices = pool.outer;
         }
-        return null;
+        return choices[Math.floor(Math.random() * choices.length)];
     }
 
-    // Update which tiles can be scouted based on explored territories
-    updateScoutableTiles() {
-        this.scoutableTiles.clear();
+    // ===================================================================
+    // FOG OF WAR — 3-STATE (hidden / scoutable / explored)
+    // ===================================================================
 
-        // Add all tiles adjacent to explored tiles
-        for (const tileKey of this.discoveredTiles) {
-            const [row, col] = tileKey.split(',').map(Number);
+    revealAround(row, col, radius) {
+        for (let dr = -radius; dr <= radius; dr++) {
+            for (let dc = -radius; dc <= radius; dc++) {
+                const r = row + dr;
+                const c = col + dc;
+                if (!this.inBounds(r, c)) continue;
 
-            // Check all adjacent tiles (8-directional)
-            for (let r = row - 1; r <= row + 1; r++) {
-                for (let c = col - 1; c <= col + 1; c++) {
-                    if (r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth) {
-                        const adjKey = `${r},${c}`;
-                        if (!this.discoveredTiles.has(adjKey)) {
-                            this.scoutableTiles.add(adjKey);
-                            // Update visibility using new model
-                            if (this.hexMap[r] && this.hexMap[r][c]) {
-                                if (this.hexMap[r][c].visibility === 'hidden') {
-                                    this.hexMap[r][c].visibility = 'scoutable';
-                                }
-                            }
-                        }
+                const hex = this.hexMap[r][c];
+                if (dr === 0 && dc === 0) {
+                    hex.visibility = 'explored';
+                } else if (Math.abs(dr) + Math.abs(dc) <= radius) {
+                    if (hex.visibility === 'hidden') {
+                        hex.visibility = 'scoutable';
                     }
                 }
             }
         }
+        // Also mark tiles adjacent to newly-scoutable tiles as scoutable
+        this.updateScoutableFringe();
     }
 
-    // Reveal new territories when scouts discover them
-    revealNewTerritories(count = 1) {
-        const availableForDiscovery = Array.from(this.scoutableTiles);
-        let revealed = 0;
-
-        while (revealed < count && availableForDiscovery.length > 0) {
-            // Pick a random scoutable tile
-            const randomIndex = Math.floor(Math.random() * availableForDiscovery.length);
-            const tileKey = availableForDiscovery[randomIndex];
-            const [row, col] = tileKey.split(',').map(Number);
-
-            // Reveal the tile using new visibility model
-            if (this.hexMap[row] && this.hexMap[row][col]) {
-                this.hexMap[row][col].visibility = 'explored';
-                this.discoveredTiles.add(tileKey);
-
-                // Remove from available list
-                availableForDiscovery.splice(randomIndex, 1);
-                revealed++;
-
-                console.log(`[World] Discovered ${this.formatCoords(row, col)}: ${this.hexMap[row][col].terrain}`);
-            }
-        }
-
-        // Update scoutable tiles after discoveries
-        this.updateScoutableTiles();
-
-        // Re-render the map to show new discoveries
-        if (this.worldGrid) {
-            this.renderHexMap();
-        }
-
-        return revealed;
-    }
-
-    setupWorldUI() {
-        // Create world map container structure
-        const dynastyName = (typeof this.gameState.getDynastyName === 'function')
-            ? this.gameState.getDynastyName()
-            : (this.game?.tutorialManager?.getDynastyName?.() || 'Noble');
-        this.worldGrid.innerHTML = `
-            <div class="world-container" style="height: 100%; display: flex; flex-direction: column; overflow: hidden; margin: 0; padding: 0; background: var(--primary-dark, #1a1a1a);">
-                <style>
-                    /* Local styles just for World UI layout enhancements */
-                    .hex-info-panel { transition: width 0.2s ease, max-width 0.2s ease; }
-                    .hex-info-panel.expanded { min-width: 420px !important; max-width: 420px !important; width: 420px !important; flex: 0 0 420px !important; }
-                    .world-sidebar { min-width: 360px !important; max-width: 360px !important; width: 360px !important; flex: 0 0 360px !important; }
-                    .panel-header-btn { background: transparent; color: #ecf0f1; border: 1px solid #7f8c8d; border-radius: 6px; padding: 4px 8px; cursor: pointer; }
-                    .panel-header-btn:hover { background: #34495e; }
-                </style>
-        <div class="world-header" style="flex-shrink: 0;">
-                    <h2>🌍 World Map</h2>
-                    <div class="world-info">
-                        <span>Dynasty: <span id="world-dynasty">House ${dynastyName}</span></span>
-                        <span>Day: <span id="world-day">${this.gameState.currentDay}</span></span>
-                        <span>Season: <span id="world-season">${this.gameState.season}</span></span>
-            <button id="toggle-zoc" class="panel-header-btn" title="Toggle ZOC overlay" style="margin-left:8px;">🛡️ ZOC</button>
-                    </div>
-                </div>
-                <div class="world-main" style="display: flex; flex-direction: row; gap: 1rem; flex: 1; min-height: 0; padding: 1rem; margin: 0;">
-                    <div class="hex-info-panel" id="hex-info-panel" style="min-width:320px;max-width:320px;width:320px;flex:0 0 320px;background:#2c3e50;border-radius:12px;padding:1rem;border:1px solid #34495e;align-self:stretch;height:100%;display:flex;flex-direction:column;">
-                        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                            <h4 style="margin:0;">�️ Territory Info</h4>
-                            <button id="hex-panel-toggle" class="panel-header-btn" title="Expand/Collapse">⤢</button>
-                        </div>
-                        <div id="hex-info-content" style="flex:1; overflow:auto; margin-top:8px;">
-                            <div style="text-align:center; padding:20px 10px; color:#95a5a6;">
-                                <div style="font-size:32px; margin-bottom:10px;">🏰</div>
-                                <p style="margin:0 0 10px 0;">Your capital is at the center of the map.</p>
-                                <p style="margin:0; font-size:0.9em;">Click any tile to view details.<br/>Coordinates show distance from capital.</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="world-map-container" style="flex:1;min-width:0;background:#22303a;border-radius:16px;border:2px solid #2de0c6;box-shadow:0 2px 16px #0002;position:relative;display:flex;align-items:center;justify-content:center;">
-                        <div class="hex-overlay" id="hex-overlay" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;border-radius:12px;pointer-events:auto;"></div>
-                    </div>
-                    <div class="world-sidebar" style="min-width:360px;max-width:360px;width:360px;flex:0 0 360px;">
-                        <div class="parties-management">
-                            <h3>📋 Parties Management</h3>
-                            <div class="party-tabs">
-                                <button class="party-tab active" data-tab="expeditions">⚔️ Expeditions</button>
-                                <button class="party-tab" data-tab="quests">📜 Quests (Locked)</button>
-                                <button class="party-tab" data-tab="battles">⚔️ Battles</button>
-                            </div>
-                            <div class="party-content">
-                                <div id="expeditions-tab" class="party-panel active">
-                                    <div class="expedition-list" id="expedition-list">
-                                        <p style="color: #bdc3c7; font-style: italic;">No expeditions active. Draft an army to begin exploring.</p>
-                                    </div>
-                                </div>
-                                <div id="quests-tab" class="party-panel">
-                                    <p style="color: #7f8c8d; font-style: italic;">Quest system will be unlocked as your dynasty grows in power and influence.</p>
-                                </div>
-                                <div id="battles-tab" class="party-panel">
-                                    <p style="color: #bdc3c7; font-style: italic;">No active battles. Engage hostile forces to begin combat.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Setup party tab switching
-        this.setupPartyTabs();
-
-        // Wire up expand/collapse toggle for the left info panel
-        const hexPanel = document.getElementById('hex-info-panel');
-        const toggleBtn = document.getElementById('hex-panel-toggle');
-        const zocBtn = document.getElementById('toggle-zoc');
-        if (hexPanel && toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                hexPanel.classList.toggle('expanded');
-                toggleBtn.textContent = hexPanel.classList.contains('expanded') ? '⤡' : '⤢';
-            });
-        }
-        if (zocBtn) {
-            zocBtn.addEventListener('click', () => {
-                this.showZOCOverlay = !this.showZOCOverlay;
-                // Re-render to apply overlay shading
-                this.renderHexMap();
-            });
-        }
-
-        // Keep Expeditions list in sync with population movements
-        if (window.eventBus && typeof window.eventBus.on === 'function') {
-            window.eventBus.on('population-changed', () => this.updateExpeditionsList());
-            window.eventBus.on('population_gained', () => this.updateExpeditionsList());
-            window.eventBus.on('population_returned', () => this.updateExpeditionsList());
-            window.eventBus.on('population_drafted', () => this.updateExpeditionsList());
-            // Advance expeditions and process army upkeep at end of day
-            window.eventBus.on('day-ended', () => {
-                try {
-                    this.processArmyDailyUpkeep();
-                } catch (e) {
-                    console.warn('[World] Army upkeep processing error:', e);
+    updateScoutableFringe() {
+        // Any hidden tile adjacent to an explored tile becomes scoutable
+        for (let r = 0; r < this.mapHeight; r++) {
+            for (let c = 0; c < this.mapWidth; c++) {
+                if (this.hexMap[r][c].visibility !== 'hidden') continue;
+                const neighbors = this.getNeighbors(r, c);
+                if (neighbors.some(n => this.hexMap[n.row][n.col].visibility === 'explored')) {
+                    this.hexMap[r][c].visibility = 'scoutable';
                 }
-                try {
-                    this.processArmyDailyEvents();
-                } catch (e) {
-                    console.warn('[World] Army events processing error:', e);
-                }
-                try {
-                    this.processArmyDailyTravel();
-                } catch (e) {
-                    console.warn('[World] Army travel processing error:', e);
-                }
-                try {
-                    this.updateExpeditions(); // progress scout expeditions
-                } catch (e) {
-                    console.warn('[World] Expedition daily update error:', e);
-                }
-                // Process UnitManager daily updates
-                try {
-                    if (this.unitManager) {
-                        this.unitManager.processDaily();
-                    }
-                } catch (e) {
-                    console.warn('[World] UnitManager daily update error:', e);
-                }
-                // Refresh UI panels
-                this.updateExpeditionsList();
-                this.updateArmyDisplays();
-                // Refresh map entities to show unit updates
-                if (this.mapRenderer) {
-                    this.mapRenderer.updateEntities();
-                }
-            });
-        }
-
-        // Populate Expeditions list immediately so existing armies appear
-        this.updateExpeditionsList();
-    }
-
-    setupPartyTabs() {
-        const tabs = document.querySelectorAll('.party-tab');
-        const panels = document.querySelectorAll('.party-panel');
-
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // Remove active from all tabs and panels
-                tabs.forEach(t => t.classList.remove('active'));
-                panels.forEach(p => p.classList.remove('active'));
-
-                // Add active to clicked tab and corresponding panel
-                tab.classList.add('active');
-                const targetPanel = document.getElementById(`${tab.dataset.tab}-tab`);
-                if (targetPanel) {
-                    targetPanel.classList.add('active');
-                }
-
-                // Update content based on active tab
-                if (tab.dataset.tab === 'battles') {
-                    this.updateBattlesTab();
-                } else if (tab.dataset.tab === 'quests') {
-                    window.showToast('🔒 Quest system not yet implemented', {
-                        icon: '📜',
-                        type: 'info',
-                        timeout: 2000
-                    });
-                }
-            });
-        });
-
-        // Initialize battles tab on first load
-        this.updateBattlesTab();
-    }
-
-    updateBattlesTab() {
-        const battlesTab = document.getElementById('battles-tab');
-        if (!battlesTab) return;
-
-        // Get active battles from battle manager
-        const battleManager = this.gameState.battleManager;
-        if (!battleManager) {
-            battlesTab.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">Battle system not initialized.</p>';
-            return;
-        }
-
-        const activeBattles = battleManager.getActiveBattles();
-
-        if (activeBattles.length === 0) {
-            battlesTab.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No active battles. Encounters will appear when your expeditions meet enemy forces.</p>';
-            return;
-        }
-
-        let battleHTML = '<div class="battles-list">';
-
-        activeBattles.forEach((battle, index) => {
-            const summary = battleManager.getBattleSummary(battle);
-            const difficultyClass = summary.difficulty <= 2 ? 'easy' : summary.difficulty <= 3 ? 'medium' : 'hard';
-
-            battleHTML += `
-                <div class="battle-card ${difficultyClass}" data-battle-id="${battle.id}">
-                    <div class="battle-header">
-                        <h4>⚔️ ${summary.location}</h4>
-                        <span class="battle-type">${summary.type.toUpperCase()}</span>
-                    </div>
-                    <div class="battle-info">
-                        <div class="enemy-info">
-                            <span class="enemy-name">👹 ${summary.enemy}</span>
-                            <span class="difficulty-badge difficulty-${difficultyClass}">
-                                ${'★'.repeat(summary.difficulty)}
-                            </span>
-                        </div>
-                        <div class="environment">
-                            <span class="weather">${battleManager.getWeatherIcon(summary.weather)} ${summary.weather}</span>
-                            <span class="terrain">${battleManager.getTerrainIcon(summary.terrain)} ${summary.terrain}</span>
-                        </div>
-                    </div>
-                    <div class="battle-actions">
-                        <button class="btn primary battle-btn" onclick="worldManager.startBattle('${battle.id}')">
-                            Enter Battle
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-
-        battleHTML += '</div>';
-
-        // Add styles for battle cards
-        battleHTML += `
-            <style>
-                .battles-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 10px;
-                }
-                
-                .battle-card {
-                    background: #f8f9fa;
-                    border-radius: 8px;
-                    padding: 12px;
-                    border: 2px solid #e9ecef;
-                    transition: border-color 0.2s;
-                }
-                
-                .battle-card.easy {
-                    border-left: 4px solid #27ae60;
-                }
-                
-                .battle-card.medium {
-                    border-left: 4px solid #f39c12;
-                }
-                
-                .battle-card.hard {
-                    border-left: 4px solid #e74c3c;
-                }
-                
-                .battle-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 8px;
-                }
-                
-                .battle-header h4 {
-                    margin: 0;
-                    font-size: 14px;
-                    color: #2c3e50;
-                }
-                
-                .battle-time {
-                    font-size: 12px;
-                    color: #7f8c8d;
-                    background: #ecf0f1;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                }
-                
-                .battle-info {
-                    margin-bottom: 10px;
-                }
-                
-                .enemy-info {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 5px;
-                }
-                
-                .enemy-name {
-                    font-weight: bold;
-                    color: #e74c3c;
-                }
-                
-                .difficulty-badge {
-                    font-size: 12px;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    color: white;
-                }
-                
-                .difficulty-easy {
-                    background: #27ae60;
-                }
-                
-                .difficulty-medium {
-                    background: #f39c12;
-                }
-                
-                .difficulty-hard {
-                    background: #e74c3c;
-                }
-                
-                .environment {
-                    display: flex;
-                    gap: 10px;
-                    font-size: 12px;
-                    color: #7f8c8d;
-                }
-                
-                .battle-actions {
-                    display: flex;
-                    justify-content: center;
-                }
-                
-                .battle-btn {
-                    padding: 6px 12px;
-                    font-size: 12px;
-                    border-radius: 5px;
-                    background: #3498db;
-                    color: white;
-                    border: none;
-                    cursor: pointer;
-                    transition: background 0.2s;
-                }
-                
-                .battle-btn:hover {
-                    background: #2980b9;
-                }
-            </style>
-        `;
-
-        battlesTab.innerHTML = battleHTML;
-    }
-
-    startBattle(battleId) {
-        const battleManager = this.gameState.battleManager;
-        if (!battleManager) return;
-
-        const battle = battleManager.getActiveBattles().find(b => b.id === battleId);
-        if (battle) {
-            battleManager.triggerBattle(battle);
-        }
-    }
-
-    // Method to create army encounters when expeditions meet enemies
-    createArmyEncounter(encounterData) {
-        const battleManager = this.gameState.battleManager;
-        if (!battleManager) return null;
-
-        // Create encounter-based battle
-        const battle = battleManager.triggerArmyEncounter({
-            playerArmy: encounterData.playerArmy || this.generateBasicPlayerArmy(),
-            enemyArmy: encounterData.enemyArmy,
-            location: encounterData.location,
-            terrain: encounterData.terrain,
-            weather: encounterData.weather
-        });
-
-        // Update battles tab to show new encounter
-        this.updateBattlesTab();
-
-        return battle;
-    }
-
-    // Helper method to generate a basic player army for encounters
-    generateBasicPlayerArmy() {
-        const army = [];
-
-        // Use populationManager if available, filter to adults only (16+)
-        let availableVillagers = [];
-        if (this.gameState.populationManager) {
-            const allVillagers = this.gameState.populationManager.getAll();
-            availableVillagers = allVillagers.filter(v => 
-                v.age >= 16 && // Adults only - no children!
-                v.age <= 65 && // Not too old
-                v.status !== 'drafted' &&
-                v.status !== 'sick' &&
-                v.canWork !== false
-            ).slice(0, 5);
-        }
-
-        availableVillagers.forEach(villager => {
-            const unitType = this.getUnitTypeFromProfession(villager.role || villager.profession);
-            const existingUnit = army.find(u => u.type === unitType);
-
-            if (existingUnit) {
-                existingUnit.count++;
-            } else {
-                army.push({
-                    type: unitType,
-                    count: 1
-                });
-            }
-        });
-
-        // Ensure at least some basic units
-        if (army.length === 0) {
-            army.push({ type: 'militia', count: 2 });
-        }
-
-        return army;
-    }
-
-    getUnitTypeFromProfession(profession) {
-        const professionToUnit = {
-            'Guard': 'veteran_soldier',
-            'Blacksmith': 'heavy_infantry',
-            'Woodcutter': 'archer',
-            'Builder': 'engineer',
-            'Merchant': 'scout',
-            'Miner': 'sapper'
-        };
-
-        return professionToUnit[profession] || 'militia';
-    }
-
-    // Method called when expeditions are launched to check for encounters
-    checkForExpeditionEncounters(expeditionData) {
-        // 30% chance of encounter during expedition
-        if (Math.random() < 0.3) {
-            const encounterData = this.generateRandomEncounter(expeditionData);
-            return this.createArmyEncounter(encounterData);
-        }
-        return null;
-    }
-
-    // Generate a random enemy encounter based on expedition location
-    generateRandomEncounter(expeditionData) {
-        const enemyTypes = [
-            {
-                name: 'Bandit Patrol',
-                size: 'small',
-                basePower: 80,
-                unitType: 'bandit',
-                description: 'A small group of highway bandits'
-            },
-            {
-                name: 'Goblin Raiding Party',
-                size: 'medium',
-                basePower: 120,
-                unitType: 'goblin',
-                description: 'Aggressive goblin raiders'
-            },
-            {
-                name: 'Orc Warband',
-                size: 'medium',
-                basePower: 150,
-                unitType: 'orc',
-                description: 'Fierce orc warriors'
-            },
-            {
-                name: 'Wild Beast Pack',
-                size: 'small',
-                basePower: 90,
-                unitType: 'beast',
-                description: 'Dangerous wild animals'
-            },
-            {
-                name: 'Undead Patrol',
-                size: 'large',
-                basePower: 180,
-                unitType: 'undead',
-                description: 'Shambling undead creatures'
-            }
-        ];
-
-        const selectedEnemy = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-
-        return {
-            playerArmy: expeditionData.army || this.generateBasicPlayerArmy(),
-            enemyArmy: selectedEnemy,
-            location: expeditionData.location || 'Unknown Territory',
-            terrain: expeditionData.terrain || this.getRandomTerrain(),
-            weather: expeditionData.weather || this.getRandomWeather()
-        };
-    }
-
-    getRandomTerrain() {
-        const terrains = ['plains', 'forest', 'hills', 'swamp', 'desert', 'mountains'];
-        return terrains[Math.floor(Math.random() * terrains.length)];
-    }
-
-    getRandomWeather() {
-        const weathers = ['clear', 'rain', 'fog', 'storm', 'snow', 'wind'];
-        return weathers[Math.floor(Math.random() * weathers.length)];
-    }
-
-    applyVisualsToAllTerrain() {
-        // Apply visual styling to all terrain tiles
-        for (let row = 0; row < this.mapHeight; row++) {
-            for (let col = 0; col < this.mapWidth; col++) {
-                const hex = this.hexMap[row][col];
-
-                // Set terrain symbols and colors based on terrain type
-                this.applyTerrainVisuals(hex);
-
-                // Add weather effects
-                const weatherTypes = ['clear', 'cloudy', 'misty'];
-                hex.weather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
             }
         }
     }
 
-    applyTerrainVisuals(hex) {
-        // Use global terrain config for consistency
-        const terrainData = window.getTerrain?.(hex.terrain) || { symbol: '🌱', color: '#48bb78' };
-        
-        // Fallback visuals with brighter colors for zone-based terrain
-        const fallbackVisuals = {
-            grass: { symbol: '🌱', color: '#48bb78', bgColor: '#68d391' },
-            plains: { symbol: '🌾', color: '#68d391', bgColor: '#9ae6b4' },
-            forest: { symbol: '🌲', color: '#276749', bgColor: '#48bb78' },
-            hill: { symbol: '⛰️', color: '#a0855b', bgColor: '#c9a87c' },
-            mountain: { symbol: '🏔️', color: '#718096', bgColor: '#a0aec0' },
-            swamp: { symbol: '🪵', color: '#4a5568', bgColor: '#718096' },
-            desert: { symbol: '🏜️', color: '#d69e2e', bgColor: '#ecc94b' },
-            water: { symbol: '💧', color: '#4299e1', bgColor: '#63b3ed' },
-            village: { symbol: '🏰', color: '#ecc94b', bgColor: '#f6e05e' }
-        };
-        
-        const visual = fallbackVisuals[hex.terrain] || fallbackVisuals.grass;
-        hex.symbol = terrainData.symbol || visual.symbol;
-        hex.color = terrainData.color || visual.color;
-        hex.bgColor = visual.bgColor;
-    }
-
-    placeTutorialElements() {
-        // Place player village at center of 7x7 grid
-        const centerRow = this.playerVillageHex.row;
-        const centerCol = this.playerVillageHex.col;
-
-        const villageHex = this.hexMap[centerRow][centerCol];
-        villageHex.terrain = 'village';
-        villageHex.buildings = ['Town Center', 'Houses', 'Farms'];
-        villageHex.visibility = 'explored';
-        villageHex.isPlayerVillage = true;
-
-        // Apply village visuals
-        this.applyTerrainVisuals(villageHex);
-
-        console.log(`[World] Tutorial elements placed - Capital at ${this.formatCoords(centerRow, centerCol)}`);
-    }
-
-    renderHexMap() {
-        // Prevent multiple simultaneous render attempts
-        if (this.isRendering) {
-            console.log('[World] Already rendering, skipping duplicate call');
-            return;
-        }
-        this.isRendering = true;
-
-        const container = document.getElementById('hex-overlay');
-        if (!container) {
-            console.error('[World] hex-overlay container not found');
-            this.isRendering = false;
-            return;
-        }
-
-        // Clear existing hexes
-        container.innerHTML = '';
-
-        // Ensure container fills its parent properly
-        const mapContainer = container.parentElement;
-        if (mapContainer) {
-            // Remove any fixed dimensions - let flexbox handle it
-            container.style.width = '100%';
-            container.style.height = '100%';
-        }
-
-        console.log('[World] Starting hex map render...', {
-            containerFound: !!container,
-            mapWidth: this.mapWidth,
-            mapHeight: this.mapHeight
-        });
-
-        // Wait for multiple frames to ensure container is sized and visible
-        setTimeout(() => {
-            this.createSquareGrid(container);
-            this.isRendering = false; // Reset rendering flag
-        }, 200);
-
-        // Add resize handler for viewport changes
-        if (!this.resizeHandler) {
-            this.resizeHandler = () => {
-                // Debounce resize events
-                clearTimeout(this.resizeTimeout);
-                this.resizeTimeout = setTimeout(() => {
-                    this.renderHexMap();
-                }, 250);
-            };
-            window.addEventListener('resize', this.resizeHandler);
-        }
-    }
-
-    // Method to refresh army positions without full re-render
-    refreshArmyPositions() {
-        const container = document.getElementById('hex-overlay');
-        if (!container) return;
-
-        if (this.mapRenderer) {
-            this.mapRenderer.updateEntities();
-        } else {
-            // Re-render the entire map to update army positions
-            this.renderHexMap();
-        }
-    }
-
-    // Method to update army displays and info panels
-    updateArmyDisplays() {
-        // Refresh entities to show updated army positions
-        this.refreshArmyPositions();
-
-        // Update the info panel if a hex is currently selected
-        if (this.selectedHex) {
-            const hex = this.hexMap[this.selectedHex.row][this.selectedHex.col];
-            this.updateHexInfoPanel(hex, this.selectedHex.row, this.selectedHex.col);
-        }
-    }
-
-    // Compute Zone of Control (orthogonal tiles) for all enemy units
-    recomputeEnemyZOC() {
-        const z = new Set();
-        const add = (r, c) => { if (r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth) z.add(`${r},${c}`); };
-        for (const { row, col } of this.enemyUnits.values()) {
-            add(row, col);
-            add(row + 1, col);
-            add(row - 1, col);
-            add(row, col + 1);
-            add(row, col - 1);
-        }
-        this._enemyZOC = z;
-    }
-
-    // Simple API to set enemies on the map (future expansion)
-    setEnemyUnits(list) { // list: [{id,row,col}]
-        this.enemyUnits = new Map(list.map(e => [e.id, { row: e.row, col: e.col }]));
-        this.recomputeEnemyZOC();
-        this.updateArmyDisplays();
-    }
-
-    // Check if a tile is within enemy ZOC
-    isInEnemyZOC(row, col) {
-        return this._enemyZOC.has(`${row},${col}`);
-    }
-
-    /**
-     * Initialize enemies on the world map.
-     * Called during world init to populate starting enemies.
-     */
-    spawnInitialEnemies() {
-        console.log('[World] Spawning initial enemies...');
-        
-        // Spawn 2-4 enemy groups on the map edges
-        const numEnemies = 2 + Math.floor(Math.random() * 3);
-        const factionKeys = Object.keys(this.enemyFactions);
-        
-        for (let i = 0; i < numEnemies; i++) {
-            // Pick random edge tile (not adjacent to player village)
-            let row, col, attempts = 0;
-            do {
-                // Prefer edges of the map
-                if (Math.random() < 0.5) {
-                    row = Math.random() < 0.5 ? 0 : this.mapHeight - 1;
-                    col = Math.floor(Math.random() * this.mapWidth);
-                } else {
-                    row = Math.floor(Math.random() * this.mapHeight);
-                    col = Math.random() < 0.5 ? 0 : this.mapWidth - 1;
-                }
-                attempts++;
-            } while (
-                attempts < 20 &&
-                (this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col) ||
-                 (row === this.playerVillageHex.row && col === this.playerVillageHex.col) ||
-                 this.enemyUnits.has(`enemy_${row}_${col}`))
-            );
-            
-            if (attempts >= 20) continue;
-            
-            const faction = factionKeys[Math.floor(Math.random() * factionKeys.length)];
-            this.spawnEnemy(row, col, faction);
-        }
-        
-        this.recomputeEnemyZOC();
-        console.log(`[World] Spawned ${this.enemyUnits.size} enemy groups`);
-    }
-
-    /**
-     * Spawn a single enemy unit at the given location.
-     */
-    spawnEnemy(row, col, faction = 'bandits', strength = null) {
-        const factionData = this.enemyFactions[faction] || this.enemyFactions.bandits;
-        const enemyId = `enemy_${this._enemyIdCounter++}`;
-        
-        // Strength scales with distance from village
-        const distFromVillage = Math.abs(row - this.playerVillageHex.row) + Math.abs(col - this.playerVillageHex.col);
-        const baseStrength = strength || (20 + distFromVillage * 10 + Math.floor(Math.random() * 20));
-        
-        const enemy = {
-            id: enemyId,
-            row,
-            col,
-            faction,
-            name: `${factionData.name} ${this.getEnemyGroupName()}`,
-            strength: baseStrength,
-            maxStrength: baseStrength,
-            aggression: factionData.aggression,
-            icon: factionData.icon,
-            color: factionData.color,
-            lastMoveDay: this.gameState?.day || 0,
-            patrolOrigin: { row, col },
-            patrolRadius: 2
-        };
-        
-        this.enemyUnits.set(enemyId, enemy);
-        console.log(`[World] Spawned ${enemy.name} at (${row}, ${col}) with strength ${baseStrength}`);
-        return enemy;
-    }
-
-    /**
-     * Get a random group name for enemies.
-     */
-    getEnemyGroupName() {
-        const names = ['Warband', 'Raiders', 'Patrol', 'Scouts', 'Marauders', 'Pillagers', 'Horde', 'Pack'];
-        return names[Math.floor(Math.random() * names.length)];
-    }
-
-    /**
-     * Process enemy movement and actions each day.
-     * Called from gameState.endDay() or world update cycle.
-     */
-    processEnemyTurn() {
-        if (!this.enemyUnits || this.enemyUnits.size === 0) return;
-        
-        const currentDay = this.gameState?.day || 0;
-        const enemiesArray = Array.from(this.enemyUnits.values());
-        
-        enemiesArray.forEach(enemy => {
-            // Enemies move every 2-3 days based on aggression
-            const moveInterval = Math.max(1, Math.floor(3 - enemy.aggression * 2));
-            if (currentDay - enemy.lastMoveDay < moveInterval) return;
-            
-            // Decide movement behavior
-            const behavior = Math.random();
-            
-            if (behavior < enemy.aggression * 0.5) {
-                // Aggressive: move toward player village
-                this.moveEnemyToward(enemy, this.playerVillageHex);
-            } else if (behavior < 0.7) {
-                // Patrol: move within patrol radius of origin
-                this.moveEnemyPatrol(enemy);
-            } else {
-                // Stay put
-            }
-            
-            enemy.lastMoveDay = currentDay;
-        });
-        
-        // Check for encounters with player armies
-        this.checkEnemyEncounters();
-        
-        // Recompute ZOC after movement
-        this.recomputeEnemyZOC();
-        
-        // Maybe spawn new enemies periodically
-        this.maybeSpawnNewEnemy();
-        
-        // Update visuals
-        this.updateArmyDisplays();
-    }
-
-    /**
-     * Move enemy toward a target location.
-     */
-    moveEnemyToward(enemy, target) {
-        const dx = target.col - enemy.col;
-        const dy = target.row - enemy.row;
-        
-        // Move one step toward target
-        let newRow = enemy.row;
-        let newCol = enemy.col;
-        
-        if (Math.abs(dy) > Math.abs(dx)) {
-            newRow += Math.sign(dy);
-        } else if (Math.abs(dx) > 0) {
-            newCol += Math.sign(dx);
-        }
-        
-        // Check bounds and don't enter player village
-        if (this.canEnemyMoveTo(newRow, newCol)) {
-            enemy.row = newRow;
-            enemy.col = newCol;
-        }
-    }
-
-    /**
-     * Move enemy in patrol pattern around origin.
-     */
-    moveEnemyPatrol(enemy) {
-        const directions = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]];
-        const validMoves = directions.filter(([dr, dc]) => {
-            const newRow = enemy.row + dr;
-            const newCol = enemy.col + dc;
-            const distFromOrigin = Math.abs(newRow - enemy.patrolOrigin.row) + Math.abs(newCol - enemy.patrolOrigin.col);
-            return distFromOrigin <= enemy.patrolRadius && this.canEnemyMoveTo(newRow, newCol);
-        });
-        
-        if (validMoves.length > 0) {
-            const [dr, dc] = validMoves[Math.floor(Math.random() * validMoves.length)];
-            enemy.row += dr;
-            enemy.col += dc;
-        }
-    }
-
-    /**
-     * Check if an enemy can move to a tile.
-     */
-    canEnemyMoveTo(row, col) {
-        // Check bounds
-        if (row < 0 || row >= this.mapHeight || col < 0 || col >= this.mapWidth) return false;
-        
-        // Don't enter player village
-        if (row === this.playerVillageHex.row && col === this.playerVillageHex.col) return false;
-        
-        // Check terrain (no water)
+    exploreTile(row, col) {
         const hex = this.hexMap[row]?.[col];
-        if (hex?.terrain === 'water') return false;
-        
-        // Don't stack with other enemies
-        for (const e of this.enemyUnits.values()) {
-            if (e.row === row && e.col === col) return false;
-        }
-        
-        return true;
+        if (!hex || hex.visibility === 'explored') return;
+        hex.visibility = 'explored';
+        // Reveal neighbors as scoutable
+        this.revealAround(row, col, 1);
+        window.eventBus?.emit('tile_explored', { row, col, terrain: hex.terrain });
     }
 
-    /**
-     * Check for encounters between player armies and enemies.
-     */
-    checkEnemyEncounters() {
-        if (!this.parties?.expeditions) return;
-        
-        this.parties.expeditions.forEach(army => {
-            // Get army position
-            const core = army.armyId ? this.gameState.getArmy?.(army.armyId) : null;
-            const armyPos = core?.position 
-                ? { row: core.position.y, col: core.position.x }
-                : army.location || null;
-            
-            if (!armyPos) return;
-            
-            // Check if any enemy is on the same tile
-            for (const enemy of this.enemyUnits.values()) {
-                if (enemy.row === armyPos.row && enemy.col === armyPos.col) {
-                    // Trigger encounter!
-                    this.triggerEnemyEncounter(army, enemy);
-                    break;
-                }
-            }
-        });
-    }
-
-    /**
-     * Trigger a combat encounter between player army and enemy.
-     */
-    triggerEnemyEncounter(playerArmy, enemy) {
-        console.log(`[World] Encounter! ${playerArmy.name} meets ${enemy.name} at (${enemy.row}, ${enemy.col})`);
-        
-        // Calculate player army strength
-        const playerStrength = this.calculateArmyStrength(playerArmy);
-        
-        // Show encounter notification
-        window.showToast?.(`⚔️ ${playerArmy.name} encounters ${enemy.name}!`, {
-            type: 'warning',
-            timeout: 4000
-        });
-        
-        // For now, auto-resolve based on strength comparison
-        // Later this can open the battle system
-        const playerRoll = playerStrength * (0.8 + Math.random() * 0.4);
-        const enemyRoll = enemy.strength * (0.8 + Math.random() * 0.4);
-        
-        if (playerRoll > enemyRoll) {
-            // Player wins
-            const damageToEnemy = Math.floor(enemy.strength * 0.6);
-            enemy.strength -= damageToEnemy;
-            
-            // Damage to player army (morale loss)
-            const moraleLoss = Math.floor(10 * (enemyRoll / playerRoll));
-            playerArmy.morale = Math.max(0, (playerArmy.morale || 100) - moraleLoss);
-            
-            if (enemy.strength <= 0) {
-                // Enemy destroyed
-                this.destroyEnemy(enemy, playerArmy);
-            } else {
-                // Enemy retreats
-                this.retreatEnemy(enemy);
-                window.showToast?.(`✅ ${playerArmy.name} drives back ${enemy.name}!`, {
-                    type: 'success',
-                    timeout: 3000
-                });
-            }
-        } else {
-            // Enemy wins - player army takes morale damage and is pushed back
-            const moraleLoss = Math.floor(20 * (enemyRoll / playerRoll));
-            playerArmy.morale = Math.max(0, (playerArmy.morale || 100) - moraleLoss);
-            
-            // Push player army back toward village
-            this.pushArmyBack(playerArmy);
-            
-            window.showToast?.(`❌ ${playerArmy.name} is repelled by ${enemy.name}! (-${moraleLoss} morale)`, {
-                type: 'error',
-                timeout: 4000
-            });
-        }
-        
-        this.recomputeEnemyZOC();
-        this.updateArmyDisplays();
-        this.updateExpeditionsList();
-    }
-
-    /**
-     * Calculate army strength for combat.
-     */
-    calculateArmyStrength(army) {
-        let strength = 0;
-        
-        // Base strength from members
-        if (army.members) {
-            army.members.forEach(member => {
-                const roleBonus = {
-                    'Commander': 25,
-                    'Soldier': 15,
-                    'Guard': 20,
-                    'Villager': 8
-                };
-                strength += roleBonus[member.role] || 10;
-            });
-        }
-        
-        // Morale modifier
-        const moraleMod = (army.morale || 100) / 100;
-        strength *= moraleMod;
-        
-        // Supplies modifier (starving armies fight poorly)
-        const people = Math.max(army.members?.length || 1, 1);
-        const foodDays = Math.floor((army.supplies?.food || 0) / people);
-        if (foodDays <= 0) strength *= 0.5;
-        else if (foodDays <= 2) strength *= 0.8;
-        
-        return Math.floor(strength);
-    }
-
-    /**
-     * Destroy an enemy unit and grant rewards.
-     */
-    destroyEnemy(enemy, playerArmy) {
-        console.log(`[World] Enemy ${enemy.name} destroyed!`);
-        
-        // Remove from map
-        this.enemyUnits.delete(enemy.id);
-        
-        // Grant rewards
-        const goldReward = Math.floor(enemy.maxStrength * 0.5);
-        const foodReward = Math.floor(enemy.maxStrength * 0.2);
-        
-        if (this.gameState) {
-            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
-            this.gameState.resources.food = (this.gameState.resources.food || 0) + foodReward;
-        }
-        
-        window.showToast?.(`🏆 ${playerArmy.name} defeats ${enemy.name}! +${goldReward}💰 +${foodReward}🍖`, {
-            type: 'success',
-            timeout: 4000
-        });
-        
-        // Emit event for achievements
-        window.eventBus?.emit('enemy_defeated', { enemy, army: playerArmy });
-    }
-
-    /**
-     * Make an enemy retreat to a new position.
-     */
-    retreatEnemy(enemy) {
-        // Move away from player village
-        const dx = enemy.col - this.playerVillageHex.col;
-        const dy = enemy.row - this.playerVillageHex.row;
-        
-        let newRow = enemy.row + Math.sign(dy);
-        let newCol = enemy.col + Math.sign(dx);
-        
-        // Clamp to map bounds
-        newRow = Math.max(0, Math.min(this.mapHeight - 1, newRow));
-        newCol = Math.max(0, Math.min(this.mapWidth - 1, newCol));
-        
-        if (this.canEnemyMoveTo(newRow, newCol)) {
-            enemy.row = newRow;
-            enemy.col = newCol;
-            enemy.patrolOrigin = { row: newRow, col: newCol };
-        }
-    }
-
-    /**
-     * Push a player army back toward the village.
-     */
-    pushArmyBack(army) {
-        const core = army.armyId ? this.gameState.getArmy?.(army.armyId) : null;
-        if (!core) return;
-        
-        const currentPos = { row: core.position.y, col: core.position.x };
-        const dx = this.playerVillageHex.col - currentPos.col;
-        const dy = this.playerVillageHex.row - currentPos.row;
-        
-        // Move one step toward village
-        let newCol = currentPos.col + Math.sign(dx);
-        let newRow = currentPos.row + Math.sign(dy);
-        
-        core.position = { x: newCol, y: newRow };
-        army.location = { row: newRow, col: newCol };
-    }
-
-    /**
-     * Maybe spawn a new enemy group (called each day).
-     */
-    maybeSpawnNewEnemy() {
-        const currentDay = this.gameState?.day || 0;
-        
-        // Don't spawn too often (every 10-15 days)
-        if (currentDay - this._lastEnemySpawnDay < 10) return;
-        
-        // Limit total enemies
-        if (this.enemyUnits.size >= 6) return;
-        
-        // 20% chance per eligible day
-        if (Math.random() > 0.2) return;
-        
-        // Spawn on a random edge
-        const factionKeys = Object.keys(this.enemyFactions);
-        const faction = factionKeys[Math.floor(Math.random() * factionKeys.length)];
-        
-        let row, col, attempts = 0;
-        do {
-            if (Math.random() < 0.5) {
-                row = Math.random() < 0.5 ? 0 : this.mapHeight - 1;
-                col = Math.floor(Math.random() * this.mapWidth);
-            } else {
-                row = Math.floor(Math.random() * this.mapHeight);
-                col = Math.random() < 0.5 ? 0 : this.mapWidth - 1;
-            }
-            attempts++;
-        } while (
-            attempts < 15 &&
-            (this.isAdjacent(row, col, this.playerVillageHex.row, this.playerVillageHex.col) ||
-             this.hexMap[row]?.[col]?.terrain === 'water')
-        );
-        
-        if (attempts < 15) {
-            this.spawnEnemy(row, col, faction);
-            this._lastEnemySpawnDay = currentDay;
-            
-            window.showToast?.(`⚠️ ${this.enemyFactions[faction].icon} ${this.enemyFactions[faction].name} spotted on the frontier!`, {
-                type: 'warning',
-                timeout: 4000
-            });
-        }
-    }
-
-    /**
-     * Get enemy at a specific tile (for display/interaction).
-     */
-    getEnemyAt(row, col) {
-        for (const enemy of this.enemyUnits.values()) {
-            if (enemy.row === row && enemy.col === col) return enemy;
-        }
-        return null;
-    }
-
-    /**
-     * Get all enemies as array for display.
-     */
-    getAllEnemies() {
-        return Array.from(this.enemyUnits.values());
-    }
-
-    createSquareGrid(container) {
-        // Wait for container to be properly sized
-        const containerRect = container.getBoundingClientRect();
-        console.log('[World] Container dimensions:', containerRect.width, 'x', containerRect.height);
-
-        if (containerRect.width < 100 || containerRect.height < 100) {
-            console.log('[World] Container too small, retrying...');
-            // Limit retry attempts to prevent infinite loop
-            if (!this.retryCount) this.retryCount = 0;
-            this.retryCount++;
-            if (this.retryCount > 50) {
-                console.error('[World] Container failed to size properly after 50 attempts, aborting');
-                return;
-            }
-            setTimeout(() => this.createSquareGrid(container), 100);
-            return;
-        }
-
-        // Reset retry count on successful sizing
-        this.retryCount = 0;
-
-        // Create simple square grid (3x3)
-        const baseTileSize = 60; // Base tile size
-
-        // Square tile dimensions
-        const tileWidth = baseTileSize;
-        const tileHeight = baseTileSize;
-
-        // Square grid spacing calculations  
-        const horizSpacing = tileWidth + 5; // Horizontal spacing between tile centers
-        const vertSpacing = tileHeight + 5; // Vertical spacing between rows
-
-        // Calculate required grid dimensions for square grid
-        const requiredWidth = (this.mapWidth - 1) * horizSpacing + tileWidth;
-        const requiredHeight = (this.mapHeight - 1) * vertSpacing + tileHeight;
-
-        // Use actual container dimensions
-        const containerWidth = containerRect.width;
-        const containerHeight = containerRect.height;
-
-        // Calculate scale to fit the grid perfectly in container
-        const scaleX = (containerWidth - 40) / requiredWidth; // 40px padding
-        const scaleY = (containerHeight - 40) / requiredHeight; // 40px padding
-        const scale = Math.min(scaleX, scaleY, 1); // Never scale up
-
-        // Apply scaling
-        const tileSize = baseTileSize * scale;
-        const scaledHorizSpacing = horizSpacing * scale;
-        const scaledVertSpacing = vertSpacing * scale;
-        const gridWidth = requiredWidth * scale;
-        const gridHeight = requiredHeight * scale;
-
-        // Center the grid horizontally but start from top
-        const startX = Math.max(0, (containerWidth - gridWidth) / 2);
-        const startY = Math.max(20, 20); // Small top margin instead of centering
-
-        console.log('[World] Creating square grid:', {
-            containerWidth, containerHeight,
-            requiredWidth, requiredHeight,
-            scale, tileSize,
-            gridWidth, gridHeight,
-            startX, startY
-        });
-
-        // Create tiles as DOM elements
-        for (let row = 0; row < this.mapHeight; row++) {
-            for (let col = 0; col < this.mapWidth; col++) {
-                const hex = this.hexMap[row][col];
-
-                // Always show tiles, but with different styling for fog of war
-                const x = startX + col * scaledHorizSpacing;
-                const y = startY + row * scaledVertSpacing;
-
-                this.createSquareButton(container, x, y, hex, row, col, tileSize);
-            }
-        }
-
-        console.log('[World] Square grid creation complete - buttons added:', container.children.length);
-    }
-
-    createSquareButton(container, x, y, hex, row, col, size) {
-        const squareButton = document.createElement('button');
-        squareButton.className = 'tile-button';
-
-        // Position the square tile button
-        squareButton.style.position = 'absolute';
-        squareButton.style.left = x + 'px';
-        squareButton.style.top = y + 'px';
-        squareButton.style.width = size + 'px';
-        squareButton.style.height = size + 'px';
-
-        // Get visibility state (use new model or fallback to legacy)
-        const visibility = hex.visibility || (hex.discovered ? 'explored' : hex.scoutable ? 'scoutable' : 'hidden');
-        const coordLabel = this.formatCoords(row, col);
-
-        // Apply styling based on visibility state
-        if (visibility === 'hidden') {
-            // Fog of war - unexplored
-            squareButton.style.background = 'linear-gradient(45deg, #1a252f, #2c3e50)';
-            squareButton.style.borderRadius = '8px';
-            squareButton.style.border = '2px solid #4a5568';
-            squareButton.style.opacity = '0.5';
-            squareButton.textContent = '?';
-            squareButton.style.color = '#718096';
-            squareButton.title = `${coordLabel} - Unexplored Territory`;
-        } else if (visibility === 'scoutable') {
-            // Scoutable - adjacent to explored tiles
-            squareButton.style.background = 'linear-gradient(45deg, #2c5282, #2b6cb0)';
-            squareButton.style.borderRadius = '8px';
-            squareButton.style.border = '2px dashed #4299e1';
-            squareButton.style.opacity = '0.85';
-            squareButton.textContent = '👁️';
-            squareButton.style.color = '#bee3f8';
-            squareButton.title = `${coordLabel} - Send scouts to explore`;
-        } else {
-            // Explored - full visibility
-            const terrainInfo = window.getTerrain?.(hex.terrain) || { color: hex.color || '#4a90a4' };
-            squareButton.style.background = `linear-gradient(145deg, ${this._brightenColor(terrainInfo.color, 0.2)}, ${terrainInfo.color})`;
-            squareButton.style.borderRadius = '8px';
-            squareButton.style.border = '2px solid rgba(255,255,255,0.25)';
-            squareButton.style.opacity = '1';
-            squareButton.title = `${coordLabel} - ${hex.terrain} (${hex.biome || 'Unknown'})`;
-        }
-
-        squareButton.style.cursor = 'pointer';
-        squareButton.style.transition = 'all 0.2s ease';
-        squareButton.style.display = 'flex';
-        squareButton.style.alignItems = 'center';
-        squareButton.style.justifyContent = 'center';
-        squareButton.style.fontSize = Math.max(12, size * 0.4) + 'px';
-        squareButton.style.outline = 'none';
-        squareButton.style.padding = '0';
-        squareButton.style.margin = '0';
-        squareButton.style.boxSizing = 'border-box';
-        squareButton.style.zIndex = '1';
-
-        // Add special styling for player village
-        if (hex.isPlayerVillage) {
-            squareButton.style.border = '3px solid #f1c40f';
-            squareButton.style.boxShadow = '0 0 10px rgba(241, 196, 15, 0.5)';
-        }
-
-        // Check if there's an army at this position
-        const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
-
-        // Check if there are scouts stationed at this position
-        const scoutsAtPosition = this.expeditions.find(exp =>
-            exp.status === 'stationed' &&
-            exp.targetHex.row === row &&
-            exp.targetHex.col === col
-        );
-
-        // Check if there's an enemy at this position
-        const enemyAtPosition = this.getEnemyAt(row, col);
-
-        // Add terrain symbol or unit indicators
-        if (hex.fogOfWar) {
-            // Don't show details for fog of war tiles
-            if (hex.scoutable) {
-                squareButton.textContent = '👁️';
-                squareButton.style.color = '#ecf0f1';
-            } else {
-                squareButton.textContent = '🌫️';
-                squareButton.style.color = '#95a5a6';
-            }
-        } else if (enemyAtPosition) {
-            // Show enemy unit prominently
-            squareButton.innerHTML = `<div style="position: relative;">
-                <div style="position: absolute; top: -4px; left: 50%; transform: translateX(-50%); background: ${enemyAtPosition.color}; color: white; border-radius: 4px; padding: 2px 6px; font-size: 14px; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.5); white-space: nowrap; z-index: 10;">
-                    ${enemyAtPosition.icon}
-                </div>
-                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold; opacity: 0.7;">${hex.symbol || '🌱'}</span>
-            </div>`;
-            squareButton.title = `${enemyAtPosition.name} (Strength: ${enemyAtPosition.strength})`;
-            squareButton.style.border = `2px solid ${enemyAtPosition.color}`;
-            squareButton.style.boxShadow = `0 0 8px ${enemyAtPosition.color}80`;
-        } else if (armyAtPosition && scoutsAtPosition) {
-            // Show both army and scouts
-            squareButton.innerHTML = `<div style="position: relative;">
-                <div style="position: absolute; top: -2px; left: -2px; background: #e74c3c; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚔</div>
-                <div style="position: absolute; top: -2px; right: -2px; background: #3498db; color: white; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 9px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">👁</div>
-                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
-            </div>`;
-        } else if (armyAtPosition) {
-            // Show army with different styling
-            squareButton.innerHTML = `<div style="position: relative;">
-                <div style="position: absolute; top: -2px; left: -2px; background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">⚔</div>
-                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
-            </div>`;
-        } else if (scoutsAtPosition) {
-            // Show scouts stationed here
-            squareButton.innerHTML = `<div style="position: relative;">
-                <div style="position: absolute; top: -2px; right: -2px; background: #3498db; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">👁</div>
-                <span style="color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); font-weight: bold;">${hex.symbol || '🌱'}</span>
-            </div>`;
-        } else {
-            squareButton.textContent = hex.symbol || '🌱';
-            squareButton.style.color = '#fff';
-            squareButton.style.textShadow = '1px 1px 2px rgba(0,0,0,0.8)';
-            squareButton.style.fontWeight = 'bold';
-        }
-
-        // Add a subtle ZOC badge for discovered tiles under enemy Zone of Control
-        if (!hex.fogOfWar && this.isInEnemyZOC(row, col)) {
-            // Optional full-tile shading when overlay is toggled
-            if (this.showZOCOverlay) {
-                const shade = document.createElement('div');
-                shade.style.position = 'absolute';
-                shade.style.inset = '0';
-                shade.style.borderRadius = '6px';
-                shade.style.background = 'rgba(192,57,43,0.22)';
-                shade.style.pointerEvents = 'none';
-                shade.style.zIndex = '0';
-                squareButton.appendChild(shade);
-            }
-
-            const zocBadge = document.createElement('div');
-            zocBadge.textContent = '🛡️';
-            zocBadge.style.position = 'absolute';
-            zocBadge.style.bottom = '-2px';
-            zocBadge.style.left = '-2px';
-            zocBadge.style.width = '18px';
-            zocBadge.style.height = '18px';
-            zocBadge.style.display = 'flex';
-            zocBadge.style.alignItems = 'center';
-            zocBadge.style.justifyContent = 'center';
-            zocBadge.style.fontSize = '10px';
-            zocBadge.style.background = '#c0392b';
-            zocBadge.style.color = 'white';
-            zocBadge.style.borderRadius = '50%';
-            zocBadge.style.border = '1px solid white';
-            zocBadge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
-            squareButton.appendChild(zocBadge);
-        }
-
-        // Store tile coordinates
-        squareButton.dataset.row = row;
-        squareButton.dataset.col = col;
-
-        // Add selection state
-        if (this.selectedHex && this.selectedHex.row === row && this.selectedHex.col === col) {
-            squareButton.classList.add('selected');
-            squareButton.style.transform = 'scale(1.1)';
-            squareButton.style.background = this._brightenColor(hex.color || '#888', 0.4);
-
-            // Different border for army selection vs hex selection
-            if (this.selectedArmy) {
-                squareButton.style.border = '3px solid #e74c3c'; // Red for army
-                squareButton.style.boxShadow = '0 0 15px rgba(231, 76, 60, 0.8)';
-            } else {
-                squareButton.style.border = hex.isPlayerVillage
-                    ? '3px solid #f1c40f'
-                    : '3px solid #fff';
-                squareButton.style.boxShadow = '0 0 15px rgba(255,255,255,0.8)';
-            }
-            squareButton.style.zIndex = '10';
-        }
-
-        // Add hover effects
-        squareButton.addEventListener('mouseenter', () => {
-            if (!squareButton.classList.contains('selected')) {
-                squareButton.style.transform = 'scale(1.05)';
-                squareButton.style.background = this._brightenColor(hex.color || '#888', 0.2);
-                squareButton.style.boxShadow = hex.isPlayerVillage
-                    ? '0 0 12px rgba(241, 196, 15, 0.6)'
-                    : '0 0 8px rgba(255,255,255,0.3)';
-                squareButton.style.zIndex = '5';
-            }
-        });
-
-        squareButton.addEventListener('mouseleave', () => {
-            if (!squareButton.classList.contains('selected')) {
-                squareButton.style.transform = 'scale(1)';
-                squareButton.style.background = hex.discovered ? hex.color : '#555';
-                squareButton.style.boxShadow = hex.isPlayerVillage
-                    ? '0 0 10px rgba(241, 196, 15, 0.5)'
-                    : 'none';
-                squareButton.style.zIndex = '1';
-            }
-        });
-
-        // Add click handler
-        squareButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.selectHex(row, col);
-        });
-
-        // Add focus styles for accessibility
-        squareButton.addEventListener('focus', () => {
-            if (!squareButton.classList.contains('selected')) {
-                squareButton.style.boxShadow = '0 0 8px rgba(52, 152, 219, 0.6)';
-            }
-        });
-
-        squareButton.addEventListener('blur', () => {
-            if (!squareButton.classList.contains('selected')) {
-                squareButton.style.boxShadow = hex.isPlayerVillage
-                    ? '0 0 10px rgba(241, 196, 15, 0.5)'
-                    : 'none';
-            }
-        });
-
-        container.appendChild(squareButton);
-    }
-
-    // Movement cost helpers
-    _getMoveCostForTile(row, col) {
-        const key = this.hexMap?.[row]?.[col]?.terrain;
-        switch (key) {
-            case 'grass': return 1;
-            case 'plains': return 1;
-            case 'forest': return 2;
-            case 'ruins': return 2;
-            case 'desert': return 2;
-            case 'hill': return 3;
-            case 'swamp': return 3;
-            case 'mountain': return 4;
-            case 'village': return 1;
-            case 'ore': return 2;
-            case 'water': return 99;
-            default: return 1;
-        }
-    }
-
-    _computePathDays(path) {
-        if (!Array.isArray(path) || path.length < 2) return 0;
-        let days = 0;
-        for (let i = 1; i < path.length; i++) {
-            days += this._getMoveCostForTile(path[i].row, path[i].col);
-        }
-        return days;
-    }
-
+    // ===================================================================
+    // SELECTION & INFO PANEL
+    // ===================================================================
 
     selectHex(row, col) {
-        const hex = this.hexMap[row][col];
+        this.selectedHex = { row, col };
+        this.updateInfoPanel();
+        this.updateActionPanel();
+        this.renderer?.fullTileStyleRefresh();
+    }
+
+    formatCoords(r, c) {
+        const dr = r - this.capitalRow;
+        const dc = c - this.capitalCol;
+        const ns = dr < 0 ? `${Math.abs(dr)}N` : dr > 0 ? `${dr}S` : '';
+        const ew = dc < 0 ? `${Math.abs(dc)}W` : dc > 0 ? `${dc}E` : '';
+        return ns + ew || 'Capital';
+    }
+
+    updateInfoPanel() {
+        const panel = document.getElementById('hex-info');
+        if (!panel) return;
+
+        if (!this.selectedHex) {
+            panel.innerHTML = '<p class="info-placeholder">Select a tile to view details</p>';
+            return;
+        }
+
+        const { row, col } = this.selectedHex;
+        const hex = this.hexMap[row]?.[col];
         if (!hex) return;
 
-        // Army movement with path preview when MapRenderer is active
-        if (this.selectedArmy && (this.selectedArmy.position.x !== col || this.selectedArmy.position.y !== row)) {
-            // If user clicks same target twice, confirm move
-            if (this.pendingMoveTarget && this.pendingMoveTarget.row === row && this.pendingMoveTarget.col === col) {
-                const success = this.gameState.moveArmy(this.selectedArmy.id, { x: col, y: row });
-                if (success) {
-                    this.pendingPath = null;
-                    this.pendingMoveTarget = null;
-                    this.selectedArmy = null; // Clear selection after move
-                    this.updateArmyDisplays();
-                    return;
-                }
-            } else {
-                // Compute path preview if pathfinding available
-                try {
-                    // Lazy import only when needed to avoid bundling issues
-                    if (!window.__findPathLoaded) {
-                        // dynamic import for Vite (optional); fall back if unavailable
-                        window.__findPathLoaded = true; // marker only; module import below optional
-                    }
-                } catch (_) { }
-                // Use simple A* from src/world/pathfinding.js if available globally or attach a minimal inline heuristic when absent
-                let computePath = null;
-                if (window.findPath) {
-                    computePath = window.findPath;
-                }
-                // Fallback: no global findPath exposed; try to access via ES module import hint
-                // Note: if bundler doesn't support here, we'll skip preview gracefully
-                if (!computePath) {
-                    try {
-                        // eslint-disable-next-line no-new-func
-                        computePath = null; // keep null; preview will be skipped
-                    } catch (_) { /* no-op */ }
-                }
+        const terrain = window.getTerrain?.(hex.terrain) || { symbol: '?', description: 'Unknown' };
+        const terrainDef = window.WORLD_DATA?.terrainTypes?.[hex.terrain] || {};
+        const coords = this.formatCoords(row, col);
 
-                if (computePath) {
-                    const start = { row: this.selectedArmy.position.y, col: this.selectedArmy.position.x };
-                    const goal = { row, col };
-                    const path = computePath(this.hexMap, start, goal);
-                    if (path && path.length) {
-                        this.pendingPath = path;
-                        this.pendingMoveTarget = { row, col };
-                        if (this.mapRenderer) this.mapRenderer.updateEntities();
-                        if (window.showToast) {
-                            window.showToast(`🚶 Path preview: ${path.length - 1} steps. Click again to confirm move.`, { type: 'info', timeout: 2500 });
-                        }
-                        // Do not proceed with selection styling now
-                        return;
-                    } else if (window.showToast) {
-                        window.showToast('❌ No valid path to destination.', { type: 'error', timeout: 2500 });
-                        return;
-                    }
-                } else {
-                    // No computePath available; fall back to immediate move
-                    const success = this.gameState.moveArmy(this.selectedArmy.id, { x: col, y: row });
-                    if (success) {
-                        this.pendingPath = null;
-                        this.pendingMoveTarget = null;
-                        this.selectedArmy = null;
-                        this.updateArmyDisplays();
-                        return;
-                    }
-                }
-            }
-        }
+        let html = `<h3>${terrain.symbol} ${terrainDef.name || hex.terrain}</h3>`;
+        html += `<p class="hex-coords">${coords}</p>`;
 
-        // Clear previous selection
-        // Clear previous selection (legacy square tiles only)
-        let prevRow = this.selectedHex?.row;
-        let prevCol = this.selectedHex?.col;
-        if (!this.mapRenderer) {
-            const previousSelected = document.querySelector('.tile-button.selected');
-            if (previousSelected) {
-                previousSelected.classList.remove('selected');
-                previousSelected.style.transform = 'scale(1)';
-                previousSelected.style.zIndex = '1';
-
-                // Reset background and border to original state
-                prevRow = parseInt(previousSelected.dataset.row);
-                prevCol = parseInt(previousSelected.dataset.col);
-                const prevHex = this.hexMap[prevRow][prevCol];
-                previousSelected.style.background = prevHex.discovered ? prevHex.color : '#555';
-                previousSelected.style.border = prevHex.isPlayerVillage
-                    ? '3px solid #f1c40f'
-                    : '2px solid rgba(255,255,255,0.3)';
-                previousSelected.style.boxShadow = prevHex.isPlayerVillage
-                    ? '0 0 10px rgba(241, 196, 15, 0.5)'
-                    : 'none';
-            }
-        }
-
-        this.selectedHex = { row, col };
-        this.updateHexInfoPanel(hex, row, col);
-
-        // Check if there's an army at this location
-        const armyAtLocation = this.gameState.getArmyAt({ x: col, y: row });
-        if (armyAtLocation) {
-            this.selectedArmy = armyAtLocation;
-            if (window.showToast) {
-                window.showToast(`⚔️ Army "${armyAtLocation.name}" selected. Click another tile to move.`, {
-                    icon: '👆',
-                    type: 'info',
-                    timeout: 3000
-                });
-            }
+        if (hex.visibility === 'hidden') {
+            html += `<p>Unexplored territory</p>`;
+        } else if (hex.visibility === 'scoutable') {
+            html += `<p>Visible but unexplored — send an army to scout</p>`;
         } else {
-            this.selectedArmy = null;
-        }
-
-        // Highlight the new selection
-        if (this.mapRenderer) {
-            // Let MapRenderer reflect selection state
-            if (typeof prevRow === 'number' && typeof prevCol === 'number') {
-                this.mapRenderer.updateTile(prevRow, prevCol);
-            }
-            this.mapRenderer.updateTile(row, col);
-        } else {
-            const newSelected = document.querySelector(`button[data-row="${row}"][data-col="${col}"]`);
-            if (newSelected) {
-                newSelected.classList.add('selected');
-                newSelected.style.transform = 'scale(1.1)';
-                newSelected.style.background = this._brightenColor(hex.color || '#888', 0.4);
-                newSelected.style.border = hex.isPlayerVillage
-                    ? '3px solid #f1c40f'
-                    : armyAtLocation ? '3px solid #ff6b6b' : '3px solid #fff';
-                newSelected.style.boxShadow = armyAtLocation
-                    ? '0 0 15px rgba(255,107,107,0.8)'
-                    : '0 0 15px rgba(255,255,255,0.8)';
-                newSelected.style.zIndex = '10';
+            html += `<p>${terrainDef.description || ''}</p>`;
+            html += `<p>Move cost: ${terrainDef.moveCost || 1}</p>`;
+            if (terrainDef.defensiveBonus) {
+                html += `<p>Defense bonus: +${Math.round(terrainDef.defensiveBonus * 100)}%</p>`;
             }
         }
-    }
 
-    // Utility to brighten a hex color (hex string or named)
-    _brightenColor(color, amount) {
-        amount = amount === undefined ? 0.2 : amount;
-        let c = color;
-        if (c[0] === '#') {
-            // Convert hex to RGB
-            let num = parseInt(c.slice(1), 16);
-            let r = (num >> 16) & 0xff;
-            let g = (num >> 8) & 0xff;
-            let b = num & 0xff;
-            r = Math.min(255, Math.floor(r + (255 - r) * amount));
-            g = Math.min(255, Math.floor(g + (255 - g) * amount));
-            b = Math.min(255, Math.floor(b + (255 - b) * amount));
-            return `rgb(${r},${g},${b})`;
+        // Show enemies at this tile (only if visible to player)
+        const visibleEnemies = this.getVisibleEnemiesAt(row, col);
+        if (visibleEnemies.length > 0) {
+            html += `<hr><h4>⚠️ Enemies</h4>`;
+            visibleEnemies.forEach(e => {
+                html += `<p>${this.getEnemyTypeInfo(e).icon} ${e.name} — ${e.units.length} units</p>`;
+            });
         }
-        // fallback: just return color
-        return color;
+
+        // Show player armies at this tile
+        const armiesHere = this.getPlayerArmiesAt(row, col);
+        if (armiesHere.length > 0) {
+            html += `<hr><h4>⚔️ Your Armies</h4>`;
+            armiesHere.forEach(a => {
+                html += `<p>${a.name} — ${a.units.length} units (${a.status})</p>`;
+            });
+        }
+
+        panel.innerHTML = html;
     }
 
-    isAdjacentToDiscovered(row, col) {
-        // Check if hex is adjacent to any discovered hex
-        const neighbors = this.getHexNeighbors(row, col);
-        return neighbors.some(neighbor => {
-            const [nRow, nCol] = neighbor;
-            return this.hexMap[nRow] && this.hexMap[nRow][nCol] && this.hexMap[nRow][nCol].discovered;
-        });
-    }
-
-    getHexNeighbors(row, col) {
-        // Get coordinates of neighboring hexes in a hexagonal grid
-        const neighbors = [];
-        const isEvenRow = row % 2 === 0;
-
-        const neighborOffsets = isEvenRow ? [
-            [-1, -1], [-1, 0], [0, -1], [0, 1], [1, -1], [1, 0]
-        ] : [
-            [-1, 0], [-1, 1], [0, -1], [0, 1], [1, 0], [1, 1]
-        ];
-
-        neighborOffsets.forEach(([rowOffset, colOffset]) => {
-            const newRow = row + rowOffset;
-            const newCol = col + colOffset;
-
-            if (newRow >= 0 && newRow < this.mapHeight && newCol >= 0 && newCol < this.mapWidth) {
-                neighbors.push([newRow, newCol]);
-            }
-        });
-
-        return neighbors;
-    }
-
-    setupHexInteraction() {
-        // Interactions are now handled directly by individual hex elements
-        // No need for complex coordinate conversion!
-        console.log('[World] Hex interactions set up via individual CSS elements');
-    }
-
-    updateHexInfoPanel(hex, row, col) {
-        const panel = document.getElementById('hex-info-panel');
+    updateActionPanel() {
+        const panel = document.getElementById('world-actions');
         if (!panel) return;
-        const contentContainer = document.getElementById('hex-info-content');
 
-        // Check for armies at this position
-        const armyAtPosition = this.gameState.getArmyAt({ x: col, y: row });
+        let html = '';
 
-        // Check for scouts at this position
-        const scoutsAtPosition = this.expeditions.find(exp =>
-            exp.status === 'stationed' &&
-            exp.targetHex.row === row &&
-            exp.targetHex.col === col
-        );
+        // Draft army button (always available)
+        const canDraft = this.getAvailableForDraft().length >= 1;
+        html += `<button class="world-btn" onclick="window.worldManager.showDraftModal()" 
+                    ${canDraft ? '' : 'disabled'}>
+                    ⚔️ Draft Army</button>`;
 
-        // Check for enemy at this position
-        const enemyAtPosition = this.getEnemyAt(row, col);
+        // Context-sensitive buttons based on selection
+        if (this.selectedHex) {
+            const { row, col } = this.selectedHex;
+            const hex = this.hexMap[row]?.[col];
 
-        // Get terrain info
-        const terrainInfo = window.getTerrain?.(hex.terrain) || { symbol: hex.symbol, color: hex.color };
-        const zone = hex.zone || this.getTerrainZone(this.getDistanceFromCapital(row, col));
-        const zoneLabels = {
-            core: '🏰 Capital',
-            inner: '🌾 Heartlands',
-            middle: '🌲 Borderlands', 
-            outer: '⚔️ Frontier',
-            frontier: '🗺️ Wilds'
-        };
-
-        let content = `
-            <div class="hex-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h4 style="margin:0;">📍 ${this.formatCoords(row, col)}</h4>
-                <span style="color:#7f8c8d;font-size:0.85em;">${zoneLabels[zone] || zone}</span>
-            </div>
-            <div class="hex-terrain" style="background:#2c3e50;border-radius:8px;padding:10px;margin-bottom:12px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:28px;">${terrainInfo.symbol || hex.symbol}</span>
-                    <div>
-                        <div style="font-weight:bold;color:#ecf0f1;text-transform:capitalize;">${hex.terrain}</div>
-                        <div style="font-size:0.85em;color:#95a5a6;">${hex.biome || 'Unknown biome'}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="hex-details" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-                <div style="background:#34495e;padding:8px;border-radius:6px;text-align:center;">
-                    <div style="color:#95a5a6;font-size:0.75em;">WEATHER</div>
-                    <div>${this.getWeatherIcon(hex.weather)} ${hex.weather}</div>
-                </div>
-                <div style="background:#34495e;padding:8px;border-radius:6px;text-align:center;">
-                    <div style="color:#95a5a6;font-size:0.75em;">ELEVATION</div>
-                    <div>${Math.min(hex.elevation || 0, 5) > 0 ? '⬆'.repeat(Math.min(Math.ceil((hex.elevation || 0) / 20), 5)) : '〰️ Low'}</div>
-                </div>
-            </div>
-        `;
-
-        // Show army information if present
-        if (armyAtPosition) {
-            const foodUpkeepPD = (armyAtPosition.units?.length || 1); // 1 person-day per unit per day
-            content += `
-                <div class="army-info" style="border: 2px solid #e74c3c; border-radius: 8px; padding: 10px; margin: 10px 0; background: rgba(231, 76, 60, 0.1);">
-                    <h5>⚔️ Army: ${armyAtPosition.name}</h5>
-                    <p><strong>Units:</strong> ${armyAtPosition.units.length}</p>
-            <p><strong>Food Upkeep:</strong> ${foodUpkeepPD} PD/day</p>
-                    ${armyAtPosition.isMoving ?
-                    `<p><strong>Status:</strong> 🚶 Moving to (${armyAtPosition.movementTarget.x}, ${armyAtPosition.movementTarget.y})</p>
-                         <p><strong>Progress:</strong> ${Math.round(armyAtPosition.movementProgress * 100)}%</p>` :
-                    `<p><strong>Status:</strong> 🛡️ Stationed</p>`
-                }
-                    ${this.selectedArmy && this.selectedArmy.id === armyAtPosition.id ?
-                    `<p style="color: #e74c3c; font-weight: bold;">📍 SELECTED - Click another tile to move</p>` :
-                    ''
-                }
-                </div>
-            `;
-        }
-
-        // Show scout information if present
-        if (scoutsAtPosition) {
-            content += `
-                <div class="scout-info" style="border: 2px solid #3498db; border-radius: 8px; padding: 10px; margin: 10px 0; background: rgba(52, 152, 219, 0.1);">
-                    <h5>👁️ Scouts Stationed</h5>
-                    <p><strong>Scouts:</strong> ${scoutsAtPosition.scouts.map(s => s.name).join(', ')}</p>
-                    <p><strong>Count:</strong> ${scoutsAtPosition.scouts.length} scout${scoutsAtPosition.scouts.length !== 1 ? 's' : ''}</p>
-                    <p><strong>Status:</strong> 🔍 Gathering intelligence</p>
-                    <button class="action-btn secondary" onclick="window.worldManager.orderScoutsHome('${scoutsAtPosition.id}')" style="margin-top: 8px;">
-                        🏠 Order Return Home
-                    </button>
-                </div>
-            `;
-        }
-
-        // Show enemy information if present
-        if (enemyAtPosition) {
-            const faction = this.enemyFactions[enemyAtPosition.faction] || {};
-            const strengthPercent = Math.round((enemyAtPosition.strength / enemyAtPosition.maxStrength) * 100);
-            const strengthColor = strengthPercent > 60 ? '#27ae60' : strengthPercent > 30 ? '#f39c12' : '#e74c3c';
-            
-            content += `
-                <div class="enemy-info" style="border: 2px solid ${enemyAtPosition.color}; border-radius: 8px; padding: 10px; margin: 10px 0; background: ${enemyAtPosition.color}22;">
-                    <h5>${enemyAtPosition.icon} ${enemyAtPosition.name}</h5>
-                    <p><strong>Faction:</strong> ${faction.name || 'Unknown'}</p>
-                    <p><strong>Strength:</strong> 
-                        <span style="color: ${strengthColor}; font-weight: bold;">${enemyAtPosition.strength}</span>
-                        <span style="color: #888;">/ ${enemyAtPosition.maxStrength}</span>
-                    </p>
-                    <div style="background: #333; border-radius: 4px; height: 8px; margin: 5px 0;">
-                        <div style="background: ${strengthColor}; width: ${strengthPercent}%; height: 100%; border-radius: 4px;"></div>
-                    </div>
-                    <p><strong>Behavior:</strong> ${enemyAtPosition.aggression > 0.5 ? '⚔️ Aggressive' : enemyAtPosition.aggression > 0.3 ? '👁️ Watchful' : '🛡️ Defensive'}</p>
-                    ${this.getThreatAssessmentHTML(enemyAtPosition)}
-                    <p style="color: #e74c3c; font-style: italic; margin-top: 8px;">
-                        ⚠️ Hostile! Send an army to engage or avoid this area.
-                    </p>
-                </div>
-            `;
-        }
-
-        if (hex.isPlayerVillage) {
-            content += `
-                <div class="village-actions">
-                    <h5>🏰 Your Village</h5>
-                    <button class="action-btn" id="enter-village-btn">
-                        🏠 Enter Village
-                    </button>
-                    <button class="action-btn" id="draft-army-btn">
-                        ⚔️ Draft Army
-                    </button>
-                </div>
-            `;
-        } else if (hex.units && hex.units.length > 0) {
-            content += `
-                <div class="hex-units">
-                    <h5>👥 Units Present</h5>
-            `;
-            hex.units.forEach(unit => {
-                content += `
-                    <div class="unit-info">
-                        <p><strong>${unit.name}</strong></p>
-                        <p>Strength: ${unit.strength}</p>
-                        <p>${unit.description}</p>
-                    </div>
-                `;
-            });
-            content += `</div>`;
-        }
-
-        // Show appropriate exploration actions based on hex status
-        if (hex.scoutable && hex.fogOfWar) {
-            content += `
-                <div class="hex-actions">
-                    <button class="action-btn primary" onclick="window.safeWorldManagerCall?.('exploreHex', ${row}, ${col}) || (window.worldManager && window.worldManager.exploreHex?.(${row}, ${col}))">
-                        🗺️ Send Scouts to Explore
-                    </button>
-                </div>
-            `;
-        } else if (hex.discovered) {
-            content += `
-                <div class="hex-actions">
-                    <button class="action-btn secondary" onclick="window.safeWorldManagerCall?.('exploreHex', ${row}, ${col}) || (window.worldManager && window.worldManager.exploreHex?.(${row}, ${col}))">
-                        🔍 Detailed Exploration
-                    </button>
-                    ${this.isInEnemyZOC(row, col) ? '<div style="margin-top:6px;color:#e74c3c;">🛡️ Enemy Zone of Control here</div>' : ''}
-                </div>
-            `;
-        } else if (hex.fogOfWar) {
-            content += `
-                <div class="hex-info-note" style="color: #95a5a6; font-style: italic; margin-top: 10px;">
-                    This territory is too distant to explore directly. Discover adjacent areas first.
-                </div>
-            `;
-        }
-
-        content += `</div>`;
-        if (contentContainer) {
-            contentContainer.innerHTML = content;
-        } else {
-            // Fallback for older structure
-            panel.innerHTML = content;
-        }
-
-        // Attach event listeners for village actions (avoid inline onclick)
-        if (hex.isPlayerVillage) {
-            const root = contentContainer || panel;
-            const enterBtn = root.querySelector('#enter-village-btn');
-            if (enterBtn) enterBtn.addEventListener('click', () => this.enterVillage());
-            const draftBtn = root.querySelector('#draft-army-btn');
-            if (draftBtn) draftBtn.addEventListener('click', () => this.draftArmy());
-        }
-    }
-
-    getWeatherIcon(weather) {
-        const icons = {
-            clear: '☀️',
-            cloudy: '☁️',
-            rain: '🌧️',
-            fog: '🌫️'
-        };
-        return icons[weather] || '🌤️';
-    }
-
-    /**
-     * Generate HTML for strategic threat assessment display.
-     */
-    getThreatAssessmentHTML(enemy) {
-        if (!window.strategicCombat || !this.gameState?.army) {
-            return '';
-        }
-        
-        try {
-            const playerArmy = { units: this.gameState.army || [] };
-            const enemyArmy = { units: enemy.units || [] };
-            
-            // If enemy doesn't have detailed units, create fake ones based on strength
-            if (enemyArmy.units.length === 0 && enemy.strength) {
-                for (let i = 0; i < Math.ceil(enemy.strength / 10); i++) {
-                    enemyArmy.units.push({ 
-                        type: 'militia', 
-                        attack: 5, 
-                        defense: 3, 
-                        alive: true 
-                    });
-                }
-            }
-            
-            const assessment = window.strategicCombat.assessThreat(enemyArmy, playerArmy);
-            if (!assessment) return '';
-            
-            const threatColors = {
-                low: '#27ae60',
-                moderate: '#f39c12',
-                high: '#e67e22',
-                extreme: '#e74c3c'
-            };
-            const threatIcon = window.strategicCombat.getThreatIcon(assessment.threatLevel);
-            const color = threatColors[assessment.threatLevel] || '#95a5a6';
-            
-            let html = `
-                <div style="background: ${color}22; border: 1px solid ${color}; border-radius: 6px; padding: 8px; margin: 8px 0;">
-                    <p style="margin: 0 0 6px; font-weight: bold; color: ${color};">
-                        ${threatIcon} Threat: ${assessment.threatLevel.toUpperCase()} (${assessment.threatScore}%)
-                    </p>
-                    <p style="margin: 0; font-size: 0.9em; color: #bdc3c7;">
-                        ${assessment.recommendation}
-                    </p>
-            `;
-            
-            if (assessment.advantages.length > 0) {
-                html += `<p style="margin: 6px 0 0; font-size: 0.85em; color: #27ae60;">✓ ${assessment.advantages[0]}</p>`;
-            }
-            if (assessment.disadvantages.length > 0) {
-                html += `<p style="margin: 4px 0 0; font-size: 0.85em; color: #e74c3c;">✗ ${assessment.disadvantages[0]}</p>`;
-            }
-            
-            html += '</div>';
-            return html;
-        } catch (e) {
-            console.warn('[World] Failed to generate threat assessment:', e);
-            return '';
-        }
-    }
-
-    enterVillage() {
-        // Switch back to village view - try multiple methods since the codebase has different systems
-        console.log('[World] Attempting to switch to village view...');
-
-        let switchSuccessful = false;
-
-        // Method 1: Try global switchView function (from game.html)
-        if (typeof window.switchView === 'function') {
-            console.log('[World] Using global switchView function');
-            window.switchView('village');
-            switchSuccessful = true;
-        }
-        // Method 2: Try this.game.switchView if this.game is actually a Game instance
-        else if (this.game && typeof this.game.switchView === 'function') {
-            console.log('[World] Using this.game.switchView');
-            this.game.switchView('village');
-            switchSuccessful = true;
-        }
-        // Method 3: Try window.game.switchView if there's a global game instance
-        else if (window.game && typeof window.game.switchView === 'function') {
-            console.log('[World] Using window.game.switchView');
-            window.game.switchView('village');
-            switchSuccessful = true;
-        }
-        // Method 4: Manual view switching (DOM manipulation)
-        else {
-            console.log('[World] Using manual DOM view switching');
-            // Hide all game views
-            document.querySelectorAll('.game-view').forEach(el => el.classList.remove('active'));
-            // Show village view
-            const villageView = document.getElementById('village-view');
-            if (villageView) {
-                villageView.classList.add('active');
-                switchSuccessful = true;
-                console.log('[World] Manually switched to village view');
+            // Move army button
+            const armies = this.gameState.getAllArmies?.() || [];
+            const idleArmies = armies.filter(a => a.status === 'idle');
+            if (idleArmies.length > 0 && hex?.visibility !== 'hidden') {
+                html += `<button class="world-btn" onclick="window.worldManager.showMoveArmyModal()">
+                            🚶 Move Army Here</button>`;
             }
 
-            // Update nav buttons
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.view === 'village') {
-                    btn.classList.add('active');
-                }
-            });
-        }
-
-        if (switchSuccessful) {
-            if (window.showToast) {
-                window.showToast('🏰 Returning to your village...', {
-                    icon: '🏠',
-                    type: 'info',
-                    timeout: 2000
+            // Scout button for scoutable tiles
+            if (hex?.visibility === 'scoutable') {
+                const armiesOnAdj = armies.filter(a => {
+                    const dist = Math.abs(a.position.y - row) + Math.abs(a.position.x - col);
+                    return dist <= 1 && a.status === 'idle';
                 });
+                if (armiesOnAdj.length > 0) {
+                    html += `<button class="world-btn" onclick="window.worldManager.scoutTile(${row}, ${col})">
+                                🔭 Scout This Tile</button>`;
+                }
             }
-            console.log('[World] Successfully switched to village view');
-        } else {
-            console.error('[World] Failed to switch to village view. Available methods:', {
-                globalSwitchView: typeof window.switchView,
-                thisGameSwitchView: typeof this.game?.switchView,
-                windowGameSwitchView: typeof window.game?.switchView,
-                gameObject: this.game
-            });
-        }
-    }
-
-    draftArmy() {
-        // Start army drafting process
-        console.log('[World] Starting army drafting process...');
-        console.log('[World] draftArmy() called on:', this);
-        console.log('[World] window.worldManager:', window.worldManager);
-        console.log('[World] Global reference check - this === window.worldManager:', this === window.worldManager);
-        this.showArmyDraftingModal();
-    }
-
-    showArmyDraftingModal() {
-        const dynastyName = (typeof this.gameState.getDynastyName === 'function')
-            ? this.gameState.getDynastyName()
-            : (this.game?.tutorialManager?.getDynastyName?.() || 'Noble');
-
-        // Get available villagers for drafting
-        let availableVillagers = [];
-        let totalPopulation = this.gameState.population || 0;
-
-        if (this.gameState.populationManager) {
-            const allVillagers = this.gameState.populationManager.getAll();
-            availableVillagers = allVillagers.filter(villager =>
-                villager.age >= 16 && // Only adults
-                villager.status !== 'drafted' &&
-                villager.status !== 'sick' &&
-                villager.canWork // Only those able to work
-            );
-            totalPopulation = allVillagers.filter(v => v.status !== 'drafted').length;
         }
 
-        // Generate companion options from actual villagers
-        let companionOptions = '';
-        if (availableVillagers.length > 0) {
-            // Take up to 10 available villagers for selection
-            const selectableVillagers = availableVillagers.slice(0, 10);
-
-            selectableVillagers.forEach((villager, index) => {
-                const roleDescription = this.getVillagerDescription(villager);
-                const isPreSelected = index < 3; // Pre-select first 3
-
-                companionOptions += `
-                    <label style="display: block; margin: 5px 0;">
-                        <input type="checkbox" name="companion" value="${villager.id}" ${isPreSelected ? 'checked' : ''} style="margin-right: 8px;">
-                        <span>${villager.name} (${roleDescription})</span>
-                    </label>
-                `;
-            });
-        } else {
-            companionOptions = '<p style="color: #e74c3c;">⚠️ No eligible villagers available for drafting. You need adults (16+) who are not sick or already drafted.</p>';
-        }
-
-        const draftingContent = `
-            <div class="army-drafting" style="padding: 20px;">
-                <h3>⚔️ Draft Army</h3>
-                <p>Select inhabitants to form your expedition army. You'll need supplies and brave souls willing to venture beyond the village walls.</p>
-                <div class="inhabitant-selection">
-                    <h4>👥 Available Inhabitants (Population: ${totalPopulation})</h4>
-                    <div class="draft-options" style="margin: 15px 0;">
-                        <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
-                            <h5>👑 Commander (Required)</h5>
-                            <label style="display: block; margin: 5px 0;">
-                                <input type="radio" name="ruler" value="yourself" checked style="margin-right: 8px;">
-                                <span>Yourself (Heir of House ${dynastyName})</span>
-                            </label>
-                            <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">As commander, you lead the expedition but cannot manage the village while away.</p>
-                        </div>
-                        <div class="draft-role" style="margin-bottom: 20px; padding: 15px; border: 1px solid #2ecc71; border-radius: 8px;">
-                            <h5>👥 Companions (Select up to ${Math.min(availableVillagers.length, 10)})</h5>
-                            ${companionOptions}
-                            <p style="font-size: 0.9em; color: #bdc3c7; margin: 5px 0 0 0;">Selected inhabitants will leave the village, reducing local workforce.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="draft-warning" style="padding: 10px; background-color: rgba(230, 126, 34, 0.2); border-radius: 5px; margin-top: 15px;">
-                    <p><strong>⚠️ Important:</strong> While your army is deployed, village operations will continue automatically but you cannot give direct commands.</p>
-                </div>
-                <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
-                    <button id="cancel-draft-btn" class="btn btn-secondary" style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                        Cancel
-                    </button>
-                    <button id="confirm-draft-btn" class="btn btn-primary" style="padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                        ⚔️ Form Army
-                    </button>
-                </div>
-            </div>
-        `;
-
-        // Use the modalSystem
-        if (window.modalSystem) {
-            console.log('[World] Using modalSystem');
-            window.modalSystem.showModal({
-                title: 'Army Drafting',
-                content: draftingContent,
-                width: '500px',
-                className: 'army-drafting-modal',
-                modalType: 'army-drafting'
-            }).then(() => {
-                // Add event listeners to the buttons after modal is shown
-                const confirmBtn = document.getElementById('confirm-draft-btn');
-                const cancelBtn = document.getElementById('cancel-draft-btn');
-
-                if (confirmBtn) {
-                    confirmBtn.addEventListener('click', () => {
-                        this.createArmy();
-                        window.modalSystem.closeTopModal();
-                    });
-                }
-
-                if (cancelBtn) {
-                    cancelBtn.addEventListener('click', () => {
-                        window.modalSystem.closeTopModal();
-                    });
-                }
-            });
-        }
-        // Fallback to showModal if available
-        else if (window.showModal) {
-            console.log('[World] Using window.showModal fallback');
-            window.showModal('Army Drafting', draftingContent, {
-                icon: '⚔️',
-                confirmText: 'Form Army',
-                cancelText: 'Cancel',
-                onConfirm: () => {
-                    this.createArmy();
-                }
-            });
-        } else {
-            console.error('[World] No modal system available');
-            // Final fallback - simple alert with instructions
-            alert('Army Drafting: Click on the village tile again and check the expeditions panel to see if an army was created.');
-            // Create the army anyway
-            this.createArmy();
-        }
-    }
-
-    createArmy() {
-        // Get selected companions from the modal
-        const selectedCompanions = [];
-        const companionInputs = document.querySelectorAll('input[name="companion"]:checked');
-
-        // Store villager IDs for actual drafting
-        const selectedVillagerIds = [];
-        companionInputs.forEach(input => {
-            selectedVillagerIds.push(input.value);
-        });
-
-        // Create unique army ID
-        const armyId = `army-${Date.now()}`;
-        const armyNumber = this.parties.expeditions.length + 1;
-        const armyName = `${armyNumber}${this.getOrdinalSuffix(armyNumber)} Army`;
-
-        // Create army units array for the new system
-        const armyUnits = [
-            { id: 'commander', name: 'Yourself', role: 'Commander', type: 'ruler', health: 100, attack: 20, experience: 0 }
-        ];
-
-        // Draft villagers from the population manager
-        if (this.gameState.populationManager && selectedVillagerIds.length > 0) {
-            selectedVillagerIds.forEach(villagerId => {
-                const villager = this.gameState.populationManager.getInhabitant(parseInt(villagerId));
-                if (villager && villager.status !== 'drafted') {
-                    // Record originals before any mutation
-                    const originalRole = villager.role;
-                    const originalStatus = villager.status;
-
-                    // Mark villager as drafted
-                    this.gameState.populationManager.updateStatus(villager.id, 'drafted');
-
-                    // Add to army units
-                    armyUnits.push({
-                        id: `unit_${villager.id}`,
-                        name: villager.name,
-                        role: 'Soldier',
-                        type: 'villager',
-                        villagerId: villager.id,
-                        // Preserve originals for restoration on disband
-                        originalRole: originalRole,
-                        originalStatus: originalStatus,
-                        health: 80,
-                        attack: 10 + Math.floor(villager.age / 10), // Age affects combat ability
-                        experience: 0,
-                        age: villager.age
-                    });
-                }
-            });
-
-            // Update population count to reflect drafted villagers
-            this.gameState.population = this.gameState.populationManager.getAll()
-                .filter(v => v.status !== 'drafted').length;
-
-            console.log(`[WorldManager] Drafted ${armyUnits.length - 1} villagers for army. Remaining population: ${this.gameState.population}`);
-        }
-
-        // Create army using new system (starts at village location)
-        const newArmy = this.gameState.createArmy(armyName, armyUnits, this.playerVillageHex);
-
-        // Legacy expedition tracking (for UI compatibility)
-        const legacyArmy = {
-            id: armyId,
-            name: armyName,
-            members: armyUnits.map(unit => ({
-                name: unit.name,
-                role: unit.role,
-                type: unit.type,
-                villagerId: unit.villagerId,
-                age: unit.age
-            })),
-            morale: 100,
-            supplies: {
-                food: 0,
-                water: 0,
-                equipment: 'basic'
-            },
-            location: this.playerVillageHex,
-            status: 'ready',
-            draftedVillagers: armyUnits.filter(u => u.type === 'villager').map(u => ({
-                id: u.villagerId,
-                name: u.name,
-                // Use preserved originals captured at draft time
-                originalRole: u.originalRole || 'peasant',
-                originalStatus: u.originalStatus || 'idle',
-                age: u.age
-            })),
-            armyId: newArmy.id // Link to new army system
-        };
-
-        this.parties.expeditions.push(legacyArmy);
-        this.updateExpeditionsList();
-
-        // Update UI
-        if (this.gameState.updateResourceDisplay) {
-            this.gameState.updateResourceDisplay();
-        } else if (this.gameState.updateUI) {
-            this.gameState.updateUI();
-        }
-
-        // Show army created notification
-        if (window.showToast) {
-            window.showToast(`⚔️ Army "${armyName}" has been formed with ${armyUnits.length} members at village!`, {
-                icon: '🏗️',
-                type: 'success',
-                timeout: 5000
+        // List active armies with disband buttons
+        const armies = this.gameState.getAllArmies?.() || [];
+        if (armies.length > 0) {
+            html += `<hr><h4>Active Armies</h4>`;
+            armies.forEach(a => {
+                const statusIcon = a.status === 'traveling' ? '🚶' : a.status === 'fighting' ? '⚔️' : '🏕️';
+                html += `<div class="army-list-item">
+                    <span>${statusIcon} ${a.name} (${a.units.length} units)</span>
+                    <button class="world-btn-sm" onclick="window.worldManager.returnArmy('${a.id}')">🏠</button>
+                    <button class="world-btn-sm" onclick="window.worldManager.disbandArmy('${a.id}')">❌</button>
+                </div>`;
             });
         }
 
-        // Emit population drafted event for achievements
-        if (window.eventBus) {
-            window.eventBus.emit('population_drafted', { amount: armyUnits.length - 1 }); // -1 for commander
-        }
-
-        // Achievement system notification
-        if (window.achievementSystem) {
-            window.achievementSystem.emitPopulationDrafted(armyUnits.length - 1, { armyId: armyId });
-        }
-
-        // Update army displays to show the new army on the map
-        this.updateArmyDisplays();
-
-        // Show logistics tutorial after a brief delay
-        setTimeout(() => {
-            this.showLogisticsTutorial();
-        }, 2000);
+        panel.innerHTML = html;
     }
 
-    getVillagerDescription(villager) {
-        const age = villager.age;
-        const role = villager.role || 'peasant';
+    // ===================================================================
+    // ARMY DRAFTING — POPULATION INTERACTION
+    // ===================================================================
 
-        // Age categories
-        let ageDesc = '';
-        if (age < 20) ageDesc = 'Young';
-        else if (age < 30) ageDesc = 'Adult';
-        else if (age < 40) ageDesc = 'Experienced';
-        else ageDesc = 'Veteran';
-
-        // Role descriptions
-        const roleDescs = {
-            'peasant': 'Hardy worker',
-            'farmer': 'Experienced with crops',
-            'builder': 'Skilled in construction',
-            'guard': 'Trained in combat',
-            'scout': 'Quick and observant'
-        };
-
-        const roleDesc = roleDescs[role] || 'Willing worker';
-
-        return `${ageDesc} ${roleDesc}, age ${age}`;
+    getAvailableForDraft() {
+        if (!this.gameState.populationManager) return [];
+        return this.gameState.populationManager.getAll().filter(v =>
+            v.age >= 16 &&
+            v.status !== 'drafted' &&
+            v.status !== 'sick' &&
+            v.canWork !== false
+        );
     }
 
-    getOrdinalSuffix(num) {
-        const lastDigit = num % 10;
-        const lastTwoDigits = num % 100;
-
-        if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
-            return 'th';
-        }
-
-        switch (lastDigit) {
-            case 1: return 'st';
-            case 2: return 'nd';
-            case 3: return 'rd';
-            default: return 'th';
-        }
-    }
-
-    updateExpeditionsList() {
-        const list = document.getElementById('expedition-list');
-        if (!list) return;
-
-        // Check for both armies and scout expeditions
-        const hasArmies = this.parties.expeditions.length > 0;
-        const hasScoutTrips = this.expeditions && this.expeditions.length > 0;
-        // Also include any population members outside the village (traveling/drafted with non-village location)
-        let outsidePeople = [];
-        if (this.gameState.populationManager) {
-            const all = this.gameState.populationManager.getAll();
-            outsidePeople = all.filter(p => (p.location && p.location !== 'village') || p.status === 'drafted' || p.status === 'traveling');
-        }
-        const hasOutsidePeople = outsidePeople.length > 0;
-
-        if (!hasArmies && !hasScoutTrips && !hasOutsidePeople) {
-            list.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">No expeditions active. Draft an army or send scouts to begin exploring.</p>';
+    showDraftModal() {
+        const available = this.getAvailableForDraft();
+        if (available.length < 1) {
+            window.showToast?.('No villagers available for drafting.', { type: 'warning' });
             return;
         }
 
-        let content = '';
+        let html = `<h2>⚔️ Draft Army</h2>`;
+        html += `<p>Select villagers to draft (${available.length} available):</p>`;
+        html += `<div class="draft-list" style="max-height:300px;overflow-y:auto;">`;
 
-        // Display army expeditions
-        if (hasArmies) {
-            content += '<h4 style="color: #e74c3c; margin-bottom: 10px;">⚔️ Army Expeditions</h4>';
-            this.parties.expeditions.forEach(army => {
-                // Determine if this army is currently in enemy ZOC
-                let inZOC = false;
-                try {
-                    const core = army.armyId ? this.gameState.getArmy(army.armyId) : null;
-                    const pos = core && core.position
-                        ? { row: core.position.y, col: core.position.x }
-                        : (army.location && typeof army.location.row === 'number' && typeof army.location.col === 'number'
-                            ? { row: army.location.row, col: army.location.col }
-                            : this.playerVillageHex);
-                    if (pos) inZOC = this.isInEnemyZOC(pos.row, pos.col);
-                } catch (_) { /* ignore */ }
-                const people = Math.max(army.members?.length || 1, 1);
-                const totalFood = (army.supplies?.food ?? 0);
-                const daysLeft = Math.floor(totalFood / people);
-                const lowFood = daysLeft <= 3 && daysLeft > 0;
-                const noFood = daysLeft <= 0;
-                const lowMorale = (army.morale ?? 100) <= 30;
-                const badges = [
-                    noFood ? '<span class="badge danger">🍞 0</span>' : (lowFood ? `<span class="badge warning">🍞 ${daysLeft}</span>` : ''),
-                    lowMorale ? `<span class="badge danger">😔 ${army.morale}%</span>` : ''
-                ].filter(Boolean).join(' ');
-                const canReturn = true;
-                content += `
-                    <div class="expedition-item army-expedition">
-                        <h4>⚔️ ${army.name} ${badges}</h4>
-                        <p><strong>Members:</strong> ${army.members.length} (${army.members.map(m => m.name).join(', ')})</p>
-                        <p><strong>Morale:</strong> ${army.morale}%</p>
-                        <p><strong>Status:</strong> ${army.status}</p>
-                        
-                        <div class="expedition-actions">
-                            <button class="action-btn small" onclick="window.safeWorldManagerCall?.('manageLogistics', '${army.id}') || (window.worldManager && window.worldManager.manageLogistics?.('${army.id}'))">
-                                📦 Manage Logistics
-                            </button>
-                            <button class="action-btn small secondary" onclick="window.safeWorldManagerCall?.('renameArmy', '${army.id}') || (window.worldManager && window.worldManager.renameArmy?.('${army.id}'))">
-                                ✏️ Rename
-                            </button>
-                            <button class="action-btn small" onclick="window.safeWorldManagerCall?.('viewComposition', '${army.id}') || (window.worldManager && window.worldManager.viewComposition?.('${army.id}'))">
-                                👥 View Composition
-                            </button>
-                            <button class="action-btn small primary" onclick="window.safeWorldManagerCall?.('travel', '${army.id}') || (window.worldManager && window.worldManager.travel?.('${army.id}'))">
-                                🚶 Travel
-                            </button>
-                            <button class="action-btn small" onclick="window.safeWorldManagerCall?.('returnHome', '${army.id}') || (window.worldManager && window.worldManager.returnHome?.('${army.id}'))">
-                                🏠 Return Home
-                            </button>
-                            <button class="action-btn small danger" ${inZOC ? 'disabled title="Cannot disband in enemy ZOC"' : ''} onclick="window.safeWorldManagerCall?.('disbandArmy', '${army.id}') || (window.worldManager && window.worldManager.disbandArmy?.('${army.id}'))">
-                                ❌ Disband
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
+        available.slice(0, 12).forEach((v, i) => {
+            const checked = i < 3 ? 'checked' : '';
+            html += `<label class="draft-option">
+                <input type="checkbox" value="${v.id}" ${checked}>
+                ${v.name || 'Villager'} (age ${v.age}, ${v.role || 'idle'})
+            </label><br>`;
+        });
+        html += `</div>`;
+        html += `<div style="margin-top:12px;">
+            <label>Army name: <input type="text" id="draft-army-name" value="Army ${(this.gameState.armies?.length || 0) + 1}" /></label>
+        </div>`;
+        html += `<div class="modal-buttons" style="margin-top:12px;">
+            <button class="btn-primary" onclick="window.worldManager.confirmDraft()">Confirm Draft</button>
+            <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
+        </div>`;
+
+        window.modalSystem?.showModal(html);
+    }
+
+    confirmDraft() {
+        const checkboxes = document.querySelectorAll('.draft-list input[type=checkbox]:checked');
+        const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        const armyName = document.getElementById('draft-army-name')?.value || 'Army';
+
+        if (ids.length < 1) {
+            window.showToast?.('Select at least 1 villager.', { type: 'warning' });
+            return;
         }
 
-        // Display scout expeditions
-        if (hasScoutTrips) {
-            if (hasArmies) {
-                content += '<hr style="margin: 15px 0; border: 1px solid #34495e;">';
-            }
-            content += '<h4 style="color: #3498db; margin-bottom: 10px;">🔍 Scout Expeditions</h4>';
+        const units = [];
+        ids.forEach(id => {
+            const villager = this.gameState.populationManager.getInhabitant(id);
+            if (!villager || villager.status === 'drafted') return;
 
-            this.expeditions.forEach(expedition => {
-                const daysPassed = window.gameState.currentDay - expedition.startDay;
-                let currentStatus = '';
-                let actionButton = '';
+            const originalRole = villager.role;
+            const originalStatus = villager.status;
 
-                if (expedition.returningHome) {
-                    const returnDistance = Math.abs(expedition.currentHex.row - this.playerVillageHex.row) +
-                        Math.abs(expedition.currentHex.col - this.playerVillageHex.col);
-                    const returnProgress = Math.max(0, expedition.travelDistance - expedition.daysRemaining);
-                    const returnDaysLeft = Math.max(0, expedition.daysRemaining);
+            // Mark drafted in population
+            this.gameState.populationManager.updateStatus(villager.id, 'drafted');
 
-                    currentStatus = `🏠 Returning home (${returnDaysLeft} day${returnDaysLeft !== 1 ? 's' : ''} remaining)`;
+            units.push({
+                id: `unit_${villager.id}`,
+                villagerId: villager.id,
+                name: villager.name || 'Soldier',
+                originalRole,
+                originalStatus,
+                health: 80 + Math.floor(Math.random() * 20),
+                maxHealth: 100,
+                attack: 10 + Math.floor(villager.age / 10)
+            });
+        });
 
-                    if (returnDaysLeft === 0) {
-                        actionButton = `<button class="action-btn small primary" onclick="window.worldManager.completeExpedition('${expedition.id}')" style="margin-top: 8px;">
-                            ✅ Scouts Returned
-                        </button>`;
-                    }
-                } else if (expedition.status === 'traveling') {
-                    const travelProgress = Math.min(expedition.travelDistance, daysPassed);
-                    const daysLeft = Math.max(0, expedition.travelDistance - daysPassed);
+        if (units.length === 0) return;
 
-                    if (daysLeft === 0) {
-                        currentStatus = '✅ Arrived at destination - Scouting area';
-                        actionButton = `<button class="action-btn small secondary" onclick="window.worldManager.orderScoutsHome('${expedition.id}')" style="margin-top: 8px;">
-                            🏠 Order Return Home
-                        </button>`;
-                        // Update expedition status to stationed
-                        expedition.status = 'stationed';
-                        expedition.isStationed = true;
-                        // Reveal the hex now that scouts have arrived
-                        this.revealHex(expedition.targetHex.row, expedition.targetHex.col);
-                        this.revealSurroundingHexes(expedition.targetHex.row, expedition.targetHex.col);
-                    } else {
-                        currentStatus = `🚶 Traveling to destination (${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining)`;
-                    }
-                } else if (expedition.status === 'stationed') {
-                    currentStatus = '🔍 Stationed at destination - Gathering intelligence';
-                    actionButton = `<button class="action-btn small secondary" onclick="window.worldManager.orderScoutsHome('${expedition.id}')" style="margin-top: 8px;">
-                        🏠 Order Return Home
+        // Create army in gameState (canonical source)
+        const army = this.gameState.createArmy(armyName, units, {
+            x: this.capitalCol,
+            y: this.capitalRow
+        });
+
+        // Store drafted villager data on the army for restoration on disband
+        army.draftedVillagers = units.map(u => ({
+            id: u.villagerId,
+            name: u.name,
+            originalRole: u.originalRole,
+            originalStatus: u.originalStatus
+        }));
+        army.supplies = { food: Math.min(units.length * 5, this.gameState.resources?.food || 0) };
+
+        // Deduct food for supplies
+        if (this.gameState.resources) {
+            this.gameState.resources.food = Math.max(0, this.gameState.resources.food - army.supplies.food);
+        }
+
+        // Update population count (exclude drafted)
+        this.gameState.population = this.gameState.populationManager.getAll()
+            .filter(v => v.status !== 'drafted').length;
+
+        window.modalSystem?.closeModal();
+        window.showToast?.(`${armyName} formed with ${units.length} soldiers!`, { type: 'success' });
+        window.eventBus?.emit('army_drafted', { army });
+
+        this.refreshUI();
+        this.gameState.save?.();
+    }
+
+    // ===================================================================
+    // ARMY MOVEMENT
+    // ===================================================================
+
+    showMoveArmyModal() {
+        if (!this.selectedHex) return;
+        const armies = (this.gameState.getAllArmies?.() || []).filter(a => a.status === 'idle');
+        if (armies.length === 0) return;
+
+        const { row, col } = this.selectedHex;
+        let html = `<h2>🚶 Move Army</h2>`;
+        html += `<p>Select army to move to ${this.formatCoords(row, col)}:</p>`;
+
+        armies.forEach(a => {
+            html += `<button class="world-btn" style="margin:4px 0;width:100%;"
+                        onclick="window.worldManager.moveArmy('${a.id}', ${row}, ${col})">
+                        ${a.name} (${a.units.length} units)
                     </button>`;
+        });
+        html += `<div class="modal-buttons" style="margin-top:12px;">
+            <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
+        </div>`;
+
+        window.modalSystem?.showModal(html);
+    }
+
+    moveArmy(armyId, targetRow, targetCol) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+
+        const fromRow = army.position.y;
+        const fromCol = army.position.x;
+
+        // Use A* pathfinding
+        const pathfind = window.findPath || window.pathfinding?.findPath;
+        let path;
+        if (pathfind) {
+            path = pathfind(
+                { row: fromRow, col: fromCol },
+                { row: targetRow, col: targetCol },
+                this.hexMap,
+                this.mapWidth,
+                this.mapHeight
+            );
+        }
+
+        if (!path || path.length < 2) {
+            // Fallback: direct move (will take multiple days for > 1 distance)
+            path = this.buildSimplePath(fromRow, fromCol, targetRow, targetCol);
+        }
+
+        army.travelPlan = {
+            path: path,
+            index: 0
+        };
+        army.status = 'traveling';
+
+        window.modalSystem?.closeModal();
+        window.showToast?.(`${army.name} is moving to ${this.formatCoords(targetRow, targetCol)}`, { type: 'info' });
+        this.refreshUI();
+    }
+
+    buildSimplePath(fromRow, fromCol, toRow, toCol) {
+        // Step-by-step path for when A* isn't available
+        const path = [{ row: fromRow, col: fromCol }];
+        let r = fromRow, c = fromCol;
+        while (r !== toRow || c !== toCol) {
+            if (r < toRow) r++;
+            else if (r > toRow) r--;
+            if (c < toCol) c++;
+            else if (c > toCol) c--;
+            path.push({ row: r, col: c });
+        }
+        return path;
+    }
+
+    returnArmy(armyId) {
+        this.moveArmy(armyId, this.capitalRow, this.capitalCol);
+    }
+
+    processArmyMovement() {
+        const armies = this.gameState.getAllArmies?.() || [];
+        armies.forEach(army => {
+            if (army.status !== 'traveling' || !army.travelPlan) return;
+
+            const plan = army.travelPlan;
+            plan.index++;
+
+            if (plan.index >= plan.path.length) {
+                // Arrived at destination
+                const dest = plan.path[plan.path.length - 1];
+                army.position = { x: dest.col, y: dest.row };
+                army.status = 'idle';
+                army.travelPlan = null;
+
+                // If arrived at capital, auto-disband
+                if (dest.row === this.capitalRow && dest.col === this.capitalCol) {
+                    this.performDisband(army.id);
+                    return;
                 }
 
-                const totalProgress = expedition.returningHome ?
-                    (expedition.isStationed ? 50 + ((expedition.travelDistance - expedition.daysRemaining) / expedition.travelDistance) * 50 : 0) :
-                    (Math.min(daysPassed, expedition.travelDistance) / expedition.travelDistance) * 100;
+                // Explore the tile we arrived at
+                this.exploreTile(dest.row, dest.col);
 
-                content += `
-                    <div class="expedition-item scout-expedition ${expedition.isStationed && !expedition.returningHome ? 'stationed' : ''}">
-                        <div class="expedition-header">
-                            <h5>🎯 Scout Mission to (${expedition.targetHex.row}, ${expedition.targetHex.col})</h5>
-                            <span class="expedition-scouts">${expedition.scouts.length} scouts</span>
-                        </div>
-                        <div class="expedition-details">
-                            <p><strong>Scouts:</strong> ${expedition.scouts.map(s => s.name).join(', ')}</p>
-                            <p><strong>Distance:</strong> ${expedition.travelDistance} hex${expedition.travelDistance !== 1 ? 'es' : ''}</p>
-                            <p><strong>Status:</strong> ${currentStatus}</p>
-                        </div>
-                        <div class="expedition-progress">
-                            <div class="progress-bar" style="background: #34495e; border-radius: 4px; height: 8px; margin: 8px 0;">
-                                <div class="progress-fill" style="width: ${totalProgress}%; background: ${expedition.isStationed ? '#f39c12' : '#3498db'}; height: 100%; border-radius: 4px; transition: width 0.3s;"></div>
-                            </div>
-                            <span class="progress-text" style="font-size: 0.8em; color: #bdc3c7;">${Math.floor(totalProgress)}% journey complete</span>
-                        </div>
-                        ${actionButton}
-                    </div>
-                `;
-            });
-        }
+                window.showToast?.(`${army.name} arrived at ${this.formatCoords(dest.row, dest.col)}`, { type: 'info' });
+            } else {
+                // Move one step
+                const step = plan.path[plan.index];
+                army.position = { x: step.col, y: step.row };
 
-        // Display non-village population presence (outside city)
-        if (hasOutsidePeople) {
-            if (hasArmies || hasScoutTrips) {
-                content += '<hr style="margin: 15px 0; border: 1px solid #34495e;">';
+                // Explore tiles as army moves through
+                this.exploreTile(step.row, step.col);
             }
-            content += '<h4 style="color: #8e44ad; margin-bottom: 10px;">🚶 People Outside the City</h4>';
 
-            // Group by location/status for readability
-            const groups = {};
-            outsidePeople.forEach(p => {
-                const key = p.location && p.location !== 'village' ? p.location : (p.status || 'outside');
-                if (!groups[key]) groups[key] = [];
-                groups[key].push(p);
-            });
-
-            Object.entries(groups).forEach(([key, persons]) => {
-                content += `
-                    <div class="expedition-item outside-group">
-                        <div class="expedition-header" style="display:flex;justify-content:space-between;align-items:center;">
-                            <h5>${key === 'drafted' ? 'Drafted (assigned to armies)' : key}</h5>
-                            <span class="expedition-scouts">${persons.length} people</span>
-                        </div>
-                        <div class="expedition-details">
-                            <p><strong>Members:</strong> ${persons.map(p => p.name).join(', ')}</p>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        // Add simple badge styles once
-        if (!document.getElementById('expedition-badge-styles')) {
-            const style = document.createElement('style');
-            style.id = 'expedition-badge-styles';
-            style.textContent = `
-                .badge { display:inline-block; padding:2px 6px; margin-left:6px; border-radius:10px; font-size:0.75em; color:#fff; }
-                .badge.warning { background:#f39c12; }
-                .badge.danger { background:#e74c3c; }
-            `;
-            document.head.appendChild(style);
-        }
-        list.innerHTML = content;
+            // Consume supplies
+            if (army.supplies) {
+                army.supplies.food -= (army.units?.length || 1);
+                if (army.supplies.food <= 0) {
+                    army.supplies.food = 0;
+                    // Starvation: lose morale
+                    army.morale = Math.max(0, (army.morale || 100) - 10);
+                    if (army.morale <= 0) {
+                        window.showToast?.(`${army.name} disbanded from starvation!`, { type: 'error' });
+                        this.performDisband(army.id);
+                    }
+                }
+            }
+        });
     }
+
+    // ===================================================================
+    // ARMY DISBANDING — POPULATION RESTORATION
+    // ===================================================================
 
     disbandArmy(armyId) {
-        const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) {
-            console.error('[WorldManager] Army not found:', armyId);
-            return;
-        }
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
 
-        // Confirm disbanding
-        if (window.modalSystem) {
-            console.log('[World] Showing confirmation modal for army disbanding');
-            window.modalSystem.showConfirmation(
-                `Are you sure you want to disband ${army.name}? All members will return to the village.`,
-                {
-                    title: 'Disband Army',
-                    confirmText: 'Disband',
-                    cancelText: 'Cancel',
-                    onConfirm: () => {
-                        console.log('[World] Confirmation onConfirm callback triggered');
-                        this.performDisbandArmy(armyId);
-                    },
-                    onCancel: () => {
-                        console.log('[World] Confirmation onCancel callback triggered');
-                    }
-                }
-            ).then((result) => {
-                console.log('[World] Confirmation dialog result:', result);
-            }).catch((error) => {
-                console.error('[World] Confirmation dialog error:', error);
-                // Fallback to browser confirm
-                if (confirm(`Disband ${army.name}? All members will return to the village.`)) {
-                    this.performDisbandArmy(armyId);
-                }
-            });
-        } else if (confirm(`Disband ${army.name}? All members will return to the village.`)) {
-            this.performDisbandArmy(armyId);
-        }
-    }
-
-    performDisbandArmy(armyId) {
-        const armyIndex = this.parties.expeditions.findIndex(a => a.id === armyId);
-        if (armyIndex === -1) return;
-
-        const army = this.parties.expeditions[armyIndex];
-
-        // Prevent disbanding inside enemy Zone of Control (ZOC)
-        try {
-            const coreArmy = army.armyId && this.gameState && typeof this.gameState.getArmy === 'function'
-                ? this.gameState.getArmy(army.armyId)
-                : null;
-            const pos = coreArmy && coreArmy.position
-                ? { row: coreArmy.position.y, col: coreArmy.position.x }
-                : (army.location && typeof army.location.row === 'number' && typeof army.location.col === 'number'
-                    ? { row: army.location.row, col: army.location.col }
-                    : null);
-            if (pos && this.isInEnemyZOC(pos.row, pos.col)) {
-                if (window.showToast) {
-                    window.showToast('🛡️ Cannot disband inside enemy Zone of Control.', { type: 'warning', timeout: 3000 });
-                }
-                return;
-            }
-        } catch (_) { /* ignore */ }
-
-        // Return drafted villagers to the population
-        if (this.gameState.populationManager && army.draftedVillagers) {
-            army.draftedVillagers.forEach(draftedVillager => {
-                const villager = this.gameState.populationManager.getInhabitant(draftedVillager.id);
-                if (villager) {
-                    // Restore original status (fallback to idle)
-                    const restoredStatus = draftedVillager.originalStatus || 'idle';
-                    this.gameState.populationManager.updateStatus(villager.id, restoredStatus);
-                    // Restore original role if it was changed
-                    if (draftedVillager.originalRole && villager.role !== draftedVillager.originalRole) {
-                        this.gameState.populationManager.assignRole(villager.id, draftedVillager.originalRole);
-                    }
-                    // Ensure location is back to village and clear transient flags
-                    villager.location = 'village';
-                    villager.onExpedition = false;
-                    if (villager.status === 'traveling' || villager.status === 'away') {
-                        this.gameState.populationManager.updateStatus(villager.id, 'idle');
-                    }
-                }
-            });
-
-            // Update population count
-            this.gameState.population = this.gameState.populationManager.getAll()
-                .filter(v => v.status !== 'drafted').length;
-
-            // Re-optimize jobs after people return
-            try { this.gameState.populationManager.optimizeJobAssignments(); } catch (_) { }
-        } else {
-            // Fallback: simple population addition
-            const returningMembers = army.members.length - 1; // -1 for commander (yourself)
-            if (this.gameState && typeof this.gameState.population === 'number') {
-                this.gameState.population += returningMembers;
-            }
-        }
-
-        // Remove linked core army if present
-        try {
-            if (army.armyId && this.gameState && typeof this.gameState.getArmy === 'function') {
-                const idx = this.gameState.armies?.findIndex?.(a => a.id === army.armyId);
-                if (idx != null && idx >= 0) {
-                    this.gameState.armies.splice(idx, 1);
-                }
-            }
-        } catch (_) { /* ignore */ }
-
-        // Remove army from expeditions
-        this.parties.expeditions.splice(armyIndex, 1);
-
-        // Update UI
-        this.updateExpeditionsList();
-        if (this.gameState.updateResourceDisplay) {
-            this.gameState.updateResourceDisplay();
-        } else if (this.gameState.updateUI) {
-            this.gameState.updateUI();
-        }
-
-        // Emit population returned event
-        if (window.eventBus) {
-            window.eventBus.emit('population_returned', {
-                amount: army.draftedVillagers ? army.draftedVillagers.length : army.members.length - 1,
-                armyName: army.name
-            });
-            // Also emit expedition_completed to close any management locks/listeners
-            try { window.eventBus.emit('expedition_completed', { disbanded: true, armyName: army.name }); } catch (_) { }
-        }
-
-        window.showToast(`🏠 ${army.name} disbanded! Members have returned to the village.`, {
-            icon: '✅',
-            type: 'success',
-            timeout: 3000
-        });
-    }
-
-    manageLogistics(armyId) {
-        console.log('[World] manageLogistics called with armyId:', armyId);
-        console.log('[World] this.parties.expeditions:', this.parties.expeditions);
-        const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) {
-            console.error('[World] Army not found:', armyId, 'Available armies:', this.parties.expeditions.map(a => a.id));
-            return;
-        }
-
-        // Get current resources from gameState
-        const currentFood = this.gameState.food || this.gameState.resources?.food || 0;
-
-        const people = Math.max(army.members?.length || 1, 1);
-        const totalPD = army.supplies.food || 0; // person-days
-        const daysForArmy = Math.floor(totalPD / people);
-        const capacityPD = people * 5;
-        const remainingCapacityPD = Math.max(0, capacityPD - totalPD);
-        const addDays = 7; // default add via button
-        const addPD = addDays * people; // person-days requested
-        const foodPerPD = 3; // cost: 3 food per person-day
-        const totalCost = addPD * foodPerPD;
-        const logisticsContent = `
-            <div class="logistics-management" style="padding: 12px 16px; max-width: 860px;">
-                <h3 style="margin:0 0 8px 0;">📦 Logistics - ${army.name}</h3>
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0;">
-                    <div style="background: rgba(52,152,219,0.15); border:1px solid #2980b9; border-radius:8px; padding:12px;">
-                        <div style="font-weight:700; color:#3498db; margin-bottom:6px;">Available Food</div>
-                        <div style="font-size:1.25em;">🍞 ${currentFood}</div>
-                    </div>
-                    <div style="background: rgba(46,204,113,0.12); border:1px solid #27ae60; border-radius:8px; padding:12px;">
-                        <div style="font-weight:700; color:#27ae60; margin-bottom:6px;">Person-Days</div>
-                        <div>Current: <strong>${totalPD}</strong> · Capacity: <strong>${capacityPD}</strong></div>
-                        <div style="opacity:0.85;">≈ <strong>${daysForArmy}</strong> days for <strong>${people}</strong> people</div>
-                    </div>
-                    <div style="background: rgba(241,196,15,0.12); border:1px solid #f1c40f; border-radius:8px; padding:12px;">
-                        <div style="font-weight:700; color:#f1c40f; margin-bottom:6px;">Status</div>
-                        <div style="color:${totalPD > 0 ? '#2ecc71' : '#e74c3c'};">${totalPD > 0 ? '✅ Ready' : '⚠️ No food packed'}</div>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 16px;">
-                    <div style="background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:12px;">
-                        <h4 style="margin:0 0 8px 0;">🥖 Food Supplies</h4>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button class="action-btn" 
-                                onclick="window.safeWorldManagerCall?.('addSupply','${armyId}','food', ${addDays}) || (window.worldManager && window.worldManager.addSupply?.('${armyId}','food', ${addDays}))"
-                                ${currentFood < totalCost ? 'disabled' : ''}>
-                                Add ${addDays} Days (-${totalCost} food)
-                            </button>
-                            ${remainingCapacityPD > 0 ? (() => { const needDays = Math.ceil(remainingCapacityPD / people); const cost = remainingCapacityPD * foodPerPD; return `<button class='action-btn secondary' onclick="window.safeWorldManagerCall?.('addSupply','${armyId}','food', ${needDays}) || (window.worldManager && window.worldManager.addSupply?.('${armyId}','food', ${needDays}))" ${currentFood < cost ? 'disabled' : ''}>Fill to Capacity (-${cost} food)</button>`; })() : `<span style='color:#e67e22; align-self:center;'>Capacity full.</span>`}
-                        </div>
-                    </div>
-                    <div style="display:grid; gap:12px;">
-                        <div style="background: rgba(52,152,219,0.1); border:1px solid #3498db; border-radius:10px; padding:10px;">
-                            <div style="font-weight:700; color:#3498db;">💧 Water</div>
-                            <div>Current: ${army.supplies.water} days</div>
-                            <div style="opacity:0.8;">Optional — often found en route</div>
-                        </div>
-                        <div style="background: rgba(243,156,18,0.1); border:1px solid #f39c12; border-radius:10px; padding:10px;">
-                            <div style="font-weight:700; color:#f39c12;">⚔️ Equipment</div>
-                            <div>Current: ${army.supplies.equipment}</div>
-                            <div style="opacity:0.8;">Basic gear for scouting missions</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top:14px; background: rgba(241,196,15,0.12); border:1px solid #f1c40f; border-radius:8px; padding:12px;">
-                    <h4 style="margin:0 0 8px 0;">💡 Tips</h4>
-                    <ul style="margin-left:16px;">
-                        <li>Keep at least 3–5 days of food per person.</li>
-                        <li>Base travel speed is ~7 days per hex tile.</li>
-                        <li>Events can change supply usage and progress.</li>
-                        <li>Plan for the round trip or build outposts.</li>
-                    </ul>
-                </div>
+        window.modalSystem?.showModal(`
+            <h2>Disband ${army.name}?</h2>
+            <p>Soldiers will return to village life.</p>
+            <div class="modal-buttons">
+                <button class="btn-primary" onclick="window.worldManager.performDisband('${armyId}')">Confirm</button>
+                <button class="btn-secondary" onclick="window.modalSystem?.closeModal()">Cancel</button>
             </div>
-        `;
-
-        if (window.showModal) {
-            window.showModal(
-                `Logistics - ${army.name}`,
-                logisticsContent,
-                {
-                    icon: '📦',
-                    type: 'info',
-                    confirmText: 'Done'
-                }
-            );
-        } else {
-            console.error('[World] Modal system not available');
-        }
+        `);
     }
 
-    updateLogisticsModal(armyId) {
-        console.log('[World] Updating logistics modal for armyId:', armyId);
-        const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) {
-            console.error('[World] Army not found for modal update:', armyId);
-            return;
+    performDisband(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+
+        // Restore villagers
+        if (this.gameState.populationManager && army.draftedVillagers) {
+            army.draftedVillagers.forEach(dv => {
+                const villager = this.gameState.populationManager.getInhabitant(dv.id);
+                if (!villager) return;
+
+                const restoredStatus = dv.originalStatus || 'idle';
+                this.gameState.populationManager.updateStatus(villager.id, restoredStatus);
+
+                if (dv.originalRole) {
+                    this.gameState.populationManager.assignRole?.(villager.id, dv.originalRole);
+                }
+                villager.location = 'village';
+                villager.onExpedition = false;
+            });
+
+            // Re-optimize jobs
+            this.gameState.populationManager.optimizeJobAssignments?.();
         }
 
-        // Try to find and update the existing modal
-        const modalTitle = `Logistics - ${army.name}`;
-        const existingModal = Array.from(document.querySelectorAll('.modal')).find(modal => {
-            const titleElement = modal.querySelector('.modal-title, h3');
-            return titleElement && titleElement.textContent.includes(`Logistics - ${army.name}`);
+        // Remove army from gameState
+        const idx = this.gameState.armies.findIndex(a => a.id === armyId);
+        if (idx !== -1) this.gameState.armies.splice(idx, 1);
+
+        // Recount population
+        this.gameState.population = this.gameState.populationManager
+            ? this.gameState.populationManager.getAll().filter(v => v.status !== 'drafted').length
+            : this.gameState.population;
+
+        window.modalSystem?.closeModal();
+        window.showToast?.(`Army has been disbanded.`, { type: 'info' });
+        window.eventBus?.emit('army_disbanded', { armyId });
+
+        this.refreshUI();
+        this.gameState.save?.();
+    }
+
+    // ===================================================================
+    // SCOUTING
+    // ===================================================================
+
+    scoutTile(row, col) {
+        const hex = this.hexMap[row]?.[col];
+        if (!hex || hex.visibility !== 'scoutable') return;
+
+        // Require an army on an adjacent explored tile
+        const armies = this.gameState.getAllArmies?.() || [];
+        const nearbyArmy = armies.find(a => {
+            const dist = Math.abs(a.position.y - row) + Math.abs(a.position.x - col);
+            return dist <= 1 && a.status === 'idle';
         });
 
-        if (existingModal) {
-            console.log('[World] Found existing logistics modal, updating content...');
-
-            // Get current resources from gameState
-            const currentFood = this.gameState.food || this.gameState.resources?.food || 0;
-
-            // Generate updated content (lightweight; not duplicating Fill button here for brevity)
-            const logisticsContent = `
-                <div class="logistics-management" style="padding: 20px;">
-                    <h3>📦 Logistics Management - ${army.name}</h3>
-                    <p>Manage supplies and equipment for your expedition. Proper preparation is crucial for survival in the wilderness.</p>
-                    
-                    <div class="current-resources" style="margin: 15px 0; padding: 10px; background-color: rgba(52, 152, 219, 0.2); border-radius: 5px;">
-                        <h4>Available Resources</h4>
-                        <p>🍞 Food: ${currentFood}</p>
-                    </div>
-                    
-                    <div class="supply-grid" style="margin: 20px 0;">
-                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #e74c3c; border-radius: 8px;">
-                            <h4>🍞 Food Supplies</h4>
-                            <p>Current: ${army.supplies.food} person-days</p>
-                            <p style="color: ${(army.supplies.food || 0) > 0 ? '#27ae60' : '#e74c3c'};">
-                                ${(army.supplies.food || 0) > 0 ? '✅ Army has food supplies' : '⚠️ Insufficient! Armies need food to maintain morale and strength.'}
-                            </p>
-                            <button class="action-btn" onclick="window.safeWorldManagerCall?.('addSupply', '${armyId}', 'food', 7) || (window.worldManager && window.worldManager.addSupply?.('${armyId}', 'food', 7))" 
-                                    style="margin-top: 10px; padding: 8px 12px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;"
-                                    ${currentFood < 21 ? 'disabled' : ''}>
-                                Add 7 Days Food (-21 food) ${currentFood < 21 ? '(Not enough food)' : ''}
-                            </button>
-                        </div>
-                        
-                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #3498db; border-radius: 8px;">
-                            <h4>💧 Water</h4>
-                            <p>Current: ${army.supplies.water} days worth</p>
-                            <p style="color: #3498db;">ℹ️ Optional - Can be found along the way</p>
-                        </div>
-                        
-                        <div class="supply-item" style="margin-bottom: 15px; padding: 15px; border: 1px solid #f39c12; border-radius: 8px;">
-                            <h4>⚔️ Equipment</h4>
-                            <p>Current: ${army.supplies.equipment}</p>
-                            <p style="color: #f39c12;">Basic equipment suitable for scouting missions</p>
-                        </div>
-                    </div>
-                    
-                    <div class="logistics-tutorial" style="padding: 15px; background-color: rgba(241, 196, 15, 0.2); border-radius: 5px;">
-                        <h4>💡 Tutorial: Expedition Logistics</h4>
-                        <ul style="text-align: left; padding-left: 20px; margin: 10px 0;">
-                            <li><strong>Food:</strong> Essential for maintaining army morale and preventing starvation</li>
-                            <li><strong>Travel Speed:</strong> Base speed is 7 days per hex tile</li>
-                            <li><strong>Events:</strong> Random encounters can affect supplies and progress</li>
-                            <li><strong>Planning:</strong> Consider round-trip supplies for safe return</li>
-                        </ul>
-                    </div>
-                </div>
-            `;
-
-            // Update the modal body content
-            const modalBody = existingModal.querySelector('.modal-body');
-            if (modalBody) {
-                modalBody.innerHTML = logisticsContent;
-                console.log('[World] Logistics modal content updated successfully');
-            } else {
-                console.warn('[World] Could not find modal body to update');
-            }
-        } else {
-            console.log('[World] No existing logistics modal found, reopening...');
-            // Fallback: re-open the modal
-            setTimeout(() => this.manageLogistics(armyId), 300);
-        }
-    }
-
-    addSupply(armyId, supplyType, amount) {
-        const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) {
-            console.error('[World] Army not found for supply addition:', armyId);
+        if (!nearbyArmy) {
+            window.showToast?.('Need an army on an adjacent tile to scout.', { type: 'warning' });
             return;
         }
 
-        const costs = {
-            // cost per person-day
-            food: { perPD: 3, resource: 'food' }
+        this.exploreTile(row, col);
+        window.showToast?.(`Scouted ${this.formatCoords(row, col)} — ${hex.terrain}!`, { type: 'success' });
+        this.refreshUI();
+    }
+
+    // ===================================================================
+    // ENEMY SYSTEM — SPAWNING & ADVANCING
+    // ===================================================================
+
+    processEnemies() {
+        const day = this.gameState.day || 0;
+        const cfg = window.WORLD_DATA?.enemySpawnConfig;
+        if (!cfg || day < cfg.startDay) return;
+
+        // --- Spawn check ---
+        const daysSinceStart = day - cfg.startDay;
+        const spawnChance = cfg.baseChance + daysSinceStart * cfg.chancePerDay;
+
+        if (Math.random() < spawnChance) {
+            this.spawnEnemyGroup(day, cfg);
+        }
+
+        // --- Advance existing enemies ---
+        this.advanceEnemies();
+
+        // --- Check for combat (army vs enemy on same tile) ---
+        this.checkCombatEncounters();
+    }
+
+    spawnEnemyGroup(day, cfg) {
+        const daysSinceStart = day - cfg.startDay;
+
+        // Pick random edge tile (16 edge tiles on 5×5)
+        const edgeTiles = [];
+        for (let r = 0; r < this.mapHeight; r++) {
+            for (let c = 0; c < this.mapWidth; c++) {
+                if (r === 0 || r === this.mapHeight - 1 || c === 0 || c === this.mapWidth - 1) {
+                    edgeTiles.push({ row: r, col: c });
+                }
+            }
+        }
+        const spawnTile = edgeTiles[Math.floor(Math.random() * edgeTiles.length)];
+
+        // Determine enemy type by day thresholds
+        const types = window.WORLD_DATA?.enemyTypes || {};
+        const eligible = Object.entries(types).filter(([, t]) => day >= t.minDay && day <= t.maxDay);
+        const [typeKey, typeData] = eligible.length > 0
+            ? eligible[Math.floor(Math.random() * eligible.length)]
+            : ['bandits', { name: 'Bandits', icon: '⚔️', color: '#e74c3c' }];
+
+        // Scale units and stats
+        const groupSize = cfg.groupSizeBase + Math.floor(daysSinceStart / cfg.groupSizeGrowthDays);
+        const timeMultiplier = 1 + daysSinceStart * cfg.scalingPerDay;
+
+        const units = [];
+        for (let i = 0; i < groupSize; i++) {
+            units.push({
+                health: Math.round(cfg.unitBaseHealth * timeMultiplier),
+                maxHealth: Math.round(cfg.unitBaseHealth * timeMultiplier),
+                attack: Math.round(cfg.unitBaseAttack * timeMultiplier)
+            });
+        }
+
+        const enemy = {
+            id: `enemy_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+            type: typeKey,
+            name: `${typeData.name} (Day ${day})`,
+            position: { row: spawnTile.row, col: spawnTile.col },
+            units,
+            spawnDay: day,
+            status: 'advancing'
         };
 
-        const cost = costs[supplyType];
-        if (!cost) {
-            console.error('[World] Unknown supply type:', supplyType);
-            return;
-        }
+        this.enemies.push(enemy);
+        console.log(`[WorldManager] Enemy spawned: ${enemy.name} at (${spawnTile.row},${spawnTile.col}) — ${groupSize} units`);
+    }
 
-        // Interpret amount as "days for the whole army"
-        const people = Math.max(army.members?.length || 1, 1);
-        const addDaysForArmy = Math.max(0, Number(amount) || 0);
-        let addPD = addDaysForArmy * people; // person-days to add
+    advanceEnemies() {
+        const pathfind = window.findPath || window.pathfinding?.findPath;
 
-        // Capacity: 5 days per person
-        if (!army.supplies) army.supplies = { food: 0, water: 0 };
-        const currentPD = army.supplies.food || 0; // person-days
-        const capacityPD = people * 5;
-        const remainingCapacityPD = Math.max(0, capacityPD - currentPD);
-        if (addPD > remainingCapacityPD) {
-            addPD = remainingCapacityPD;
-        }
+        this.enemies.forEach(enemy => {
+            if (enemy.status !== 'advancing') return;
 
-        const totalCost = addPD * cost.perPD;
-        console.log('[World] Adding supply (person-day model):', { armyId, supplyType, addDaysForArmy, people, addPD, totalCost, capacityPD, currentPD });
+            // Move 1 tile toward the village capital
+            const from = enemy.position;
+            let nextRow = from.row;
+            let nextCol = from.col;
 
-        // Check available resources - try multiple possible locations
-        let currentResources = 0;
-        let resourceUpdateMethod = null;
-
-        // Try gameState.food first (most common)
-        if (typeof this.gameState.food === 'number') {
-            currentResources = this.gameState.food;
-            resourceUpdateMethod = () => { this.gameState.food -= totalCost; };
-        }
-        // Try gameState.resources.food
-        else if (this.gameState.resources && typeof this.gameState.resources.food === 'number') {
-            currentResources = this.gameState.resources.food;
-            resourceUpdateMethod = () => { this.gameState.resources.food -= totalCost; };
-        }
-        // Try direct resource access
-        else if (this.gameState[cost.resource] !== undefined) {
-            currentResources = this.gameState[cost.resource];
-            resourceUpdateMethod = () => { this.gameState[cost.resource] -= totalCost; };
-        }
-        else {
-            console.error('[World] Could not find food resources in gameState. Available properties:', Object.keys(this.gameState));
-            if (window.showToast) {
-                window.showToast('❌ Error accessing food resources. Check console for details.', {
-                    icon: '⚠️',
-                    type: 'error',
-                    timeout: 4000
-                });
-            }
-            return;
-        }
-
-        console.log('[World] Current resources:', currentResources, 'Required:', totalCost);
-
-        if (currentResources >= totalCost) {
-            // Deduct resources
-            resourceUpdateMethod();
-
-            // Add supplies to army in person-days
-            army.supplies[supplyType] += addPD;
-
-            // Keep core GameState army in sync if linked
-            try {
-                if (army.armyId && this.gameState && typeof this.gameState.getArmy === 'function') {
-                    const realArmy = this.gameState.getArmy(army.armyId);
-                    if (realArmy && realArmy.supplies) {
-                        if (typeof realArmy.supplies[supplyType] !== 'number') realArmy.supplies[supplyType] = 0;
-                        realArmy.supplies[supplyType] += addPD;
-                    }
+            if (pathfind) {
+                const path = pathfind(
+                    { row: from.row, col: from.col },
+                    { row: this.capitalRow, col: this.capitalCol },
+                    this.hexMap,
+                    this.mapWidth,
+                    this.mapHeight
+                );
+                if (path && path.length >= 2) {
+                    nextRow = path[1].row;
+                    nextCol = path[1].col;
                 }
-            } catch (e) { console.warn('[World] Failed to sync GameState army supplies:', e); }
-
-            // Update UI if available
-            if (typeof this.gameState.updateUI === 'function') {
-                this.gameState.updateUI();
-                console.log('[World] GameState UI updated');
             } else {
-                console.log('[World] GameState updateUI not available');
+                // Simple step toward capital
+                if (from.row < this.capitalRow) nextRow++;
+                else if (from.row > this.capitalRow) nextRow--;
+                if (from.col < this.capitalCol) nextCol++;
+                else if (from.col > this.capitalCol) nextCol--;
             }
 
-            if (window.showToast) {
-                const daysForArmy = people > 0 ? Math.floor(addPD / people) : addDaysForArmy;
-                window.showToast(`📦 Added ~${daysForArmy} day${daysForArmy !== 1 ? 's' : ''} of ${supplyType} for the army (-${totalCost} food)`, {
-                    icon: '✅',
-                    type: 'success',
-                    timeout: 3000
-                });
-            }
+            enemy.position = { row: nextRow, col: nextCol };
 
-            // Try to update the existing modal content in place
-            this.updateLogisticsModal(armyId);
-        } else {
-            if (window.showToast) {
-                window.showToast(`❌ Insufficient ${cost.resource}! Need ${totalCost}, have ${currentResources}.`, {
-                    icon: '⚠️',
-                    type: 'error',
-                    timeout: 4000
-                });
+            // If reached village tile, trigger defense
+            if (nextRow === this.capitalRow && nextCol === this.capitalCol) {
+                enemy.status = 'attacking';
+                this.triggerVillageDefense(enemy);
             }
-        }
+        });
+
+        // Remove defeated enemies
+        this.enemies = this.enemies.filter(e => e.status !== 'defeated');
     }
 
-    showLogisticsTutorial() {
-        const tutorialContent = `
-            <div class="tutorial-panel" style="padding: 20px;">
-                <h3>📚 Tutorial: Expedition Logistics</h3>
-                <p>Your army has been formed, but they need supplies before venturing into the wilderness!</p>
-                
-                <div class="tutorial-steps">
-                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #e74c3c;">
-                        <h4>🍞 Food is Essential</h4>
-                        <p>Armies consume food during travel and combat. Without adequate supplies, morale will drop and your expedition may fail.</p>
-                    </div>
-                    
-                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #3498db;">
-                        <h4>📦 Click "Manage Logistics"</h4>
-                        <p>Use this button to equip your army with the supplies they need for the journey ahead.</p>
-                    </div>
-                    
-                    <div class="tutorial-step" style="margin-bottom: 15px; padding: 10px; border-left: 3px solid #2ecc71;">
-                        <h4>🚶 Travel When Ready</h4>
-                        <p>Once supplied, use the "Travel" button to begin moving your army across the world map.</p>
-                    </div>
-                </div>
-                
-                <p style="font-style: italic; color: #95a5a6;"><em>Remember: While your army is deployed, those members are not available for village work!</em></p>
-            </div>
-        `;
+    triggerVillageDefense(enemy) {
+        console.log(`[WorldManager] Enemy ${enemy.name} reached the village!`);
 
-        if (window.showModal) {
-            window.showModal(
-                'Expedition Tutorial',
-                tutorialContent,
-                {
-                    icon: '📚',
-                    type: 'info',
-                    confirmText: 'Understood'
-                }
+        // Build army data for villageDefense
+        const attackerArmy = {
+            id: enemy.id,
+            name: enemy.name,
+            units: enemy.units,
+            strength: enemy.units.reduce((s, u) => s + u.attack, 0),
+            type: enemy.type
+        };
+
+        // Emit event for VillageDefenseSystem
+        window.eventBus?.emit('enemyAtVillage', { army: attackerArmy });
+
+        // Mark defeated (VillageDefenseSystem handles the outcome)
+        enemy.status = 'defeated';
+
+        window.showToast?.(`⚠️ ${enemy.name} is attacking your village!`, { type: 'error' });
+    }
+
+    checkCombatEncounters() {
+        const armies = this.gameState.getAllArmies?.() || [];
+
+        this.enemies.forEach(enemy => {
+            if (enemy.status !== 'advancing') return;
+
+            // Check if any player army is on the same tile
+            const armyOnTile = armies.find(a =>
+                a.position.y === enemy.position.row &&
+                a.position.x === enemy.position.col
             );
-        } else {
-            console.error('[World] Modal system not available for tutorial');
-        }
-    }
 
-    travel(armyId) {
-        console.log('[World] travel called with armyId:', armyId);
-        const legacyArmy = this.parties.expeditions.find(a => a.id === armyId);
-        if (!legacyArmy) {
-            window.showToast('❌ Army not found', { icon: '⚠️', type: 'error', timeout: 2000 });
-            return;
-        }
-
-        // Require at least 1 person-day of food to start traveling
-        if (!legacyArmy.supplies || (legacyArmy.supplies.food || 0) < (legacyArmy.members?.length || 1)) {
-            window.showToast('🍞 Not enough food for one day of marching. Add supplies first.', { icon: '⚠️', type: 'warning', timeout: 3500 });
-            return;
-        }
-
-        // Mark legacy status for visibility
-        legacyArmy.status = 'marching';
-
-        // Select the linked core army and prompt the user to click a destination tile
-        let coreArmy = null;
-        if (legacyArmy.armyId && this.gameState && typeof this.gameState.getArmy === 'function') {
-            coreArmy = this.gameState.getArmy(legacyArmy.armyId);
-        }
-
-        if (coreArmy) {
-            this.selectedArmy = coreArmy;
-            // Highlight current position
-            this.selectedHex = { row: coreArmy.position.y, col: coreArmy.position.x };
-            this.updateArmyDisplays();
-            window.showToast('🗺️ Select a destination tile to move your army.', { icon: '🚶', type: 'info', timeout: 4000 });
-            // Arm the next click to compute a path and store it for day-by-day travel
-            const originalSelectHex = this.selectHex.bind(this);
-            const onceHandler = (row, col) => {
-                try {
-                    // Compute path using global findPath if available
-                    const start = { row: coreArmy.position.y, col: coreArmy.position.x };
-                    const goal = { row, col };
-                    let path = null;
-                    if (window.findPath) {
-                        path = window.findPath(this.hexMap, start, goal);
-                    }
-                    if (!path || path.length < 2) {
-                        window.showToast('❌ No valid path to destination.', { type: 'error', timeout: 2500 });
-                        // Still allow normal selection
-                        originalSelectHex(row, col);
-                        return;
-                    }
-                    // ZOC guard: path cannot enter enemy ZOC (except starting tile)
-                    const zocBreach = path.slice(1).find(p => this.isInEnemyZOC(p.row, p.col));
-                    if (zocBreach) {
-                        window.showToast('🛡️ Path blocked by enemy Zone of Control.', { type: 'warning', timeout: 3000 });
-                        originalSelectHex(row, col);
-                        return;
-                    }
-                    // Compute terrain-weighted travel days for the route
-                    const routeDays = this._computePathDays(path);
-                    const people = Math.max(legacyArmy.members?.length || 1, 1);
-                    const needPD = routeDays * people;
-                    const havePD = legacyArmy.supplies?.food || 0;
-                    if (havePD < needPD) {
-                        // Offer auto-provision if village has enough food
-                        const deficitPD = needPD - havePD;
-                        const perPD = 3;
-                        const addDaysForArmy = Math.ceil(deficitPD / people);
-                        const cost = deficitPD * perPD;
-                        const available = (typeof this.gameState.food === 'number') ? this.gameState.food : (this.gameState.resources?.food || 0);
-                        if (available >= cost) {
-                            const ok = confirm(`Supplies low for this journey (need ${needPD} PD ≈ ${routeDays} travel days for ${people}). Auto-provision ${addDaysForArmy} day(s) for the army for ${cost} food?`);
-                            if (ok) {
-                                this.addSupply(legacyArmy.id, 'food', addDaysForArmy);
-                            } else {
-                                window.showToast(`🍞 Insufficient supplies for this journey. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
-                                originalSelectHex(row, col);
-                                return;
-                            }
-                        } else {
-                            window.showToast(`🍞 Insufficient supplies for this journey. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
-                            originalSelectHex(row, col);
-                            return;
-                        }
-                    }
-
-                    // Store travel plan on legacy and core
-                    // Build terrain-aware travel plan
-                    const stepCosts = [];
-                    for (let i = 1; i < path.length; i++) {
-                        stepCosts.push(this._getMoveCostForTile(path[i].row, path[i].col));
-                    }
-                    legacyArmy.travelPlan = {
-                        path,
-                        index: 0, // at start index; next move is to index 1
-                        destination: { row, col },
-                        stepCosts,
-                        remainingForStep: stepCosts[0] || 0
-                    };
-                    coreArmy.movementPath = path.map(p => ({ x: p.col, y: p.row }));
-                    coreArmy.movementIndex = 0;
-                    coreArmy.isMoving = true;
-                    coreArmy.movementTarget = { x: goal.col, y: goal.row };
-                    coreArmy.movementProgress = 0;
-
-                    window.showToast(`🚶 Marching to (${row}, ${col}). Estimated ${routeDays} day(s) by terrain.`, { type: 'success', timeout: 3500 });
-                } finally {
-                    // Restore normal selectHex behavior and re-run click for standard UI update
-                    this.selectHex = originalSelectHex;
-                    originalSelectHex(row, col);
-                }
-            };
-
-            // Monkey-patch selectHex temporarily to capture the next destination click
-            this.selectHex = (r, c) => onceHandler(r, c);
-        } else {
-            // Fallback: just inform user
-            window.showToast('🗺️ Click on the map to choose a destination for your army.', { icon: '🚶', type: 'info', timeout: 4000 });
-        }
-    }
-
-    renameArmy(armyId) {
-        // Army renaming functionality
-        window.showToast('✏️ Army renaming coming soon!', {
-            icon: '📝',
-            type: 'info',
-            timeout: 2000
-        });
-    }
-
-    viewComposition(armyId) {
-        console.log('[World] viewComposition called with armyId:', armyId);
-        const army = this.parties.expeditions.find(a => a.id === armyId);
-        if (!army) {
-            console.error('[World] Army not found for viewComposition:', armyId, 'Available armies:', this.parties.expeditions.map(a => a.id));
-            return;
-        }
-
-        let compositionContent = `
-            <div class="army-composition">
-                <h3>👥 ${army.name} Composition</h3>
-                <div class="member-list">
-        `;
-
-        army.members.forEach(member => {
-            compositionContent += `
-                <div class="member-item">
-                    <h4>${member.name}</h4>
-                    <p>Role: ${member.role}</p>
-                    <p>Type: ${member.type}</p>
-                </div>
-            `;
-        });
-
-        compositionContent += `
-                </div>
-                <div class="army-stats">
-                    <p><strong>Total Members:</strong> ${army.members.length}</p>
-                    <p><strong>Morale:</strong> ${army.morale}%</p>
-                    <p><strong>Food Supplies:</strong> ${army.supplies.food} days</p>
-                </div>
-            </div>
-        `;
-
-        window.showModal(
-            `${army.name} Details`,
-            compositionContent,
-            {
-                icon: '👥',
-                type: 'info',
-                confirmText: 'Close'
+            if (armyOnTile) {
+                this.resolveCombat(armyOnTile, enemy);
             }
+        });
+    }
+
+    resolveCombat(army, enemy) {
+        console.log(`[WorldManager] Combat: ${army.name} vs ${enemy.name}`);
+
+        const armyStrength = (army.units || []).reduce((s, u) => s + (u.attack || 10), 0);
+        const enemyStrength = enemy.units.reduce((s, u) => s + u.attack, 0);
+
+        // Simple auto-resolve: compare total strength with some randomness
+        const armyRoll = armyStrength * (0.8 + Math.random() * 0.4);
+        const enemyRoll = enemyStrength * (0.8 + Math.random() * 0.4);
+
+        if (armyRoll >= enemyRoll) {
+            // Player wins
+            const casualties = Math.floor(Math.random() * Math.ceil(army.units.length * 0.3));
+            for (let i = 0; i < casualties && army.units.length > 0; i++) {
+                const deadIdx = Math.floor(Math.random() * army.units.length);
+                const dead = army.units.splice(deadIdx, 1)[0];
+                // Remove from drafted villagers too
+                if (army.draftedVillagers) {
+                    const dvIdx = army.draftedVillagers.findIndex(dv => dv.id === dead.villagerId);
+                    if (dvIdx !== -1) army.draftedVillagers.splice(dvIdx, 1);
+                }
+                // Kill the villager in population
+                if (dead.villagerId && this.gameState.populationManager) {
+                    this.gameState.populationManager.removeInhabitant?.(dead.villagerId);
+                }
+            }
+
+            enemy.status = 'defeated';
+            const goldReward = 5 + Math.floor(Math.random() * 15) * enemy.units.length;
+            if (this.gameState.resources) {
+                this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
+            }
+
+            window.showToast?.(`⚔️ ${army.name} defeated ${enemy.name}! +${goldReward} gold. Lost ${casualties} soldiers.`, { type: 'success' });
+
+            // If army wiped out, disband
+            if (army.units.length === 0) {
+                this.performDisband(army.id);
+            }
+        } else {
+            // Enemy wins — army takes heavy casualties
+            const casualties = Math.ceil(army.units.length * 0.5);
+            for (let i = 0; i < casualties && army.units.length > 0; i++) {
+                const deadIdx = Math.floor(Math.random() * army.units.length);
+                const dead = army.units.splice(deadIdx, 1)[0];
+                if (army.draftedVillagers) {
+                    const dvIdx = army.draftedVillagers.findIndex(dv => dv.id === dead.villagerId);
+                    if (dvIdx !== -1) army.draftedVillagers.splice(dvIdx, 1);
+                }
+                if (dead.villagerId && this.gameState.populationManager) {
+                    this.gameState.populationManager.removeInhabitant?.(dead.villagerId);
+                }
+            }
+
+            // Enemy loses some units too
+            const enemyCasualties = Math.floor(enemy.units.length * 0.2);
+            enemy.units.splice(0, enemyCasualties);
+
+            window.showToast?.(`💀 ${army.name} was defeated by ${enemy.name}! Lost ${casualties} soldiers.`, { type: 'error' });
+
+            if (army.units.length === 0) {
+                this.performDisband(army.id);
+            }
+        }
+
+        window.eventBus?.emit('combat_resolved', { army: army.id, enemy: enemy.id });
+        this.refreshUI();
+    }
+
+    // ===================================================================
+    // ENEMY VISIBILITY — fog of war for enemies
+    // ===================================================================
+
+    /**
+     * Enemies are only visible if a player army is on the same or adjacent tile,
+     * OR the enemy has reached the village tile itself.
+     */
+    isEnemyVisible(enemy) {
+        const armies = this.gameState.getAllArmies?.() || [];
+        // Always visible if on the village tile
+        if (enemy.position.row === this.capitalRow && enemy.position.col === this.capitalCol) {
+            return true;
+        }
+        // Visible if a player army is on the same or adjacent tile
+        return armies.some(a => {
+            const dist = Math.abs(a.position.y - enemy.position.row) + Math.abs(a.position.x - enemy.position.col);
+            return dist <= 1;
+        });
+    }
+
+    getVisibleEnemiesAt(row, col) {
+        return this.enemies.filter(e =>
+            e.position.row === row &&
+            e.position.col === col &&
+            e.status === 'advancing' &&
+            this.isEnemyVisible(e)
         );
     }
 
-    exploreHex(row, col) {
-        // Prevent multiple modals from being created
-        if (document.querySelector('.scout-modal-overlay')) {
-            console.log('[WorldManager] Scout modal already open, ignoring duplicate request');
-            return;
-        }
-
-        // Trigger exploration achievement
-        if (window.achievementSystem) {
-            window.achievementSystem.triggerTileExplored();
-            console.log('[WorldManager] Tile exploration achievement triggered');
-        } else {
-            console.warn('[WorldManager] Achievement system not available for tile exploration');
-        }
-
-        // Start scout selection process
-        this.showScoutSelectionModal(row, col);
+    getEnemyTypeInfo(enemy) {
+        const types = window.WORLD_DATA?.enemyTypes || {};
+        return types[enemy.type] || { name: enemy.type, icon: '⚔️', color: '#e74c3c' };
     }
 
-    showScoutSelectionModal(targetRow, targetCol) {
-        // Check if a scout modal is already open
-        if (document.querySelector('.scout-modal-overlay')) {
-            console.log('[WorldManager] Scout modal already open, ignoring request');
-            return;
-        }
+    // ===================================================================
+    // DAILY PROCESSING
+    // ===================================================================
 
-        // Get available villagers for scouting (working age, not already working)
-        const availableScouts = [];
-        if (window.gameState && window.gameState.populationManager) {
-            const population = window.gameState.populationManager.getAll();
-            population.forEach(villager => {
-                const isRightAge = villager.age >= 16 && villager.age <= 65;
-                const isAvailable = villager.status !== 'working' && villager.status !== 'scouting';
-                if (isRightAge && isAvailable) {
-                    availableScouts.push(villager);
-                }
-            });
-        }
+    onDayEnded() {
+        if (!this.initialized) return;
 
-        if (availableScouts.length === 0) {
-            window.showToast('❌ No available scouts! Need unemployed villagers aged 16-65.', {
-                icon: '❌',
-                type: 'error',
-                timeout: 3000
-            });
-            return;
-        }
-
-        // Create scout selection modal
-        const modal = document.createElement('div');
-        modal.className = 'scout-modal-overlay';
-        modal.innerHTML = `
-            <div class="scout-modal">
-                <div class="scout-modal-header">
-                    <h3>🧭🔍 Select Scouts for Expedition</h3>
-                    <p>Choose up to 3 villagers to scout hex (${targetRow}, ${targetCol})</p>
-                </div>
-                <div class="scout-selection">
-                    <div class="scout-list">
-                        ${availableScouts.map(scout => `
-                            <div class="scout-option" data-scout-id="${scout.id}">
-                                <input type="checkbox" id="scout-${scout.id}" class="scout-checkbox">
-                                <label for="scout-${scout.id}" class="scout-label">
-                                    <span class="scout-name">${scout.name}</span>
-                                    <span class="scout-details">Age: ${scout.age}, ${scout.gender}</span>
-                                    <span class="scout-role">${scout.role || 'villager'}</span>
-                                </label>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="scout-modal-actions">
-                    <button class="scout-btn cancel" onclick="this.parentElement.parentElement.parentElement.remove()">Cancel</button>
-                    <button class="scout-btn confirm" onclick="this.disabled=true; window.worldManager.confirmScoutExpedition(${targetRow}, ${targetCol})">Send Scouts</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        // Add event listeners for checkbox limitation (max 3)
-        const checkboxes = modal.querySelectorAll('.scout-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                const checked = modal.querySelectorAll('.scout-checkbox:checked');
-                if (checked.length > 3) {
-                    checkbox.checked = false;
-                    window.showToast('⚠️ Maximum 3 scouts per expedition!', {
-                        icon: '👥',
-                        type: 'warning',
-                        timeout: 2000
-                    });
-                }
-            });
-        });
+        this.processArmyMovement();
+        this.processEnemies();
+        this.refreshUI();
+        this.saveWorldData();
     }
 
-    confirmScoutExpedition(targetRow, targetCol) {
-        const modal = document.querySelector('.scout-modal-overlay');
-        if (!modal) {
-            console.error('[WorldManager] Scout modal not found');
-            return;
-        }
+    // ===================================================================
+    // SAVE / LOAD
+    // ===================================================================
 
-        // Disable the confirm button to prevent double-clicking
-        const confirmButton = modal.querySelector('.scout-btn.confirm');
-        if (confirmButton) {
-            confirmButton.disabled = true;
-            confirmButton.textContent = 'Sending...';
-        }
-
-        const selectedScouts = [];
-        const checkedBoxes = modal.querySelectorAll('.scout-checkbox:checked');
-
-        if (checkedBoxes.length === 0) {
-            window.showToast('❌ Please select at least one scout!', {
-                icon: '👥',
-                type: 'error',
-                timeout: 2000
-            });
-            return;
-        }
-
-        // Get scout data
-        checkedBoxes.forEach(checkbox => {
-            const scoutId = parseInt(checkbox.id.replace('scout-', '')); // Convert to number
-            const scout = window.gameState.populationManager.getAll().find(v => v.id === scoutId);
-            if (scout) {
-                selectedScouts.push(scout);
-            } else {
-                console.warn('[WorldManager] Could not find scout with ID:', scoutId);
-            }
-        });
-
-        if (selectedScouts.length === 0) {
-            window.showToast('❌ No valid scouts found!', {
-                icon: '👥',
-                type: 'error',
-                timeout: 2000
-            });
-            // Re-enable the button
-            if (confirmButton) {
-                confirmButton.disabled = false;
-                confirmButton.textContent = 'Send Scouts';
-            }
-            return;
-        }
-
-        // Check if any selected scouts are already on expeditions
-        const busyScouts = selectedScouts.filter(scout => scout.status === 'scouting');
-        if (busyScouts.length > 0) {
-            window.showToast(`❌ Some scouts are already on expeditions: ${busyScouts.map(s => s.name).join(', ')}`, {
-                icon: '👥',
-                type: 'error',
-                timeout: 3000
-            });
-            // Re-enable the button
-            if (confirmButton) {
-                confirmButton.disabled = false;
-                confirmButton.textContent = 'Send Scouts';
-            }
-            return;
-        }
-
-        // Check if this hex is scoutable
-        const targetHex = this.hexMap[targetRow][targetCol];
-        if (!targetHex.scoutable && targetHex.fogOfWar) {
-            window.showToast('❌ This area is too far to scout! Explore adjacent areas first.', {
-                icon: '🗺️',
-                type: 'error',
-                timeout: 3000
-            });
-            // Re-enable the button
-            if (confirmButton) {
-                confirmButton.disabled = false;
-                confirmButton.textContent = 'Send Scouts';
-            }
-            return;
-        }
-
-        // Calculate travel distance (Manhattan distance for simplicity)
-        const playerPos = this.playerVillageHex;
-        const distance = Math.abs(targetRow - playerPos.row) + Math.abs(targetCol - playerPos.col);
-
-        // Determine expedition type based on hex status
-        let expeditionType = 'explore'; // Default to exploration
-        if (targetHex.discovered) {
-            expeditionType = 'further_explore'; // Already discovered, doing detailed exploration
-        }
-
-        // Create exploration expedition
-        const expedition = {
-            id: `expedition_${Date.now()}`,
-            scouts: selectedScouts,
-            targetHex: { row: targetRow, col: targetCol },
-            currentHex: { row: playerPos.row, col: playerPos.col },
-            status: 'traveling',
-            type: expeditionType,
-            progress: 0,
-            travelDistance: distance,
-            daysRemaining: Math.max(distance, 1), // Minimum 1 day
-            explorationDaysRemaining: 2 + selectedScouts.length, // Exploration time based on scout count
-            startDay: window.gameState.currentDay,
-            returningHome: false
-        };
-
-        // Initialize expeditions array if it doesn't exist
-        if (!this.expeditions) {
-            this.expeditions = [];
-        }
-        this.expeditions.push(expedition);
-
-        // Mark scouts as busy
-        selectedScouts.forEach(scout => {
-            // Double-check scout isn't already on an expedition
-            if (scout.status === 'scouting') {
-                console.warn('[WorldManager] Scout', scout.name, 'already on expedition, skipping');
-                return;
-            }
-            scout.status = 'scouting';
-            scout.expeditionId = expedition.id;
-        });
-
-        // Remove modal FIRST to prevent double-clicking
-        modal.remove();
-
-        // Show confirmation message based on expedition type
-        let message;
-        if (expeditionType === 'explore') {
-            message = `🧭 ${selectedScouts.length} scouts sent to explore uncharted territory at (${targetRow}, ${targetCol})! Travel time: ${distance} day${distance > 1 ? 's' : ''}.`;
-        } else {
-            message = `🔍 ${selectedScouts.length} scouts sent for detailed exploration at (${targetRow}, ${targetCol})! Travel time: ${distance} day${distance > 1 ? 's' : ''}.`;
-        }
-
-        window.showToast(message, {
-            icon: '🗺️',
-            type: 'success',
-            timeout: 4000
-        });
-
-        // Update expedition display
-        this.updateExpeditionsList(); // Use main expeditions list instead of separate display
-    }
-
-    orderScoutsHome(expeditionId) {
-        const expedition = this.expeditions.find(e => e.id === expeditionId);
-        if (!expedition) {
-            console.error('[WorldManager] Expedition not found:', expeditionId);
-            return;
-        }
-
-        if (expedition.returningHome) {
-            window.showToast('⚠️ Scouts are already returning home!', {
-                icon: '🏠',
-                type: 'warning',
-                timeout: 2000
-            });
-            return;
-        }
-
-        // Calculate return distance
-        const returnDistance = Math.abs(expedition.targetHex.row - this.playerVillageHex.row) +
-            Math.abs(expedition.targetHex.col - this.playerVillageHex.col);
-
-        // Update expedition status
-        expedition.returningHome = true;
-        expedition.status = 'returning';
-        expedition.daysRemaining = returnDistance;
-        expedition.returnStartDay = window.gameState.currentDay;
-
-        window.showToast(`🏠 Ordered ${expedition.scouts.length} scouts to return home. ${returnDistance} day${returnDistance !== 1 ? 's' : ''} travel time.`, {
-            icon: '📋',
-            type: 'success',
-            timeout: 3000
-        });
-
-        // Update expedition display
-        this.updateExpeditionsList();
-    }
-
-    completeExpedition(expeditionId) {
-        const expedition = this.expeditions.find(e => e.id === expeditionId);
-        if (!expedition) return;
-
-        // Return scouts to available status
-        expedition.scouts.forEach(scout => {
-            scout.status = 'idle';
-            delete scout.expeditionId;
-        });
-
-        // Remove expedition
-        this.expeditions = this.expeditions.filter(e => e.id !== expeditionId);
-
-        // Show results
-        if (expedition.returningHome) {
-            window.showToast(`✅ ${expedition.scouts.length} scouts have returned home safely!`, {
-                icon: '✅',
-                type: 'success',
-                timeout: 4000
-            });
-        } else {
-            // This shouldn't normally happen, but handle legacy cases
-            const { row, col } = expedition.targetHex;
-
-            // Reveal the target hex and surrounding hexes (fog of war)
-            this.revealHex(row, col);
-            this.revealSurroundingHexes(row, col);
-
-            window.showToast(`🎉 Expedition complete! Discovered hex (${row}, ${col}) and surrounding area.`, {
-                icon: '🗺️',
-                type: 'success',
-                timeout: 4000
-            });
-        }
-
-        // Update displays
-        this.updateExpeditionsList(); // Use main expeditions list
-        this.renderHexMap();
-    }
-
-    revealHex(row, col) {
-        if (this.hexMap[row] && this.hexMap[row][col]) {
-            this.hexMap[row][col].visibility = 'explored';
-            this.discoveredTiles.add(`${row},${col}`);
-        }
-    }
-
-    revealSurroundingHexes(centerRow, centerCol) {
-        // Reveal adjacent hexes (6 directions in hex grid)
-        const directions = [
-            [-1, -1], [-1, 0], [0, -1], [0, 1], [1, 0], [1, 1]
-        ];
-
-        directions.forEach(([dRow, dCol]) => {
-            const newRow = centerRow + dRow;
-            const newCol = centerCol + dCol;
-            if (newRow >= 0 && newRow < this.mapHeight && newCol >= 0 && newCol < this.mapWidth) {
-                this.revealHex(newRow, newCol);
-            }
-        });
-    }
-
-    updateExpeditions() {
-        // Called each day to update expedition progress
-        if (!this.expeditions || this.expeditions.length === 0) return;
-
-        this.expeditions.forEach(expedition => {
-            if (expedition.returningHome) {
-                // Update return journey progress
-                expedition.daysRemaining = Math.max(0, expedition.daysRemaining - 1);
-
-                if (expedition.daysRemaining === 0) {
-                    // Scouts have returned home - they'll be processed by completeExpedition
-                    expedition.status = 'complete';
-                }
-            } else if (expedition.status === 'traveling') {
-                // Update travel progress
-                const daysPassed = window.gameState.currentDay - expedition.startDay;
-
-                if (daysPassed >= expedition.travelDistance) {
-                    // Scouts have arrived at destination
-                    expedition.status = 'stationed';
-                    expedition.isStationed = true;
-
-                    // Reveal the target hex and surrounding area
-                    this.revealHex(expedition.targetHex.row, expedition.targetHex.col);
-                    this.revealSurroundingHexes(expedition.targetHex.row, expedition.targetHex.col);
-
-                    // Show arrival notification
-                    window.showToast(`🔍 Scouts have arrived at hex (${expedition.targetHex.row}, ${expedition.targetHex.col}) and are scouting the area!`, {
-                        icon: '🗺️',
-                        type: 'success',
-                        timeout: 4000
-                    });
-                }
-            }
-        });
-
-        // Update expedition display in the expeditions list
-        this.updateExpeditionsList();
-    }
-
-    /**
-     * Daily upkeep for armies: consume food, apply morale effects, and auto-resolve collapse
-     * Rules:
-     *  - Each day, an army consumes 1 day of food supplies (shared for the whole army)
-     *  - At low supplies (<=3), warn; at 0 supplies, morale drops by 10/day
-     *  - If morale reaches 0, the army disbands and members return to the village
-     * Also keeps the core GameState army object in sync with legacy values.
-     */
-    processArmyDailyUpkeep() {
-        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
-
-        this.parties.expeditions.slice().forEach(army => {
-            if (!army.supplies) army.supplies = { food: 0, water: 0 };
-            if (typeof army.morale !== 'number') army.morale = 100;
-
-            const people = Math.max(army.members?.length || 1, 1);
-            const needPD = people; // 1 person-day per person per day
-            const havePD = army.supplies.food || 0;
-
-            if (havePD >= needPD) {
-                // Consume person-days for the day
-                army.supplies.food = havePD - needPD;
-
-                const daysLeft = Math.floor(army.supplies.food / people);
-                if (daysLeft === 3 || daysLeft === 1) {
-                    window.showToast(`🍞 ${army.name}: ${daysLeft} day${daysLeft === 1 ? '' : 's'} of food left.`, {
-                        icon: '⚠️', type: 'warning', timeout: 3000
-                    });
-                }
-                this._syncCoreArmy(army, { supplies: { food: army.supplies.food } });
-            } else {
-                // Not enough food for all; set to zero and drop morale
-                army.supplies.food = 0;
-                const before = army.morale;
-                army.morale = Math.max(0, army.morale - 10);
-                if (before > 0 && army.morale === 0) {
-                    window.showToast(`💀 ${army.name} has lost all morale due to starvation and disbands.`, {
-                        icon: '💀', type: 'error', timeout: 4000
-                    });
-                    this.performDisbandArmy(army.id);
-                    return;
-                } else if (army.morale > 0 && army.morale <= 30) {
-                    window.showToast(`😔 ${army.name} morale is critically low (${army.morale}%).`, {
-                        icon: '😔', type: 'warning', timeout: 3000
-                    });
-                } else {
-                    // Throttle first out-of-food toast to once per day per army
-                    const cd = this._toastCooldowns.get(army.id) || {};
-                    const today = window.gameState?.currentDay;
-                    if (cd.lastNoFoodDay !== today) {
-                        window.showToast(`🍞 ${army.name} is out of food! Morale will drop daily.`, {
-                            icon: '⚠️', type: 'warning', timeout: 3500
-                        });
-                        cd.lastNoFoodDay = today;
-                        this._toastCooldowns.set(army.id, cd);
-                    }
-                }
-                this._syncCoreArmy(army, { morale: army.morale, supplies: { food: army.supplies.food } });
-            }
-        });
-
-        // Refresh UI after processing
-        this.updateExpeditionsList();
-        this.updateArmyDisplays();
-    }
-
-    /**
-     * Advance armies along their planned paths by consuming 1 day of movement per day
-     * Supports terrain-weighted step costs and random delays injected by events.
-     */
-    processArmyDailyTravel() {
-        if (!this.parties || !Array.isArray(this.parties.expeditions)) return;
-        this.parties.expeditions.forEach(army => {
-            if (!army.travelPlan || !army.travelPlan.path || army.travelPlan.index == null) return;
-            const plan = army.travelPlan;
-            // Skip travel if delayed today
-            if (this._skipTravelToday.has(army.id)) {
-                this._skipTravelToday.delete(army.id);
-                return;
-            }
-            if (plan.index < plan.path.length - 1) {
-                if (plan.remainingForStep == null) {
-                    plan.remainingForStep = (plan.stepCosts && plan.stepCosts[plan.index] != null)
-                        ? plan.stepCosts[plan.index]
-                        : this._getMoveCostForTile(plan.path[plan.index + 1].row, plan.path[plan.index + 1].col);
-                }
-                plan.remainingForStep -= 1;
-                if (plan.remainingForStep <= 0) {
-                    plan.index += 1;
-                    const step = plan.path[plan.index];
-                    // ZOC stop: do not enter ZOC tiles mid-travel
-                    if (this.isInEnemyZOC(step.row, step.col)) {
-                        plan.index -= 1; // revert
-                        plan.remainingForStep = 1; // require another day before retry
-                        army.status = 'halted (ZOC)';
-                        window.showToast(`🛡️ ${army.name} halted by enemy Zone of Control.`, { type: 'warning', timeout: 3000 });
-                        return;
-                    }
-                    // Update legacy location indicator for UI
-                    army.location = { row: step.row, col: step.col };
-
-                    // Sync core army position
-                    if (army.armyId) {
-                        const core = this.gameState.getArmy(army.armyId);
-                        if (core) {
-                            core.position = { x: step.col, y: step.row };
-                            core.status = plan.index < plan.path.length - 1 ? 'moving' : 'idle';
-                            const totalDays = this._computePathDays(plan.path);
-                            const progressedDays = this._computePathDays(plan.path.slice(0, plan.index + 1));
-                            core.movementProgress = totalDays > 0 ? progressedDays / totalDays : 1;
-                            if (plan.index >= plan.path.length - 1) {
-                                core.isMoving = false;
-                                core.movementPath = null;
-                                core.movementIndex = null;
-                            }
-                        }
-                    }
-
-                    // On arrival at destination
-                    if (plan.index >= plan.path.length - 1) {
-                        army.status = 'arrived';
-                        window.showToast(`✅ ${army.name} arrived at (${plan.destination.row}, ${plan.destination.col}).`, { type: 'success', timeout: 3000 });
-                        // Reveal destination and neighbors
-                        this.revealHex(step.row, step.col);
-                        this.revealSurroundingHexes(step.row, step.col);
-                        // Clear plan
-                        army.travelPlan = null;
-                    } else {
-                        // Prepare next step remaining cost
-                        const nextCost = (plan.stepCosts && plan.stepCosts[plan.index] != null)
-                            ? plan.stepCosts[plan.index]
-                            : this._getMoveCostForTile(plan.path[plan.index + 1].row, plan.path[plan.index + 1].col);
-                        plan.remainingForStep = nextCost;
-                    }
-                }
-            }
-        });
-        // Update visuals on map
-        this.updateArmyDisplays();
-    }
-
-    // Plan and start return path to village
-    returnHome(armyId) {
-        const legacyArmy = this.parties.expeditions.find(a => a.id === armyId);
-        if (!legacyArmy) return;
-        const core = legacyArmy.armyId ? this.gameState.getArmy(legacyArmy.armyId) : null;
-        const start = core ? { row: core.position.y, col: core.position.x } : legacyArmy.location || this.playerVillageHex;
-        const goal = this.playerVillageHex;
-        if (!window.findPath) {
-            window.showToast('❌ No pathfinding available.', { type: 'error', timeout: 2500 });
-            return;
-        }
-        const path = window.findPath(this.hexMap, start, goal);
-        if (!path || path.length < 2) {
-            window.showToast('❌ No valid path home.', { type: 'error', timeout: 3000 });
-            return;
-        }
-        if (path.slice(1).some(p => this.isInEnemyZOC(p.row, p.col))) {
-            window.showToast('🛡️ Return path blocked by enemy Zone of Control.', { type: 'warning', timeout: 3000 });
-            return;
-        }
-        // Require adequate supplies for the return journey (terrain-weighted)
-        const routeDays = this._computePathDays(path);
-        const people = Math.max(legacyArmy.members?.length || 1, 1);
-        const needPD = routeDays * people;
-        const havePD = legacyArmy.supplies?.food || 0;
-        if (havePD < needPD) {
-            window.showToast(`🍞 Not enough supplies to return home. Need ${needPD} PD (≈ ${routeDays} days for ${people}).`, { type: 'warning', timeout: 4500 });
-            return;
-        }
-        // Build terrain-aware travel plan
-        const stepCosts = [];
-        for (let i = 1; i < path.length; i++) stepCosts.push(this._getMoveCostForTile(path[i].row, path[i].col));
-        legacyArmy.travelPlan = { path, index: 0, destination: goal, stepCosts, remainingForStep: stepCosts[0] || 0 };
-        legacyArmy.status = 'returning';
-        if (core) {
-            core.movementPath = path.map(p => ({ x: p.col, y: p.row }));
-            core.movementIndex = 0;
-            core.isMoving = true;
-            core.movementTarget = { x: goal.col, y: goal.row };
-            core.movementProgress = 0;
-        }
-        window.showToast('🏠 Marching back to the village.', { type: 'info', timeout: 3000 });
-    }
-
-    // Build legacy list from current core armies (for save/load consistency)
-    rebuildLegacyArmiesFromCore() {
-        if (!Array.isArray(this.parties?.expeditions)) this.parties.expeditions = [];
-        const coreArmies = this.gameState?.getAllArmies?.() || [];
-        // Keep existing legacy entries linked, add missing
-        const existingIds = new Set(this.parties.expeditions.map(a => a.armyId));
-        coreArmies.forEach(core => {
-            if (!existingIds.has(core.id)) this.addLegacyArmyFromCore(core);
-        });
-        this.updateExpeditionsList();
-        this.updateArmyDisplays();
-    }
-
-    addLegacyArmyFromCore(coreArmy) {
-        const members = (coreArmy.units || []).map(u => ({ name: u.name, role: u.role, type: u.type, villagerId: u.villagerId, age: u.age }));
-        const legacy = {
-            id: `legacy_${coreArmy.id}`,
-            name: coreArmy.name,
-            members,
-            morale: coreArmy.morale ?? 100,
-            supplies: { food: coreArmy.supplies?.food || 0, water: coreArmy.supplies?.water || 0, equipment: 'basic' },
-            location: { row: coreArmy.position?.y ?? this.playerVillageHex.row, col: coreArmy.position?.x ?? this.playerVillageHex.col },
-            status: 'ready',
-            draftedVillagers: members.filter(m => m.type === 'villager').map(m => ({ id: m.villagerId, name: m.name, originalRole: 'Companion', age: m.age })),
-            armyId: coreArmy.id
-        };
-        this.parties.expeditions.push(legacy);
-    }
-
-    // Helper to sync legacy party army fields to the core GameState army
-    _syncCoreArmy(legacyArmy, delta) {
+    saveWorldData() {
         try {
-            if (!legacyArmy || !legacyArmy.armyId) return;
-            const core = this.gameState && typeof this.gameState.getArmy === 'function'
-                ? this.gameState.getArmy(legacyArmy.armyId)
-                : null;
-            if (!core) return;
-            if (delta.morale != null) core.morale = delta.morale;
-            if (delta.supplies && typeof delta.supplies.food === 'number') {
-                if (!core.supplies) core.supplies = { food: 0, water: 0 };
-                core.supplies.food = delta.supplies.food;
+            const data = {
+                hexMap: this.hexMap,
+                enemies: this.enemies
+            };
+            localStorage.setItem('worldMapData', JSON.stringify(data));
+        } catch (e) {
+            console.warn('[WorldManager] Save failed:', e);
+        }
+    }
+
+    restoreFromSave() {
+        try {
+            const raw = localStorage.getItem('worldMapData');
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            if (data.hexMap && data.hexMap.length === this.mapHeight) {
+                this.hexMap = data.hexMap;
+                this.enemies = data.enemies || [];
+                console.log('[WorldManager] Restored from save');
+                return true;
             }
         } catch (e) {
-            console.warn('[World] Failed to sync core army:', e);
+            console.warn('[WorldManager] Restore failed:', e);
         }
+        return false;
     }
 
-    /**
-     * Serialize enemy data for saving.
-     */
-    serializeEnemies() {
-        return {
-            enemies: Array.from(this.enemyUnits.values()),
-            lastSpawnDay: this._lastEnemySpawnDay,
-            enemyIdCounter: this._enemyIdCounter
-        };
+    // ===================================================================
+    // HELPERS
+    // ===================================================================
+
+    inBounds(r, c) {
+        return r >= 0 && r < this.mapHeight && c >= 0 && c < this.mapWidth;
     }
 
-    /**
-     * Deserialize enemy data from save.
-     */
-    deserializeEnemies(data) {
-        if (!data) return;
-        
-        // Restore enemies
-        if (Array.isArray(data.enemies)) {
-            this.enemyUnits = new Map();
-            data.enemies.forEach(enemy => {
-                this.enemyUnits.set(enemy.id, enemy);
-            });
-            console.log(`[World] Loaded ${this.enemyUnits.size} enemies from save`);
-        }
-        
-        // Restore counters
-        if (typeof data.lastSpawnDay === 'number') {
-            this._lastEnemySpawnDay = data.lastSpawnDay;
-        }
-        if (typeof data.enemyIdCounter === 'number') {
-            this._enemyIdCounter = data.enemyIdCounter;
-        }
-        
-        // Recompute ZOC
-        this.recomputeEnemyZOC();
+    getNeighbors(r, c) {
+        const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        return dirs
+            .map(([dr, dc]) => ({ row: r + dr, col: c + dc }))
+            .filter(n => this.inBounds(n.row, n.col));
     }
 
-    /**
-     * Get full world state for saving.
-     */
-    getWorldSaveData() {
-        return {
-            enemies: this.serializeEnemies(),
-            discoveredTiles: Array.from(this.discoveredTiles),
-            scoutableTiles: Array.from(this.scoutableTiles),
-            parties: this.parties,
-            expeditions: this.expeditions || []
-        };
+    getPlayerArmiesAt(row, col) {
+        return (this.gameState.getAllArmies?.() || []).filter(a =>
+            a.position.y === row && a.position.x === col
+        );
     }
 
-    /**
-     * Load world state from save.
-     */
-    loadWorldSaveData(data) {
-        if (!data) return;
-        
-        // Load enemies
-        if (data.enemies) {
-            this.deserializeEnemies(data.enemies);
-        }
-        
-        // Load discovered tiles
-        if (Array.isArray(data.discoveredTiles)) {
-            this.discoveredTiles = new Set(data.discoveredTiles);
-            // Mark hexes as explored using new visibility model
-            data.discoveredTiles.forEach(key => {
-                const [row, col] = key.split(',').map(Number);
-                if (this.hexMap[row]?.[col]) {
-                    this.hexMap[row][col].visibility = 'explored';
-                }
-            });
-        }
-        
-        // Load scoutable tiles
-        if (Array.isArray(data.scoutableTiles)) {
-            this.scoutableTiles = new Set(data.scoutableTiles);
-            data.scoutableTiles.forEach(key => {
-                const [row, col] = key.split(',').map(Number);
-                if (this.hexMap[row]?.[col]) {
-                    // Only set scoutable if not already explored
-                    if (this.hexMap[row][col].visibility !== 'explored') {
-                        this.hexMap[row][col].visibility = 'scoutable';
-                    }
-                }
-            });
-        }
-        
-        // Load parties
-        if (data.parties) {
-            this.parties = data.parties;
-        }
-        
-        // Load expeditions
-        if (Array.isArray(data.expeditions)) {
-            this.expeditions = data.expeditions;
-        }
-        
-        console.log('[World] Loaded world save data');
+    // ===================================================================
+    // UI SETUP — 3-COLUMN LAYOUT
+    // ===================================================================
+
+    setupWorldUI() {
+        const container = document.getElementById('world-view');
+        if (!container) return;
+
+        // Preserve battle-modal if it exists
+        const battleModal = document.getElementById('battle-modal');
+        const battleModalHTML = battleModal ? battleModal.outerHTML : '';
+
+        container.innerHTML = `
+            <div class="world-layout">
+                <div class="world-sidebar world-sidebar-left" id="hex-info">
+                    <p class="info-placeholder">Select a tile to view details</p>
+                </div>
+                <div class="world-map-area">
+                    <div id="hex-overlay" class="hex-overlay"></div>
+                </div>
+                <div class="world-sidebar world-sidebar-right" id="world-actions">
+                </div>
+            </div>
+            ${battleModalHTML}
+        `;
+
+        console.log('[WorldManager] UI built');
     }
-    
-    // ==========================================
-    // Unit System Integration Methods
-    // ==========================================
-    
-    /**
-     * Create a player army unit on the map
-     */
-    createPlayerUnit(config) {
-        if (!this.unitManager) {
-            console.warn('[World] UnitManager not available');
-            return null;
-        }
-        return this.unitManager.createPlayerArmy({
-            row: config.row ?? this.playerVillageHex.row,
-            col: config.col ?? this.playerVillageHex.col,
-            ...config
-        });
+
+    show() {
+        this.init();
     }
-    
-    /**
-     * Create a scout party
-     */
-    createScoutUnit(config) {
-        if (!this.unitManager) {
-            console.warn('[World] UnitManager not available');
-            return null;
+
+    refreshUI() {
+        if (!this.initialized) return;
+
+        // Mark tiles that have player units for rendering
+        for (let r = 0; r < this.mapHeight; r++) {
+            for (let c = 0; c < this.mapWidth; c++) {
+                this.hexMap[r][c].hasPlayerUnit = this.getPlayerArmiesAt(r, c).length > 0;
+            }
         }
-        return this.unitManager.createScoutParty({
-            row: config.row ?? this.playerVillageHex.row,
-            col: config.col ?? this.playerVillageHex.col,
-            ...config
-        });
-    }
-    
-    /**
-     * Create a trade caravan
-     */
-    createTradeCaravan(config) {
-        if (!this.unitManager) {
-            console.warn('[World] UnitManager not available');
-            return null;
-        }
-        return this.unitManager.createTradeCaravan({
-            row: config.row ?? this.playerVillageHex.row,
-            col: config.col ?? this.playerVillageHex.col,
-            ...config
-        });
-    }
-    
-    /**
-     * Spawn an enemy raider band
-     */
-    spawnEnemyRaiders(config) {
-        if (!this.unitManager) {
-            console.warn('[World] UnitManager not available');
-            return null;
-        }
-        return this.unitManager.createRaiderBand(config);
-    }
-    
-    /**
-     * Spawn a neutral merchant
-     */
-    spawnMerchant(config) {
-        if (!this.unitManager) {
-            console.warn('[World] UnitManager not available');
-            return null;
-        }
-        return this.unitManager.createWanderingMerchant(config);
-    }
-    
-    /**
-     * Get all units at a specific hex
-     */
-    getUnitsAtHex(row, col) {
-        if (!this.unitManager) return [];
-        return this.unitManager.getUnitsAt(row, col);
-    }
-    
-    /**
-     * Command a unit to travel to a destination
-     */
-    commandUnitTravel(unitId, destRow, destCol) {
-        if (!this.unitManager) return false;
-        
-        const unit = this.unitManager.getUnit(unitId);
-        if (!unit) {
-            console.warn('[World] Unit not found:', unitId);
-            return false;
-        }
-        
-        // Calculate path using pathfinding
-        const path = this.findPath(unit.row, unit.col, destRow, destCol);
-        if (!path || path.length === 0) {
-            window.showToast?.('No path to destination!', { type: 'error' });
-            return false;
-        }
-        
-        return this.unitManager.startUnitTravel(unitId, path, { row: destRow, col: destCol });
-    }
-    
-    /**
-     * Get summary of all units for UI
-     */
-    getUnitSummary() {
-        if (!this.unitManager) return null;
-        return this.unitManager.getSummary();
+
+        this.renderer?.fullTileStyleRefresh();
+        this.renderer?.updateEntities();
+        this.updateInfoPanel();
+        this.updateActionPanel();
     }
 }
-// Inject hex-button CSS for flat-top hexagon styling
-if (!document.getElementById('hex-button-style')) {
-    const style = document.createElement('style');
-    style.id = 'hex-button-style';
-    style.innerHTML = `
-    .hex-button {
-        pointer-events: auto !important;
-        transition: all 0.2s ease;
-        transform-origin: center center;
-    }
-    .hex-button:hover {
-        z-index: 5 !important;
-    }
-    .hex-button.selected {
-        z-index: 10 !important;
-    }
-    `;
-    document.head.appendChild(style);
-}
 
-// Make WorldManager globally available
+// Expose globally
 window.WorldManager = WorldManager;
-
-// Also expose worldManager instance globally when created
-if (typeof window !== 'undefined') {
-    // This will be set when worldManager is instantiated
-    window.worldManager = null;
-}
+console.log('[WorldManager] Class loaded');

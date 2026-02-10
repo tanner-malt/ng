@@ -747,6 +747,14 @@ class VillageManager {
     // Validate if position is good for building placement (tile coords)
     isValidBuildingPosition(tileX, tileY) {
         if (!this.isWithinTileBounds(tileX, tileY)) return false;
+
+        // Check terrain buildability (water, forest, rocky are unbuildable)
+        if (this.terrain && this.terrain[tileY] && this.terrain[tileY][tileX]) {
+            const terrainType = this.terrain[tileY][tileX];
+            const terrainInfo = this.terrainTypes[terrainType];
+            if (terrainInfo && !terrainInfo.buildable) return false;
+        }
+
         if (window.tileManager) {
             const tile = window.tileManager.getTileAt(tileX, tileY);
             return !!(tile && !tile.building);
@@ -842,12 +850,19 @@ class VillageManager {
             }
 
             // Create new ghost building
+            const t = this.toTile(x, y);
+            const positionValid = this.isWithinTileBounds(t.x, t.y) && this.isValidBuildingPosition(t.x, t.y);
+
             if (this.isPositionFree(x, y)) {
                 ghostBuilding = document.createElement('div');
                 ghostBuilding.className = `building ghost-building ${this.gameState.buildMode}`;
                 ghostBuilding.style.left = x + 'px';
                 ghostBuilding.style.top = y + 'px';
-                ghostBuilding.style.opacity = '0.5';
+                ghostBuilding.style.opacity = positionValid ? '0.5' : '0.3';
+                if (!positionValid) {
+                    ghostBuilding.style.backgroundColor = 'rgba(255, 50, 50, 0.4)';
+                    ghostBuilding.style.border = '2px solid #ff3333';
+                }
                 ghostBuilding.textContent = this.getBuildingSymbol(this.gameState.buildMode);
                 // Add ghost building to the grid content instead of grid itself
                 this.villageGridContent.appendChild(ghostBuilding);
@@ -904,19 +919,6 @@ class VillageManager {
             // Check if position is free and within bounds (tile-based)
             const t = this.toTile(x, y);
             if (this.isWithinTileBounds(t.x, t.y) && this.isValidBuildingPosition(t.x, t.y)) {
-                // Temporarily disable terrain check for debugging
-                // if (!this.isTerrainBuildable(x, y)) {
-                //     console.log('[Village] Cannot build on this terrain type');
-                //     if (window.modalSystem) {
-                //         const terrainType = this.getTerrainAt(x, y);
-                //         const terrainInfo = this.terrainTypes[terrainType];
-                //         window.modalSystem.showMessage(
-                //             'Cannot Build Here',
-                //             `Cannot build on ${terrainType} terrain ${terrainInfo.symbol}. Look for buildable terrain like grass 🌱, hills ⛰️, or fertile land 🌾.`
-                //         );
-                //     }
-                //     return;
-                // }
 
                 // Verify we have a valid buildMode before proceeding
                 if (!this.gameState.buildMode) {

@@ -43,6 +43,7 @@ const StorageManager = {
         'enemySpawnState',
         'unitManagerState',
         'commanderData',
+        'worldMapData',
         
         // Backups
         'gamestate_backup'

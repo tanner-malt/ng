@@ -56,14 +56,14 @@ Order matters — each phase depends on the scripts above it.
 |-------|---------|---------|
 | **Config** | `gameData.js` → `buildingData.js` → `resourceData.js` → `jobData.js` + dynamic `wikiData.js` | Pure data, no dependencies |
 | **Core/Model** | `eventBus.js` → `dataModel.js` → `buildingModel.js` → `resourceModel.js` → `jobModel.js` → `modelInit.js` → `modelBridge.js` | EventBus first, then reactive models, then bridge |
-| **World data** | `worldData.js` → `worldModel.js` | World config + model |
+| **World data** | `worldData.js` | World config (5×5 map, terrain types, enemy spawn config) |
 | **State** | `skillSystem.js` → `populationManager.js` → `gameState.js` → `effectsManager.js` → `errorRecovery.js` → `storageManager.js` | Core state and management |
 | **UI** | `modalSystem.js` → `messageHistory.js` | Modal and notification infrastructure |
 | **Features** | `achievements.js` → `unlockSystem.js` → `techTree.js` → `tutorial.js` | Achievement/unlock/tutorial systems |
 | **Managers** | `royalFamily.js` → `buildingEffects.js` → `buildingTutorial.js` → `constructionManager.js` → `jobManager.js` → `tileManager.js` → `economySystem.js` → `legacySystem.js` | Game logic managers |
 | **Gameplay** | `village.js` → `throne.js` → `battle.js` → `quest.js` → `monarch.js` | View-specific gameplay |
 | **UI glue** | `uiPopups.js` → `uiBindings.js` → `eventBusIntegrations.js` | UI wiring, event cross-connections |
-| **World map** | `terrain.js` → `pathfinding.js` → `Unit.js` → `UnitManager.js` → `mapRenderer.js` → `worldManager.js` → `worldBridge.js` → `enemySpawnSystem.js` → `villageDefense.js` | Terrain/pathfinding/rendering must load before worldManager |
+| **World map** | `terrain.js` → `pathfinding.js` → `mapRenderer.js` → `worldManager.js` → `villageDefense.js` | Terrain helpers, renderer, then WorldManager (contains enemy system) |
 | **Boot** | `app.js` → `main.js` | Game class + `DOMContentLoaded` → `initializeGame()` |
 
 ## Testing Conventions
