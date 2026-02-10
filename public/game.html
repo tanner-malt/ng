@@ -48,7 +48,6 @@
     <script src="../src/systems/gameplay/village.js"></script>
     <script src="../src/systems/gameplay/throne.js"></script>
     <script src="../src/systems/gameplay/battle.js"></script>
-    <script src="../src/systems/gameplay/quest.js"></script>
     <script src="../src/systems/gameplay/monarch.js"></script>
     <script src="../src/systems/ui/uiPopups.js"></script>
     <script src="../src/systems/ui/uiBindings.js"></script>
@@ -138,9 +137,6 @@
                     <button id="message-history-btn" class="icon-btn" title="Message History"
                         style="position: relative;">
                         <span>📜</span>
-                    </button>
-                    <button id="quest-btn" class="icon-btn" title="Expeditions & Quests">
-                        <span>🗺️</span>
                     </button>
                     <button id="settings-btn" class="icon-btn" title="Settings">
                         <span>⚙️</span>
@@ -876,9 +872,6 @@
                                 window.eventBus.on('day-ended', updateStatsDisplay);
                                 window.eventBus.on('resources-updated', updateStatsDisplay);
                                 window.eventBus.on('building-built', updateBuildingGrid);
-                                window.eventBus.on('expedition_started', updateBuildingGrid);
-                                window.eventBus.on('expedition_completed', updateBuildingGrid);
-                                window.eventBus.on('expedition_return_started', updateBuildingGrid);
                             }
 
                             // Initial update

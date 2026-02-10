@@ -22,7 +22,7 @@
  * 
  * Usage:
  * - window.showModal(title, content, options) - Main modal function
- * - window.showNotification(message, options) - Quick notifications
+ * - window.showToast(message, options) - Quick toast notifications (see uiPopups.js)
  * - Automatic DOM container creation and management
  */
 
@@ -611,66 +611,6 @@ class ModalSystem {
     }
 
     // Show notification
-    showNotification(message, options = {}) {
-        const {
-            type = 'info', // info, success, warning, error
-            duration = 4000,
-            icon = '',
-            closable = true,
-            position = 'top-right' // top-right, top-left, bottom-right, bottom-left, center
-        } = options;
-
-        const notification = document.createElement('div');
-        const notificationId = `notification-${Date.now()}`;
-        notification.id = notificationId;
-        notification.className = `notification notification-${type} notification-${position}`;
-
-        notification.innerHTML = `
-            <div class="notification-content">
-                ${icon ? `<span class="notification-icon">${icon}</span>` : ''}
-                <div class="notification-message">${message}</div>
-                ${closable ? '<button class="notification-close">×</button>' : ''}
-            </div>
-        `;
-
-        // Add to container
-        const container = document.getElementById('notification-container');
-        container.appendChild(notification);
-
-        // Setup close button
-        if (closable) {
-            const closeBtn = notification.querySelector('.notification-close');
-            closeBtn.addEventListener('click', () => this.closeNotification(notificationId));
-        }
-
-        // Auto-close after duration
-        if (duration > 0) {
-            setTimeout(() => {
-                this.closeNotification(notificationId);
-            }, duration);
-        }
-
-        // Entrance animation
-        requestAnimationFrame(() => {
-            notification.classList.add('notification-enter');
-        });
-
-        return notificationId;
-    }
-
-    // Close notification
-    closeNotification(notificationId) {
-        const notification = document.getElementById(notificationId);
-        if (!notification) return;
-
-        notification.classList.add('notification-exit');
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }
-
     // Show confirmation dialog
     showConfirmation(message, options = {}) {
         return new Promise((resolve, reject) => {
@@ -780,264 +720,8 @@ class ModalSystem {
         });
     }
 
-    // Show quest menu (replacing the quest view)
-    showQuestMenu(questManager) {
-        const questsContent = this.generateQuestMenuContent(questManager);
 
-        const modalId = this.showModal({
-            id: 'quest-menu-modal',
-            title: '🗺️ Expeditions & Quests',
-            content: questsContent,
-            width: '800px',
-            height: '600px',
-            className: 'quest-menu-modal',
-            modalType: 'quest-menu',
-            onClose: () => {
-                // Clean up any quest-specific listeners
-            }
-        });
 
-        // Setup quest menu interactions
-        this.setupQuestMenuHandlers(modalId, questManager);
-
-        return modalId;
-    }
-
-    generateQuestMenuContent(questManager) {
-        if (!questManager.currentExpedition) {
-            // Check if expeditions are unlocked
-            if (!questManager.areExpeditionsUnlocked()) {
-                return `
-                    <div class="expedition-locked">
-                        <h3>🏰 Expeditions Locked</h3>
-                        <p>To unlock expeditions, you need:</p>
-                        <ul>
-                            <li>✅ Build a Barracks</li>
-                            <li>✅ Complete the "Military Establishment" achievement</li>
-                        </ul>
-                        <p>Expeditions allow you to send royal-led armies to explore, conquer, and gather resources from distant lands.</p>
-                    </div>
-                `;
-            }
-
-            // Show available expeditions
-            let expeditionsHTML = '<div class="expedition-grid">';
-
-            questManager.availableLocations.forEach(location => {
-                if (!location.unlocked) return;
-
-                const requiredSupplies = questManager.calculateRequiredSupplies(location);
-                const availableSupplies = questManager.getAvailableSupplies();
-                const canAfford = questManager.canStartExpedition(location, availableSupplies, requiredSupplies);
-                const availableRoyals = questManager.getAvailableRoyalLeaders();
-
-                expeditionsHTML += `
-                    <div class="expedition-card ${!canAfford || availableRoyals.length === 0 ? 'insufficient' : ''}" data-location="${location.id}">
-                        <h4>${location.name}</h4>
-                        <p class="expedition-description">${location.description}</p>
-                        <div class="expedition-details">
-                            <div class="expedition-stat">
-                                <span class="stat-icon">🚶</span>
-                                <span>Travel: ${location.travelDays} days each way</span>
-                            </div>
-                            <div class="expedition-stat">
-                                <span class="stat-icon">⚔️</span>
-                                <span>Difficulty: ${location.difficulty}</span>
-                            </div>
-                            <div class="expedition-stat">
-                                <span class="stat-icon">🌍</span>
-                                <span>Terrain: ${location.terrain}</span>
-                            </div>
-                            <div class="expedition-stat">
-                                <span class="stat-icon">🎯</span>
-                                <span>Type: ${location.type}</span>
-                            </div>
-                            <div class="expedition-stat">
-                                <span class="stat-icon">👑</span>
-                                <span>Leaders: ${availableRoyals.length} available</span>
-                            </div>
-                        </div>
-                        <div class="expedition-requirements">
-                            <strong>Required Supplies:</strong>
-                            <div class="requirements-list">
-                                ${Object.keys(requiredSupplies).map(supply => `
-                                    <span class="requirement-item ${availableSupplies[supply] >= requiredSupplies[supply] ? 'sufficient' : 'insufficient'}">
-                                        ${questManager.getSupplyIcon(supply)} ${requiredSupplies[supply]}
-                                    </span>
-                                `).join('')}
-                            </div>
-                        </div>
-                        <div class="expedition-rewards">
-                            <strong>Potential Rewards:</strong>
-                            <div class="rewards-list">
-                                ${Object.keys(location.rewards).map(resource => {
-                    if (resource === 'special') return `<span>✨ ${location.rewards[resource]}</span>`;
-                    return `<span>${questManager.getSupplyIcon(resource)} ${location.rewards[resource].min}-${location.rewards[resource].max}</span>`;
-                }).join('')}
-                            </div>
-                        </div>
-                        <button class="expedition-start-btn ${!canAfford || availableRoyals.length === 0 ? 'disabled' : ''}" 
-                                data-location="${location.id}"
-                                ${!canAfford || availableRoyals.length === 0 ? 'disabled' : ''}>
-                            ${availableRoyals.length === 0 ? 'No Royal Leaders' : !canAfford ? 'Insufficient Supplies' : 'Plan Expedition'}
-                        </button>
-                    </div>
-                `;
-            });
-
-            expeditionsHTML += '</div>';
-            return expeditionsHTML;
-
-        } else {
-            // Show active expedition status with enhanced details
-            const expedition = questManager.currentExpedition;
-            const location = expedition.location;
-            const progressPercent = questManager.calculateExpeditionProgress();
-            const leader = expedition.leader;
-
-            return `
-                <div class="active-expedition">
-                    <h4>🚶 Active Expedition: ${location.name}</h4>
-                    <div class="expedition-leader">
-                        <span class="leader-icon">👑</span>
-                        <span>Led by: ${leader ? leader.name : 'Unknown Commander'}</span>
-                        ${leader ? `<span class="leader-experience">(${leader.experience} exp)</span>` : ''}
-                    </div>
-                    
-                    <div class="expedition-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
-                        </div>
-                        <p>Progress: ${Math.floor(progressPercent)}% - Phase: ${questManager.expeditionState}</p>
-                        <p class="progress-details">
-                            ${questManager.expeditionState === 'traveling_out' ? `Traveling to ${location.name}` :
-                    questManager.expeditionState === 'battling' ? 'Engaged in battle' :
-                        questManager.expeditionState === 'traveling_back' ? 'Returning home' : 'Preparing'}
-                        </p>
-                    </div>
-
-                    <div class="expedition-status">
-                        <div class="status-overview">
-                            <h5>📊 Expedition Status</h5>
-                            <div class="status-grid">
-                                <div class="status-item">
-                                    <span class="status-icon">🥖</span>
-                                    <span>Food: ${expedition.supplies.food}</span>
-                                </div>
-                                <div class="status-item">
-                                    <span class="status-icon">💊</span>
-                                    <span>Medicine: ${expedition.supplies.medicine}</span>
-                                </div>
-                                <div class="status-item">
-                                    <span class="status-icon">😊</span>
-                                    <span>Morale: ${expedition.armyMorale}%</span>
-                                </div>
-                                <div class="status-item">
-                                    <span class="status-icon">🌤️</span>
-                                    <span>Weather: ${expedition.weather.name}</span>
-                                </div>
-                                <div class="status-item">
-                                    <span class="status-icon">⚰️</span>
-                                    <span>Casualties: ${expedition.casualties}</span>
-                                </div>
-                                <div class="status-item">
-                                    <span class="status-icon">🏃</span>
-                                    <span>Desertions: ${expedition.desertions}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        ${expedition.pursuitRisk > 0 ? `
-                            <div class="pursuit-warning">
-                                <span class="warning-icon">⚠️</span>
-                                <span>Pursuit Risk: ${Math.floor(expedition.pursuitRisk * 100)}%</span>
-                            </div>
-                        ` : ''}
-
-                        ${expedition.inventoryItems && expedition.inventoryItems.length > 0 ? `
-                            <div class="expedition-inventory">
-                                <h5>📦 Special Equipment</h5>
-                                <div class="inventory-items">
-                                    ${expedition.inventoryItems.map(item =>
-                            `<span class="inventory-item">${item.name}</span>`
-                        ).join('')}
-                                </div>
-                            </div>
-                        ` : ''}
-                        
-                        <div class="recent-events">
-                            <h5>📰 Recent Events</h5>
-                            <div class="events-list">
-                                ${expedition.events.slice(-4).map(event =>
-                            `<div class="event-item ${event.type}">
-                                        <span class="event-time">${event.time}</span>
-                                        <span class="event-text">${event.text}</span>
-                                    </div>`
-                        ).join('')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    ${questManager.expeditionState === 'traveling_out' || questManager.expeditionState === 'traveling_back' ? `
-                        <div class="expedition-actions">
-                            <button class="action-btn" id="rest-army-action">🏕️ Rest Army</button>
-                            <button class="action-btn" id="force-march-action">⚡ Force March</button>
-                            <button class="action-btn" id="hunt-food-action">🏹 Hunt for Food</button>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-    }
-
-    setupQuestMenuHandlers(modalId, questManager) {
-        const modal = document.getElementById(modalId);
-        if (!modal) {
-            console.log('[ModalSystem] Modal not found for quest menu handlers:', modalId);
-            return;
-        }
-
-        // Handle expedition planning buttons (new system)
-        modal.querySelectorAll('.expedition-start-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const locationId = e.target.dataset.location;
-                if (!e.target.disabled) {
-                    // Use new planning system instead of direct start
-                    if (questManager.planExpedition(locationId)) {
-                        // Planning modal will handle the actual expedition start
-                        this.closeModal(modalId);
-                    }
-                }
-            });
-        });
-
-        // Handle travel actions for active expeditions
-        const restBtn = modal.querySelector('#rest-army-action');
-        const marchBtn = modal.querySelector('#force-march-action');
-        const huntBtn = modal.querySelector('#hunt-food-action');
-
-        if (restBtn) restBtn.addEventListener('click', () => {
-            questManager.restArmy();
-            this.refreshQuestMenu(modalId, questManager);
-        });
-
-        if (marchBtn) marchBtn.addEventListener('click', () => {
-            questManager.forceMarch();
-            this.refreshQuestMenu(modalId, questManager);
-        });
-
-        if (huntBtn) huntBtn.addEventListener('click', () => {
-            questManager.huntForFood();
-            this.refreshQuestMenu(modalId, questManager);
-        });
-    }
-
-    refreshQuestMenu(modalId, questManager) {
-        const modal = document.getElementById(modalId);
-        const modalBody = modal.querySelector('.modal-body');
-        modalBody.innerHTML = this.generateQuestMenuContent(questManager);
-        this.setupQuestMenuHandlers(modalId, questManager);
-    }
 
     // Check if any modal is currently open
     hasActiveModals() {
@@ -1073,17 +757,17 @@ class ModalSystem {
                     <h5>🏘️ Village Management</h5>
                     <ul>
                         <li>Build structures to generate resources</li>
-                        <li>Manage your population and defenses</li>
-                        <li>Resources only generate during expeditions</li>
+                        <li>Manage your population and assign jobs</li>
+                        <li>Resources are produced by workers each day</li>
                     </ul>
                 </div>
 
                 <div class="tutorial-section">
-                    <h5>⚔️ Combat & Expeditions</h5>
+                    <h5>⚔️ Combat</h5>
                     <ul>
-                        <li>Send your army on expeditions to generate resources</li>
-                        <li>Experience Oregon Trail-style travel events</li>
-                        <li>Battle enemies and gather supplies</li>
+                        <li>Defend your village from enemy attacks</li>
+                        <li>Draft armies and explore the world map</li>
+                        <li>Battle enemies and protect your people</li>
                     </ul>
                 </div>
 
@@ -1187,11 +871,6 @@ class ModalSystem {
         const totalBirths = gs.stats?.totalBirths || 0;
         const totalDeaths = gs.stats?.totalDeaths || 0;
 
-        // Expedition stats
-        const expeditionsSent = gs.stats?.totalExpeditionsSent || 0;
-        const expeditionsSuccess = gs.stats?.successfulExpeditions || 0;
-        const expeditionsFailed = gs.stats?.failedExpeditions || 0;
-
         // Combat stats
         const battlesWon = window.achievementSystem?.stats?.battles_won || gs.stats?.battlesWon || 0;
         const enemiesDefeated = gs.stats?.enemiesDefeated || 0;
@@ -1210,9 +889,6 @@ class ModalSystem {
             'modal-stat-years-passed': yearsPassed,
             'modal-stat-total-births': totalBirths,
             'modal-stat-total-deaths': totalDeaths,
-            'modal-stat-expeditions-sent': expeditionsSent,
-            'modal-stat-expeditions-success': expeditionsSuccess,
-            'modal-stat-expeditions-failed': expeditionsFailed,
             'modal-stat-battles-won': battlesWon,
             'modal-stat-enemies-defeated': enemiesDefeated,
             'modal-stat-monarchs': monarchCount,
@@ -1285,25 +961,6 @@ class ModalSystem {
                         </div>
                     </div>
                     
-                    <!-- Expedition Stats -->
-                    <div class="stats-category">
-                        <div class="stats-category-title">🗺️ Expeditions</div>
-                        <div class="stats-row">
-                            <div class="stat-box">
-                                <div class="stat-box-value">${stats.expeditionsSent.toLocaleString()}</div>
-                                <div class="stat-box-label">Sent</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-box-value">${stats.expeditionsSuccess.toLocaleString()}</div>
-                                <div class="stat-box-label">Success</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-box-value">${stats.expeditionsFailed.toLocaleString()}</div>
-                                <div class="stat-box-label">Failed</div>
-                            </div>
-                        </div>
-                    </div>
-                    
                     <!-- Combat Stats -->
                     <div class="stats-category">
                         <div class="stats-category-title">⚔️ Combat</div>
@@ -1364,9 +1021,6 @@ class ModalSystem {
             totalDeaths: gs.stats?.totalDeaths || 0,
             buildingsBuilt: gs.stats?.buildingsBuilt || (gs.buildings?.length || 0),
             buildingsCurrent: gs.buildings?.length || 0,
-            expeditionsSent: gs.stats?.totalExpeditionsSent || 0,
-            expeditionsSuccess: gs.stats?.successfulExpeditions || 0,
-            expeditionsFailed: gs.stats?.failedExpeditions || 0,
             battlesWon: window.achievementSystem?.stats?.battles_won || gs.stats?.battlesWon || 0,
             enemiesDefeated: gs.stats?.enemiesDefeated || 0,
             monarchCount: gs.royalFamily?.monarchHistory?.length || 1,
@@ -1679,12 +1333,12 @@ class ModalSystem {
                 a.download = `dynasty-builder-save-${new Date().toISOString().split('T')[0]}.json`;
                 a.click();
                 URL.revokeObjectURL(url);
-                this.showNotification('Save exported successfully!', { type: 'success' });
+                window.showToast?.('Save exported successfully!', { type: 'success' });
             } else {
-                this.showNotification('No save data found', { type: 'warning' });
+                window.showToast?.('No save data found', { type: 'warning' });
             }
         } catch (e) {
-            this.showNotification('Failed to export save', { type: 'error' });
+            window.showToast?.('Failed to export save', { type: 'error' });
         }
     }
 
@@ -1703,10 +1357,10 @@ class ModalSystem {
                         // Write to new key; keep legacy for compatibility
                         localStorage.setItem('dynastyBuilder_save', saveData);
                         localStorage.setItem('idleDynastyBuilder', saveData);
-                        this.showNotification('Save imported successfully! Reloading to apply...', { type: 'success', duration: 2500 });
+                        window.showToast?.('Save imported successfully! Reloading to apply...', { type: 'success', timeout: 2500 });
                         setTimeout(() => location.reload(), 600);
                     } catch (err) {
-                        this.showNotification('Invalid save file', { type: 'error' });
+                        window.showToast?.('Invalid save file', { type: 'error' });
                     }
                 };
                 reader.readAsText(file);
@@ -2191,11 +1845,11 @@ class ModalSystem {
                     <div class="construction-details">
                         <div class="detail-item">
                             <span class="detail-icon">⏱️</span>
-                            <span class="detail-text">Will complete in <strong>${constructionHours} hours</strong> of expedition time</span>
+                            <span class="detail-text">Will complete in <strong>${constructionHours} construction points</strong></span>
                         </div>
                         <div class="detail-item">
                             <span class="detail-icon">📋</span>
-                            <span class="detail-text">Buildings are constructed automatically during expeditions</span>
+                            <span class="detail-text">Assign builders to speed up construction</span>
                         </div>
                     </div>
                 </div>
@@ -2558,11 +2212,6 @@ window.showModal = (title, content, options = {}) => {
         content: content,
         ...options
     });
-};
-
-// Backwards compatibility - replace old showNotification function
-window.showNotification = (message, options = {}) => {
-    return window.modalSystem.showNotification(message, options);
 };
 
 // Make ModalSystem available globally

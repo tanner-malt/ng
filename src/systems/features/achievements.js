@@ -357,15 +357,6 @@ class AchievementSystem {
             reward: { prestige: 200, influence: 100 }
         });
 
-        this.defineAchievement('expedition_master', {
-            title: 'Expedition Master',
-            description: 'Complete 5 successful expeditions',
-            icon: '🗺️',
-            type: 'exploration',
-            requirement: { expeditions_completed: 5 },
-            reward: { gold: 1000, metal: 500 }
-        });
-
         this.defineAchievement('elite_army', {
             title: 'Elite Army',
             description: 'Have all 7 unit types available in your forces',
@@ -533,12 +524,6 @@ class AchievementSystem {
     triggerMasterBuilder() {
         if (this.isUnlocked('master_builder')) return;
         this.unlock('master_builder');
-    }
-
-    // Trigger expedition achievement
-    triggerExpeditionMaster() {
-        if (this.isUnlocked('expedition_master')) return;
-        this.unlock('expedition_master');
     }
 
     // Trigger dynasty achievements
@@ -746,8 +731,8 @@ class AchievementSystem {
                     console.log(`[Achievements] Added ${amount} refugee families (${amount * 4} total people) as achievement reward`);
                     // Partial acceptance notice
                     const plannedPeople = amount * 4;
-                    if (actuallyAddedPeople < plannedPeople && window.showNotification) {
-                        window.showNotification(`🏠 Housing full: accepted ${actuallyAddedPeople}/${plannedPeople} refugees`, 'warning');
+                    if (actuallyAddedPeople < plannedPeople && window.showToast) {
+                        window.showToast(`🏠 Housing full: accepted ${actuallyAddedPeople}/${plannedPeople} refugees`, { type: 'warning' });
                     }
                 } else {
                     console.warn(`[Achievements] PopulationManager not available for refugee families`);
@@ -783,8 +768,8 @@ class AchievementSystem {
         // Emit events for population gains, but avoid immediate requirement checking
         if (populationGained > 0) {
             // Show notification for population gains
-            if (window.showNotification) {
-                window.showNotification(`🎉 ${populationGained} new villagers joined your dynasty!`, 'success');
+            if (window.showToast) {
+                window.showToast(`🎉 ${populationGained} new villagers joined your dynasty!`, { type: 'success' });
             }
 
             // Emit event for other systems, but delay it to avoid immediate recursive checking
@@ -954,9 +939,6 @@ class AchievementSystem {
                         case 'royal_family_count':
                             // Placeholder - would need royal family system implementation
                             current = window.gameState.royalFamilyCount || 0;
-                            break;
-                        case 'expeditions_completed':
-                            current = window.gameState.expeditionsCompleted || 0;
                             break;
                         case 'unit_types_available':
                             // Placeholder - would check available unit types from military system

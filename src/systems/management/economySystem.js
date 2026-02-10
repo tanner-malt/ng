@@ -133,7 +133,7 @@ class EconomySystem {
         let totalUpkeep = 0;
         
         // Count units in armies
-        const armies = window.worldManager?.parties?.expeditions || [];
+        const armies = window.worldManager?.armies || [];
         armies.forEach(army => {
             const units = army.units || [];
             units.forEach(unit => {
@@ -143,7 +143,6 @@ class EconomySystem {
         });
         
         // Count village guards
-        const guards = this.countVillageGuards();
         totalUpkeep += guards * (this.upkeepCosts.guard || 2);
         
         // Apply logistics tech bonus
@@ -320,7 +319,7 @@ class EconomySystem {
         const breakdown = {};
         
         // Army units
-        const armies = window.worldManager?.parties?.expeditions || [];
+        const armies = window.worldManager?.armies || [];
         armies.forEach(army => {
             const units = army.units || [];
             units.forEach(unit => {

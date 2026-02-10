@@ -575,7 +575,6 @@ class WorldManager {
                     this.gameState.populationManager.assignRole?.(villager.id, dv.originalRole);
                 }
                 villager.location = 'village';
-                villager.onExpedition = false;
             });
 
             // Re-optimize jobs

@@ -8,7 +8,7 @@ Browser-based idle/strategy game with **no bundler** — scripts load via `<scri
 
 The codebase has two parallel data systems for buildings. The legacy `GameData` object in `src/config/gameData.js` stores `buildingCosts`, `buildingProduction`, `constructionPoints`, `buildingInfo`, and `buildingCategories` as flat lookup tables. The newer reactive model layer (`BuildingRegistry`, `ResourceModel`, `DataModel`) stores the same data in `BUILDING_DATA` definitions loaded from `src/config/buildingData.js`.
 
-**Why both still exist:** `ModelBridge` only intercepts 4 `gameState` methods (`canAfford`, `isBuildingUnlocked`, `getBuildingCosts`, `spendResources`). However, ~37 call sites across `village.js`, `jobManager.js`, `gameState.js`, `economySystem.js`, and `quest.js` read `GameData.building*` properties **directly** — not through `gameState`. The helper methods `calculatePopulationCap()` and `calculateSeasonalStorageCap()` also internally read from `GameData.buildingProduction`. Until those call sites are converted, both systems must stay in sync.
+**Why both still exist:** `ModelBridge` only intercepts 4 `gameState` methods (`canAfford`, `isBuildingUnlocked`, `getBuildingCosts`, `spendResources`). However, ~37 call sites across `village.js`, `jobManager.js`, `gameState.js`, and `economySystem.js` read `GameData.building*` properties **directly** — not through `gameState`. The helper methods `calculatePopulationCap()` and `calculateSeasonalStorageCap()` also internally read from `GameData.buildingProduction`. Until those call sites are converted, both systems must stay in sync.
 
 **Migration goal:** Eliminate `GameData.buildingCosts`, `buildingProduction`, `constructionPoints`, `buildingInfo`, and `buildingCategories` by routing all reads through `BuildingRegistry.getDefinition()`. The heaviest file to convert is `village.js` (~25 legacy reads). New code should prefer `BuildingRegistry` when possible.
 
@@ -61,7 +61,7 @@ Order matters — each phase depends on the scripts above it.
 | **UI** | `modalSystem.js` → `messageHistory.js` | Modal and notification infrastructure |
 | **Features** | `achievements.js` → `unlockSystem.js` → `techTree.js` → `tutorial.js` | Achievement/unlock/tutorial systems |
 | **Managers** | `royalFamily.js` → `buildingEffects.js` → `buildingTutorial.js` → `constructionManager.js` → `jobManager.js` → `tileManager.js` → `economySystem.js` → `legacySystem.js` | Game logic managers |
-| **Gameplay** | `village.js` → `throne.js` → `battle.js` → `quest.js` → `monarch.js` | View-specific gameplay |
+| **Gameplay** | `village.js` → `throne.js` → `battle.js` → `monarch.js` | View-specific gameplay |
 | **UI glue** | `uiPopups.js` → `uiBindings.js` → `eventBusIntegrations.js` | UI wiring, event cross-connections |
 | **World map** | `terrain.js` → `pathfinding.js` → `mapRenderer.js` → `worldManager.js` → `villageDefense.js` | Terrain helpers, renderer, then WorldManager (contains enemy system) |
 | **Boot** | `app.js` → `main.js` | Game class + `DOMContentLoaded` → `initializeGame()` |

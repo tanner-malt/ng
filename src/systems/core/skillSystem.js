@@ -58,7 +58,7 @@ class SkillSystem {
                     diplomacy: { name: 'Diplomacy', icon: '🤝', description: 'Negotiation, alliance building, and international relations' },
                     trade: { name: 'Trade', icon: '💰', description: 'Economic negotiation, market analysis, and commercial strategy' },
                     lawEnforcement: { name: 'Law Enforcement', icon: '⚖️', description: 'Justice administration, crime prevention, and civil order' },
-                    logistics: { name: 'Logistics', icon: '📦', description: 'Supply chain management, resource distribution, and expedition planning' },
+                    logistics: { name: 'Logistics', icon: '📦', description: 'Supply chain management, resource distribution, and operational planning' },
                     inspiration: { name: 'Inspiration', icon: '✨', description: 'Morale boosting, public speaking, and loyalty cultivation' },
                     strategy: { name: 'Strategy', icon: '🧠', description: 'Long-term planning, risk assessment, and tactical decision-making' }
                 }

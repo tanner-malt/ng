@@ -226,12 +226,9 @@ class VillageManager {
             // Listen for effect and season/day events to keep Active Effects panel fresh
             this.setupEffectEventListeners();
 
-            // Listen for expedition lifecycle to manage lock modal
+            // Listen for day end events to check management lock
             try {
                 if (window.eventBus) {
-                    window.eventBus.on('expedition_started', () => this.ensureManagementLock());
-                    window.eventBus.on('expedition_completed', () => this.closeManagementLock());
-                    window.eventBus.on('expedition_return_started', () => this.ensureManagementLock());
                     // Periodic safety check on day end
                     window.eventBus.on('day-ended', () => this.ensureManagementLock());
                 }
@@ -262,8 +259,8 @@ class VillageManager {
         try {
             const mgmt = this.getManagementStatus();
             const message = mgmt.message || 'Village management is locked';
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(message, { type: 'warning', icon: '⚠️', duration: 3000 });
+            if (window.showToast) {
+                window.showToast(message, { type: 'warning', icon: '⚠️', timeout: 3000 });
             }
         } catch (_) { /* ignore */ }
     }
@@ -283,12 +280,12 @@ class VillageManager {
 
         // When not allowed, do NOT show a blocking modal. Keep the experience inspectable.
         // Optionally nudge with a lightweight toast once per lock session.
-        if (window.modalSystem && !this._managementLockToastShown) {
+        if (window.showToast && !this._managementLockToastShown) {
             try {
                 const mgmt = this.getManagementStatus();
-                window.modalSystem.showNotification(
+                window.showToast(
                     mgmt.message || 'Village management locked: building is disabled until leadership is present.',
-                    { type: 'warning', icon: '🚫', duration: 3500 }
+                    { type: 'warning', icon: '🚫', timeout: 3500 }
                 );
             } catch (_) { /* ignore */ }
             this._managementLockToastShown = true;
@@ -335,10 +332,10 @@ class VillageManager {
                             if (jobs) requiredWorkers = Object.values(jobs).reduce((s, v) => s + (v || 0), 0);
                         }
                     } catch (_) { /* ignore */ }
-                    if (requiredWorkers > 0 && window.modalSystem) {
-                        window.modalSystem.showNotification(
+                    if (requiredWorkers > 0 && window.showToast) {
+                        window.showToast(
                             `${building.type} completed! Workers assigned automatically.`,
-                            { type: 'success', duration: 4000 }
+                            { type: 'success', timeout: 4000 }
                         );
                     }
                 }
@@ -510,14 +507,14 @@ class VillageManager {
                 // Check both affordability and unlock status
                 if (!this.gameState.isBuildingUnlocked(buildingType)) {
                     console.log(`[Village] Building ${buildingType} is locked`);
-                    this.showMessage('Building Locked', `Complete prerequisite buildings to unlock ${buildingType}.`);
+                    window.modalSystem?.showMessage('Building Locked', `Complete prerequisite buildings to unlock ${buildingType}.`, { type: 'warning' });
                     return;
                 }
                 if (this.gameState.canAfford(buildingType)) {
                     this.enterBuildMode(buildingType);
                 } else {
                     console.log(`[Village] Cannot afford ${buildingType}`);
-                    this.showMessage('Insufficient Resources', `You need more resources to build a ${buildingType}.`);
+                    window.modalSystem?.showMessage('Insufficient Resources', `You need more resources to build a ${buildingType}.`, { type: 'warning' });
                 }
             });
 
@@ -930,7 +927,7 @@ class VillageManager {
                 // Check if we can afford the building before proceeding
                 if (!this.gameState.canAfford(this.gameState.buildMode)) {
                     console.log('[Village] Cannot afford building');
-                    this.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.');
+                    window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.', { type: 'warning' });
                     return;
                 }
 
@@ -1107,7 +1104,7 @@ class VillageManager {
         // Check if we can afford the building
         if (!this.gameState.canAfford(type)) {
             console.log('[Village] Cannot afford building:', type);
-            this.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.');
+            window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.', { type: 'warning' });
             return false;
         }
 
@@ -1115,7 +1112,7 @@ class VillageManager {
         const spendSuccess = this.gameState.spend(type);
         if (!spendSuccess) {
             console.error('[Village] Failed to spend resources for building');
-            this.showMessage('Construction Failed', 'Unable to spend resources for construction.');
+            window.modalSystem?.showMessage('Construction Failed', 'Unable to spend resources for construction.', { type: 'error' });
             return false;
         }
 
@@ -1169,9 +1166,9 @@ class VillageManager {
             const assigned = this.gameState.jobManager.autoAssignWorkers();
             if (assigned > 0) {
                 console.log(`[Village] Auto-assigned ${assigned} workers after placing ${building.type}`);
-                window.modalSystem?.showNotification?.(
+                window.showToast?.(
                     `${assigned} workers assigned to jobs`,
-                    { type: 'info', duration: 3000 }
+                    { type: 'info', timeout: 3000 }
                 );
             }
         } catch (e) {
@@ -1478,10 +1475,10 @@ class VillageManager {
             this.showConstructionPriorityModal(buildingId);
 
             // Show feedback
-            if (window.modalSystem) {
-                window.modalSystem.showNotification(
+            if (window.showToast) {
+                window.showToast(
                     `Priority set to ${priority}`,
-                    { type: 'success', duration: 2000 }
+                    { type: 'success', timeout: 2000 }
                 );
             }
         }
@@ -1542,75 +1539,6 @@ class VillageManager {
         // Count level 0 buildings for debugging
         const constructionSites = this.gameState.buildings.filter(b => b.level === 0).length;
         console.log(`[Village] ${constructionSites} buildings under construction (level 0)`);
-    }
-
-    showMessage(title, message) {
-        // Simple modal message system
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.display = 'flex';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>${title}</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p style="white-space: pre-line;">${message}</p>
-                </div>
-            </div>
-        `;
-
-        // Add close handler
-        modal.querySelector('.modal-close').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
-
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                document.body.removeChild(modal);
-            }
-        });
-
-        document.body.appendChild(modal);
-    }
-
-    showNotification(title, message, type = 'success', duration = 4000) {
-        const notification = document.createElement('div');
-        notification.className = `notification-modal ${type}`;
-
-        const iconMap = {
-            success: '✅',
-            error: '❌',
-            warning: '⚠️',
-            info: 'ℹ️',
-            construction: '🏗️'
-        };
-
-        notification.innerHTML = `
-            <div class="notification-icon">${iconMap[type] || iconMap.success}</div>
-            <div class="notification-content">
-                <div class="notification-title">${title}</div>
-                <div class="notification-message">${message}</div>
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-
-        // Trigger show animation
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 10);
-
-        // Auto-remove after duration
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    document.body.removeChild(notification);
-                }
-            }, 400);
-        }, duration);
     }
 
     showBuildingCompletionEffect(x, y) {
@@ -2566,7 +2494,7 @@ class VillageManager {
         // Include current monarch if tracked on gameState.royalFamily
         if (this.gameState?.royalFamily?.currentMonarch) {
             const m = this.gameState.royalFamily.currentMonarch;
-            royals.push({ name: m.name, role: 'Monarch', age: m.age, status: m.onExpedition ? 'away' : 'in village' });
+            royals.push({ name: m.name, role: 'Monarch', age: m.age, status: m.status === 'away' ? 'away' : 'in village' });
             console.log('[Leadership] Found currentMonarch from royalFamily', m.name);
         }
         // Include other royal family members if available
@@ -2574,7 +2502,7 @@ class VillageManager {
             this.gameState.royalFamily.royalFamily.forEach(member => {
                 // Avoid duplicating current monarch
                 if (this.gameState.royalFamily.currentMonarch && member.id === this.gameState.royalFamily.currentMonarch.id) return;
-                royals.push({ name: member.name, role: this.gameState?.royalFamily?.getMemberClass ? this.gameState.royalFamily.getMemberClass(member) : (member.type || 'royal'), age: member.age, status: member.onExpedition ? 'away' : (member.injured ? 'injured' : 'in village') });
+                royals.push({ name: member.name, role: this.gameState?.royalFamily?.getMemberClass ? this.gameState.royalFamily.getMemberClass(member) : (member.type || 'royal'), age: member.age, status: member.injured ? 'injured' : 'in village' });
             });
             console.log('[Leadership] Added royal family members from royalFamily list', { count: this.gameState.royalFamily.royalFamily.length });
         } else {
@@ -2583,7 +2511,7 @@ class VillageManager {
             // Normalize role label for display
             derived.forEach(p => {
                 const role = (p.role === 'royal' && (p.status === 'ruling' || p.status === 'leader')) ? 'Monarch' : (p.role === 'player' ? 'Monarch' : (p.role || 'royal'));
-                royals.push({ name: p.name, role, age: p.age, status: p.onExpedition ? 'away' : (p.injured ? 'injured' : (p.status || 'in village')) });
+                royals.push({ name: p.name, role, age: p.age, status: p.injured ? 'injured' : (p.status || 'in village') });
             });
             console.log('[Leadership] Derived royals from population', { count: derived.length });
         }
@@ -2598,10 +2526,8 @@ class VillageManager {
             });
         }
         const civil = pop.filter(p => p.role === 'civil_leader' || p.role === 'mayor' || p.role === 'administrator');
-        // Military commanders: current expedition leader and any guard captains
+        // Military commanders: guard captains
         const commanders = [];
-        const expeditionLeader = this.game?.questManager?.currentExpedition?.leader;
-        if (expeditionLeader) commanders.push({ name: expeditionLeader.name, type: 'Expedition Leader' });
         const guards = pop.filter(p => p.role === 'guard_captain' || p.role === 'guard');
         if (guards.length) commanders.push({ name: `${guards.length} Guard${guards.length > 1 ? 's' : ''}`, type: 'Garrison' });
 
@@ -2628,7 +2554,7 @@ class VillageManager {
                 </div>
                 <label style="display:flex; align-items:center; gap:8px;">
                     <span style="color:${monarch.isGoverning ? '#2ecc71' : '#e74c3c'}; font-weight:700;">${monarch.isGoverning ? 'ON' : 'OFF'}</span>
-                    <input type="checkbox" id="governing-toggle" ${monarch.isGoverning ? 'checked' : ''} ${this.game?.questManager?.currentExpedition?.leader ? 'disabled' : ''} />
+                    <input type="checkbox" id="governing-toggle" ${monarch.isGoverning ? 'checked' : ''} />
                 </label>
             </div>` : '';
 
@@ -2656,9 +2582,6 @@ class VillageManager {
                         checkbox.addEventListener('change', (e) => {
                             const monarch = this.gameState?.royalFamily?.currentMonarch;
                             if (!monarch) return;
-                            // If expedition leader exists, block toggling off
-                            const away = !!this.game?.questManager?.currentExpedition?.leader;
-                            if (away) { e.preventDefault(); checkbox.checked = true; return; }
                             monarch.isGoverning = !!checkbox.checked;
                             try { this.gameState.save?.(); } catch (_) { }
                             // Update management lock/banner immediately
@@ -3051,11 +2974,10 @@ class VillageManager {
 
         const assigned = this.gameState.jobManager.autoAssignWorkers();
 
-        if (window.showNotification) {
-            window.showNotification(
-                `🔄 Auto-Assignment Complete!`,
+        if (window.showToast) {
+            window.showToast(
                 `Assigned ${assigned} workers to available jobs`,
-                { timeout: 3000, icon: '👷' }
+                { title: '🔄 Auto-Assignment Complete!', timeout: 3000, icon: '👷', type: 'success' }
             );
         }
 
@@ -3915,7 +3837,7 @@ class VillageManager {
         // Refresh modal
         this.showBuildingManagement(buildingId);
         // Notify
-        window.modalSystem?.showNotification(`Training ${enabled ? 'enabled' : 'disabled'} for ${b.type}`, { type: enabled ? 'success' : 'info' });
+        window.showToast?.(`Training ${enabled ? 'enabled' : 'disabled'} for ${b.type}`, { type: enabled ? 'success' : 'info' });
     }
 
     setBuildingTrainingSkill(buildingId, skill) {
@@ -4110,7 +4032,7 @@ class VillageManager {
         );
 
         if (!canAfford) {
-            this.showMessage('Insufficient Resources', 'You don\'t have enough resources to upgrade this building.');
+            window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to upgrade this building.', { type: 'warning' });
             return;
         }
 
@@ -4122,11 +4044,9 @@ class VillageManager {
         // Upgrade building
         const newLevel = this.buildingEffectsManager.upgradeBuildingLevel(buildingType, position);
 
-        this.showNotification(
-            'Building Upgraded!',
+        window.showToast?.(
             `${buildingType} upgraded to level ${newLevel}`,
-            'success',
-            3000
+            { title: 'Building Upgraded!', type: 'success', icon: '⬆️', timeout: 3000 }
         );
 
         // Update displays
@@ -4172,7 +4092,7 @@ class VillageManager {
         const availableSpecs = specializations[buildingType] || [];
 
         if (availableSpecs.length === 0) {
-            this.showMessage('No Specializations', 'This building type does not have specialization options.');
+            window.modalSystem?.showMessage('No Specializations', 'This building type does not have specialization options.', { type: 'info' });
             return;
         }
 
@@ -4217,11 +4137,9 @@ class VillageManager {
         const success = this.buildingEffectsManager.addBuildingSpecialization(buildingType, position, specializationId);
 
         if (success) {
-            this.showNotification(
-                'Specialization Applied!',
+            window.showToast?.(
                 `${buildingType} has been specialized`,
-                'success',
-                3000
+                { title: 'Specialization Applied!', type: 'success', icon: '⭐', timeout: 3000 }
             );
 
             // Close modal and return to building management
@@ -4266,11 +4184,9 @@ class VillageManager {
         // Remove building from gameState
         this.gameState.buildings = this.gameState.buildings.filter(b => b.id !== buildingId);
 
-        this.showNotification(
-            'Building Demolished',
+        window.showToast?.(
             `${building.type} has been demolished`,
-            'info',
-            3000
+            { title: 'Building Demolished', type: 'info', icon: '🏚️', timeout: 3000 }
         );
 
         // Update displays

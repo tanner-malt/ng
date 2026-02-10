@@ -170,8 +170,8 @@ class TechTree {
                 cost: 400,
                 requires: ['tradeRoutes'],
                 requiresBuilding: 'university',
-                effects: { expeditionCapacity: 0.30, travelSpeed: 0.20 },
-                description: '+30% expedition capacity, +20% travel speed'
+                effects: { travelSpeed: 0.20, storageCapacity: 0.30 },
+                description: '+20% travel speed, +30% storage capacity'
             },
             architecture: {
                 id: 'architecture',
@@ -200,8 +200,8 @@ class TechTree {
                 cost: 400,
                 requires: ['militaryTactics'],
                 requiresBuilding: 'university',
-                effects: { armyUpkeep: -0.20, expeditionSupplies: 0.25 },
-                description: '-20% army upkeep, supplies last 25% longer'
+                effects: { armyUpkeep: -0.20 },
+                description: '-20% army upkeep'
             }
         };
     }

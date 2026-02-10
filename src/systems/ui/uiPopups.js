@@ -1,86 +1,76 @@
-// ===== TOAST NOTIFICATIONS =====
-// Brief, non-intrusive notifications (e.g., "Building placed", "Resource gained")
-// Usage: window.showToast('Building placed successfully!', {icon: '🏠', type: 'success'})
+// ===== UNIFIED TOAST NOTIFICATION SYSTEM =====
+// Single API for all transient notifications in the game.
+// Usage:
+//   showToast('Building placed!', { icon: '🏠', type: 'success' })
+//   showToast('Stone quarry now available!', { title: 'New Unlock!', type: 'unlock', icon: '🔓', timeout: 5000 })
+//   showToast('Not enough wood', { type: 'warning', log: false })  // skip message-log entry
+//
+// Supported types: 'info' | 'success' | 'warning' | 'error' | 'building' | 'unlock'
+// All toasts auto-log to MessageHistory unless { log: false }.
+
 function showToast(message, opts = {}) {
-    console.log('[UI] Toast:', message);
-    
+    const type = opts.type || 'info';
+    const title = opts.title || null;
+    const icon = opts.icon || null;
+    const timeout = opts.timeout || (type === 'unlock' ? 5000 : 3000);
+    const shouldLog = opts.log !== false;
+
+    // --- Log to MessageHistory ---
+    if (shouldLog && window.messageHistory) {
+        const logTitle = title || message;
+        const logContent = title ? message : '';
+        window.messageHistory.addMessage(logTitle, logContent, type);
+    }
+
+    // --- DOM rendering ---
     const container = document.getElementById('notification-container');
     if (!container) return;
-    
-    // Limit to 3 visible toast notifications
+
+    // Limit to 3 visible toasts
     while (container.children.length >= 3) {
         container.removeChild(container.firstChild);
     }
-    
+
     const toast = document.createElement('div');
-    const type = opts.type || 'info';
     toast.className = `toast-notification toast-${type}`;
-    
-    // Build toast content
-    let content = '';
-    if (opts.icon) {
-        content += `<span class="toast-icon">${opts.icon}</span>`;
+
+    // Build content — two-line layout when title is present
+    let html = '';
+    if (icon) {
+        html += `<span class="toast-icon">${icon}</span>`;
     }
-    content += `<span class="toast-message">${message}</span>`;
-    toast.innerHTML = content;
-    
-    // Style the toast
-    toast.style.cssText = `
-        position: relative;
-        background: linear-gradient(135deg, #2c3e50, #34495e);
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        border-left: 4px solid ${getTypeColor(type)};
-        transform: translateX(100%);
-        opacity: 0;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        color: #ecf0f1;
-        max-width: 320px;
-        z-index: 1000;
-    `;
-    
+    if (title) {
+        html += `<div class="toast-body">`;
+        html += `<div class="toast-title">${title}</div>`;
+        html += `<div class="toast-message">${message}</div>`;
+        html += `</div>`;
+    } else {
+        html += `<span class="toast-message">${message}</span>`;
+    }
+    toast.innerHTML = html;
+
     // Click to dismiss
     toast.onclick = () => dismissToast(toast);
-    
     container.appendChild(toast);
-    
+
     // Animate in
     requestAnimationFrame(() => {
-        toast.style.transform = 'translateX(0)';
-        toast.style.opacity = '1';
+        toast.classList.add('toast-enter');
     });
-    
+
     // Auto-dismiss
-    setTimeout(() => dismissToast(toast), opts.timeout || 3000);
+    setTimeout(() => dismissToast(toast), timeout);
 }
 
 function dismissToast(toast) {
     if (!toast.parentNode) return;
-    toast.style.transform = 'translateX(100%)';
-    toast.style.opacity = '0';
+    toast.classList.remove('toast-enter');
+    toast.classList.add('toast-exit');
     setTimeout(() => {
         if (toast.parentNode) {
             toast.parentNode.removeChild(toast);
         }
     }, 300);
-}
-
-function getTypeColor(type) {
-    const colors = {
-        success: '#27ae60',
-        error: '#e74c3c',
-        warning: '#f39c12',
-        info: '#3498db',
-        building: '#9b59b6'
-    };
-    return colors[type] || colors.info;
 }
 
 // Export toast functions
@@ -93,7 +83,6 @@ function bindTopRightPopups(game) {
     console.log('[UI] bindTopRightPopups called');
     console.log('[UI] progress-btn:', document.getElementById('progress-btn'));
     console.log('[UI] progress-popup:', document.getElementById('progress-popup'));
-    console.log('[UI] quest-btn:', document.getElementById('quest-btn'));
     console.log('[UI] settings-btn:', document.getElementById('settings-btn'));
     console.log('[UI] settings-popup:', document.getElementById('settings-popup'));
     console.log('[UI] quit-btn:', document.getElementById('quit-btn'));
@@ -132,25 +121,6 @@ function bindTopRightPopups(game) {
     } else {
         if (!messageHistoryBtn) console.log('[UI] message-history-btn not found');
         if (!window.messageHistory) console.log('[UI] messageHistory not available');
-    }
-
-    // Quest menu button
-    const questBtn = document.getElementById('quest-btn');
-    if (questBtn && game && game.questManager && window.modalSystem) {
-        questBtn.onclick = () => {
-            console.log('[UI] Quest menu triggered');
-            window.modalSystem.showQuestMenu(game.questManager);
-        };
-        questBtn.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                questBtn.click();
-            }
-        });
-    } else {
-        if (!questBtn) console.log('[UI] quest-btn not found');
-        if (!game.questManager) console.log('[UI] questManager not available');
-        if (!window.modalSystem) console.log('[UI] modalSystem not available');
     }
 
     // Settings/menu popup
@@ -294,172 +264,3 @@ function performGameReset() {
 // Attach to window for browser compatibility
 window.bindTopRightPopups = bindTopRightPopups;
 window.performGameReset = performGameReset;
-
-// ===== MINI TOAST NOTIFICATIONS =====
-// Ultra-lightweight notifications for small changes (resource updates, building completion)
-// Usage: window.showMiniToast('🏠') or window.showMiniToast('💰', '+50')
-function showMiniToast(icon, numberChange = null, opts = {}) {
-    // Create mini toast container if it doesn't exist
-    let container = document.getElementById('mini-toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'mini-toast-container';
-        container.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            z-index: 2000;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        `;
-        document.body.appendChild(container);
-    }
-    
-    // Remove old toasts (keep max 5)
-    while (container.children.length >= 5) {
-        container.removeChild(container.firstChild);
-    }
-    
-    const miniToast = document.createElement('div');
-    miniToast.className = 'mini-toast';
-    
-    // Build content
-    let content = `<span class="mini-toast-icon">${icon}</span>`;
-    if (numberChange) {
-        const isPositive = !numberChange.startsWith('-');
-        const color = isPositive ? '#2ecc71' : '#e74c3c';
-        content += `<span class="mini-toast-number" style="color: ${color};">${numberChange}</span>`;
-    }
-    miniToast.innerHTML = content;
-    
-    // Style the mini toast
-    const bgColor = opts.background || 'rgba(44, 62, 80, 0.9)';
-    miniToast.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        background: ${bgColor};
-        border-radius: 20px;
-        padding: 6px 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        border: 1px solid rgba(255,255,255,0.1);
-        font-size: 14px;
-        font-weight: 500;
-        color: #ecf0f1;
-        transform: translateX(100%) scale(0.8);
-        opacity: 0;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        min-width: 40px;
-        justify-content: center;
-    `;
-    
-    container.appendChild(miniToast);
-    
-    // Animate in
-    requestAnimationFrame(() => {
-        miniToast.style.transform = 'translateX(0) scale(1)';
-        miniToast.style.opacity = '1';
-    });
-    
-    // Auto-dismiss
-    const duration = opts.duration || 2000;
-    setTimeout(() => {
-        if (miniToast.parentNode) {
-            miniToast.style.transform = 'translateX(100%) scale(0.8)';
-            miniToast.style.opacity = '0';
-            setTimeout(() => {
-                if (miniToast.parentNode) {
-                    miniToast.parentNode.removeChild(miniToast);
-                }
-            }, 300);
-        }
-    }, duration);
-}
-
-// Helper function for resource changes
-function showResourceChange(resource, amount) {
-    const icons = {
-        food: '🌾',
-        wood: '🪵', 
-        stone: '🪨',
-        metal: '⚱️',
-        gold: '💰',
-        population: '👥'
-    };
-    
-    const icon = icons[resource] || '📦';
-    const change = amount > 0 ? `+${amount}` : `${amount}`;
-    showMiniToast(icon, change);
-}
-
-// Helper function for building completion
-function showBuildingComplete(buildingType) {
-    const icons = {
-        house: '🏠',
-        farm: '🚜',
-        townCenter: '🏛️',
-        barracks: '🏰',
-        mine: '⛏️',
-        market: '🏪'
-    };
-    
-    const icon = icons[buildingType] || '🏗️';
-    showMiniToast(icon, null, { 
-        background: 'rgba(46, 204, 113, 0.9)',
-        duration: 3000 
-    });
-}
-
-// ===== UNLOCK TOAST =====
-// Prominent but non-blocking notification for unlocks (bigger than a normal toast, not a modal)
-function showUnlockToast(name, description, icon = '🔓') {
-    const container = document.getElementById('notification-container');
-    if (!container) return;
-
-    const toast = document.createElement('div');
-    toast.className = 'toast-notification toast-unlock';
-    toast.innerHTML = `
-        <span class="unlock-toast-icon">${icon}</span>
-        <div class="unlock-toast-body">
-            <div class="unlock-toast-title">🔓 ${name} Unlocked!</div>
-            <div class="unlock-toast-desc">${description || 'You can now build this!'}</div>
-        </div>
-    `;
-    toast.style.cssText = `
-        position: relative;
-        background: linear-gradient(135deg, #1a3a2a, #2c4a3c);
-        border-radius: 10px;
-        padding: 14px 18px;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-        border-left: 4px solid #27ae60;
-        transform: translateX(100%);
-        opacity: 0;
-        transition: all 0.35s ease-out;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: #ecf0f1;
-        max-width: 340px;
-        z-index: 1100;
-    `;
-
-    toast.onclick = () => dismissToast(toast);
-    container.appendChild(toast);
-
-    requestAnimationFrame(() => {
-        toast.style.transform = 'translateX(0)';
-        toast.style.opacity = '1';
-    });
-
-    setTimeout(() => dismissToast(toast), 5000);
-}
-
-// Attach to window
-window.showMiniToast = showMiniToast;
-window.showResourceChange = showResourceChange;
-window.showBuildingComplete = showBuildingComplete;
-window.showUnlockToast = showUnlockToast;

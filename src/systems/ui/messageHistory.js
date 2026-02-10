@@ -21,7 +21,7 @@ class MessageHistory {
             id: Date.now() + Math.random(),
             title: title,
             content: content,
-            type: type, // 'info', 'achievement', 'warning', 'royal', 'tutorial'
+            type: type, // 'info', 'success', 'error', 'warning', 'achievement', 'royal', 'tutorial', 'grant', 'unlock', 'building'
             timestamp: timestamp || new Date(),
             read: false,
             seen: false // New field to track if user has seen this in the UI
@@ -152,11 +152,15 @@ class MessageHistory {
     formatMessage(message) {
         const typeIcons = {
             'info': '📋',
+            'success': '✅',
+            'error': '❌',
             'achievement': '🏆',
             'warning': '⚠️',
             'royal': '👑',
             'tutorial': '🎓',
-            'grant': '💰'
+            'grant': '💰',
+            'unlock': '🔓',
+            'building': '🏗️'
         };
 
         const icon = typeIcons[message.type] || '📋';
@@ -185,11 +189,15 @@ class MessageHistory {
     getTypeColor(type) {
         const colors = {
             'info': '#3498db',
+            'success': '#27ae60',
+            'error': '#e74c3c',
             'achievement': '#f39c12',
             'warning': '#e74c3c',
             'royal': '#9b59b6',
             'tutorial': '#2ecc71',
-            'grant': '#f1c40f'
+            'grant': '#f1c40f',
+            'unlock': '#2ecc71',
+            'building': '#9b59b6'
         };
         return colors[type] || '#3498db';
     }

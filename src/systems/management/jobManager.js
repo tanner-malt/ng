@@ -634,9 +634,9 @@ class JobManager {
             // Exclude explicit leadership background roles from normal jobs
             const isLeadershipRole = (worker.role === 'player' || worker.role === 'monarch' || worker.role === 'royal');
 
-            // Exclude drafted soldiers and expedition/away travelers from auto-assign
+            // Exclude drafted soldiers and away travelers from auto-assign
             const isDrafted = worker.status === 'drafted';
-            const isAway = worker.status === 'away' || worker.status === 'traveling' || worker.onExpedition === true;
+            const isAway = worker.status === 'away' || worker.status === 'traveling';
 
             const available = isOldEnough && isYoungEnough && isHealthy && hasNoBuildingJob && !isGoverningLeader && !isLeadershipRole && !isDrafted && !isAway;
 

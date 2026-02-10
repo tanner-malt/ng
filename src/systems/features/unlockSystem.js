@@ -117,7 +117,7 @@ class UnlockSystem {
         this.registerUnlock('barracks', {
             type: 'building',
             name: 'Barracks',
-            description: 'Military training facility - unlocks World View and expeditions',
+            description: 'Military training facility - unlocks World View',
             conditions: [
                 { type: 'building_count', building: 'house', count: 2 }, // Need some housing first
                 { type: 'resource', resource: 'population', amount: 6 } // Need some population
@@ -191,17 +191,6 @@ class UnlockSystem {
         });
 
         // Feature Unlocks - Achievement Gated
-        this.registerUnlock('expeditions', {
-            type: 'feature',
-            name: 'Expeditions',
-            description: 'Send forces to explore and conquer',
-            conditions: [
-                { type: 'achievement', achievement: 'military_establishment' },
-                { type: 'building_count', building: 'barracks', count: 1 }
-            ],
-            autoUnlock: true
-        });
-
         this.registerUnlock('advanced_construction', {
             type: 'feature',
             name: 'Advanced Construction',
@@ -735,26 +724,19 @@ class UnlockSystem {
     }
 
     notifyUnlock(config) {
-        const title = `🎉 ${config.name} Unlocked!`;
         const message = config.description;
+        const icon = this.getUnlockIcon(config);
 
-        // Add to message history
-        if (window.messageHistory) {
-            window.messageHistory.addMessage(
-                title,
-                message,
-                'info'
-            );
-        }
-
-        // Show as a prominent toast — non-blocking, doesn't interrupt gameplay or tutorials
-        if (window.showUnlockToast) {
-            const icon = this.getUnlockIcon(config);
-            window.showUnlockToast(config.name, message, icon);
-        } else if (window.showToast) {
-            window.showToast(`${title}`, { type: 'success', icon: '🔓', timeout: 4000 });
+        // Show as a prominent unlock toast — non-blocking, auto-logs to MessageHistory
+        if (window.showToast) {
+            window.showToast(message || 'You can now build this!', {
+                title: `${config.name} Unlocked!`,
+                type: 'unlock',
+                icon: icon,
+                timeout: 5000
+            });
         } else {
-            console.log(`[UnlockSystem] ${title} - ${message}`);
+            console.log(`[UnlockSystem] ${config.name} Unlocked! - ${message}`);
         }
     }
 

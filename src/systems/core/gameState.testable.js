@@ -116,11 +116,9 @@ class GameStateTestable {
                     try { if (typeof btn.disabled !== 'undefined') btn.disabled = true; } catch (_) { }
                     btn.classList.add('disabled');
                     btn.classList.add('locked');
-                    btn.title = mgmtStatus.message || (mgmtStatus.reason === 'leader_away'
-                        ? 'Village management locked: Leader is away on expedition'
-                        : (mgmtStatus.reason === 'not_governing'
+                    btn.title = mgmtStatus.message || (mgmtStatus.reason === 'not_governing'
                             ? 'Village management locked: Monarch is not governing'
-                            : 'Village management locked'));
+                            : 'Village management locked');
                     return;
                 }
 

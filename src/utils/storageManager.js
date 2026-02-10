@@ -275,7 +275,6 @@ const StorageManager = {
         if (window.worldManager) {
             try {
                 window.worldManager.territories = [];
-                window.worldManager.expeditions = [];
             } catch (e) { /* ignore */ }
         }
 

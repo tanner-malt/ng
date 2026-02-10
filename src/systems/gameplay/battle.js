@@ -556,7 +556,7 @@ class BattleManager {
         return battle;
     }
     
-    // Called when enemy armies are encountered during expeditions or world exploration
+    // Called when enemy armies are encountered during world exploration
     triggerArmyEncounter(encounterData) {
         const battle = this.createBattleFromEncounter(
             encounterData.playerArmy,
@@ -1275,63 +1275,6 @@ class BattleManager {
         }, 1000);
     }
 
-    // New method for expedition battles
-    startExpeditionBattle(location) {
-        // Generate enemies based on location difficulty
-        this.generateExpeditionEnemies(location);
-        this.updateWeatherAndTerrain();
-        this.renderBattleField();
-        
-        // Start the battle automatically
-        this.startBattle();
-        
-        // Set expedition battle flag
-        this.isExpeditionBattle = true;
-        this.expeditionLocation = location;
-        
-        window.showNotification(
-            `⚔️ Expedition battle at ${location.name} begins!`,
-            { timeout: 4000, icon: '🏰' }
-        );
-    }
-
-    generateExpeditionEnemies(location) {
-        const difficultyMultipliers = {
-            'easy': 1.0,
-            'medium': 1.5,
-            'hard': 2.0,
-            'extreme': 3.0
-        };
-        
-        const multiplier = difficultyMultipliers[location.difficulty] || 1.0;
-        const enemyCount = Math.floor((2 + Math.random() * 4) * multiplier);
-        
-        this.enemies = [];
-        for (let i = 0; i < enemyCount; i++) {
-            let enemyTypes = ['goblin', 'orc', 'skeleton'];
-            
-            // Add stronger enemies for harder locations
-            if (location.difficulty === 'medium' || location.difficulty === 'hard') {
-                enemyTypes.push('troll', 'ogre');
-            }
-            if (location.difficulty === 'extreme') {
-                enemyTypes.push('dragon', 'lich');
-            }
-            
-            const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-            
-            this.enemies.push({
-                id: `enemy_${i}`,
-                type: type,
-                health: Math.floor((30 + Math.random() * 40) * multiplier),
-                maxHealth: Math.floor((30 + Math.random() * 40) * multiplier),
-                attack: Math.floor((8 + Math.random() * 12) * multiplier),
-                x: Math.random() * 400 + 450,
-                y: Math.random() * 300 + 50,
-                ai: this.generateEnemyAI(type)
-            });
-        }
-    }
     
     selectOptimalCommander() {
         // AI learning system - commanders remember what worked
@@ -1734,116 +1677,77 @@ class BattleManager {
             this.activeCommander.experience += 10;
             this.saveCommanderData(); // Save experience progression
             
-            // Handle expedition battle completion differently
-            if (this.isExpeditionBattle && this.expeditionLocation) {
-                this.gameState.logBattleEvent(`🎉 Victory at ${this.expeditionLocation.name}! Beginning return journey...`);
-                
-                // Heal surviving units
-                this.gameState.army.forEach(unit => {
-                    if (unit.health > 0) {
-                        unit.health = Math.min(100, unit.health + 20);
-                        unit.experience = (unit.experience || 0) + 5;
-                    }
-                });
-                
-                // Start return journey via quest manager
-                setTimeout(() => {
-                    if (window.game && window.game.questManager) {
-                        window.game.questManager.startReturnJourney();
-                    }
-                }, 2000);
-                
-                // Clear expedition flags
-                this.isExpeditionBattle = false;
-                this.expeditionLocation = null;
-                
-            } else {
-                // Regular battle completion
-                this.gameState.defeatedArmies = (this.gameState.defeatedArmies || 0) + 1;
-                const goldReward = Math.floor(50 * (1 + this.gameState.defeatedArmies * 0.1));
-                this.gameState.gold += goldReward;
-                this.gameState.logBattleEvent(`🎉 Victory! Enemy army defeated!`);
-                
-                // Show important battle victory modal
-                if (window.showModal) {
-                    window.showModal(
-                        '🎉 Victory!',
-                        `<p><strong>Enemy army defeated!</strong></p>
-                        <p>💰 Gold earned: ${goldReward}</p>
-                        <p>⚔️ Commander ${this.activeCommander.name} gained experience</p>
-                        <p>🏥 Surviving units healed</p>
-                        <p>🗺️ Territory secured for expansion</p>`,
-                        { type: 'success', icon: '🏆' }
-                    );
-                }
-                
-                // Heal surviving units
-                this.gameState.army.forEach(unit => {
-                    if (unit.health > 0) {
-                        unit.health = Math.min(100, unit.health + 20);
-                        unit.experience = (unit.experience || 0) + 5;
-                    }
-                });
-                
-                // Return to world map or village view
-                setTimeout(() => {
-                    // Allow for next battles or world map encounters
-                    this.isActive = false;
-                    console.log('[Battle] Victory - returning to exploration mode');
-                }, 2000);
+            // Regular battle completion
+            this.gameState.defeatedArmies = (this.gameState.defeatedArmies || 0) + 1;
+            const goldReward = Math.floor(50 * (1 + this.gameState.defeatedArmies * 0.1));
+            this.gameState.gold += goldReward;
+            this.gameState.logBattleEvent(`🎉 Victory! Enemy army defeated!`);
+            
+            // Show important battle victory modal
+            if (window.showModal) {
+                window.showModal(
+                    '🎉 Victory!',
+                    `<p><strong>Enemy army defeated!</strong></p>
+                    <p>💰 Gold earned: ${goldReward}</p>
+                    <p>⚔️ Commander ${this.activeCommander.name} gained experience</p>
+                    <p>🏥 Surviving units healed</p>
+                    <p>🗺️ Territory secured for expansion</p>`,
+                    { type: 'success', icon: '🏆' }
+                );
             }
+            
+            // Heal surviving units
+            this.gameState.army.forEach(unit => {
+                if (unit.health > 0) {
+                    unit.health = Math.min(100, unit.health + 20);
+                    unit.experience = (unit.experience || 0) + 5;
+                }
+            });
+            
+            // Return to world map or village view
+            setTimeout(() => {
+                // Allow for next battles or world map encounters
+                this.isActive = false;
+                console.log('[Battle] Victory - returning to exploration mode');
+            }, 2000);
             
         } else {
             this.activeCommander.experience += 2; // Small experience for trying
             this.saveCommanderData(); // Save experience even for defeats
             
-            if (this.isExpeditionBattle) {
-                this.gameState.logBattleEvent(`💀 Defeat at ${this.expeditionLocation.name}! Army retreats...`);
-                
-                // For expedition defeats, still start return journey but with reduced rewards
-                setTimeout(() => {
-                    if (window.game && window.game.questManager) {
-                        window.game.questManager.startReturnJourney(true); // true = defeated
-                    }
-                }, 2000);
-                
-                this.isExpeditionBattle = false;
-                this.expeditionLocation = null;
-                
-            } else {
-                this.gameState.logBattleEvent(`💀 Defeat! Retreating to monarch view...`);
-                
-                // Show important defeat modal 
-                if (window.showModal) {
-                    window.showModal(
-                        '💀 Defeat!',
-                        `<p><strong>Your army has been defeated!</strong></p>
-                        <p>⚰️ Army has fallen but will be restored</p>
-                        <p>🏰 Retreat to the Monarch view to spend gold on improvements</p>
-                        <p>💡 Invest in better commanders, equipment, or village upgrades</p>
-                        <p><em>This is how you grow stronger for the next attempt!</em></p>`,
-                        { type: 'warning', icon: '⚔️' }
-                    ).then(() => {
-                        // Switch to monarch view after user acknowledges
-                        if (window.game) {
-                            window.game.switchView('monarch');
-                        }
-                    });
-                }
-                
-                // Reset army
-                this.gameState.army = [
-                    { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
-                    { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
-                ];
-                
-                // Trigger monarch view transition after short delay (fallback if modal not shown)
-                setTimeout(() => {
+            this.gameState.logBattleEvent(`💀 Defeat! Retreating to monarch view...`);
+            
+            // Show important defeat modal 
+            if (window.showModal) {
+                window.showModal(
+                    '💀 Defeat!',
+                    `<p><strong>Your army has been defeated!</strong></p>
+                    <p>⚰️ Army has fallen but will be restored</p>
+                    <p>🏰 Retreat to the Monarch view to spend gold on improvements</p>
+                    <p>💡 Invest in better commanders, equipment, or village upgrades</p>
+                    <p><em>This is how you grow stronger for the next attempt!</em></p>`,
+                    { type: 'warning', icon: '⚔️' }
+                ).then(() => {
+                    // Switch to monarch view after user acknowledges
                     if (window.game) {
                         window.game.switchView('monarch');
                     }
-                }, 3000);
+                });
             }
+            
+            // Reset army
+            this.gameState.army = [
+                { id: 'soldier1', type: 'soldier', health: 100, attack: 15, experience: 0 },
+                { id: 'archer1', type: 'archer', health: 80, attack: 20, experience: 0 }
+            ];
+            
+            // Trigger monarch view transition after short delay (fallback if modal not shown)
+            setTimeout(() => {
+                if (window.game) {
+                    window.game.switchView('monarch');
+                }
+            }, 3000);
+        }
         }
         
         // Update UI

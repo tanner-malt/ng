@@ -13,9 +13,8 @@ describe('Dynasty naming flow', () => {
     // Reset localStorage
     localStorage.clear();
 
-    // Stub toast/notification to no-ops to avoid errors
+    // Stub toast to no-op to avoid errors
     window.showToast = vi.fn();
-    window.showNotification = vi.fn();
 
     // Reset global tutorial/achievement instances between tests
     delete window.tutorialManager;

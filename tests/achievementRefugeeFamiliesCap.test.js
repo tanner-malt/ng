@@ -7,7 +7,7 @@ describe('Achievements refugee_families respects population cap', () => {
   it('adds partial people when near cap and shows notification', () => {
     const notifications = [];
     global.window = global.window || {};
-    window.showNotification = (msg) => notifications.push(msg);
+    window.showToast = (msg) => notifications.push(msg);
 
     // Stub gameState and populationManager
     const people = [1, 2, 3, 4]; // start with 4 people
@@ -51,8 +51,8 @@ describe('Achievements refugee_families respects population cap', () => {
         if (!child2) break; actuallyAddedPeople += 1;
       }
       const plannedPeople = amount * 4;
-      if (actuallyAddedPeople < plannedPeople && window.showNotification) {
-        window.showNotification(`🏠 Housing full: accepted ${actuallyAddedPeople}/${plannedPeople} refugees`, 'warning');
+      if (actuallyAddedPeople < plannedPeople && window.showToast) {
+        window.showToast(`🏠 Housing full: accepted ${actuallyAddedPeople}/${plannedPeople} refugees`, { type: 'warning' });
       }
     }
 

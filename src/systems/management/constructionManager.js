@@ -368,11 +368,10 @@ class ConstructionManager {
                             console.log(`[Construction] ${worker.name} advanced to ${this.getSkillLevelName(newSkillLevel)} in ${skillName}!`);
 
                             // Show notification if available
-                            if (window.showNotification) {
-                                window.showNotification(
-                                    `📈 Skill Advancement!`,
+                            if (window.showToast) {
+                                window.showToast(
                                     `${worker.name} is now ${this.getSkillLevelName(newSkillLevel)} in ${skillName}`,
-                                    { timeout: 3000, icon: '🔨' }
+                                    { title: '📈 Skill Advancement!', timeout: 3000, icon: '🔨', type: 'success' }
                                 );
                             }
                         }
@@ -558,11 +557,10 @@ class ConstructionManager {
         }
 
         // Show completion notification
-        if (window.showNotification) {
-            window.showNotification(
-                `🏗️ Construction Complete!`,
+        if (window.showToast) {
+            window.showToast(
                 `${site.buildingType} (Level ${site.buildingLevel}) is now operational`,
-                { timeout: 5000, icon: '✅' }
+                { title: '🏗️ Construction Complete!', timeout: 5000, icon: '✅', type: 'success' }
             );
         }
 

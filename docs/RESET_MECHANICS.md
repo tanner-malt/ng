@@ -34,7 +34,6 @@ The core game loop revolves around building a dynasty, reaching its peak, and th
 - Population size at peak
 - Territory controlled
 - Technologies discovered
-- Quests completed
 - Relics obtained 
 
 ### Inheritance System
@@ -49,7 +48,6 @@ The core game loop revolves around building a dynasty, reaching its peak, and th
 - **Buildings**: Physical structures destroyed 
 - **Current Resources**: Gold, materials, armies lost
 - **Active Relationships**: Diplomatic ties severed
-- **Current Quests**: In-progress missions abandoned
 
 ### Starting Bonuses
 **Based on Legacy Points:**
@@ -109,11 +107,6 @@ BASED ON MONARCH UNLOCKS
 - **Dynasty Achievements**: Rewards for successful multi-generation rules
 - **Reset Achievements**: Bonuses for different types of ending scenarios
 - **Legacy Achievements**: Long-term goals spanning multiple dynasties
-
-### Quest System
-- **Ancestral Quests**: Missions related to previous dynasty achievements
-- **Historical Mysteries**: Uncover secrets from past rulers
-- **Legacy Challenges**: Objectives that require multiple dynasties to complete
 
 ## Technical Implementation
 

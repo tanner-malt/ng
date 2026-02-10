@@ -56,15 +56,15 @@ describe('Governance gating and tooltips', () => {
     expect(btn.title).toContain('stone: 0/5');
   });
 
-  it('shows leader away reason when expedition leader is away (via management status)', () => {
+  it('shows leader away reason when leader is away (via management status)', () => {
     global.window.villageManager = {
-      getManagementStatus: () => ({ allowed: false, reason: 'leader_away', message: 'Village management locked: Leader is away on expedition' }),
+      getManagementStatus: () => ({ allowed: false, reason: 'leader_away', message: 'Village management locked: Royal leadership is away or traveling' }),
     };
 
     gs.updateBuildButtons();
 
     const btn = document.querySelector('[data-building="house"]');
     expect(btn.classList.contains('disabled')).toBe(true);
-    expect(btn.title).toContain('Leader is away');
+    expect(btn.title).toContain('away');
   });
 });
