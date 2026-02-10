@@ -247,23 +247,24 @@ class RoyalFamilyManager {
         return newMonarch;
     }
 
-    // Handle dynasty extinction (triggers reset)
+    // Handle dynasty extinction — delegates to LegacySystem
     handleDynastyExtinction() {
-        console.log('[RoyalFamily] Dynasty has ended - triggering reset mechanism');
+        console.log('[RoyalFamily] Dynasty has ended - triggering legacy system');
 
-        if (window.showModal) {
-            window.showModal(
-                '⚰️ Dynasty Extinct',
-                `<p>The royal bloodline has ended with no viable heirs.</p>
-                 <p>Your legacy will be remembered...</p>
-                 <p>Preparing new dynasty with inherited bonuses.</p>`,
-                { type: 'warning', icon: '💀' }
-            );
-        }
-
-        // Trigger dynasty reset (to be implemented)
-        if (this.gameState.triggerDynastyReset) {
-            this.gameState.triggerDynastyReset();
+        if (window.legacySystem) {
+            const dName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
+            window.legacySystem.performEndDynasty(this.gameState, dName, 'dynasty_extinct');
+        } else {
+            // Fallback: show info then reload
+            if (window.showModal) {
+                window.showModal(
+                    '⚰️ Dynasty Extinct',
+                    `<p>The royal bloodline has ended with no viable heirs.</p>
+                     <p>Your legacy will be remembered...</p>`,
+                    { type: 'warning', icon: '💀' }
+                );
+            }
+            setTimeout(() => location.reload(), 2000);
         }
     }
 

@@ -21,7 +21,9 @@ const StorageManager = {
         
         // Dynasty & Legacy
         'dynastyName',
-        'dynastyLegacy',
+        'dynastyBuilder_legacy',
+        'dynastyHistory',
+        'dynastyBuilder_postReset',
         
         // Progression systems
         'achievements',

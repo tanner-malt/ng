@@ -357,15 +357,68 @@ class LegacySystem {
 
     /**
      * Confirm and execute dynasty end.
+     * Called internally by showEndDynastyModal confirm button.
      */
     confirmEndDynasty(gameState, dynastyName) {
-        // Calculate and save legacy
+        // Delegate to the canonical entry point
+        this.performEndDynasty(gameState, dynastyName, 'voluntary');
+    }
+
+    /**
+     * CANONICAL ENTRY POINT for ending a dynasty.
+     * All paths (voluntary prestige, extinction, UI buttons) call this.
+     * 
+     * 1. Calculate & persist legacy points
+     * 2. Show success modal
+     * 3. Trigger clean reset via app.performReset()
+     * 
+     * @param {object} gameState  - current GameState
+     * @param {string} dynastyName - dynasty name for the record
+     * @param {string} reason     - 'voluntary' | 'dynasty_extinct' | 'village_destroyed'
+     */
+    performEndDynasty(gameState, dynastyName, reason = 'voluntary') {
+        if (this._endInProgress) return;
+        this._endInProgress = true;
+
+        gameState = gameState || window.gameState;
+        dynastyName = dynastyName || localStorage.getItem('dynastyName') || 'Unknown';
+
+        // 1. Calculate and save legacy BEFORE any storage is cleared
         const result = this.endDynasty(gameState, dynastyName);
-        
-        // Close the modal
+
+        // Tag the last history entry with the real reason
+        const lastEntry = this.legacy.dynastyHistory[this.legacy.dynastyHistory.length - 1];
+        if (lastEntry) lastEntry.endReason = reason;
+        this.saveLegacy();
+
+        console.log(`[Legacy] Dynasty ended (${reason}). +${result.legacyPoints} pts, total ${result.totalLegacy}`);
+
+        // 2. Notify other systems
+        try { window.eventBus?.emit?.('dynasty_reset_initiated', { reason, legacyPoints: result.legacyPoints }); } catch (_) {}
+
+        // 3. Close any open modal, then show success + trigger reset
         window.modalSystem?.closeTopModal();
-        
-        // Show success message
+
+        const doReset = () => {
+            this._endInProgress = false;
+            if (window.app?.performReset) {
+                window.app.performReset();
+            } else if (window.game?.performReset) {
+                window.game.performReset();
+            } else {
+                // Emergency fallback — preserve legacy ourselves
+                const legacyData = localStorage.getItem(this.STORAGE_KEY);
+                const historyData = localStorage.getItem('dynastyHistory');
+                const dName = localStorage.getItem('dynastyName');
+                localStorage.clear();
+                if (legacyData) localStorage.setItem(this.STORAGE_KEY, legacyData);
+                if (historyData) localStorage.setItem('dynastyHistory', historyData);
+                if (dName) localStorage.setItem('dynastyName', dName);
+                localStorage.setItem('dynastyBuilder_postReset', 'true');
+                location.reload();
+            }
+        };
+
         setTimeout(() => {
             if (window.modalSystem?.showModal) {
                 window.modalSystem.showModal({
@@ -388,19 +441,13 @@ class LegacySystem {
                     maxWidth: '400px',
                     showCloseButton: false
                 });
-                
+
                 setTimeout(() => {
-                    document.getElementById('start-new-dynasty')?.addEventListener('click', () => {
-                        // Perform the actual reset
-                        if (window.app?.performReset) {
-                            window.app.performReset();
-                        } else {
-                            localStorage.removeItem('idleDynastyBuilder');
-                            localStorage.removeItem('dynastyBuilder_save');
-                            location.reload();
-                        }
-                    });
+                    document.getElementById('start-new-dynasty')?.addEventListener('click', doReset);
                 }, 50);
+            } else {
+                // No modal system — just reset immediately
+                doReset();
             }
         }, 300);
     }

@@ -104,7 +104,6 @@ class MonarchManager {
         this.setupDynastyButtons();
         this.generateAdvisorAdvice();
         this.updateInvestmentDisplay();
-        this.calculateInheritance();
     }
     
     setupInvestmentButtons() {
@@ -126,38 +125,30 @@ class MonarchManager {
         
         if (calculateBtn) {
             calculateBtn.addEventListener('click', () => {
-                const inheritance = this.calculateInheritance();
+                if (!window.legacySystem) return;
+                const { total, breakdown } = window.legacySystem.calculateLegacyPoints(this.gameState);
+                const breakdownHtml = breakdown.map(b =>
+                    `<div class="inheritance-item" style="display:flex;justify-content:space-between;padding:4px 0;">
+                        <span class="inheritance-label">${b.label}:</span>
+                        <span class="inheritance-value">+${b.value} (${b.detail})</span>
+                    </div>`
+                ).join('');
                 if (window.showModal) {
                     window.showModal(
-                        'Dynasty Inheritance Calculation',
+                        'Legacy Point Preview',
                         `<div class="dynasty-calculation">
-                            <h3>💰 Current Dynasty Value</h3>
-                            <p>If your dynasty ended today, your heir would inherit:</p>
+                            <h3>🏆 Current Legacy Value</h3>
+                            <p>If your dynasty ended today, you would earn:</p>
                             <div class="inheritance-breakdown">
-                                <div class="inheritance-item">
-                                    <span class="inheritance-label">Base Inheritance:</span>
-                                    <span class="inheritance-value">500 💰</span>
-                                </div>
-                                <div class="inheritance-item">
-                                    <span class="inheritance-label">Wave Bonus:</span>
-                                    <span class="inheritance-value">${this.gameState.wave * 50} 💰</span>
-                                </div>
-                                <div class="inheritance-item">
-                                    <span class="inheritance-label">Building Bonus:</span>
-                                    <span class="inheritance-value">${this.gameState.buildings.length * 25} 💰</span>
-                                </div>
-                                <div class="inheritance-item">
-                                    <span class="inheritance-label">Population Bonus:</span>
-                                    <span class="inheritance-value">${Math.floor(this.gameState.population / 5) * 10} 💰</span>
-                                </div>
+                                ${breakdownHtml}
                                 <hr style="margin: 1rem 0; border-color: #444;">
                                 <div class="inheritance-total">
-                                    <span class="inheritance-label"><strong>Total Inheritance:</strong></span>
-                                    <span class="inheritance-value"><strong>${inheritance} 💰</strong></span>
+                                    <span class="inheritance-label"><strong>Total Legacy Points:</strong></span>
+                                    <span class="inheritance-value"><strong>${total}</strong></span>
                                 </div>
                             </div>
                         </div>`,
-                        { icon: '💰', type: 'info' }
+                        { icon: '🏆', type: 'info' }
                     );
                 }
             });
@@ -165,18 +156,13 @@ class MonarchManager {
         
         if (prestigeBtn) {
             prestigeBtn.addEventListener('click', () => {
-                if (window.modalSystem && window.modalSystem.showConfirmation) {
-                    window.modalSystem.showConfirmation(
-                        'Are you sure you want to end your dynasty? This will reset your progress but grant legacy bonuses for your next dynasty.',
-                        {
-                            title: 'End Dynasty (Prestige Reset)',
-                            confirmText: 'End Dynasty',
-                            cancelText: 'Keep Ruling',
-                            onConfirm: () => {
-                                this.triggerPrestige();
-                            }
-                        }
+                if (window.legacySystem) {
+                    window.legacySystem.showEndDynastyModal(
+                        this.gameState,
+                        localStorage.getItem('dynastyName') || this.gameState.dynastyName || 'Unknown'
                     );
+                } else {
+                    console.warn('[Monarch] Legacy system not available for prestige');
                 }
             });
         }
@@ -425,127 +411,6 @@ class MonarchManager {
         });
     }
     
-    calculateInheritance() {
-        // Calculate gold inheritance based on performance
-        const baseInheritance = 500;
-        const waveBonus = this.gameState.wave * 50;
-        const buildingBonus = this.gameState.buildings.length * 25;
-        const populationBonus = Math.floor(this.gameState.population / 5) * 10;
-        
-        const totalInheritance = baseInheritance + waveBonus + buildingBonus + populationBonus;
-        
-        this.gameState.logBattleEvent(`💰 Inheritance calculated: ${totalInheritance} gold (Base: ${baseInheritance}, Wave: ${waveBonus}, Buildings: ${buildingBonus}, Population: ${populationBonus})`);
-        
-        // Update dynasty stats display
-        this.updateDynastyStats(totalInheritance);
-        
-        return totalInheritance;
-    }
-    
-    updateDynastyStats(inheritance) {
-        const dynastyStatsDiv = document.getElementById('dynasty-stats');
-        if (!dynastyStatsDiv) return;
-        
-        dynastyStatsDiv.innerHTML = `
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Current Wave</div>
-                <div class="dynasty-stat-value">${this.gameState.wave}</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Total Buildings</div>
-                <div class="dynasty-stat-value">${this.gameState.buildings.length}</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Population</div>
-                <div class="dynasty-stat-value">${this.gameState.population}</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Current Gold</div>
-                <div class="dynasty-stat-value">${this.gameState.gold} 💰</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Potential Inheritance</div>
-                <div class="dynasty-stat-value">${inheritance} 💰</div>
-            </div>
-            <div class="dynasty-stat">
-                <div class="dynasty-stat-label">Dynasty Age</div>
-                <div class="dynasty-stat-value">${this.gameState.currentDay || 1} days</div>
-            </div>
-        `;
-    }
-    
-    triggerPrestige() {
-        // Save current progress
-        const inheritance = this.calculateInheritance();
-        
-        // Show confirmation of the reset
-        if (window.showModal) {
-            window.showModal(
-                'Dynasty Reset Complete',
-                `<div class="dynasty-calculation">
-                    <h3>👑 Your Dynasty Has Ended</h3>
-                    <p>Your rule has come to an end, but your legacy lives on...</p>
-                    <div class="inheritance-breakdown">
-                        <div class="inheritance-total">
-                            <span class="inheritance-label">Legacy Gold Inherited:</span>
-                            <span class="inheritance-value">${inheritance} 💰</span>
-                        </div>
-                    </div>
-                    <p><em>Your successor will begin their reign with the benefits of your accumulated wisdom and resources.</em></p>
-                </div>`,
-                { icon: '⚰️', type: 'info' }
-            );
-        }
-        
-        // Reset some values but keep investments
-        this.gameState.wave = 1;
-        this.gameState.buildings = [
-            { id: 'house1', type: 'house', x: 100, y: 100, level: 1 },
-            { id: 'farm1', type: 'farm', x: 200, y: 150, level: 1 }
-        ];
-        this.gameState.resources = { food: 100, wood: 50, stone: 25 };
-        this.gameState.population = 10;
-        this.gameState.gold = inheritance;
-        
-        // Apply prestige bonuses
-        if (this.gameState.investments.prestigeAutomation) {
-            this.gameState.logBattleEvent('🤖 Prestige automation remembering successful strategies...');
-            // Auto-place optimal buildings based on previous runs
-            this.autoPlaceOptimalBuildings();
-        }
-        
-        this.gameState.save();
-        this.gameState.updateUI();
-        
-        // Switch back to village view
-        if (window.game) {
-            window.game.switchView('village');
-        }
-    }
-    
-    autoPlaceOptimalBuildings() {
-        // Simple automation - place a few optimal buildings
-        const optimalBuildings = [
-            { type: 'townCenter', x: 150, y: 200 },
-            { type: 'barracks', x: 250, y: 250 }
-        ];
-        
-        optimalBuildings.forEach(building => {
-            if (this.gameState.canAfford(building.type)) {
-                const newBuilding = {
-                    id: `${building.type}_auto_${Date.now()}`,
-                    type: building.type,
-                    x: building.x,
-                    y: building.y,
-                    level: 1
-                };
-                
-                this.gameState.spend(building.type);
-                this.gameState.addBuilding(newBuilding);
-                this.gameState.logBattleEvent(`🤖 Auto-placed ${building.type}`);
-            }
-        });
-    }
 }
 
 // Make MonarchManager globally available

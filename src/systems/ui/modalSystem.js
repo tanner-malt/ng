@@ -1474,6 +1474,8 @@ class ModalSystem {
                         // Keys to preserve (legacy and achievements)
                         const preserveKeys = [
                             'dynastyBuilder_legacy',
+                            'dynastyHistory',
+                            'dynastyName',
                             'dynastyBuilder_achievements',
                             'idleDynastyBuilder_achievements'
                         ];
@@ -1566,11 +1568,12 @@ class ModalSystem {
     }
 
     /**
-     * End Dynasty - prestige mechanic with legacy rewards (preserved for external calls)
+     * End Dynasty - prestige mechanic with legacy rewards.
+     * Delegates entirely to the canonical LegacySystem flow.
      */
     endDynasty() {
         if (window.legacySystem && window.gameState) {
-            const dynastyName = window.gameState.dynastyName || 'Unknown';
+            const dynastyName = window.gameState.dynastyName || localStorage.getItem('dynastyName') || 'Unknown';
             window.legacySystem.showEndDynastyModal(window.gameState, dynastyName);
         } else {
             // Fallback to end run if legacy system not available
