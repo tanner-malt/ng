@@ -1748,7 +1748,6 @@ class BattleManager {
                 }
             }, 3000);
         }
-        }
         
         // Update UI
         const startButton = document.getElementById('start-battle-btn');
