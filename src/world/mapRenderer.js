@@ -234,11 +234,20 @@ class MapRenderer {
     // Player armies from gameState
     if (this.world.gameState && typeof this.world.gameState.getAllArmies === 'function') {
       const armies = this.world.gameState.getAllArmies();
+      const selectedId = this.world.selectedArmyId || null;
       armies.forEach(a => {
         const marker = document.createElement('div');
         marker.className = 'entity army-marker';
+        if (a.id === selectedId) marker.classList.add('selected');
         marker.textContent = '⚔';
         marker.title = `${a.name} (${a.units?.length || 0} units) — ${a.status || 'idle'}`;
+        // Make army markers clickable
+        marker.style.pointerEvents = 'auto';
+        marker.style.cursor = 'pointer';
+        marker.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.world.selectArmy) this.world.selectArmy(a.id);
+        });
         this.positionEntity(marker, a.position.y, a.position.x);
         this.entityLayer.appendChild(marker);
       });
@@ -319,6 +328,20 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
       background: linear-gradient(135deg, #8b6914, #a07828) !important;
       border-color: #5a4230 !important;
       font-weight: bold;
+      transition: box-shadow 0.2s, transform 0.15s;
+    }
+    .army-marker:hover {
+      transform: scale(1.15);
+      box-shadow: 0 0 8px rgba(201,168,76,0.6) !important;
+    }
+    .army-marker.selected {
+      border-color: #c9a84c !important;
+      box-shadow: 0 0 10px rgba(201,168,76,0.8), 0 0 20px rgba(201,168,76,0.4) !important;
+      animation: pulse-selected 1.5s infinite;
+    }
+    @keyframes pulse-selected {
+      0%, 100% { box-shadow: 0 0 10px rgba(201,168,76,0.8), 0 0 20px rgba(201,168,76,0.4); }
+      50% { box-shadow: 0 0 14px rgba(201,168,76,1), 0 0 28px rgba(201,168,76,0.6); }
     }
     .enemy-army-marker {
       color: #e8d5b0;

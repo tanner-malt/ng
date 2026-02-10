@@ -36,6 +36,8 @@ class WorldManager {
         // UI state
         this.selectedHex = null;
         this.pendingPath = null;
+        this.selectedArmyId = null; // Currently selected player army
+        this.moveMode = false;      // true when waiting for click-to-move destination
         this.initialized = false;
         this.renderer = null;
 
@@ -176,10 +178,68 @@ class WorldManager {
     // ===================================================================
 
     selectHex(row, col) {
+        // If in move mode, treat this click as the destination for the selected army
+        if (this.moveMode && this.selectedArmyId) {
+            const hex = this.hexMap[row]?.[col];
+            if (hex && hex.visibility !== 'hidden') {
+                this.moveArmy(this.selectedArmyId, row, col);
+                this.moveMode = false;
+                // Keep army selected, update panels
+                this.selectedHex = { row, col };
+                this.refreshUI();
+                return;
+            } else {
+                window.showToast?.('Cannot move to an unexplored tile.', { type: 'warning' });
+                return;
+            }
+        }
+
+        // Check if there's a player army on the clicked tile — auto-select the army
+        const armiesHere = this.getPlayerArmiesAt(row, col);
+        if (armiesHere.length > 0) {
+            this.selectedArmyId = armiesHere[0].id;
+        } else {
+            // Clicking elsewhere deselects the army
+            this.selectedArmyId = null;
+        }
+
         this.selectedHex = { row, col };
         this.updateInfoPanel();
         this.updateActionPanel();
         this.renderer?.fullTileStyleRefresh();
+        this.renderer?.updateEntities();
+    }
+
+    /** Select an army by ID (called from army marker click) */
+    selectArmy(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+        this.selectedArmyId = armyId;
+        this.moveMode = false;
+        this.selectedHex = { row: army.position.y, col: army.position.x };
+        this.updateInfoPanel();
+        this.updateActionPanel();
+        this.renderer?.fullTileStyleRefresh();
+        this.renderer?.updateEntities();
+    }
+
+    /** Enter move mode for the selected army */
+    enterMoveMode() {
+        if (!this.selectedArmyId) return;
+        const army = this.gameState.getArmy?.(this.selectedArmyId);
+        if (!army || army.status === 'traveling') {
+            window.showToast?.('This army is already traveling.', { type: 'warning' });
+            return;
+        }
+        this.moveMode = true;
+        this.updateActionPanel();
+        window.showToast?.('Click a tile to move the army there.', { type: 'info', timeout: 3000 });
+    }
+
+    /** Cancel move mode */
+    cancelMoveMode() {
+        this.moveMode = false;
+        this.updateActionPanel();
     }
 
     formatCoords(r, c) {
@@ -249,7 +309,41 @@ class WorldManager {
 
         let html = '';
 
-        // Draft army button (only when selected tile is the capital / city)
+        // ── Selected army command panel ──
+        const selectedArmy = this.selectedArmyId ? this.gameState.getArmy?.(this.selectedArmyId) : null;
+        if (selectedArmy) {
+            const statusIcon = selectedArmy.status === 'traveling' ? '🚶' : selectedArmy.status === 'fighting' ? '⚔️' : '🏕️';
+            const statusLabel = selectedArmy.status === 'traveling' ? 'Traveling' : selectedArmy.status === 'fighting' ? 'In Combat' : 'Idle';
+
+            html += `<div class="selected-army-panel">`;
+            html += `<h4>${statusIcon} ${selectedArmy.name}</h4>`;
+            html += `<p style="opacity:0.8;font-size:0.85em;margin:4px 0;">${selectedArmy.units?.length || 0} soldiers — ${statusLabel}</p>`;
+            
+            if (selectedArmy.supplies) {
+                html += `<p style="opacity:0.7;font-size:0.8em;margin:2px 0;">🍖 Supplies: ${selectedArmy.supplies.food || 0}</p>`;
+            }
+
+            html += `<div class="army-commands" style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">`;
+
+            if (this.moveMode) {
+                html += `<p style="color:#c9a84c;font-size:0.85em;text-align:center;">📍 Click a tile to move</p>`;
+                html += `<button class="world-btn" onclick="window.worldManager.cancelMoveMode()">✖ Cancel Move</button>`;
+            } else if (selectedArmy.status === 'idle') {
+                html += `<button class="world-btn" onclick="window.worldManager.enterMoveMode()">🚶 Move</button>`;
+                html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Return Home</button>`;
+                html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
+            } else if (selectedArmy.status === 'traveling') {
+                html += `<p style="opacity:0.7;font-size:0.8em;text-align:center;">Army is on the move...</p>`;
+                html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Recall</button>`;
+            }
+
+            html += `</div>`;
+            html += `<hr style="border-color:#5a4230;margin:8px 0;">`;
+            html += `<button class="world-btn-sm" style="width:100%;opacity:0.6;" onclick="window.worldManager.deselectArmy()">Deselect Unit</button>`;
+            html += `</div>`;
+        }
+
+        // ── Draft army button (only when selected tile is the capital) ──
         const isCapitalSelected = this.selectedHex &&
             this.selectedHex.row === this.capitalRow &&
             this.selectedHex.col === this.capitalCol;
@@ -260,48 +354,47 @@ class WorldManager {
                         ⚔️ Draft Army</button>`;
         }
 
-        // Context-sensitive buttons based on selection
-        if (this.selectedHex) {
+        // ── Context-sensitive tile buttons ──
+        if (this.selectedHex && !selectedArmy) {
             const { row, col } = this.selectedHex;
             const hex = this.hexMap[row]?.[col];
 
-            // Move army button
-            const armies = this.gameState.getAllArmies?.() || [];
-            const idleArmies = armies.filter(a => a.status === 'idle');
-            if (idleArmies.length > 0 && hex?.visibility !== 'hidden') {
-                html += `<button class="world-btn" onclick="window.worldManager.showMoveArmyModal()">
-                            🚶 Move Army Here</button>`;
-            }
-
             // Scout button for scoutable tiles
             if (hex?.visibility === 'scoutable') {
+                const armies = this.gameState.getAllArmies?.() || [];
                 const armiesOnAdj = armies.filter(a => {
                     const dist = Math.abs(a.position.y - row) + Math.abs(a.position.x - col);
                     return dist <= 1 && a.status === 'idle';
                 });
                 if (armiesOnAdj.length > 0) {
                     html += `<button class="world-btn" onclick="window.worldManager.scoutTile(${row}, ${col})">
-                                🔭 Scout This Tile
-                                <small style="display:block;opacity:0.7;font-size:0.75em;">Armies also auto-explore while moving</small></button>`;
+                                🔭 Scout This Tile</button>`;
                 }
             }
         }
 
-        // List active armies with disband buttons
-        const armies = this.gameState.getAllArmies?.() || [];
-        if (armies.length > 0) {
-            html += `<hr><h4>Active Armies</h4>`;
-            armies.forEach(a => {
-                const statusIcon = a.status === 'traveling' ? '🚶' : a.status === 'fighting' ? '⚔️' : '🏕️';
-                html += `<div class="army-list-item">
-                    <span>${statusIcon} ${a.name} (${a.units.length} units)</span>
-                    <button class="world-btn-sm" onclick="window.worldManager.returnArmy('${a.id}')">🏠</button>
-                    <button class="world-btn-sm" onclick="window.worldManager.disbandArmy('${a.id}')">❌</button>
-                </div>`;
-            });
+        // ── Army list (only if no army is selected) ──
+        if (!selectedArmy) {
+            const armies = this.gameState.getAllArmies?.() || [];
+            if (armies.length > 0) {
+                html += `<hr><h4>Active Armies</h4>`;
+                armies.forEach(a => {
+                    const statusIcon = a.status === 'traveling' ? '🚶' : a.status === 'fighting' ? '⚔️' : '🏕️';
+                    html += `<div class="army-list-item" style="cursor:pointer;" onclick="window.worldManager.selectArmy('${a.id}')">
+                        <span>${statusIcon} ${a.name} (${a.units.length})</span>
+                    </div>`;
+                });
+            }
         }
 
         panel.innerHTML = html;
+    }
+
+    deselectArmy() {
+        this.selectedArmyId = null;
+        this.moveMode = false;
+        this.updateActionPanel();
+        this.renderer?.updateEntities();
     }
 
     // ===================================================================
