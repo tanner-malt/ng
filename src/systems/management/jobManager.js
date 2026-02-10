@@ -59,10 +59,14 @@ class JobManager {
         let completedBuildings = 0;
         let buildingsWithJobs = 0;
 
-        // Always provide baseline builder slots (global job - no building required)
-        // This ensures players can always start construction
+        // Always provide baseline builder and gatherer slots (global jobs - no building required)
+        // This ensures players can always start construction and idle workers can gather
         const globalBuilderSlots = 4; // 4 builders available by default
-        const globalGathererSlots = 2; // 2 gatherers for basic resource collection
+        // Scale gatherer slots to population so idle workers always have fallback work
+        const pop = this.gameState.populationManager
+            ? this.gameState.populationManager.getAll().length
+            : (this.gameState.population || 5);
+        const globalGathererSlots = Math.max(4, pop); // At least 4, grows with population
         this.availableJobs.set('global', { 
             builder: globalBuilderSlots,
             gatherer: globalGathererSlots
@@ -736,7 +740,8 @@ class JobManager {
             let score = 0;
             // Avoid starving: prioritize food production if food low vs. upkeep
             if (job.jobType === 'farmer') score += needs.foodUrgency * 10;
-            if (job.jobType === 'gatherer') score += needs.basicUrgency * 3; // light help
+            // Gatherers are the fallback job — always score positively so idle workers gather
+            if (job.jobType === 'gatherer') score += 2 + needs.basicUrgency * 3;
 
             // Wood and stone based on caps and deficits
             if (job.jobType === 'woodcutter') score += needs.woodUrgency * 6;
@@ -768,15 +773,13 @@ class JobManager {
                 score += needs.productionUrgency * 1; // small weight
             }
 
-            // Builders: prioritize when construction active, but always keep some available
-            // so player can START building (chicken-and-egg problem)
+            // Builders: high priority when construction active, otherwise deprioritize
+            // so workers go to productive jobs (farming, woodcutting, gathering)
             if (job.jobType === 'builder') {
                 if (hasActiveConstruction) {
                     score += 8; // High priority when building
-                } else if (currentBuilders < 2) {
-                    score += 3; // Always have at least 2 builders ready
                 } else {
-                    score -= 5; // Lower priority for excess builders when idle
+                    score -= 10; // No construction → don't waste workers as idle builders
                 }
             }
             if (job.jobType === 'foreman') score += hasActiveConstruction ? 6 : -20;
@@ -808,9 +811,9 @@ class JobManager {
         for (const job of scoredJobs) {
             // Resource gating: skip sawyer if insufficient wood to consume
             if (job.jobType === 'sawyer' && (resources.wood || 0) < 3) continue;
-            // Respect desired caps for builders/foremen
-            if (job.jobType === 'builder' && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
-            if (job.jobType === 'foreman' && this.countWorkersInJobType('foreman') >= desiredForemen) continue;
+            // Respect desired caps for builders/foremen (soft cap — don't starve other jobs)
+            if (job.jobType === 'builder' && desiredBuilders > 0 && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
+            if (job.jobType === 'foreman' && desiredForemen > 0 && this.countWorkersInJobType('foreman') >= desiredForemen) continue;
 
             let slotsToFill = Math.min(job.availableSlots, availableWorkers.length - workerIndex);
             for (let i = 0; i < slotsToFill; i++) {
@@ -947,10 +950,21 @@ class JobManager {
         const res = gs.resources || {};
         const hasActiveConstruction = !!(gs.constructionManager && gs.constructionManager.constructionSites && gs.constructionManager.constructionSites.size > 0);
 
-        // 1) Release builders/foremen when no construction is active
+        // 1) Release all builders/foremen when no construction is active
+        //    Builders produce nothing while idle — let them farm/chop/gather instead.
+        //    When the player queues a building, autoAssign will pull workers back.
         if (!hasActiveConstruction) {
             this.releaseWorkersFromJobType('builder', Infinity);
             this.releaseWorkersFromJobType('foreman', Infinity);
+        } else {
+            // Construction IS active — free up gatherers so they can become builders.
+            // Gatherers are the lowest-value fallback job.
+            const desiredBuilders = this.computeDesiredBuilders(7);
+            const currentBuilders = this.countWorkersInJobType('builder');
+            const buildersNeeded = Math.max(0, desiredBuilders - currentBuilders);
+            if (buildersNeeded > 0) {
+                this.releaseWorkersFromJobType('gatherer', buildersNeeded);
+            }
         }
 
         // 2) If wood is scarce, release sawyers (they consume wood)
@@ -1141,6 +1155,34 @@ class JobManager {
         };
 
         this.availableJobs.forEach((jobTypes, buildingId) => {
+            // Handle global jobs (builder/gatherer — not tied to a building)
+            if (buildingId === 'global') {
+                summary.buildings['global'] = {
+                    type: 'village',
+                    position: { x: 0, y: 0 },
+                    jobs: {}
+                };
+
+                Object.entries(jobTypes).forEach(([jobType, maxWorkers]) => {
+                    const currentWorkers = this.getWorkersInJob(buildingId, jobType).length;
+
+                    summary.totalJobs += maxWorkers;
+                    summary.totalWorkers += currentWorkers;
+
+                    if (!summary.jobTypes[jobType]) {
+                        summary.jobTypes[jobType] = { available: 0, filled: 0 };
+                    }
+                    summary.jobTypes[jobType].available += maxWorkers;
+                    summary.jobTypes[jobType].filled += currentWorkers;
+
+                    summary.buildings['global'].jobs[jobType] = {
+                        current: currentWorkers,
+                        max: maxWorkers
+                    };
+                });
+                return;
+            }
+
             const building = this.gameState.buildings.find(b => b.id === buildingId);
             if (!building) return;
 
@@ -1173,15 +1215,25 @@ class JobManager {
     }
 
     // Get worker assignment stats for UI display
+    // Uses the same eligibility filters as getAvailableWorkers() for consistency
     getWorkerStats() {
-        // Get total eligible workers (not children, not royalty with governing duties)
         const allPop = this.gameState.populationManager?.population || this.gameState.population || [];
         const eligibleWorkers = allPop.filter(p => {
             if (!p) return false;
-            if (p.isChild) return false;
-            if (p.role === 'child') return false;
-            // Exclude royalty that are governing
-            if (p.role === 'monarch' || p.role === 'heir') return false;
+            // Age filter: must be working age
+            const age = p.age || 0;
+            if (age < 16 || age > 120) return false;
+            // Health filter
+            if ((p.health || 100) < 30) return false;
+            // Exclude royal/leadership roles (same as getAvailableWorkers)
+            if (p.role === 'player' || p.role === 'monarch' || p.role === 'royal') return false;
+            // Exclude governing monarch by isGoverning flag
+            try {
+                const monarch = this.gameState?.royalFamily?.currentMonarch;
+                if (monarch && monarch.isGoverning === true && p.id === monarch.id) return false;
+            } catch (_) { }
+            // Exclude drafted soldiers and away travelers
+            if (p.status === 'drafted' || p.status === 'away' || p.status === 'traveling') return false;
             return true;
         });
         

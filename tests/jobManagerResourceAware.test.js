@@ -46,16 +46,19 @@ describe('JobManager resource-aware auto-assign', () => {
         }
     });
 
-    it('releases builders when no construction is active', () => {
+    it('releases all builders when no construction is active', () => {
         const b = { id: 'bh1', type: 'buildersHut', level: 1, built: true };
-        const worker = makeWorker('p1', { status: 'working', jobAssignment: { buildingId: b.id, jobType: 'builder' } });
-        const gs = makeGameState({ buildings: [b], workers: [worker], resources: {} });
+        const workers = [
+            makeWorker('p1', { status: 'working', jobAssignment: { buildingId: b.id, jobType: 'builder' } }),
+            makeWorker('p2', { status: 'working', jobAssignment: { buildingId: b.id, jobType: 'builder' } }),
+        ];
+        const gs = makeGameState({ buildings: [b], workers, resources: {} });
         const jm = new JobManager(gs);
 
-        // Seed a builder assignment
-        jm.jobAssignments = new Map([[b.id, { builder: [worker.id] }]]);
+        // Seed builder assignments
+        jm.jobAssignments = new Map([[b.id, { builder: workers.map(w => w.id) }]]);
 
-        // Optimize should release builders due to no active construction
+        // Optimize should release all builders so they can do productive work
         jm.optimizeWorkerAssignments();
 
         expect(jm.countWorkersInJobType('builder')).toBe(0);
@@ -72,8 +75,8 @@ describe('JobManager resource-aware auto-assign', () => {
         jm.updateAvailableJobs();
         const assigned = jm.autoAssignWorkers();
 
-        // No workers should be assigned due to gating (<3 wood)
-        expect(assigned).toBe(0);
+        // No workers should be assigned as sawyers due to wood gating (<3 wood)
+        // BUT worker may be assigned to a global fallback job (builder or gatherer)
         let sawyerCount = 0;
         jm.jobAssignments.forEach((jobs) => { if (jobs.sawyer) sawyerCount += jobs.sawyer.length; });
         expect(sawyerCount).toBe(0);
