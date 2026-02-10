@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-// Use CommonJS exports from the modules
+// Load global dependencies in correct order (each require side-effects into window.*)
+require('../src/systems/core/dataModel.js');
+require('../src/systems/core/eventBus.js');
 const GameData = require('../src/config/gameData.js');
-const JobManager = require('../src/systems/management/jobManager.js');
+require('../src/systems/core/jobModel.js');
 
-// Attach GameData to window for code paths that reference window.GameData
 if (typeof window !== 'undefined') {
     window.GameData = GameData;
 }
@@ -13,17 +14,21 @@ function makeWorker(id, overrides = {}) {
     return {
         id,
         name: `Worker-${id}`,
-        age: 30, // 1.0 age factor
-        health: 100, // 1.0 health factor
-        happiness: 100, // 1.0 happiness factor
+        age: 30,
+        health: 100,
+        happiness: 100,
         role: 'villager',
         status: 'idle',
         ...overrides,
     };
 }
 
-function makeGameState(season, buildings, workers) {
-    return {
+function resetJobRegistry(season, buildings, workers) {
+    const jr = window.JobRegistry;
+    jr._initialized = false;
+    jr._definitions.clear();
+    jr._slots = new window.CollectionModel('jobSlots', window.JobSlot);
+    jr._gameState = {
         season,
         buildings,
         populationManager: {
@@ -31,11 +36,11 @@ function makeGameState(season, buildings, workers) {
             getAll() { return workers; },
         }
     };
+    jr._initialized = true;
 }
 
 describe('Seasonal production multipliers (job-driven)', () => {
     beforeEach(() => {
-        // Ensure GameData is attached before each test
         if (typeof window !== 'undefined') {
             window.GameData = GameData;
         }
@@ -44,29 +49,29 @@ describe('Seasonal production multipliers (job-driven)', () => {
     it('applies Summer multiplier to farmer job (food)', () => {
         const farm = { id: 'b1', type: 'farm', level: 1, built: true };
         const worker = makeWorker('w1');
-        const gs = makeGameState('Summer', [farm], [worker]);
-        const jm = new JobManager(gs);
+        resetJobRegistry('Summer', [farm], [worker]);
 
-        jm.updateAvailableJobs();
-        const ok = jm.assignWorkerToJob(worker.id, farm.id, 'farmer');
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const ok = jr.assignWorkerToJob(worker.id, farm.id, 'farmer');
         expect(ok).toBe(true);
 
-        const production = jm.calculateDailyProduction();
-        // farmer base: food 3.5 per worker; Summer food multiplier: 1.5
-        expect(production.food).toBeCloseTo(3.5 * 1.5, 5);
+        const production = jr.calculateDailyProduction();
+        // farmer base: food 3.75 per worker; Summer food multiplier: 1.5
+        expect(production.food).toBeCloseTo(3.75 * 1.5, 5);
     });
 
     it('applies Autumn multiplier to woodcutter job (wood)', () => {
         const lodge = { id: 'b2', type: 'woodcutterLodge', level: 1, built: true };
         const worker = makeWorker('w2');
-        const gs = makeGameState('Autumn', [lodge], [worker]);
-        const jm = new JobManager(gs);
+        resetJobRegistry('Autumn', [lodge], [worker]);
 
-        jm.updateAvailableJobs();
-        const ok = jm.assignWorkerToJob(worker.id, lodge.id, 'woodcutter');
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const ok = jr.assignWorkerToJob(worker.id, lodge.id, 'woodcutter');
         expect(ok).toBe(true);
 
-        const production = jm.calculateDailyProduction();
+        const production = jr.calculateDailyProduction();
         // woodcutter base: wood 3 per worker; Autumn wood multiplier: 1.3
         expect(production.wood).toBeCloseTo(3 * 1.3, 5);
     });
@@ -74,15 +79,15 @@ describe('Seasonal production multipliers (job-driven)', () => {
     it('applies Winter multiplier to farmer job (food)', () => {
         const farm = { id: 'b3', type: 'farm', level: 1, built: true };
         const worker = makeWorker('w3');
-        const gs = makeGameState('Winter', [farm], [worker]);
-        const jm = new JobManager(gs);
+        resetJobRegistry('Winter', [farm], [worker]);
 
-        jm.updateAvailableJobs();
-        const ok = jm.assignWorkerToJob(worker.id, farm.id, 'farmer');
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const ok = jr.assignWorkerToJob(worker.id, farm.id, 'farmer');
         expect(ok).toBe(true);
 
-        const production = jm.calculateDailyProduction();
-        // Winter food multiplier: 0.7 with base 3.5
-        expect(production.food).toBeCloseTo(3.5 * 0.7, 5);
+        const production = jr.calculateDailyProduction();
+        // Winter food multiplier: 0.7 with base 3.75
+        expect(production.food).toBeCloseTo(3.75 * 0.7, 5);
     });
 });

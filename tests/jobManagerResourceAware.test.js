@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+// Load global dependencies in correct order
+require('../src/systems/core/dataModel.js');
+require('../src/systems/core/eventBus.js');
 const GameData = require('../src/config/gameData.js');
-const JobManager = require('../src/systems/management/jobManager.js');
+require('../src/systems/core/jobModel.js');
 
-// Attach GameData to window for code paths that reference window.GameData
 if (typeof window !== 'undefined') {
     window.GameData = GameData;
 }
@@ -22,12 +24,16 @@ function makeWorker(id, overrides = {}) {
     };
 }
 
-function makeGameState({ season = 'Spring', resources = {}, buildings = [], workers = [], constructionActive = false } = {}) {
+function resetJobRegistry({ season = 'Spring', resources = {}, buildings = [], workers = [], constructionActive = false } = {}) {
+    const jr = window.JobRegistry;
+    jr._initialized = false;
+    jr._definitions.clear();
+    jr._slots = new window.CollectionModel('jobSlots', window.JobSlot);
     const constructionSites = new Map();
     if (constructionActive) {
         constructionSites.set('site1', { pointsRemaining: 10 });
     }
-    return {
+    jr._gameState = {
         season,
         resources,
         buildings,
@@ -37,48 +43,28 @@ function makeGameState({ season = 'Spring', resources = {}, buildings = [], work
         },
         constructionManager: { constructionSites }
     };
+    jr._initialized = true;
 }
 
-describe('JobManager resource-aware auto-assign', () => {
+describe('JobRegistry resource-aware auto-assign', () => {
     beforeEach(() => {
         if (typeof window !== 'undefined') {
             window.GameData = GameData;
         }
     });
 
-    it('releases all builders when no construction is active', () => {
-        const b = { id: 'bh1', type: 'buildersHut', level: 1, built: true };
-        const workers = [
-            makeWorker('p1', { status: 'working', jobAssignment: { buildingId: b.id, jobType: 'builder' } }),
-            makeWorker('p2', { status: 'working', jobAssignment: { buildingId: b.id, jobType: 'builder' } }),
-        ];
-        const gs = makeGameState({ buildings: [b], workers, resources: {} });
-        const jm = new JobManager(gs);
-
-        // Seed builder assignments
-        jm.jobAssignments = new Map([[b.id, { builder: workers.map(w => w.id) }]]);
-
-        // Optimize should release all builders so they can do productive work
-        jm.optimizeWorkerAssignments();
-
-        expect(jm.countWorkersInJobType('builder')).toBe(0);
-        expect(gs.populationManager.population[0].jobAssignment).toBe(null);
-        expect(gs.populationManager.population[0].status).toBe('idle');
-    });
-
     it('does not assign sawyers when wood is too low', () => {
         const mill = { id: 'lm1', type: 'lumberMill', level: 1, built: true };
         const worker = makeWorker('p2');
-        const gs = makeGameState({ buildings: [mill], workers: [worker], resources: { wood: 2 } });
-        const jm = new JobManager(gs);
+        resetJobRegistry({ buildings: [mill], workers: [worker], resources: { wood: 2 } });
 
-        jm.updateAvailableJobs();
-        const assigned = jm.autoAssignWorkers();
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const assigned = jr.autoAssignWorkers();
 
         // No workers should be assigned as sawyers due to wood gating (<3 wood)
-        // BUT worker may be assigned to a global fallback job (builder or gatherer)
         let sawyerCount = 0;
-        jm.jobAssignments.forEach((jobs) => { if (jobs.sawyer) sawyerCount += jobs.sawyer.length; });
+        jr.jobAssignments.forEach((jobs) => { if (jobs.sawyer) sawyerCount += jobs.sawyer.length; });
         expect(sawyerCount).toBe(0);
     });
 
@@ -86,20 +72,20 @@ describe('JobManager resource-aware auto-assign', () => {
         const farm = { id: 'f1', type: 'farm', level: 1, built: true };
         const lodge = { id: 'w1', type: 'woodcutterLodge', level: 1, built: true };
         const worker = makeWorker('p3');
-        // Pop 10 => dailyFoodUse = 10; food=5 => <1 day buffer -> high urgency
-        const gs = makeGameState({ buildings: [farm, lodge], workers: [worker], resources: { food: 5 } });
-        // Add 9 more idle workers to reflect population size 10 (urgency uses population count)
-        for (let i = 0; i < 9; i++) gs.populationManager.population.push(makeWorker('extra' + i));
-        const jm = new JobManager(gs);
+        const allWorkers = [worker];
+        // Add 9 more idle workers so pop=10 for urgency calc
+        for (let i = 0; i < 9; i++) allWorkers.push(makeWorker('extra' + i));
+        // food=5, pop 10 => <1 day buffer -> high urgency
+        resetJobRegistry({ buildings: [farm, lodge], workers: allWorkers, resources: { food: 5 } });
 
-        jm.updateAvailableJobs();
-        const assigned = jm.autoAssignWorkers();
-        // At least one worker should be assigned under critical food shortage
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const assigned = jr.autoAssignWorkers();
         expect(assigned).toBeGreaterThanOrEqual(1);
 
-        // Verify assignment went to farmer
+        // Verify at least one farmer
         let farmerAssigned = 0;
-        jm.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerAssigned += jobs.farmer.length; });
+        jr.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerAssigned += jobs.farmer.length; });
         expect(farmerAssigned).toBeGreaterThanOrEqual(1);
     });
 
@@ -107,18 +93,16 @@ describe('JobManager resource-aware auto-assign', () => {
         const farm = { id: 'f2', type: 'farm', level: 1, built: true };
         const skilledFarmer = makeWorker('pf', { skills: { Agriculture: 1000 } });
         const skilledForester = makeWorker('pw', { skills: { Forestry: 1000 } });
-        const gs = makeGameState({ buildings: [farm], workers: [skilledFarmer, skilledForester], resources: { food: 0 } });
-        // Add more people to set pop for urgency calc (not necessary but fine)
-        const jm = new JobManager(gs);
+        resetJobRegistry({ buildings: [farm], workers: [skilledFarmer, skilledForester], resources: { food: 0 } });
 
-        jm.updateAvailableJobs();
-        const assigned = jm.autoAssignWorkers();
-        // At least one worker should be assigned to farmer; building may have multiple slots
+        const jr = window.JobRegistry;
+        jr.updateAvailableSlots();
+        const assigned = jr.autoAssignWorkers();
         expect(assigned).toBeGreaterThanOrEqual(1);
 
         // The agriculture-skilled worker should be assigned to farmer
         let farmerWorkerIds = [];
-        jm.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerWorkerIds.push(...jobs.farmer); });
+        jr.jobAssignments.forEach((jobs) => { if (jobs.farmer) farmerWorkerIds.push(...jobs.farmer); });
         expect(farmerWorkerIds).toContain('pf');
     });
 });

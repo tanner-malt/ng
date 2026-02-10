@@ -28,7 +28,8 @@ const BUILDING_DATA = {
         constructionPoints: 10,
         
         production: {
-            storage: { all: 200 }
+            storage: { all: 200 },
+            jobs: { gatherer: 2 }
             // Tax collection handled by economySystem
         },
         

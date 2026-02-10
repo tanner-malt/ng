@@ -41,7 +41,6 @@
     <script src="../src/systems/management/buildingEffects.js"></script>
     <script src="../src/systems/features/buildingTutorial.js"></script>
     <script src="../src/systems/management/constructionManager.js"></script>
-    <script src="../src/systems/management/jobManager.js"></script>
     <script src="../src/systems/management/tileManager.js"></script>
     <script src="../src/systems/management/economySystem.js"></script>
     <script src="../src/systems/features/legacySystem.js"></script>
@@ -294,9 +293,10 @@
                                 <div class="building-category">
                                     <h4>Essential Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="essential-buildings">
                                         <!-- Basic buildings needed to start -->
@@ -305,9 +305,10 @@
                                 <div class="building-category">
                                     <h4>Production Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="production-buildings">
                                         <!-- Resource gathering and processing -->
@@ -316,9 +317,10 @@
                                 <div class="building-category">
                                     <h4>Craft & Trade Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="craft-buildings">
                                         <!-- Workshops, blacksmiths, markets -->
@@ -327,9 +329,10 @@
                                 <div class="building-category">
                                     <h4>Military Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="military-buildings">
                                         <!-- Defense and training -->
@@ -338,9 +341,10 @@
                                 <div class="building-category">
                                     <h4>Royal Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="royal-buildings">
                                         <!-- Dynasty and prestige -->
@@ -349,9 +353,10 @@
                                 <div class="building-category">
                                     <h4>Knowledge Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="knowledge-buildings">
                                         <!-- Research and learning -->
@@ -360,9 +365,10 @@
                                 <div class="building-category">
                                     <h4>🔮 Advanced Buildings</h4>
                                     <div class="building-row-header">
-                                        <div>Building Name</div>
+                                        <div>Building</div>
+                                        <div>Description</div>
                                         <div>Resources</div>
-                                        <div>Work Points</div>
+                                        <div>Work Pts</div>
                                     </div>
                                     <div class="building-container" id="advanced-buildings">
                                         <!-- Late game and special -->
@@ -594,8 +600,8 @@
 
                         .building-row {
                             display: grid;
-                            grid-template-columns: 2fr 1fr 1fr;
-                            /* Building Name, Resources, Work Points */
+                            grid-template-columns: 1.2fr 2fr 1fr 0.5fr;
+                            /* Building Name, Description, Resources, Work Points */
                             gap: 8px;
                             padding: 8px;
                             margin-bottom: 4px;
@@ -621,7 +627,7 @@
 
                         .building-row-header {
                             display: grid;
-                            grid-template-columns: 2fr 1fr 1fr;
+                            grid-template-columns: 1.2fr 2fr 1fr 0.5fr;
                             gap: 8px;
                             padding: 8px;
                             font-weight: bold;

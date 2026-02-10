@@ -64,8 +64,8 @@ const GameData = {
         // Essential Buildings
         townCenter: {
             // Storage contribution for all resources
-            storage: { all: 200 }
-            // Town Center is administrative - no direct jobs
+            storage: { all: 200 },
+            jobs: { gatherer: 2 }
             // Tax collection is handled by economySystem based on population
         },
         house: {

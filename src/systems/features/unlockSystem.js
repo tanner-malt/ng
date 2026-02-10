@@ -148,6 +148,79 @@ class UnlockSystem {
             autoUnlock: false
         });
 
+        // Registered from BUILDING_DATA unlock conditions
+        this.registerUnlock('mine', {
+            type: 'building',
+            name: 'Mine',
+            description: 'Dig deep for stone and precious metal ore',
+            conditions: [
+                { type: 'building_count', building: 'quarry', count: 1 }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('workshop', {
+            type: 'building',
+            name: 'Workshop',
+            description: 'Engineers craft tools and machinery',
+            conditions: [
+                { type: 'building_count', building: 'buildersHut', count: 1 }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('blacksmith', {
+            type: 'building',
+            name: 'Blacksmith',
+            description: 'Forge metal into weapons and tools',
+            conditions: [
+                { type: 'building_count', building: 'mine', count: 1 },
+                { type: 'resource', resource: 'metal', amount: 10 }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('keep', {
+            type: 'building',
+            name: 'The Keep',
+            description: 'A fortified residence for your royal family',
+            conditions: [
+                { type: 'achievement', achievement: 'become_king' }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('monument', {
+            type: 'building',
+            name: 'Monument',
+            description: 'A grand testament to your dynasty\'s glory',
+            conditions: [
+                { type: 'tech', tech: 'stonecutting_mastery' }
+            ],
+            autoUnlock: true
+        });
+
+        this.registerUnlock('magicalTower', {
+            type: 'building',
+            name: 'Magical Tower',
+            description: 'Mysterious arts and arcane research',
+            conditions: [
+                { type: 'building_count', building: 'university', count: 1 },
+                { type: 'resource', resource: 'gold', amount: 500 }
+            ],
+            autoUnlock: false
+        });
+
+        this.registerUnlock('grandLibrary', {
+            type: 'building',
+            name: 'Grand Library',
+            description: 'A repository of all knowledge accumulated across generations',
+            conditions: [
+                { type: 'tech', tech: 'architecture' }
+            ],
+            autoUnlock: true
+        });
+
         // View Unlocks - Achievement Based
         this.registerUnlock('village_view', {
             type: 'view',
@@ -355,6 +428,11 @@ class UnlockSystem {
                 case 'resource':
                     const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
                     return hasEnoughResource;
+
+                case 'tech':
+                    return window.techTree &&
+                        typeof window.techTree.isResearched === 'function' &&
+                        window.techTree.isResearched(condition.tech);
 
                 case 'tutorial_step':
                     return window.tutorialManager &&
@@ -567,6 +645,10 @@ class UnlockSystem {
                     return buildingCount >= condition.count;
                 case 'resource':
                     return this.gameState[condition.resource] >= condition.amount;
+                case 'tech':
+                    return window.techTree &&
+                        typeof window.techTree.isResearched === 'function' &&
+                        window.techTree.isResearched(condition.tech);
                 default:
                     return false;
             }
@@ -612,6 +694,17 @@ class UnlockSystem {
                         completed: hasEnoughResource,
                         progress: `${this.gameState[condition.resource]}/${condition.amount}`,
                         icon: this.getResourceIcon(condition.resource)
+                    };
+                case 'tech':
+                    const hasTech = window.techTree &&
+                        typeof window.techTree.isResearched === 'function' &&
+                        window.techTree.isResearched(condition.tech);
+                    const techName = condition.tech.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    return {
+                        type: 'tech',
+                        description: `Tech: ${techName}`,
+                        completed: !!hasTech,
+                        icon: '🔬'
                     };
                 default:
                     return {

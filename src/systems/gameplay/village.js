@@ -435,14 +435,40 @@ class VillageManager {
                     
                     // For locked buildings, show a short unlock requirement inline
                     let unlockHint = '';
-                    if (!isUnlocked && window.unlockSystem) {
-                        const reqs = window.unlockSystem.getUnlockRequirements(buildingType);
+                    if (!isUnlocked) {
+                        let reqs = [];
+                        // Try unlockSystem first
+                        if (window.unlockSystem) {
+                            reqs = window.unlockSystem.getUnlockRequirements(buildingType);
+                        }
+                        // Fall back to BUILDING_DATA conditions if unlockSystem has no registration
+                        if ((!reqs || reqs.length === 0) && window.BUILDING_DATA && window.BUILDING_DATA[buildingType]) {
+                            const bdConditions = window.BUILDING_DATA[buildingType].unlockConditions;
+                            if (bdConditions && bdConditions.length > 0) {
+                                reqs = bdConditions.map(c => {
+                                    switch (c.type) {
+                                        case 'building_count':
+                                            return { completed: false, description: `${c.count} ${GameData.getBuildingName(c.building) || c.building}` };
+                                        case 'achievement':
+                                            return { completed: false, description: c.achievement.replace(/_/g, ' ') };
+                                        case 'resource':
+                                            return { completed: false, description: `${c.amount} ${c.resource}` };
+                                        case 'tech':
+                                            return { completed: false, description: `Tech: ${c.tech.replace(/_/g, ' ')}` };
+                                        default:
+                                            return { completed: false, description: 'Unknown requirement' };
+                                    }
+                                });
+                            }
+                        }
                         if (reqs && reqs.length > 0) {
                             const reqTexts = reqs.map(r => {
                                 const status = r.completed ? '✅' : '❌';
                                 return `${status} ${r.description}`;
                             });
                             unlockHint = `<div class="building-unlock-hint">Requires: ${reqTexts.join(' · ')}</div>`;
+                        } else {
+                            unlockHint = `<div class="building-unlock-hint">🔒 Locked — complete prerequisites</div>`;
                         }
                     }
                     
@@ -451,6 +477,12 @@ class VillageManager {
                             <span class="building-icon">${GameData.getBuildingIcon(buildingType)}</span>
                             <span class="building-title">${lockIcon}${GameData.getBuildingName(buildingType)}</span>
                         </div>
+                    `;
+
+                    // Description column (includes unlock hints for locked buildings)
+                    const descDiv = document.createElement('div');
+                    descDiv.className = 'building-description-col';
+                    descDiv.innerHTML = `
                         <div class="building-description">${description}</div>
                         ${unlockHint}
                     `;
@@ -471,6 +503,7 @@ class VillageManager {
                     workPointsDiv.textContent = workPoints > 0 ? `${workPoints} WP` : 'Instant';
 
                     buildingRow.appendChild(nameDiv);
+                    buildingRow.appendChild(descDiv);
                     buildingRow.appendChild(resourcesDiv);
                     buildingRow.appendChild(workPointsDiv);
 
@@ -2660,9 +2693,9 @@ class VillageManager {
     }
 
     showJobsManagement() {
-        // Initialize job manager if not already done
+        // Ensure job system is linked
         if (!this.gameState.jobManager) {
-            this.gameState.jobManager = new JobManager(this.gameState);
+            this.gameState.ensureJobManager();
         }
 
         // Update available jobs
@@ -2984,7 +3017,7 @@ class VillageManager {
 
     autoAssignAllWorkers() {
         if (!this.gameState.jobManager) {
-            this.gameState.jobManager = new JobManager(this.gameState);
+            this.gameState.ensureJobManager();
         }
 
         const assigned = this.gameState.jobManager.autoAssignWorkers();
@@ -4783,7 +4816,7 @@ class VillageManager {
     getAvailableJobSlots() {
         if (!window.gameState?.jobManager) return 0;
         try {
-            const jobs = window.gameState.jobManager.getAvailableJobsList();
+            const jobs = window.gameState.jobManager.getAllAvailableJobs();
             return jobs.reduce((total, job) => total + job.maxWorkers, 0);
         } catch (e) {
             return 0;
