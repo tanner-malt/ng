@@ -1551,7 +1551,7 @@ class PopulationManager {
 
     /**
      * Trigger a refugee arrival event. Shows a modal prompting the player to accept refugees.
-     * @param {number} count - Number of refugees (1-3)
+     * @param {number} count - Number of refugees (1-15)
      * @param {object} options - { isTutorial: bool } if triggered from tutorial step
      */
     triggerRefugeeEvent(count = null, options = {}) {
@@ -1559,9 +1559,10 @@ class PopulationManager {
 
         // Determine refugee count (scales with game days)
         if (count === null) {
-            count = Math.min(8, 1 + Math.floor((window.gameState?.day || 0) / 50));
+            const day = window.gameState?.day || 0;
+            count = Math.min(15, 1 + Math.ceil(day / 13));
         }
-        count = Math.max(1, Math.min(8, count));
+        count = Math.max(1, Math.min(15, count));
 
         // Check current population vs cap
         const cap = window.gameState?.getPopulationCap?.() || 0;
