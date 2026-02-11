@@ -587,7 +587,7 @@ class JobRegistry {
             }
             else if (job.jobType === 'gatherer') {
                 // Gatherer is never auto-assigned — player must assign manually
-                continue;
+                return { ...job, score: -Infinity };
             }
             else if (job.jobType === 'woodcutter') {
                 score += 5 + needs.woodUrgency * 6;
@@ -657,6 +657,7 @@ class JobRegistry {
         let assignedCount = 0;
         for (const job of scoredJobs) {
             if (availableWorkers.length === 0) break;
+            if (job.score === -Infinity) continue; // skip manually-assigned-only jobs (gatherer)
             if (job.jobType === 'sawyer' && (resources.wood || 0) < 3) continue;
             if (job.jobType === 'builder' && desiredBuilders > 0 && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
             if (job.jobType === 'foreman' && desiredForemen > 0 && this.countWorkersInJobType('foreman') >= desiredForemen) continue;

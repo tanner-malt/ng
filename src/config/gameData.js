@@ -421,7 +421,7 @@ const GameData = {
     // Starting resources for new games - minimal start
     // Note: Starting population is handled by PopulationManager (1 royal + 4 villagers = 5)
     startingResources: {
-        food: 20, // Food supply to survive first season
+        food: 100, // Food supply to survive first season
         wood: 100, // Enough wood for early construction
         stone: 10, // Stone for basic needs
         metal: 0,  // Metal will be given through tutorial achievement
@@ -432,7 +432,7 @@ const GameData = {
 
     // Resource caps (base storage capacity)
     resourceCaps: {
-        food: 50,    // Base limit of 50 for each resource
+        food: 100,   // Base limit of 100 for food
         wood: 100,
         stone: 50,
         metal: 50,
