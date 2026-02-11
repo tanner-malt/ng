@@ -766,7 +766,7 @@ class JobRegistry {
     };
 
     _getTechMultiplier(jobType) {
-        const key = JobModel.TECH_BONUS_MAP[jobType];
+        const key = JobRegistry.TECH_BONUS_MAP[jobType];
         if (!key) return 1;
         const bonus = this.gameState?.techBonuses?.[key] || 0;
         return 1 + bonus;
