@@ -120,6 +120,11 @@ class JobRegistry {
                 farm:          { food: 0.30 },
                 huntersLodge:  { food: 0.15 }
             },
+            forest: {
+                woodcutterLodge: { wood: 0.50 },
+                huntersLodge:    { food: 0.25 },
+                _default:        { wood: 0.15 }
+            },
             hills: {
                 quarry:        { stone: 0.30 },
                 mine:          { stone: 0.25, metal: 0.25 },
@@ -516,9 +521,27 @@ class JobRegistry {
     //  AUTO-ASSIGNMENT AI
     // ═══════════════════════════════════════════════════════════════════════
 
+    /**
+     * Detect food crisis level:
+     *   0 = normal, 1 = warning (< 3 days food), 2 = crisis (< 1 day), 3 = starvation (0 food)
+     */
+    _detectFoodCrisis() {
+        const gs = this.gameState;
+        const food = gs?.resources?.food || 0;
+        const pop = gs?.populationManager ? gs.populationManager.getAll().length : (gs?.population?.length || 0);
+        const dailyUse = Math.max(1, pop);
+        const daysLeft = dailyUse > 0 ? food / dailyUse : Infinity;
+
+        if (food <= 0) return 3;       // starvation
+        if (daysLeft < 1) return 2;    // crisis
+        if (daysLeft < 3) return 1;    // warning
+        return 0;                      // normal
+    }
+
     autoAssignWorkers() {
         this.debugLog('Auto-assigning workers with resource-aware optimization...');
-        this.optimizeWorkerAssignments();
+        const crisisLevel = this._detectFoodCrisis();
+        this.optimizeWorkerAssignments(crisisLevel);
 
         const availableWorkers = this.getAvailableWorkers();
         const availableJobs = this.getAllAvailableJobs();
@@ -537,11 +560,15 @@ class JobRegistry {
         const currentBuilders = this.countWorkersInJobType('builder');
         const desiredForemen = desiredBuilders > 0 ? Math.max(1, Math.floor(desiredBuilders / 4)) : 0;
         const currentForemen = this.countWorkersInJobType('foreman');
+        const isFoodJob = (jt) => jt === 'farmer' || jt === 'hunter' || jt === 'gatherer';
 
         const woodCap = (typeof window.GameData?.calculateSeasonalStorageCap === 'function')
             ? window.GameData.calculateSeasonalStorageCap('wood', gs?.season, gs?.buildings)
             : (window.GameData?.resourceCaps?.wood || 50);
         const woodPct = woodCap > 0 ? ((resources.wood || 0) / woodCap) : 0;
+
+        // Crisis bonus: massive score boost for food jobs during food emergencies
+        const crisisBoost = crisisLevel >= 3 ? 50 : crisisLevel >= 2 ? 30 : crisisLevel >= 1 ? 15 : 0;
 
         const scoredJobs = availableJobs.map(job => {
             let score = 0;
@@ -551,19 +578,24 @@ class JobRegistry {
             if (job.jobType === 'farmer') {
                 score += 5 + needs.foodUrgency * 10;
                 if (currentFarmers < minFarmers) score += 15;
+                score += crisisBoost;
             }
             else if (job.jobType === 'hunter') {
                 score += 5 + needs.foodUrgency * 8;
+                score += crisisBoost;
             }
             else if (job.jobType === 'gatherer') {
-                // Gatherer is the fallback — lowest score of any real job
+                // Gatherer normally lowest, but in crisis it produces food 1/3 of the time
                 score += 1 + needs.basicUrgency * 2;
+                score += Math.floor(crisisBoost * 0.6);
             }
             else if (job.jobType === 'woodcutter') {
                 score += 5 + needs.woodUrgency * 6;
+                if (crisisLevel >= 2) score -= 20; // deprioritize in crisis
             }
             else if (job.jobType === 'rockcutter' || job.jobType === 'miner') {
                 score += 5 + needs.stoneUrgency * 4;
+                if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'sawyer') {
                 score += 5;
@@ -571,27 +603,35 @@ class JobRegistry {
                 score += ((resources.wood || 0) >= 5 ? 2 : 0);
                 score += needs.planksUrgency * 3;
                 if ((resources.wood || 0) < 3) score -= 15;
+                if (crisisLevel >= 2) score -= 25;
             }
             else if (job.jobType === 'blacksmith') {
                 score += 5 + needs.weaponsUrgency * 2 + needs.toolsUrgency * 2;
                 if ((resources.metal || 0) < 2) score -= 10;
+                if (crisisLevel >= 2) score -= 25;
             }
             else if (job.jobType === 'trader') {
                 score += 5 + needs.goldUrgency * 1.5;
+                if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'engineer') {
                 score += 5 + needs.productionUrgency * 1;
+                if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'builder') {
                 if (hasActiveConstruction) score += 8;
                 else score -= 10;
+                // In starvation, pause construction
+                if (crisisLevel >= 3) score -= 40;
             }
             else if (job.jobType === 'foreman') {
                 score += hasActiveConstruction ? 6 : -20;
+                if (crisisLevel >= 3) score -= 40;
             }
             // Military/academic: soft penalty instead of hard block
             else if (['drillInstructor', 'militaryTheorist', 'professor', 'scholar', 'wizard', 'priest'].includes(job.jobType)) {
                 score -= 5;
+                if (crisisLevel >= 1) score -= 20;
             }
 
             // Soft caps for builder/foreman
@@ -603,6 +643,12 @@ class JobRegistry {
 
         scoredJobs.sort((a, b) => {
             if (b.score !== a.score) return b.score - a.score;
+            // In crisis, food jobs always win ties
+            if (crisisLevel >= 2) {
+                const aFood = isFoodJob(a.jobType) ? 1 : 0;
+                const bFood = isFoodJob(b.jobType) ? 1 : 0;
+                if (aFood !== bFood) return bFood - aFood;
+            }
             if (a.jobType === 'builder' && b.jobType !== 'builder') return -1;
             if (b.jobType === 'builder' && a.jobType !== 'builder') return 1;
             return 0;
@@ -625,11 +671,25 @@ class JobRegistry {
                 }
             }
         }
-        if (assignedCount > 0) this.debugLog(`Auto-assigned ${assignedCount} workers`);
+
+        // Emit crisis event for UI indicators
+        if (crisisLevel >= 2) {
+            window.eventBus?.emit?.('food_crisis', { level: crisisLevel, daysOfFood: this._getFoodDaysRemaining() });
+        }
+
+        if (assignedCount > 0) this.debugLog(`Auto-assigned ${assignedCount} workers (crisis: ${crisisLevel})`);
         return assignedCount;
     }
 
-    optimizeWorkerAssignments() {
+    /** Helper: days of food remaining */
+    _getFoodDaysRemaining() {
+        const gs = this.gameState;
+        const food = gs?.resources?.food || 0;
+        const pop = gs?.populationManager ? gs.populationManager.getAll().length : (gs?.population?.length || 0);
+        return pop > 0 ? food / pop : Infinity;
+    }
+
+    optimizeWorkerAssignments(crisisLevel = 0) {
         const gs = this.gameState;
         const res = gs?.resources || {};
         const needs = this.computeResourceNeeds();
@@ -637,6 +697,10 @@ class JobRegistry {
 
         // Release all builders/foremen when idle
         if (!hasActiveConstruction) {
+            this.releaseWorkersFromJobType('builder', Infinity);
+            this.releaseWorkersFromJobType('foreman', Infinity);
+        } else if (crisisLevel >= 3) {
+            // Starvation: pause construction, redirect everyone to food
             this.releaseWorkersFromJobType('builder', Infinity);
             this.releaseWorkersFromJobType('foreman', Infinity);
         } else {
@@ -648,7 +712,23 @@ class JobRegistry {
 
         if ((res.wood || 0) < 3) this.releaseWorkersFromJobType('sawyer', Infinity);
 
-        if (needs.foodUrgency > 1.0) {
+        // Crisis response: progressively release non-food workers
+        if (crisisLevel >= 2) {
+            // Severe crisis: release all luxury/non-essential workers
+            const luxuryJobs = ['trader', 'engineer', 'blacksmith', 'wizard', 'professor',
+                                'scholar', 'drillInstructor', 'militaryTheorist', 'priest'];
+            luxuryJobs.forEach(j => this.releaseWorkersFromJobType(j, Infinity));
+            // Also release material workers
+            ['rockcutter', 'miner', 'sawyer', 'woodcutter'].forEach(j =>
+                this.releaseWorkersFromJobType(j, Infinity)
+            );
+            this.debugLog(`FOOD CRISIS (level ${crisisLevel}): released all non-food workers`);
+        } else if (crisisLevel >= 1) {
+            // Warning: release some non-essential workers
+            ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer'].forEach(j =>
+                this.releaseWorkersFromJobType(j, Math.ceil(needs.foodUrgency))
+            );
+        } else if (needs.foodUrgency > 1.0) {
             ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer'].forEach(j =>
                 this.releaseWorkersFromJobType(j, Math.ceil(needs.foodUrgency))
             );

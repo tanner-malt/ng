@@ -13,9 +13,9 @@ const WORLD_DATA = {
     // MAP CONFIGURATION
     // =========================================
     mapConfig: {
-        width: 5,
-        height: 5,
-        capitalPosition: { row: 2, col: 2 },
+        width: 9,
+        height: 9,
+        capitalPosition: { row: 4, col: 4 },
         initialExplorationRadius: 1
     },
 

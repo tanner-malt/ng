@@ -123,7 +123,7 @@ class VillageManager {
         this.terrainHeight = 10; // Number of terrain tiles vertically
         this.terrainTypes = {
             grass: { symbol: '🌱', buildable: true, modifier: 'none', color: '#4a7c59' },
-            forest: { symbol: '🌲', buildable: false, modifier: 'wood_bonus', color: '#2d5a27' },
+            forest: { symbol: '🌲', buildable: true, modifier: 'wood_bonus', color: '#2d5a27' },
             hills: { symbol: '⛰️', buildable: true, modifier: 'stone_bonus', color: '#8b7355' },
             water: { symbol: '💧', buildable: false, modifier: 'none', color: '#4a90e2' },
             fertile: { symbol: '🌾', buildable: true, modifier: 'food_bonus', color: '#6b8e23' },
@@ -2378,61 +2378,35 @@ class VillageManager {
         const workerCounts = detailedProduction.workerCounts;
         const breakdown = detailedProduction.breakdown || {};
 
-        // Update food sources
-        const foodSourcesEl = document.querySelector('#food-sources .sources-list');
-        if (foodSourcesEl) {
-            const lines = [];
-            // Incomes
-            (breakdown.food?.income || []).forEach(item => {
-                lines.push(`${item.label}: +${Math.round(item.amount)}`);
+        // Helper: render source rows as individual divs instead of comma-separated text
+        const renderSourceRows = (el, resource) => {
+            if (!el) return;
+            const items = [];
+            (breakdown[resource]?.income || []).forEach(item => {
+                items.push({ label: item.label, amount: Math.round(item.amount), isIncome: true });
             });
-            // Expenses
-            (breakdown.food?.expense || []).forEach(item => {
-                lines.push(`${item.label}: ${Math.round(item.amount)}`); // already negative
+            (breakdown[resource]?.expense || []).forEach(item => {
+                items.push({ label: item.label, amount: Math.round(item.amount), isIncome: false });
             });
-            if (lines.length === 0) lines.push('No activity');
-            foodSourcesEl.textContent = lines.join(', ');
-        }
+            if (items.length === 0) {
+                el.innerHTML = '<em style="color:#888;">No activity</em>';
+                return;
+            }
+            el.innerHTML = items.map(item => {
+                const sign = item.isIncome ? '+' : '';
+                const color = item.isIncome ? '#4ade80' : (item.amount < 0 ? '#f87171' : '#ccc');
+                return `<div style="display:flex;justify-content:space-between;padding:1px 0;">`
+                    + `<span style="color:#ccc;">${item.label}</span>`
+                    + `<span style="color:${color};font-weight:500;">${sign}${item.amount}</span></div>`;
+            }).join('');
+        };
 
-        // Update wood sources
-        const woodSourcesEl = document.querySelector('#wood-sources .sources-list');
-        if (woodSourcesEl) {
-            const lines = [];
-            (breakdown.wood?.income || []).forEach(item => lines.push(`${item.label}: +${Math.round(item.amount)}`));
-            (breakdown.wood?.expense || []).forEach(item => lines.push(`${item.label}: ${Math.round(item.amount)}`));
-            if (lines.length === 0) lines.push('No activity');
-            woodSourcesEl.textContent = lines.join(', ');
-        }
-
-        // Update stone sources
-        const stoneSourcesEl = document.querySelector('#stone-sources .sources-list');
-        if (stoneSourcesEl) {
-            const lines = [];
-            (breakdown.stone?.income || []).forEach(item => lines.push(`${item.label}: +${Math.round(item.amount)}`));
-            (breakdown.stone?.expense || []).forEach(item => lines.push(`${item.label}: ${Math.round(item.amount)}`));
-            if (lines.length === 0) lines.push('No activity');
-            stoneSourcesEl.textContent = lines.join(', ');
-        }
-
-        // Update metal sources
-        const metalSourcesEl = document.querySelector('#metal-sources .sources-list');
-        if (metalSourcesEl) {
-            const lines = [];
-            (breakdown.metal?.income || []).forEach(item => lines.push(`${item.label}: +${Math.round(item.amount)}`));
-            (breakdown.metal?.expense || []).forEach(item => lines.push(`${item.label}: ${Math.round(item.amount)}`));
-            if (lines.length === 0) lines.push('No activity');
-            metalSourcesEl.textContent = lines.join(', ');
-        }
-
-        // Update production sources
-        const productionSourcesEl = document.querySelector('#production-sources .sources-list');
-        if (productionSourcesEl) {
-            const lines = [];
-            (breakdown.production?.income || []).forEach(item => lines.push(`${item.label}: +${Math.round(item.amount)}`));
-            (breakdown.production?.expense || []).forEach(item => lines.push(`${item.label}: ${Math.round(item.amount)}`));
-            if (lines.length === 0) lines.push('No activity');
-            productionSourcesEl.textContent = lines.join(', ');
-        }
+        // Update each resource
+        renderSourceRows(document.querySelector('#food-sources .sources-list'), 'food');
+        renderSourceRows(document.querySelector('#wood-sources .sources-list'), 'wood');
+        renderSourceRows(document.querySelector('#stone-sources .sources-list'), 'stone');
+        renderSourceRows(document.querySelector('#metal-sources .sources-list'), 'metal');
+        renderSourceRows(document.querySelector('#production-sources .sources-list'), 'production');
 
         // Update gold income sources (taxes, market, upkeep)
         this.updateGoldSources();

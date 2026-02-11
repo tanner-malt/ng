@@ -383,6 +383,9 @@ class LegacySystem {
         gameState = gameState || window.gameState;
         dynastyName = dynastyName || localStorage.getItem('dynastyName') || 'Unknown';
 
+        // Unlock Monarch view on dynasty end (any reason)
+        try { window.achievementSystem?.triggerNotAnEnd?.(); } catch (_) { }
+
         // 1. Calculate and save legacy BEFORE any storage is cleared
         const result = this.endDynasty(gameState, dynastyName);
 

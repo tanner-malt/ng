@@ -10100,3 +10100,78 @@ html {
     color: var(--text-muted);
     margin-top: var(--space-xs);
 }
+
+/* ─── Refugee Event Modal ─── */
+.refugee-story {
+    text-align: center;
+    padding: 0.75rem 1rem;
+}
+
+.refugee-story p {
+    color: #ccc;
+    line-height: 1.6;
+    margin: 0.5rem 0;
+}
+
+.refugee-story .highlight {
+    color: #f0c040;
+    font-weight: bold;
+}
+
+.refugee-count-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.modal-actions .modal-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.modal-actions .modal-btn:hover {
+    transform: translateY(-1px);
+}
+
+.modal-actions .btn-primary {
+    background: #27ae60;
+    color: #fff;
+}
+
+.modal-actions .btn-primary:hover {
+    background: #2ecc71;
+}
+
+.modal-actions .btn-secondary {
+    background: #555;
+    color: #ccc;
+}
+
+.modal-actions .btn-secondary:hover {
+    background: #666;
+    color: #fff;
+}
+
+/* Food crisis indicator bar */
+.food-crisis-banner {
+    background: linear-gradient(90deg, #c0392b 0%, #922b21 100%);
+    color: #fff;
+    text-align: center;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    animation: crisis-pulse 1.5s ease-in-out infinite;
+    border-bottom: 2px solid #e74c3c;
+}
+
+@keyframes crisis-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}

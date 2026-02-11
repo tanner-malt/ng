@@ -1,11 +1,12 @@
 /**
- * WorldTutorial — Multi-step walkthrough for the World Map view
+ * WorldTutorial — Interactive step-by-step walkthrough for the World Map
  *
  * Triggered on first visit to the World tab. Walks the player through
- * fog of war, exploration, army movement, and enemy threats.
+ * fog of war, the capital, terrain types, army drafting, movement,
+ * and enemy threats in 6 bite-sized steps.
  *
- * Follows the BuildingTutorial pattern: self-contained, localStorage-tracked,
- * uses window.modalSystem.showModal() for each step.
+ * Pattern: localStorage-tracked, uses window.modalSystem.showModal()
+ * with Next / Skip controls per step + element highlighting.
  */
 
 class WorldTutorial {
@@ -13,53 +14,125 @@ class WorldTutorial {
         this.currentStep = 0;
         this.completed = false;
         this.active = false;
+        this._eventCleanups = []; // listeners to remove on skip/complete
 
         this.steps = [
+            // ── 1. Welcome / overview ──
             {
-                id: 'world_overview',
-                title: 'The Known World',
+                id: 'world_welcome',
+                title: 'Welcome to the World Map',
                 content: `
                     <div class="tutorial-content">
-                        <p>Your kingdom sits at the center of the map. The <strong>golden tile</strong> is your capital.</p>
-                        <ul>
-                            <li><strong>Explored</strong> tiles are fully visible and traversable</li>
-                            <li><strong>Scoutable</strong> tiles show terrain but armies can't enter yet</li>
-                            <li><strong>Hidden</strong> tiles are completely unknown</li>
-                        </ul>
-                        <p>Armies automatically explore tiles as they move, revealing neighbors. Click any tile for details.</p>
+                        <p>Beyond your village walls lies a vast and untamed land. This is where you will 
+                        <strong>scout new terrain</strong>, <strong>command armies</strong>, and 
+                        <strong>defend your borders</strong>.</p>
+                        <p>Most of the map is hidden behind the <em>Fog of War</em>. Only explored tiles
+                        are fully visible — everything else is concealed until your armies discover it.</p>
+                        <p style="opacity:0.7;font-size:0.9em;">Let's walk through the basics.</p>
                     </div>`,
-                highlight: '.tile[data-row="2"][data-col="2"]'
+                highlight: '#hex-overlay'
             },
+            // ── 2. Your capital ──
             {
-                id: 'army_movement',
-                title: 'Commanding Armies',
+                id: 'world_capital',
+                title: 'Your Capital',
                 content: `
                     <div class="tutorial-content">
-                        <p>Click your <strong>capital tile</strong> and use <em>Draft Army</em> to raise troops. Select an army, then click <strong>Move</strong> to send it.</p>
-                        <ul>
-                            <li><strong>Grassland/Plains:</strong> 1 day &mdash; fast</li>
-                            <li><strong>Forest/Hills:</strong> 2 days &mdash; slower, defensible</li>
-                            <li><strong>Swamp:</strong> 3 days &mdash; treacherous</li>
-                            <li><strong>Mountains:</strong> 4 days &mdash; slow, +40% defense</li>
-                        </ul>
-                        <p>Use the right panel to move, recall, or disband selected armies.</p>
+                        <p>The <strong style="color:#c9a84c;">golden tile</strong> at the centre of the map is your <strong>Capital</strong>.
+                        This is where your village stands and where armies are drafted.</p>
+                        <p>Click the capital tile now to see its details in the left panel.</p>
+                        <p>Tiles adjacent to your capital start <strong>explored</strong>.
+                        Tiles further away are hidden and must be uncovered by your armies.</p>
+                    </div>`,
+                highlight: null, // set dynamically in showStep()
+                dynamicHighlight: () => {
+                    const cfg = window.WORLD_DATA?.mapConfig || { capitalPosition: { row: 4, col: 4 } };
+                    return `.tile[data-row="${cfg.capitalPosition.row}"][data-col="${cfg.capitalPosition.col}"]`;
+                }
+            },
+            // ── 3. Terrain types ──
+            {
+                id: 'world_terrain',
+                title: 'Reading the Land',
+                content: `
+                    <div class="tutorial-content">
+                        <p>Each tile has a <strong>terrain type</strong> that affects movement speed and defence:</p>
+                        <table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:0.9em;">
+                            <tr style="border-bottom:1px solid #5a4230;">
+                                <th style="text-align:left;padding:4px;">Terrain</th>
+                                <th style="text-align:center;padding:4px;">Speed</th>
+                                <th style="text-align:center;padding:4px;">Notes</th>
+                            </tr>
+                            <tr><td>🌱 Grassland / 🌾 Plains</td><td style="text-align:center;">1 day</td><td style="text-align:center;">Fast, open</td></tr>
+                            <tr><td>🌲 Forest</td><td style="text-align:center;">2 days</td><td style="text-align:center;">Cover</td></tr>
+                            <tr><td>⛰️ Hills</td><td style="text-align:center;">2 days</td><td style="text-align:center;">+5 % def</td></tr>
+                            <tr><td>🪵 Swamp</td><td style="text-align:center;">3 days</td><td style="text-align:center;">Dangerous</td></tr>
+                            <tr><td>🏔️ Mountains</td><td style="text-align:center;">4 days</td><td style="text-align:center;">+7 % def</td></tr>
+                            <tr><td>🏜️ Desert</td><td style="text-align:center;">2 days</td><td style="text-align:center;">Drains supplies</td></tr>
+                            <tr><td>🏚️ Ruins</td><td style="text-align:center;">2 days</td><td style="text-align:center;">Treasures</td></tr>
+                        </table>
+                        <p>Click any explored tile to see its details on the left side.</p>
+                    </div>`,
+                highlight: '#hex-info'
+            },
+            // ── 4. Drafting an army ──
+            {
+                id: 'world_draft',
+                title: 'Raising an Army',
+                content: `
+                    <div class="tutorial-content">
+                        <p>To explore the unknown you need soldiers.</p>
+                        <ol style="padding-left:18px;">
+                            <li>Click your <strong>Capital</strong> tile.</li>
+                            <li>Press the <strong>⚔️ Draft Army</strong> button on the right panel.</li>
+                            <li>Choose villagers to conscript and name your army.</li>
+                        </ol>
+                        <p>Drafted villagers leave their village jobs and become soldiers.
+                        Each army carries <strong>food supplies</strong> — when supplies run out, morale drops
+                        and the army may disband!</p>
+                        <p style="opacity:0.7;font-size:0.9em;">You can disband an army later to return soldiers to the village.</p>
                     </div>`,
                 highlight: '#world-actions'
             },
+            // ── 5. Movement ──
             {
-                id: 'world_dangers',
-                title: 'Threats & Defense',
+                id: 'world_movement',
+                title: 'Commanding Your Troops',
                 content: `
                     <div class="tutorial-content">
-                        <p>Enemies spawn at the map edges and march toward your capital. They grow stronger over time:</p>
-                        <ul>
-                            <li><strong>Bandits</strong> (~50 days) &mdash; small groups</li>
-                            <li><strong>Raiders</strong> (~100 days) &mdash; larger forces</li>
-                            <li><strong>Warlords</strong> (~200 days) &mdash; devastating armies</li>
-                        </ul>
-                        <p>Station armies on <strong>hills</strong> or <strong>mountains</strong> for defensive bonuses. Keep borders explored &mdash; you can't fight what you can't see!</p>
+                        <p>Once you have an army:</p>
+                        <ol style="padding-left:18px;">
+                            <li>Click the army marker (⚔) or select it from the right panel.</li>
+                            <li>Press <strong>🚶 Move</strong>.</li>
+                            <li>Click the <strong>destination tile</strong>.</li>
+                        </ol>
+                        <p>Your army will march along the fastest path. Armies <strong>auto-explore</strong>
+                        tiles they pass through, revealing the surrounding fog of war.</p>
+                        <p>Use <strong>🏠 Return Home</strong> to recall an army to the capital, or
+                        <strong>🔭 Scout</strong> to reveal a scoutable tile from an adjacent position.</p>
                     </div>`,
-                highlight: '#hex-info'
+                highlight: '#hex-overlay'
+            },
+            // ── 6. Dangers ──
+            {
+                id: 'world_dangers',
+                title: 'Threats on the Horizon',
+                content: `
+                    <div class="tutorial-content">
+                        <p>The wilds are not empty. Enemy forces spawn at the <strong>map edges</strong>
+                        and march toward your capital. They grow stronger over time:</p>
+                        <ul>
+                            <li><strong>⚔️ Bandits</strong> — appear around day 50, small groups.</li>
+                            <li><strong>🏴 Raiders</strong> — appear around day 100, larger warbands.</li>
+                            <li><strong>👹 Warlords</strong> — appear around day 200, devastating armies.</li>
+                        </ul>
+                        <p>Station your armies on <strong>hills</strong> or <strong>mountains</strong> for
+                        a defensive terrain bonus. Keep your borders explored — you can't fight
+                        what you can't see!</p>
+                        <p style="opacity:0.7;font-size:0.9em;">If an enemy reaches your capital they will
+                        attack your village directly.</p>
+                    </div>`,
+                highlight: null
             }
         ];
 
@@ -77,7 +150,6 @@ class WorldTutorial {
                 this.completed = !!data.completed;
                 this.currentStep = data.currentStep || 0;
             }
-            // Also honour the dedicated complete flag
             if (localStorage.getItem('worldTutorialComplete') === 'true') {
                 this.completed = true;
             }
@@ -105,7 +177,6 @@ class WorldTutorial {
      */
     checkAndShow() {
         if (this.completed || this.active) return;
-
         // Small delay so the map finishes rendering before the modal appears
         setTimeout(() => this.showStep(0), 400);
     }
@@ -126,10 +197,11 @@ class WorldTutorial {
         const isLast = index === this.steps.length - 1;
         const stepLabel = `Step ${index + 1} of ${this.steps.length}`;
 
-        // Apply highlight
+        // Apply highlight (static or dynamic selector)
         this.clearHighlight();
-        if (step.highlight) {
-            this.applyHighlight(step.highlight);
+        const highlightSel = step.dynamicHighlight ? step.dynamicHighlight() : step.highlight;
+        if (highlightSel) {
+            this.applyHighlight(highlightSel);
         }
 
         const buttonLabel = isLast ? '✅ Got it — let me explore!' : '➡️ Next';
@@ -156,7 +228,7 @@ class WorldTutorial {
             closable: false,
             showCloseButton: false,
             modalType: 'tutorial-step',
-            width: '520px'
+            width: '540px'
         });
 
         // Attach button handlers after DOM settles
@@ -167,6 +239,7 @@ class WorldTutorial {
             if (nextBtn) {
                 nextBtn.onclick = () => {
                     this.clearHighlight();
+                    this._cleanupEvents();
                     window.modalSystem?.closeTopModal?.();
                     setTimeout(() => this.showStep(index + 1), 300);
                 };
@@ -174,11 +247,19 @@ class WorldTutorial {
             if (skipBtn) {
                 skipBtn.onclick = () => {
                     this.clearHighlight();
+                    this._cleanupEvents();
                     window.modalSystem?.closeTopModal?.();
                     this.complete();
                 };
             }
         }, 150);
+    }
+
+    // ── Event listener management ──
+
+    _cleanupEvents() {
+        this._eventCleanups.forEach(fn => fn());
+        this._eventCleanups = [];
     }
 
     // ── Highlight ──
@@ -208,6 +289,7 @@ class WorldTutorial {
         this.active = false;
         this.currentStep = this.steps.length;
         this.clearHighlight();
+        this._cleanupEvents();
         localStorage.setItem('worldTutorialComplete', 'true');
         this.saveState();
         console.log('[WorldTutorial] Tutorial complete');
@@ -219,6 +301,7 @@ class WorldTutorial {
         this.completed = false;
         this.active = false;
         this.currentStep = 0;
+        this._cleanupEvents();
         localStorage.removeItem('worldTutorialState');
         localStorage.removeItem('worldTutorialComplete');
         console.log('[WorldTutorial] Tutorial reset');

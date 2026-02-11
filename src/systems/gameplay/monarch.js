@@ -515,19 +515,32 @@ class MonarchManager {
             return;
         }
 
+        // Gather available armies for general assignment
+        const armies = this.gameState.getAllArmies?.() || [];
+
         let html = '<div class="family-tree">';
         rf.royalFamily.forEach(member => {
             const isMonarch = member.id === rf.currentMonarch?.id;
             const isHeir = member.status === 'heir';
             const isSpouse = member.status === 'royal_spouse';
+            const canAssign = member.age >= 16 && !isMonarch;
             let classStr = 'family-member';
             if (isHeir) classStr += ' heir';
             if (isSpouse) classStr += ' spouse';
             if (!isHeir && !isSpouse && !isMonarch) classStr += ' child';
 
-            const icon = isMonarch ? '👑' : isHeir ? '🏰' : isSpouse ? '💍' : '👤';
-            const statusLabel = isMonarch ? 'Monarch' : member.status === 'heir' ? 'Heir' : member.status === 'royal_spouse' ? 'Spouse' : member.status;
+            const icon = isMonarch ? '👑' : member.role === 'general' ? '⚔️' : member.role === 'governor' ? '🏛️' : isHeir ? '🏰' : isSpouse ? '💍' : '👤';
+            let statusLabel = isMonarch ? 'Monarch' : member.status === 'heir' ? 'Heir' : member.status === 'royal_spouse' ? 'Spouse' : member.status;
+            // Show active role
+            if (member.role === 'general') {
+                const army = armies.find(a => a.id === member.assignedTo);
+                statusLabel = `General of ${army?.name || 'Army'}`;
+            } else if (member.role === 'governor') {
+                statusLabel = `Governor of ${member.assignedTo === 'capital' ? 'Capital' : member.assignedTo}`;
+            }
+
             const traits = (member.traits || []).map(t => `<span class="trait-badge">${t}</span>`).join(' ');
+            const skills = member.skills || {};
 
             html += `
                 <div class="${classStr}">
@@ -535,13 +548,69 @@ class MonarchManager {
                     <div class="member-details">
                         <div class="member-name">${member.name || 'Unknown'}</div>
                         <div class="member-info">Age: ${member.age || '?'} · ${statusLabel}</div>
-                        ${traits ? `<div class="member-traits">${traits}</div>` : ''}
+                        <div class="member-skills" style="font-size:0.8em;opacity:0.7;margin-top:2px;">
+                            ⚔️${skills.military || 0} 📊${skills.economics || 0} 🗣️${skills.diplomacy || 0}
+                        </div>
+                        ${traits ? `<div class="member-traits">${traits}</div>` : ''}`;
+
+            // Role assignment buttons (only for age 16+ non-monarch members)
+            if (canAssign) {
+                html += `<div class="role-buttons" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">`;
+                if (member.role) {
+                    html += `<button class="role-btn role-unassign" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#5a2020;color:#e8d5b0;border:1px solid #8b3030;border-radius:3px;cursor:pointer;">✖ Unassign</button>`;
+                } else {
+                    // Governor option (capital)
+                    const currentGov = rf.getGovernor?.('capital');
+                    if (!currentGov) {
+                        html += `<button class="role-btn role-governor" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;">🏛️ Governor</button>`;
+                    }
+                    // General option (show dropdown if armies exist)
+                    if (armies.length > 0) {
+                        armies.forEach(a => {
+                            const existingGen = rf.getGeneralForArmy?.(a.id);
+                            if (!existingGen) {
+                                html += `<button class="role-btn role-general" data-royal="${member.id}" data-army="${a.id}" style="font-size:0.7em;padding:2px 6px;background:#2a2a4a;color:#e8d5b0;border:1px solid #3a3a6a;border-radius:3px;cursor:pointer;">⚔️ Lead ${a.name}</button>`;
+                            }
+                        });
+                    }
+                }
+                html += `</div>`;
+            }
+
+            html += `
                     </div>
                 </div>
             `;
         });
         html += '</div>';
         el.innerHTML = html;
+
+        // Wire up role buttons
+        el.querySelectorAll('.role-governor').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const royalId = btn.dataset.royal;
+                rf.assignGovernor?.(royalId, 'capital');
+                this.updateFamilyTree();
+                window.showToast?.('Governor assigned to Capital — production boost active!', { type: 'success' });
+            });
+        });
+        el.querySelectorAll('.role-general').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const royalId = btn.dataset.royal;
+                const armyId = btn.dataset.army;
+                rf.assignGeneral?.(royalId, armyId);
+                this.updateFamilyTree();
+                window.showToast?.('General assigned — combat bonus active!', { type: 'success' });
+            });
+        });
+        el.querySelectorAll('.role-unassign').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const royalId = btn.dataset.royal;
+                rf.unassignRole?.(royalId);
+                this.updateFamilyTree();
+                window.showToast?.('Role removed.', { type: 'info' });
+            });
+        });
     }
 
     /* =============================

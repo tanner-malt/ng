@@ -203,6 +203,105 @@ class RoyalFamilyManager {
         return allNames[Math.floor(Math.random() * allNames.length)];
     }
 
+    // ===================================================================
+    // ROLE ASSIGNMENTS — Generals & Governors
+    // ===================================================================
+
+    /**
+     * Assign a royal family member as General of an army.
+     * Grants +10% attack per military skill point (capped at 100%).
+     * @param {string} royalId
+     * @param {string} armyId
+     */
+    assignGeneral(royalId, armyId) {
+        const royal = this.findRoyalById(royalId);
+        if (!royal) return false;
+        if (royal.age < 16) return false; // too young
+        if (royal.role === 'governor') this.unassignRole(royalId); // remove previous role
+
+        // Unassign previous general of this army (if any)
+        const prev = this.royalFamily.find(r => r.role === 'general' && r.assignedTo === armyId);
+        if (prev) { prev.role = null; prev.assignedTo = null; }
+
+        royal.role = 'general';
+        royal.assignedTo = armyId;
+        console.log(`[RoyalFamily] ${royal.name} assigned as General of army ${armyId}`);
+        try { this.gameState.save?.(); } catch (_) { }
+        return true;
+    }
+
+    /**
+     * Assign a royal family member as Governor of a location.
+     * Grants +5% production per economics skill point (capped at 100%).
+     * @param {string} royalId
+     * @param {string} locationKey - 'capital' or tile key like '4,4'
+     */
+    assignGovernor(royalId, locationKey = 'capital') {
+        const royal = this.findRoyalById(royalId);
+        if (!royal) return false;
+        if (royal.age < 16) return false;
+        if (royal.role === 'general') this.unassignRole(royalId);
+
+        // Unassign previous governor of this location
+        const prev = this.royalFamily.find(r => r.role === 'governor' && r.assignedTo === locationKey);
+        if (prev) { prev.role = null; prev.assignedTo = null; }
+
+        royal.role = 'governor';
+        royal.assignedTo = locationKey;
+        console.log(`[RoyalFamily] ${royal.name} assigned as Governor of ${locationKey}`);
+        try { this.gameState.save?.(); } catch (_) { }
+        return true;
+    }
+
+    /** Remove role from a royal family member */
+    unassignRole(royalId) {
+        const royal = this.findRoyalById(royalId);
+        if (!royal) return;
+        royal.role = null;
+        royal.assignedTo = null;
+        try { this.gameState.save?.(); } catch (_) { }
+    }
+
+    /** Get the General assigned to a specific army (if any) */
+    getGeneralForArmy(armyId) {
+        return this.royalFamily.find(r => r.role === 'general' && r.assignedTo === armyId) || null;
+    }
+
+    /** Get the Governor of a location */
+    getGovernor(locationKey = 'capital') {
+        return this.royalFamily.find(r => r.role === 'governor' && r.assignedTo === locationKey) || null;
+    }
+
+    /**
+     * Calculate the attack multiplier a General provides to their army.
+     * +10% per military skill point, capped at +100% (2.0x).
+     */
+    getGeneralAttackMultiplier(armyId) {
+        const general = this.getGeneralForArmy(armyId);
+        if (!general) return 1.0;
+        const mil = general.skills?.military || 0;
+        return 1.0 + Math.min(mil * 0.10, 1.0);
+    }
+
+    /**
+     * Calculate the production multiplier a Governor provides.
+     * +5% per economics skill point, capped at +100% (2.0x).
+     */
+    getGovernorProductionMultiplier(locationKey = 'capital') {
+        const governor = this.getGovernor(locationKey);
+        if (!governor) return 1.0;
+        const econ = governor.skills?.economics || 0;
+        return 1.0 + Math.min(econ * 0.05, 1.0);
+    }
+
+    /** Get all royal members eligible for role assignment (age >= 16, not monarch) */
+    getAssignableMembers() {
+        return this.royalFamily.filter(r =>
+            r.age >= 16 &&
+            r.id !== this.currentMonarch?.id
+        );
+    }
+
     // Update succession order
     updateSuccessionOrder() {
         this.successionOrder = this.royalFamily
@@ -243,9 +342,6 @@ class RoyalFamilyManager {
         // Dynasty founder achievement - unlocked on first succession
         try { window.achievementSystem?.triggerDynastySuccession?.(); } catch (_) { }
 
-        // First ruler death — unlock Monarch view
-        try { window.achievementSystem?.triggerNotAnEnd?.(); } catch (_) { }
-
         try { this.gameState.save?.(); } catch (_) { }
         return newMonarch;
     }
@@ -253,6 +349,9 @@ class RoyalFamilyManager {
     // Handle dynasty extinction — delegates to LegacySystem
     handleDynastyExtinction() {
         console.log('[RoyalFamily] Dynasty has ended - triggering legacy system');
+
+        // Unlock Monarch view on dynasty end
+        try { window.achievementSystem?.triggerNotAnEnd?.(); } catch (_) { }
 
         if (window.legacySystem) {
             const dName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';

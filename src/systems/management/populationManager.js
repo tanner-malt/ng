@@ -1104,16 +1104,16 @@ class PopulationManager {
     }
 
     /**
-     * Add refugees (generic adults/children mix) up to population cap
+     * Add refugees (mostly working-age adults) up to population cap
      * @param {number} count
      * @returns {number} number actually added
      */
     addRefugees(count) {
         let added = 0;
         for (let i = 0; i < count; i++) {
-            // Favor working-age adults with a chance of a child
-            const isChild = Math.random() < 0.25;
-            const age = isChild ? (5 + Math.floor(Math.random() * 11)) : (18 + Math.floor(Math.random() * 40));
+            // 90% working-age adults, 10% near-working-age teens
+            const isChild = Math.random() < 0.10;
+            const age = isChild ? (14 + Math.floor(Math.random() * 2)) : (18 + Math.floor(Math.random() * 30));
             const role = isChild ? 'child' : 'peasant';
             const status = isChild ? 'child' : 'idle';
             const villager = this.addInhabitant({
@@ -1551,18 +1551,17 @@ class PopulationManager {
 
     /**
      * Trigger a refugee arrival event. Shows a modal prompting the player to accept refugees.
-     * @param {number} count - Number of refugees (1-15)
-     * @param {object} options - { isTutorial: bool } if triggered from tutorial step
+     * @param {number} count - Number of refugees (1-30)
+     * @param {object} options - { isTutorial, isLastBigWave, isFinalWave, waveNumber, totalWaves }
      */
     triggerRefugeeEvent(count = null, options = {}) {
-        const { isTutorial = false } = options;
+        const { isTutorial = false, isLastBigWave = false, isFinalWave = false, waveNumber = 0, totalWaves = 10 } = options;
 
-        // Determine refugee count (scales with game days)
+        // Determine refugee count
         if (count === null) {
-            const day = window.gameState?.day || 0;
-            count = Math.min(15, 1 + Math.ceil(day / 13));
+            count = 5; // fallback
         }
-        count = Math.max(1, Math.min(15, count));
+        count = Math.max(1, Math.min(30, count));
 
         // Check current population vs cap
         const cap = window.gameState?.getPopulationCap?.() || 0;
@@ -1581,19 +1580,33 @@ class PopulationManager {
         const arrivalCount = actualCount > 0 ? actualCount : count;
         const noRoom = actualCount <= 0;
 
+        // Build flavor text based on wave context
+        let waveContext = '';
+        if (isLastBigWave) {
+            waveContext = '<p style="color: #f0c040; font-style: italic;">"This is the last large group — the flood of refugees is ending."</p>';
+        } else if (isFinalWave) {
+            waveContext = '<p style="color: #aaa; font-style: italic;">"A few final stragglers arrive. The exodus is over."</p>';
+        } else if (waveNumber > 0) {
+            waveContext = `<p style="color: #888; font-size: 0.85em;">Wave ${waveNumber} of ${totalWaves}</p>`;
+        }
+
         let storyHtml;
         if (noRoom) {
             storyHtml = `
-                <div class="story-panel">
-                    <p>Weary travelers approach your settlement seeking shelter, but you have <strong>no housing available</strong>.</p>
+                <div class="refugee-story">
+                    <div class="refugee-count-badge" style="font-size: 2rem; text-align: center; margin-bottom: 0.5rem;">🚫</div>
+                    <p>Weary travelers fleeing oncoming <strong>raiders</strong> approach your settlement, but you have <strong>no housing available</strong>.</p>
                     <p>Build more <span class="highlight">Houses</span> to welcome future refugees.</p>
+                    ${waveContext}
                 </div>`;
         } else {
             storyHtml = `
-                <div class="story-panel">
-                    <p>${arrivalCount} weary ${refugeeWord} ${actualCount === 1 ? 'has' : 'have'} arrived at your gates, seeking shelter from the dangers of the wilderness.</p>
-                    <p>They are willing to work and contribute to your settlement.</p>
+                <div class="refugee-story">
+                    <div class="refugee-count-badge" style="font-size: 2.5rem; text-align: center; margin-bottom: 0.5rem;">🏕️ <span style="font-size: 1.5rem; vertical-align: middle; font-weight: bold;">${arrivalCount}</span></div>
+                    <p>${arrivalCount} ${refugeeWord} fleeing from oncoming <strong>raiders</strong> ${actualCount === 1 ? 'has' : 'have'} arrived at your gates, desperate for shelter.</p>
+                    <p>They are willing to work and contribute to your settlement in exchange for safety.</p>
                     ${isTutorial ? '<p><em>Accepting refugees is a great way to grow your population quickly!</em></p>' : ''}
+                    ${waveContext}
                 </div>`;
         }
 

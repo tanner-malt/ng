@@ -1,7 +1,7 @@
 /**
  * WorldManager — World Map System (rewrite)
  *
- * Manages the 5×5 world grid: terrain generation, fog-of-war, exploration,
+ * Manages the 9×9 world grid: terrain generation, fog-of-war, exploration,
  * army drafting/movement/combat, enemy spawning & advancing, and the UI
  * (3-column layout with map + info panel + action panel).
  *
@@ -21,7 +21,7 @@ class WorldManager {
         this.game = game;
 
         // Map dimensions from config
-        const cfg = window.WORLD_DATA?.mapConfig || { width: 5, height: 5, capitalPosition: { row: 2, col: 2 } };
+        const cfg = window.WORLD_DATA?.mapConfig || { width: 9, height: 9, capitalPosition: { row: 4, col: 4 } };
         this.mapWidth = cfg.width;
         this.mapHeight = cfg.height;
         this.capitalRow = cfg.capitalPosition.row;
@@ -107,22 +107,25 @@ class WorldManager {
     }
 
     buildTerrainPool() {
-        // Zone-weighted pools based on distance from capital
+        // Zone-weighted pools based on distance from capital (9×9 map)
         return {
             inner: ['grass', 'plains', 'grass', 'plains', 'forest', 'hill'],
-            outer: ['forest', 'hill', 'mountain', 'swamp', 'desert', 'ruins', 'forest', 'hill']
+            mid:   ['grass', 'plains', 'forest', 'forest', 'hill', 'hill', 'desert', 'swamp'],
+            outer: ['forest', 'hill', 'mountain', 'swamp', 'desert', 'ruins', 'forest', 'hill', 'mountain']
         };
     }
 
     pickTerrain(dist, pool) {
-        // dist 1 = inner, dist 2+ = mix, dist 3+ = mostly outer
+        // dist 1 = inner, 2 = mix inner+mid, 3 = mid, 4+ = outer
         let choices;
         if (dist <= 1) {
             choices = pool.inner;
         } else if (dist <= 2) {
-            choices = [...pool.inner, ...pool.outer];
+            choices = [...pool.inner, ...pool.mid];
+        } else if (dist <= 3) {
+            choices = pool.mid;
         } else {
-            choices = pool.outer;
+            choices = [...pool.mid.slice(0, 3), ...pool.outer];
         }
         return choices[Math.floor(Math.random() * choices.length)];
     }
@@ -278,6 +281,16 @@ class WorldManager {
             if (terrainDef.defensiveBonus) {
                 html += `<p>Defense bonus: +${Math.round(terrainDef.defensiveBonus * 100)}%</p>`;
             }
+            // Enemy zone of control warning
+            const zocEnemy = this.getEnemyZoneOfControl(row, col);
+            if (zocEnemy) {
+                html += `<p style="color:#c0392b;font-weight:bold;">⚠️ Enemy Zone of Control (+2 move cost)</p>`;
+            }
+            // City info
+            if (hex.city) {
+                html += `<hr><h4>🏛️ ${hex.city.name}</h4>`;
+                html += `<p>Level ${hex.city.level || 1} · Founded day ${hex.city.founded || '?'}</p>`;
+            }
         }
 
         // Show enemies at this tile (only if visible to player)
@@ -310,12 +323,20 @@ class WorldManager {
         // ── Selected army command panel ──
         const selectedArmy = this.selectedArmyId ? this.gameState.getArmy?.(this.selectedArmyId) : null;
         if (selectedArmy) {
-            const statusIcon = selectedArmy.status === 'traveling' ? '🚶' : selectedArmy.status === 'fighting' ? '⚔️' : selectedArmy.status === 'garrisoned' ? '🏰' : '🏕️';
-            const statusLabel = selectedArmy.status === 'traveling' ? 'Traveling' : selectedArmy.status === 'fighting' ? 'In Combat' : selectedArmy.status === 'garrisoned' ? 'Garrisoned' : 'Idle';
+            const statusIcon = selectedArmy.status === 'traveling' ? '🚶' : selectedArmy.status === 'fighting' ? '⚔️' : selectedArmy.status === 'garrisoned' ? '🏰' : selectedArmy.status === 'city' ? '🏛️' : '🏕️';
+            const statusLabel = selectedArmy.status === 'traveling' ? 'Traveling' : selectedArmy.status === 'fighting' ? 'In Combat' : selectedArmy.status === 'garrisoned' ? 'Garrisoned' : selectedArmy.status === 'city' ? 'City Garrison' : 'Idle';
 
             html += `<div class="selected-army-panel">`;
             html += `<h4>${statusIcon} ${selectedArmy.name}</h4>`;
             html += `<p style="opacity:0.8;font-size:0.85em;margin:4px 0;">${selectedArmy.units?.length || 0} soldiers — ${statusLabel}</p>`;
+
+            // General assigned?
+            const general = this.gameState.royalFamily?.getGeneralForArmy?.(selectedArmy.id);
+            if (general) {
+                const mil = general.skills?.military || 0;
+                const bonus = Math.min(mil * 10, 100);
+                html += `<p style="color:#c9a84c;font-size:0.8em;margin:2px 0;">👑 General ${general.name} (+${bonus}% attack)</p>`;
+            }
             
             // Army stats summary
             const totalAttack = (selectedArmy.units || []).reduce((s, u) => s + (u.attack || 10), 0);
@@ -327,8 +348,20 @@ class WorldManager {
             html += `<span>❤️ ${avgHealth}%</span>`;
             html += `</div>`;
 
+            // Supply bar with visual indicator
             if (selectedArmy.supplies) {
-                html += `<p style="opacity:0.7;font-size:0.8em;margin:2px 0;">🍖 Supplies: ${selectedArmy.supplies.food || 0}</p>`;
+                const food = selectedArmy.supplies.food || 0;
+                const maxFood = (selectedArmy.units?.length || 1) * 10; // estimate: 10 days per soldier
+                const pct = Math.min(100, Math.round((food / Math.max(maxFood, 1)) * 100));
+                const barColor = pct > 50 ? '#27ae60' : pct > 20 ? '#f39c12' : '#c0392b';
+                html += `<div style="margin:4px 0;">`;
+                html += `<div style="display:flex;justify-content:space-between;font-size:0.8em;opacity:0.8;"><span>🍖 Supplies</span><span>${food} food</span></div>`;
+                html += `<div style="height:6px;background:#2a1f14;border-radius:3px;margin-top:2px;overflow:hidden;">`;
+                html += `<div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div>`;
+                html += `</div>`;
+                const daysLeft = food > 0 ? Math.floor(food / Math.max(selectedArmy.units?.length || 1, 1)) : 0;
+                html += `<div style="font-size:0.7em;opacity:0.6;margin-top:1px;">~${daysLeft} days remaining</div>`;
+                html += `</div>`;
             }
 
             // Individual soldier stat cards
@@ -358,6 +391,13 @@ class WorldManager {
             } else if (selectedArmy.status === 'idle') {
                 html += `<button class="world-btn" onclick="window.worldManager.enterMoveMode()">🚶 Move</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Return Home</button>`;
+                // Establish city — only on explored non-capital tiles without existing city
+                const armyPos = selectedArmy.position;
+                const isOnCapital = armyPos.y === this.capitalRow && armyPos.x === this.capitalCol;
+                const tileHasCity = this.hexMap[armyPos.y]?.[armyPos.x]?.city;
+                if (!isOnCapital && !tileHasCity) {
+                    html += `<button class="world-btn" onclick="window.worldManager.establishCity('${selectedArmy.id}')" style="background:linear-gradient(135deg,#2a4a2a,#3a6a3a);border-color:#4a8a4a;">🏛️ Establish City</button>`;
+                }
                 html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
             } else if (selectedArmy.status === 'traveling') {
                 html += `<p style="opacity:0.7;font-size:0.8em;text-align:center;">Army is on the move...</p>`;
@@ -404,11 +444,49 @@ class WorldManager {
         if (!selectedArmy) {
             const armies = this.gameState.getAllArmies?.() || [];
             if (armies.length > 0) {
-                html += `<hr><h4>Active Armies</h4>`;
+                html += `<hr><h4 style="margin:4px 0;">Active Armies</h4>`;
                 armies.forEach(a => {
-                    const statusIcon = a.status === 'traveling' ? '🚶' : a.status === 'fighting' ? '⚔️' : '🏕️';
-                    html += `<div class="army-list-item" style="cursor:pointer;" onclick="window.worldManager.selectArmy('${a.id}')">
-                        <span>${statusIcon} ${a.name} (${a.units.length})</span>
+                    const statusIcon = a.status === 'traveling' ? '🚶' : a.status === 'fighting' ? '⚔️' : a.status === 'garrisoned' ? '🏰' : a.status === 'city' ? '🏛️' : '🏕️';
+                    const statusLabel = a.status === 'traveling' ? 'Moving' : a.status === 'fighting' ? 'Combat' : a.status === 'garrisoned' ? 'Garrisoned' : a.status === 'city' ? 'City garrison' : 'Idle';
+                    const totalAttack = (a.units || []).reduce((s, u) => s + (u.attack || 10), 0);
+                    const totalDefense = (a.units || []).reduce((s, u) => s + (u.defense || 5), 0);
+                    const foodLeft = a.supplies?.food ?? 0;
+                    const coords = this.formatCoords(a.position?.y ?? 0, a.position?.x ?? 0);
+                    // General info
+                    const general = this.gameState.royalFamily?.getGeneralForArmy?.(a.id);
+                    const genLabel = general ? `<span style="color:#c9a84c;font-size:0.75em;">👑 ${general.name}</span>` : '';
+
+                    html += `<div class="army-list-item" style="cursor:pointer;padding:6px;border:1px solid #3a2a1a;border-radius:4px;margin:3px 0;background:rgba(42,31,20,0.3);" onclick="window.worldManager.selectArmy('${a.id}')">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>${statusIcon} ${a.name}</strong>
+                            <span style="font-size:0.75em;opacity:0.7;">${coords}</span>
+                        </div>
+                        <div style="display:flex;gap:6px;font-size:0.75em;opacity:0.8;margin-top:2px;">
+                            <span>${a.units?.length || 0} soldiers</span>
+                            <span>⚔️${totalAttack}</span>
+                            <span>🛡️${totalDefense}</span>
+                            <span>🍖${foodLeft}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+                            <span style="font-size:0.7em;opacity:0.6;">${statusLabel}</span>
+                            ${genLabel}
+                        </div>
+                    </div>`;
+                });
+            }
+
+            // ── Cities list ──
+            const cities = this.getCities?.() || [];
+            if (cities.length > 0) {
+                html += `<hr><h4 style="margin:4px 0;">Cities</h4>`;
+                cities.forEach(city => {
+                    const coords = this.formatCoords(city.row, city.col);
+                    html += `<div class="city-list-item" style="padding:4px 6px;border:1px solid #2a6a2a;border-radius:4px;margin:3px 0;background:rgba(42,106,42,0.15);cursor:pointer;" onclick="window.worldManager.selectHex(${city.row}, ${city.col})">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <strong>🏛️ ${city.name}</strong>
+                            <span style="font-size:0.75em;opacity:0.7;">${coords}</span>
+                        </div>
+                        <div style="font-size:0.7em;opacity:0.6;">Level ${city.level || 1} · Founded day ${city.founded || '?'}</div>
                     </div>`;
                 });
             }
@@ -775,6 +853,82 @@ class WorldManager {
     }
 
     // ===================================================================
+    // EXPEDITION — ESTABLISH CITIES
+    // ===================================================================
+
+    /**
+     * Establish a city on the tile where an idle army is stationed.
+     * Army transitions to status 'city' (garrisoned at city).
+     * City gets a governor slot and generates passive gold income.
+     */
+    establishCity(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army || army.status !== 'idle') return;
+
+        const row = army.position.y;
+        const col = army.position.x;
+        if (row === this.capitalRow && col === this.capitalCol) {
+            window.showToast?.('Cannot establish a city on the capital.', { type: 'warning' });
+            return;
+        }
+
+        const hex = this.hexMap[row]?.[col];
+        if (!hex || hex.visibility !== 'explored') return;
+        if (hex.city) {
+            window.showToast?.('A city already exists here.', { type: 'warning' });
+            return;
+        }
+
+        const coords = this.formatCoords(row, col);
+        const cityName = `City ${coords}`;
+
+        // Mark tile as city
+        hex.city = {
+            name: cityName,
+            founded: this.gameState.day || 0,
+            governor: null, // can be assigned from Royal Family
+            level: 1
+        };
+
+        // Army becomes city garrison
+        army.status = 'city';
+
+        window.showToast?.(`🏛️ ${cityName} established at ${coords}!`, { type: 'success' });
+        window.eventBus?.emit?.('city_established', { row, col, name: cityName, armyId });
+
+        this.refreshUI();
+        this.gameState.save?.();
+    }
+
+    /** Get all established cities */
+    getCities() {
+        const cities = [];
+        for (let r = 0; r < this.mapHeight; r++) {
+            for (let c = 0; c < this.mapWidth; c++) {
+                if (this.hexMap[r]?.[c]?.city) {
+                    cities.push({ row: r, col: c, ...this.hexMap[r][c].city });
+                }
+            }
+        }
+        return cities;
+    }
+
+    /** Process daily income from cities (1 gold per city per day) */
+    processCityIncome() {
+        const cities = this.getCities();
+        if (cities.length === 0) return;
+
+        let income = 0;
+        cities.forEach(city => {
+            income += (city.level || 1);
+        });
+
+        if (income > 0 && this.gameState.resources) {
+            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + income;
+        }
+    }
+
+    // ===================================================================
     // ENEMY SYSTEM — SPAWNING & ADVANCING
     // ===================================================================
 
@@ -801,7 +955,7 @@ class WorldManager {
     spawnEnemyGroup(day, cfg) {
         const daysSinceStart = day - cfg.startDay;
 
-        // Pick random edge tile (16 edge tiles on 5×5)
+        // Pick random edge tile from map border
         const edgeTiles = [];
         for (let r = 0; r < this.mapHeight; r++) {
             for (let c = 0; c < this.mapWidth; c++) {
@@ -965,9 +1119,55 @@ class WorldManager {
     resolveCombat(army, enemy) {
         console.log(`[WorldManager] Combat: ${army.name} vs ${enemy.name}`);
 
-        const armyStrength = (army.units || []).reduce((s, u) => s + (u.attack || 10), 0);
+        let armyStrength = (army.units || []).reduce((s, u) => s + (u.attack || 10), 0);
         const enemyStrength = enemy.units.reduce((s, u) => s + u.attack, 0);
 
+        // Apply General bonus (+10% per military skill, cap +100%)
+        const generalMult = this.gameState.royalFamily?.getGeneralAttackMultiplier?.(army.id) || 1.0;
+        armyStrength *= generalMult;
+
+        // General gains military experience from combat
+        if (generalMult > 1.0) {
+            const gen = this.gameState.royalFamily?.getGeneralForArmy?.(army.id);
+            if (gen?.experience) {
+                gen.experience.military = (gen.experience.military || 0) + 1;
+            }
+        }
+
+        // Determine terrain for this battle
+        const battleTerrain = this.hexMap[enemy.position.row]?.[enemy.position.col]?.terrain || 'plains';
+
+        // Show BattleViewer if available (animated combat)
+        if (window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
+            const playerArmy = {
+                name: army.name,
+                units: (army.units || []).map(u => ({
+                    ...u,
+                    alive: true,
+                    side: 'player'
+                }))
+            };
+            const enemyArmy = {
+                name: enemy.name,
+                units: enemy.units.map(u => ({
+                    ...u,
+                    alive: true,
+                    side: 'enemy'
+                }))
+            };
+            window.battleViewer.showBattle(playerArmy, enemyArmy, battleTerrain, (result) => {
+                // After animation completes, apply the actual combat result
+                this._applyCombatResult(army, enemy, armyStrength, enemyStrength);
+            });
+            return; // Combat result applied in callback
+        }
+
+        // Fallback: instant resolve without viewer
+        this._applyCombatResult(army, enemy, armyStrength, enemyStrength);
+    }
+
+    /** Internal: apply combat outcome after viewer animation or instant */
+    _applyCombatResult(army, enemy, armyStrength, enemyStrength) {
         // Simple auto-resolve: compare total strength with some randomness
         const armyRoll = armyStrength * (0.8 + Math.random() * 0.4);
         const enemyRoll = enemyStrength * (0.8 + Math.random() * 0.4);
@@ -1075,6 +1275,7 @@ class WorldManager {
 
         this.processArmyMovement();
         this.processEnemies();
+        this.processCityIncome();
         this.refreshUI();
         this.saveWorldData();
     }
@@ -1153,6 +1354,33 @@ class WorldManager {
         return (this.gameState.getAllArmies?.() || []).filter(a =>
             a.position.y === row && a.position.x === col
         );
+    }
+
+    /**
+     * Check if a tile is in an enemy's zone of control (adjacent to an enemy).
+     * Returns the threatening enemy or null.
+     */
+    getEnemyZoneOfControl(row, col) {
+        return this.enemies.find(e => {
+            if (e.status !== 'advancing') return false;
+            const dist = Math.abs(e.position.row - row) + Math.abs(e.position.col - col);
+            return dist <= 1;
+        }) || null;
+    }
+
+    /**
+     * Get effective move cost for a tile, including enemy zone of control penalty.
+     * ZoC adds +2 to move cost (slows armies passing near enemies).
+     */
+    getEffectiveMoveCost(row, col) {
+        const hex = this.hexMap[row]?.[col];
+        if (!hex) return 999;
+        const terrainData = window.WORLD_DATA?.terrainTypes?.[hex.terrain] || {};
+        let cost = terrainData.moveCost || 1;
+        if (this.getEnemyZoneOfControl(row, col)) {
+            cost += 2; // ZoC penalty
+        }
+        return cost;
     }
 
     // ===================================================================

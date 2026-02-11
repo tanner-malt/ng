@@ -174,6 +174,16 @@ class MapRenderer {
       el.style.textShadow = '0 1px 2px rgba(255,220,100,0.3)';
       el.innerHTML = '<span style="font-size:1.2em">🏰</span><span style="font-size:0.5em;color:#5a4230;margin-top:1px">Capital</span>';
       el.title = `${coordLabel} — Your Capital City`;
+    } else if (data.city) {
+      // Player-established city — green-gold marker
+      el.style.opacity = '1';
+      el.style.background = colors.bg;
+      el.style.border = '3px solid #2a6a2a';
+      el.style.boxShadow = '0 0 8px rgba(42,106,42,0.4), inset 0 0 6px rgba(100,200,100,0.15)';
+      el.style.color = '#2a1f14';
+      const cityName = data.city.name || 'City';
+      el.innerHTML = `<span style="font-size:1em">🏛️</span><span style="font-size:0.4em;color:#2a6a2a;margin-top:1px">${cityName}</span>`;
+      el.title = `${coordLabel} — ${cityName}`;
     } else {
       // Explored terrain — earthy map colors
       el.style.opacity = data.hasPlayerUnit ? '1' : '0.92';
@@ -237,7 +247,45 @@ class MapRenderer {
         const marker = document.createElement('div');
         marker.className = 'entity army-marker';
         if (a.id === selectedId) marker.classList.add('selected');
-        marker.textContent = '⚔';
+
+        // Traveling armies get movement indicator
+        if (a.status === 'traveling') {
+          marker.classList.add('army-moving');
+          // Direction arrow overlay
+          const plan = a.travelPlan;
+          if (plan && plan.path && plan.index < plan.path.length - 1) {
+            const cur = plan.path[plan.index];
+            const nxt = plan.path[plan.index + 1];
+            const dr = (nxt?.row ?? 0) - (cur?.row ?? 0);
+            const dc = (nxt?.col ?? 0) - (cur?.col ?? 0);
+            let arrow = '→';
+            if (dc === 1 && dr === 0) arrow = '→';
+            else if (dc === -1 && dr === 0) arrow = '←';
+            else if (dr === 1 && dc === 0) arrow = '↓';
+            else if (dr === -1 && dc === 0) arrow = '↑';
+            else if (dc > 0 && dr > 0) arrow = '↘';
+            else if (dc < 0 && dr > 0) arrow = '↙';
+            else if (dc > 0 && dr < 0) arrow = '↗';
+            else if (dc < 0 && dr < 0) arrow = '↖';
+            marker.textContent = arrow;
+
+            // Distance badge — how many steps remain
+            const stepsLeft = plan.path.length - 1 - plan.index;
+            if (stepsLeft > 0) {
+              const badge = document.createElement('span');
+              badge.className = 'travel-badge';
+              badge.textContent = stepsLeft.toString();
+              marker.appendChild(badge);
+            }
+          } else {
+            marker.textContent = '⚔';
+          }
+        } else if (a.status === 'garrisoned') {
+          marker.textContent = '🏰';
+        } else {
+          marker.textContent = '⚔';
+        }
+
         marker.title = `${a.name} (${a.units?.length || 0} units) — ${a.status || 'idle'}`;
         // Make army markers clickable
         marker.style.pointerEvents = 'auto';
@@ -401,6 +449,27 @@ if (typeof document !== 'undefined' && !document.getElementById('map-renderer-st
     .army-marker:hover {
       transform: scale(1.15);
       box-shadow: 0 0 8px rgba(201,168,76,0.6) !important;
+    }
+    .army-marker.army-moving {
+      animation: army-march 1.2s ease-in-out infinite;
+      border-color: #c9a84c !important;
+    }
+    @keyframes army-march {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    .travel-badge {
+      position: absolute;
+      bottom: -5px;
+      right: -5px;
+      font-size: 8px;
+      background: #2a1f14;
+      color: #e8d5b0;
+      border-radius: 50%;
+      padding: 1px 4px;
+      font-weight: bold;
+      border: 1px solid #5a4230;
+      line-height: 1.2;
     }
     .army-marker.selected {
       border-color: #c9a84c !important;
