@@ -99,8 +99,9 @@ class WorldManager {
             }
         }
 
-        // Reveal tiles adjacent to capital (exploration radius 1)
-        this.revealAround(this.capitalRow, this.capitalCol, 1);
+        // Reveal tiles adjacent to capital
+        const radius = window.WORLD_DATA?.mapConfig?.initialExplorationRadius || 1;
+        this.revealAround(this.capitalRow, this.capitalCol, radius);
 
         console.log('[WorldManager] Map generated');
     }
@@ -138,16 +139,13 @@ class WorldManager {
                 if (!this.inBounds(r, c)) continue;
 
                 const hex = this.hexMap[r][c];
-                if (dr === 0 && dc === 0) {
+                if (Math.abs(dr) + Math.abs(dc) <= radius) {
+                    // All tiles within radius become fully explored
                     hex.visibility = 'explored';
-                } else if (Math.abs(dr) + Math.abs(dc) <= radius) {
-                    if (hex.visibility === 'hidden') {
-                        hex.visibility = 'scoutable';
-                    }
                 }
             }
         }
-        // Also mark tiles adjacent to newly-scoutable tiles as scoutable
+        // Mark tiles adjacent to explored tiles as scoutable (fog fringe)
         this.updateScoutableFringe();
     }
 
@@ -1143,15 +1141,32 @@ class WorldManager {
 
     show() {
         this.init();
+        // Trigger world tutorial on first visit
+        if (window.worldTutorial) {
+            window.worldTutorial.checkAndShow();
+        }
     }
 
     refreshUI() {
         if (!this.initialized) return;
 
         // Mark tiles that have player units for rendering
+        // and auto-explore tiles adjacent to player armies
+        const armies = this.gameState.getAllArmies?.() || [];
         for (let r = 0; r < this.mapHeight; r++) {
             for (let c = 0; c < this.mapWidth; c++) {
                 this.hexMap[r][c].hasPlayerUnit = this.getPlayerArmiesAt(r, c).length > 0;
+            }
+        }
+
+        // Explore tiles around each player army position
+        for (const army of armies) {
+            if (army.position) {
+                const ar = army.position.y;
+                const ac = army.position.x;
+                if (this.inBounds(ar, ac)) {
+                    this.exploreTile(ar, ac);
+                }
             }
         }
 

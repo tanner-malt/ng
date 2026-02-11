@@ -34,6 +34,8 @@ const StorageManager = {
         'tutorialComplete',
         'tutorialCompleted', // Alternative key used in some places
         'buildingTutorialState',
+        'worldTutorialState',
+        'worldTutorialComplete',
         
         // UI state
         'gameSettings',
