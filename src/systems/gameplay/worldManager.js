@@ -99,9 +99,11 @@ class WorldManager {
             }
         }
 
-        // Reveal tiles adjacent to capital
-        const radius = window.WORLD_DATA?.mapConfig?.initialExplorationRadius || 1;
-        this.revealAround(this.capitalRow, this.capitalCol, radius);
+        // Reveal tiles adjacent to capital (+ army scout bonus + legacy scout bonus)
+        const baseRadius = window.WORLD_DATA?.mapConfig?.initialExplorationRadius || 1;
+        const scoutBonus = window.gameState?.investments?.armyScouts || 0;
+        const legacyScoutBonus = window.legacySystem?.legacy?.bonuses?.startingScout || 0;
+        this.revealAround(this.capitalRow, this.capitalCol, baseRadius + scoutBonus + legacyScoutBonus);
 
         console.log('[WorldManager] Map generated');
     }
@@ -1241,14 +1243,15 @@ class WorldManager {
      */
     isEnemyVisible(enemy) {
         const armies = this.gameState.getAllArmies?.() || [];
+        const scoutBonus = this.gameState?.investments?.armyScouts || 0;
         // Always visible if on the village tile
         if (enemy.position.row === this.capitalRow && enemy.position.col === this.capitalCol) {
             return true;
         }
-        // Visible if a player army is on the same or adjacent tile
+        // Visible if a player army is within sight range (1 + scout bonus)
         return armies.some(a => {
             const dist = Math.abs(a.position.y - enemy.position.row) + Math.abs(a.position.x - enemy.position.col);
-            return dist <= 1;
+            return dist <= 1 + scoutBonus;
         });
     }
 
@@ -1438,7 +1441,8 @@ class WorldManager {
             }
         }
 
-        // Explore tiles around each player army position (including adjacent)
+        // Explore tiles around each player army position (including adjacent + scout bonus)
+        const armyScoutBonus = window.gameState?.investments?.armyScouts || 0;
         for (const army of armies) {
             if (army.position) {
                 const ar = army.position.y;
@@ -1446,7 +1450,7 @@ class WorldManager {
                 if (this.inBounds(ar, ac)) {
                     // Always reveal around army, even if army tile is already explored
                     this.hexMap[ar][ac].visibility = 'explored';
-                    this.revealAround(ar, ac, 1);
+                    this.revealAround(ar, ac, 1 + armyScoutBonus);
                 }
             }
         }

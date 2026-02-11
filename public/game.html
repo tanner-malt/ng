@@ -995,128 +995,20 @@
             <!-- Royal Investment System -->
             <div class="monarch-section">
                 <h3>💰 Royal Investments</h3>
-                <div class="investment-categories">
-                    <!-- Village Investments -->
-                    <div class="investment-category">
-                        <h4>🏘️ Village Development</h4>
-                        <div class="investment-grid">
-                            <div class="investment-item">
-                                <div class="investment-icon">⚡</div>
-                                <div class="investment-details">
-                                    <h5>Production Boost</h5>
-                                    <p>+10% efficiency to all buildings</p>
-                                    <div class="investment-cost">Cost: 100 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="100"
-                                    data-type="productionBoost">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">🏗️</div>
-                                <div class="investment-details">
-                                    <h5>New Building Types</h5>
-                                    <p>Unlock advanced buildings</p>
-                                    <div class="investment-cost">Cost: 250 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="250" data-type="buildingTypes">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">🤖</div>
-                                <div class="investment-details">
-                                    <h5>Automation Level Up</h5>
-                                    <p>Improve citizen automation</p>
-                                    <div class="investment-cost">Cost: 500 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="500"
-                                    data-type="automationLevel">Invest</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Military Investments -->
-                    <div class="investment-category">
-                        <h4>⚔️ Military Excellence</h4>
-                        <div class="investment-grid">
-                            <div class="investment-item">
-                                <div class="investment-icon">🔍</div>
-                                <div class="investment-details">
-                                    <h5>Army Scouts</h5>
-                                    <p>Improve AI battle decision-making</p>
-                                    <div class="investment-cost">Cost: 200 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="200" data-type="armyScouts">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">⭐</div>
-                                <div class="investment-details">
-                                    <h5>Elite Generals</h5>
-                                    <p>Hire better commanders</p>
-                                    <div class="investment-cost">Cost: 400 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="400" data-type="eliteGenerals">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">🎓</div>
-                                <div class="investment-details">
-                                    <h5>Tactical Academy</h5>
-                                    <p>Commanders learn faster</p>
-                                    <div class="investment-cost">Cost: 800 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="800"
-                                    data-type="tacticalAcademy">Invest</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Legacy Investments -->
-                    <div class="investment-category">
-                        <h4>🏰 Dynasty Legacy</h4>
-                        <div class="investment-grid">
-                            <div class="investment-item">
-                                <div class="investment-icon">🏘️</div>
-                                <div class="investment-details">
-                                    <h5>Parallel Villages</h5>
-                                    <p>Run multiple villages simultaneously</p>
-                                    <div class="investment-cost">Cost: 1000 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="1000"
-                                    data-type="parallelVillages">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">🔄</div>
-                                <div class="investment-details">
-                                    <h5>Prestige Automation</h5>
-                                    <p>Remember placement orders</p>
-                                    <div class="investment-cost">Cost: 2000 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="2000"
-                                    data-type="prestigeAutomation">Invest</button>
-                            </div>
-
-                            <div class="investment-item">
-                                <div class="investment-icon">👑</div>
-                                <div class="investment-details">
-                                    <h5>Dynasty Progression</h5>
-                                    <p>Multi-generational upgrades</p>
-                                    <div class="investment-cost">Cost: 5000 💰</div>
-                                </div>
-                                <button class="investment-btn" data-cost="5000"
-                                    data-type="dynastyProgression">Invest</button>
-                            </div>
-                        </div>
-                    </div>
+                <div id="investment-categories" class="investment-categories">
+                    <!-- Dynamically populated by monarch.js renderInvestments() -->
                 </div>
             </div>
 
-            <!-- Royal Advisors Section -->
+            <!-- Legacy Bonus Spending -->
             <div class="monarch-section">
-                <h3>🎭 Royal Advisors</h3>
-                <div id="advisor-panel" class="advisor-panel">
-                    <!-- Advisor content will be populated by monarch.js -->
+                <h3>🏛️ Legacy Bonuses</h3>
+                <div class="legacy-bonuses-header">
+                    <span id="legacy-points-display" class="legacy-points-badge">0 Legacy Points</span>
+                    <p style="color:#95a5a6;font-size:0.85em;margin:4px 0 0;">Spend legacy points to improve starting conditions for future dynasties</p>
+                </div>
+                <div id="legacy-bonuses-grid" class="legacy-bonuses-grid">
+                    <!-- Dynamically populated by monarch.js renderLegacyBonuses() -->
                 </div>
             </div>
 

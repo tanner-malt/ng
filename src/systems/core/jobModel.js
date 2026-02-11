@@ -302,10 +302,11 @@ class JobRegistry {
         });
     }
 
-    /** Linear slot scaling by building level */
+    /** Linear slot scaling by building level + productionSize investment */
     _computeJobSlots(baseSlots, building) {
         const level = Math.max(1, building?.level || 1);
-        return Math.max(0, Math.floor(baseSlots * level));
+        const prodSizeBonus = window.gameState?.investments?.productionSize || 0;
+        return Math.max(0, Math.floor((baseSlots + prodSizeBonus) * level));
     }
 
     createSlotsForBuilding(building) {
@@ -585,9 +586,8 @@ class JobRegistry {
                 score += crisisBoost;
             }
             else if (job.jobType === 'gatherer') {
-                // Gatherer normally lowest, but in crisis it produces food 1/3 of the time
-                score += 1 + needs.basicUrgency * 2;
-                score += Math.floor(crisisBoost * 0.6);
+                // Gatherer is never auto-assigned — player must assign manually
+                continue;
             }
             else if (job.jobType === 'woodcutter') {
                 score += 5 + needs.woodUrgency * 6;
@@ -917,6 +917,17 @@ class JobRegistry {
                 });
             }
         }
+
+        // Apply Leadership Multiplier from Monarch investment
+        const leadershipMult = window.monarchManager?.getLeadershipProductionMultiplier?.() || 1.0;
+        if (leadershipMult > 1) {
+            for (const key of Object.keys(production)) {
+                if (production[key] > 0) {
+                    production[key] *= leadershipMult;
+                }
+            }
+        }
+
         return production;
     }
 
@@ -956,6 +967,18 @@ class JobRegistry {
             if (!jobAgg[jobType]) jobAgg[jobType] = { workers: 0, resources: {} };
             jobAgg[jobType].workers++;
 
+            // Gatherers: show expected average production (1/3 chance each of food/wood/stone)
+            if (jobType === 'gatherer') {
+                ['food', 'wood', 'stone'].forEach(rt => {
+                    const seasonMult = this._getSeasonalMultiplier(jobType, rt);
+                    const gen = (1 / 3) * workerEff * seasonMult * buildingMult;
+                    production[rt] += gen;
+                    if (gen > 0) workerCounts[rt]++;
+                    jobAgg[jobType].resources[rt] = (jobAgg[jobType].resources[rt] || 0) + gen;
+                });
+                continue;
+            }
+
             const techMult = this._getTechMultiplier(jobType);
             Object.entries(efficiency).forEach(([rt, base]) => {
                 if (!(rt in production)) return;
@@ -987,6 +1010,20 @@ class JobRegistry {
             const pop = this.gameState?.population ?? (this.gameState?.populationManager?.population?.length || 0);
             if (pop > 0) breakdown.food.expense.push({ label: 'Population Upkeep', workers: pop, amount: -pop });
         } catch (_) {}
+
+        // Apply Leadership Multiplier from Monarch investment
+        const leadershipMult = window.monarchManager?.getLeadershipProductionMultiplier?.() || 1.0;
+        if (leadershipMult > 1) {
+            for (const key of Object.keys(production)) {
+                if (production[key] > 0) {
+                    const bonus = production[key] * (leadershipMult - 1);
+                    production[key] *= leadershipMult;
+                    if (breakdown[key]) {
+                        breakdown[key].income.push({ label: `Leadership Bonus (×${leadershipMult.toFixed(2)})`, workers: 0, amount: Number(bonus.toFixed(2)) });
+                    }
+                }
+            }
+        }
 
         return { production, sources, workerCounts, breakdown };
     }

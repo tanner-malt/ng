@@ -29,7 +29,7 @@ Jobs are defined in **four parallel places** that must stay in sync:
 1. **`src/config/jobData.js`** (`JOB_DATA`) — canonical definition: `name`, `icon`, `description`, `buildingType` (key into `BUILDING_DATA`, or `null` for global jobs like builder/gatherer), `production` (resource→amount/worker/day), `consumption`, optional `seasonalModifiers`, `requiredSkill`, `skillGained`, `bonuses`.
 2. **`src/config/buildingData.js`** — the host building's `production.jobs` object: `{ jobKey: slotCount }`.
 3. **`src/config/gameData.js`** — mirror the same slots in `GameData.buildingProduction[buildingKey].jobs` (this is what `JobManager` actually reads at runtime).
-4. **`src/systems/management/jobManager.js`** — add a `this.jobEfficiency.set('jobKey', { ... })` line in `initializeJobEfficiency()` matching the production/consumption rates.
+4. **`src/systems/core/jobModel.js`** — the `_jobEfficiency` object in the `JobRegistry` constructor must include a matching entry with production/consumption rates.
 
 If the job produces/consumes a new resource, also define it in `src/config/resourceData.js`.
 
@@ -53,13 +53,58 @@ To test, open `public/game.html` directly in a browser or use the VS Code Live S
 # npm run build:wiki    — Compile docs/wiki/ → src/config/wikiData.js
 ```
 
-## Version Counter
+## Version Scheme
+
+Format: **MAJOR.MINOR.PATCH.BUILD** — currently `0.0.3.x`.
 
 The game version lives in **two files that must stay in sync**:
 - `package.json` → `"version": "X.X.X.X"`
 - `public/version.json` → `{ "version": "X.X.X.X" }`
 
-**Increment the patch digit in both files at the end of every task/feature.** The current format is `0.0.MAJOR.MINOR` (e.g. `0.0.2.1` → `0.0.2.2`). Bump the last digit for small changes; bump the third digit for significant features.
+**Increment rules:**
+- **BUILD** (4th digit): Every task, fix, or feature commit.
+- **PATCH** (3rd digit): Meaningful feature milestone (e.g. battle content ships).
+- **MINOR** (2nd digit): Phase completion (all MVP systems functional → 0.1, content complete → 0.2).
+- **MAJOR** (1st digit): Public release = 1.0.
+
+### Version Roadmap
+
+| Version | Focus | Key Items |
+|---------|-------|-----------|
+| **0.0.3.x** | Bug fixes & balance | Duplicate achievements, crisis mode tuning, test fixes |
+| **0.0.4.x** | Battle content | Unit types (archer, cavalry, siege), formations, morale |
+| **0.0.5.x** | Throne completion | Equipment system (currently stubbed), Court tab |
+| **0.0.6.x** | Legacy bonus UI | Spending interface for legacy points → permanent upgrades |
+| **0.0.7.x** | Data migration | Kill `GameData.building*` tables, route all reads through `BuildingRegistry` |
+| **0.0.8.x** | Save system cleanup | Integrate tech tree into main save schema, migration v1→v2 |
+| **0.0.9.x** | Playtest & polish | Full loop testing, tutorial improvements, QoL |
+| **0.1.0.x** | Trade & diplomacy | Trade routes between cities, diplomacy system |
+| **0.1.1.x** | Multi-city management | Governor delegation, city production |
+| **0.1.2.x** | Content expansion | More achievements, random events, endgame |
+| **0.2.0.x** | Difficulty & UX | Difficulty modes, UI/UX overhaul, accessibility |
+| **1.0.0.0** | Public release | Feature-complete, balanced, polished |
+
+### System Maturity (as of 0.0.3.0)
+
+| System | Status | Notes |
+|--------|--------|-------|
+| Village/Building | **Functional** | Core loop complete, dual-data migration ~60% |
+| Economy/Resources | **Functional** | 8 seasons, job-driven production |
+| Population | **Functional** | Full lifecycle, demographics, skills |
+| Job System | **Functional** | Resource-aware auto-assign, crisis mode |
+| Construction | **Functional** | Work-points, haste runes, build queue |
+| Unlock System | **Functional** | 21+ building unlocks, 3 view unlocks |
+| Tech Tree | **Functional** | 4 tiers, 19 techs (save isolation — uses own localStorage key) |
+| Battle | **Partial** | Infrastructure solid, content thin (1 unit type, 1 formation) |
+| Village Defense | **Functional** | Complete defense loop |
+| World Map | **Functional** | 9×9 hex map, armies, cities, fog of war |
+| Expeditions | **Functional** | Oregon Trail style, 1.9k lines |
+| Throne/Merge | **Partial** | Merge works; equipment/court stubbed |
+| Monarch | **Functional** | Investments, advisors, governor/general roles |
+| Legacy/Prestige | **Functional** | Full prestige loop (bonus spending UI missing) |
+| Achievements | **Functional** | 42 defined |
+| Tutorial | **Functional** | 3 modules (village, building, world) |
+| Save System | **Functional** | Versioned schema, migration-tested |
 
 ## Script Load Order (game.html)
 
@@ -69,7 +114,7 @@ Order matters — each phase depends on the scripts above it.
 |-------|---------|---------|
 | **Config** | `gameData.js` → `buildingData.js` → `resourceData.js` → `jobData.js` + dynamic `wikiData.js` | Pure data, no dependencies |
 | **Core/Model** | `eventBus.js` → `dataModel.js` → `buildingModel.js` → `resourceModel.js` → `jobModel.js` → `modelInit.js` → `modelBridge.js` | EventBus first, then reactive models, then bridge |
-| **World data** | `worldData.js` | World config (5×5 map, terrain types, enemy spawn config) |
+| **World data** | `worldData.js` | World config (9×9 map, terrain types, enemy spawn config) |
 | **State** | `skillSystem.js` → `populationManager.js` → `gameState.js` → `effectsManager.js` → `errorRecovery.js` → `storageManager.js` | Core state and management |
 | **UI** | `modalSystem.js` → `messageHistory.js` | Modal and notification infrastructure |
 | **Features** | `achievements.js` → `unlockSystem.js` → `techTree.js` → `tutorial.js` | Achievement/unlock/tutorial systems |
@@ -93,10 +138,12 @@ Two patterns:
 
 ## Key Patterns
 
-- **EventBus events:** `dayEnded`, `building_placed`, `building:completed`, `achievement:earned`, `resources-updated`, `population-changed`, `game-initialized`, `stateRestored`. Systems subscribe in their constructors or in `eventBusIntegrations.js`.
+- **EventBus events:** `dayEnded`, `building_placed`, `building:completed`, `achievement:earned`, `resources-updated`, `population-changed`, `game-initialized`, `stateRestored`, `food_crisis`, `dynasty_reset_initiated`. Systems subscribe in their constructors or in `eventBusIntegrations.js`.
 - **Save system:** Versioned via `SAVE_SCHEMA_VERSION` in `gameState.js`. Migrations in `SAVE_MIGRATIONS` are forward-only (version N → N+1). Future-version saves load read-only. Always preserve unknown fields.
 - **StorageManager guards:** `StorageManager.isHardResetInProgress()` blocks all reads/writes during reset. Check this flag before saving.
 - **Defensive initialization:** Always guard with `if (window.systemName)` before using another system — load order isn't guaranteed for all combinations.
+- **Food crisis system:** `JobRegistry._detectFoodCrisis()` returns levels 0–3. At level 2+ all non-food workers are released. Emits `food_crisis` event.
+- **Royal roles:** Family members can be assigned as `general` (army combat bonus) or `governor` (production bonus). Managed via `RoyalFamilyManager.assignGeneral/assignGovernor/unassignRole`.
 
 ## Directory Structure
 
@@ -105,7 +152,7 @@ Two patterns:
 | `src/systems/core/` | EventBus, GameState, reactive models (DataModel, BuildingModel), ModelBridge |
 | `src/systems/gameplay/` | Village, battle, throne, monarch, world — view-specific game logic |
 | `src/systems/management/` | Population, jobs, construction, economy, effects, tiles |
-| `src/systems/features/` | Tutorial, achievements, unlock system |
+| `src/systems/features/` | Tutorial, achievements, unlock system, legacy/prestige |
 | `src/systems/ui/` | Modal system, toast/popup notifications, UI bindings |
 | `src/config/` | GameData constants, BuildingData definitions, JobData, ResourceData |
 | `src/world/` | Map rendering, pathfinding, terrain, units |

@@ -70,7 +70,7 @@ const GameData = {
             // Tax collection is handled by economySystem based on population
         },
         house: {
-            populationCapacity: 9,
+            populationCapacity: 8,
             jobs: { gatherer: 1 }
         },
         farm: {
@@ -421,9 +421,9 @@ const GameData = {
     // Starting resources for new games - minimal start
     // Note: Starting population is handled by PopulationManager (1 royal + 4 villagers = 5)
     startingResources: {
-        food: 10, // Small food supply to survive first few days
-        wood: 50, // Enough wood for early construction
-        stone: 5, // Minimal stone for basic needs
+        food: 20, // Food supply to survive first season
+        wood: 100, // Enough wood for early construction
+        stone: 10, // Stone for basic needs
         metal: 0,  // Metal will be given through tutorial achievement
         planks: 0, // Planks produced by lumber mill from wood
         production: 0,
@@ -542,8 +542,10 @@ const GameData = {
             // Check if building provides population capacity
             const buildingData = this.buildingProduction[building.type];
             if (buildingData && buildingData.populationCapacity) {
+                const moPeopleBonus = window.gameState?.investments?.moPeople || 0;
+                const baseCap = buildingData.populationCapacity + moPeopleBonus;
                 const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
-                totalCap += Math.floor(buildingData.populationCapacity * levelMult);
+                totalCap += Math.floor(baseCap * levelMult);
             }
             // Legacy support for specific building types
             else if (building.type === 'house') {

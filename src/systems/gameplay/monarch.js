@@ -2,112 +2,72 @@
 class MonarchManager {
     constructor(gameState) {
         this.gameState = gameState;
-        this.investmentCategories = {
-            village: [
-                {
-                    name: 'Production Boost',
-                    description: '+10% efficiency to all buildings',
-                    cost: 100,
-                    maxLevel: 10,
-                    effect: 'productionBoost',
-                    icon: '⚡'
-                },
-                {
-                    name: 'New Building Types',
-                    description: 'Unlock advanced buildings',
-                    cost: 250,
-                    maxLevel: 3,
-                    effect: 'buildingTypes',
-                    icon: '🏗️'
-                },
-                {
-                    name: 'Automation Level Up',
-                    description: 'Improve citizen automation',
-                    cost: 500,
-                    maxLevel: 3,
-                    effect: 'automationLevel',
-                    icon: '🤖'
-                }
-            ],
-            military: [
-                {
-                    name: 'Army Scouts',
-                    description: 'Improve AI battle decision-making',
-                    cost: 200,
-                    maxLevel: 5,
-                    effect: 'armyScouts',
-                    icon: '🔍'
-                },
-                {
-                    name: 'Elite Generals',
-                    description: 'Hire better commanders',
-                    cost: 400,
-                    maxLevel: 3,
-                    effect: 'eliteGenerals',
-                    icon: '⭐'
-                },
-                {
-                    name: 'Tactical Academy',
-                    description: 'Commanders learn faster',
-                    cost: 800,
-                    maxLevel: 2,
-                    effect: 'tacticalAcademy',
-                    icon: '🎓'
-                }
-            ],
-            legacy: [
-                {
-                    name: 'Parallel Villages',
-                    description: 'Run multiple villages simultaneously',
-                    cost: 1000,
-                    maxLevel: 1,
-                    effect: 'parallelVillages',
-                    icon: '🏘️'
-                },
-                {
-                    name: 'Prestige Automation',
-                    description: 'Remember placement orders',
-                    cost: 2000,
-                    maxLevel: 1,
-                    effect: 'prestigeAutomation',
-                    icon: '🔄'
-                },
-                {
-                    name: 'Dynasty Progression',
-                    description: 'Multi-generational upgrades',
-                    cost: 5000,
-                    maxLevel: 1,
-                    effect: 'dynastyProgression',
-                    icon: '👑'
-                }
-            ]
-        };
-        
-        this.advisors = [
+
+        // ── Investment Definitions ──
+        // Cost formula: baseCost * (costMult ^ currentLevel)
+        // All reset every run (stored in gameState.investments)
+        this.investmentDefs = [
             {
-                name: 'Royal Advisor Magistrate',
-                specialty: 'economy',
-                personality: 'cautious',
-                icon: '📜',
-                advice: []
-            },
-            {
-                name: 'War Council General',
-                specialty: 'military',
-                personality: 'aggressive',
+                id: 'hireGeneral',
+                name: 'Hire General',
                 icon: '⚔️',
-                advice: []
+                category: 'kingdom',
+                description: 'Unlocks a general slot for your armies',
+                baseCost: 1000,
+                costMult: 10,
+                maxLevel: Infinity
             },
             {
-                name: 'Court Wizard',
-                specialty: 'technology',
-                personality: 'innovative',
-                icon: '🔮',
-                advice: []
+                id: 'hireGovernor',
+                name: 'Hire Governor',
+                icon: '🏛️',
+                category: 'kingdom',
+                description: 'Unlocks a governor slot for your cities',
+                baseCost: 1000,
+                costMult: 10,
+                maxLevel: Infinity
+            },
+            {
+                id: 'leadershipMultiplier',
+                name: 'Leadership Multiplier',
+                icon: '👑',
+                category: 'kingdom',
+                description: 'Monarch leadership skill boosts all production',
+                baseCost: 500,
+                costMult: 2,
+                maxLevel: 10
+            },
+            {
+                id: 'armyScouts',
+                name: 'Army Scouts',
+                icon: '🔍',
+                category: 'kingdom',
+                description: '+1 sight range on the world map',
+                baseCost: 1000,
+                costMult: 20,
+                maxLevel: Infinity
+            },
+            {
+                id: 'productionSize',
+                name: 'Increase Production Size',
+                icon: '🔨',
+                category: 'infrastructure',
+                description: '+1 job slot in ALL buildings',
+                baseCost: 100,
+                costMult: 100,
+                maxLevel: Infinity
+            },
+            {
+                id: 'moPeople',
+                name: 'Mo People',
+                icon: '🏠',
+                category: 'infrastructure',
+                description: '+1 housing capacity per house',
+                baseCost: 100,
+                costMult: 10,
+                maxLevel: Infinity
             }
         ];
-        
-        this.currentAdvisor = this.advisors[0];
     }
     
     init() {
@@ -125,9 +85,9 @@ class MonarchManager {
             if (monarchContent) monarchContent.style.display = 'none';
         }
 
-        this.setupInvestmentButtons();
         this.setupDynastyButtons();
-        this.generateAdvisorAdvice();
+        this.renderInvestments();
+        this.renderLegacyBonuses();
         this.updateInvestmentDisplay();
         this.updateDynastyStats();
         this.updateMonarchCard();
@@ -145,46 +105,266 @@ class MonarchManager {
     }
 
     /* =============================
-     *  Investment level helpers
+     *  Investment helpers
      * ============================= */
-    getInvestmentLevel(effect) {
-        const val = this.gameState.investments[effect];
-        if (typeof val === 'boolean') return val ? 1 : 0;
-        if (typeof val === 'number') return val;
-        return 0;
+    getInvestmentLevel(id) {
+        const val = this.gameState.investments[id];
+        return typeof val === 'number' ? val : 0;
     }
 
-    isMaxed(effect) {
-        const def = this.findInvestmentDef(effect);
-        if (!def) return false;
-        return this.getInvestmentLevel(effect) >= def.maxLevel;
+    getInvestmentCost(def) {
+        const level = this.getInvestmentLevel(def.id);
+        return Math.floor(def.baseCost * Math.pow(def.costMult, level));
     }
 
-    findInvestmentDef(effect) {
-        for (const cat of Object.values(this.investmentCategories)) {
-            const found = cat.find(i => i.effect === effect);
-            if (found) return found;
-        }
-        return null;
+    isMaxed(def) {
+        return this.getInvestmentLevel(def.id) >= def.maxLevel;
+    }
+
+    getDef(id) {
+        return this.investmentDefs.find(d => d.id === id);
     }
 
     /* =============================
-     *  Setup
+     *  Render investments into DOM
      * ============================= */
-    setupInvestmentButtons() {
-        document.querySelectorAll('.investment-btn').forEach(btn => {
+    renderInvestments() {
+        const container = document.getElementById('investment-categories');
+        if (!container) return;
+
+        const categories = {
+            kingdom: { title: '👑 Kingdom Development', defs: [] },
+            infrastructure: { title: '🏗️ Infrastructure', defs: [] }
+        };
+
+        this.investmentDefs.forEach(d => {
+            if (categories[d.category]) categories[d.category].defs.push(d);
+        });
+
+        let html = '';
+        Object.values(categories).forEach(cat => {
+            html += `<div class="investment-category"><h4>${cat.title}</h4><div class="investment-grid">`;
+            cat.defs.forEach(def => {
+                const level = this.getInvestmentLevel(def.id);
+                const cost = this.getInvestmentCost(def);
+                const maxed = this.isMaxed(def);
+                html += `
+                    <div class="investment-item" data-investment="${def.id}">
+                        <div class="investment-icon">${def.icon}</div>
+                        <div class="investment-details">
+                            <h5>${def.name}</h5>
+                            <p>${def.description}</p>
+                            <div class="investment-level">Level ${level}${def.maxLevel < Infinity ? '/' + def.maxLevel : ''}</div>
+                            <div class="investment-cost">${maxed ? 'MAX' : 'Cost: ' + this.formatGold(cost) + ' 💰'}</div>
+                            ${def.id === 'leadershipMultiplier' ? `<div class="investment-effect">${this.getLeadershipEffectText()}</div>` : ''}
+                        </div>
+                        <button class="investment-btn" data-id="${def.id}" ${maxed ? 'disabled' : ''}>
+                            ${maxed ? 'MAX' : 'Invest (' + this.formatGold(cost) + ' 💰)'}
+                        </button>
+                    </div>`;
+            });
+            html += `</div></div>`;
+        });
+
+        container.innerHTML = html;
+
+        // Wire up buttons
+        container.querySelectorAll('.investment-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const cost = parseInt(btn.dataset.cost);
-                const investmentType = btn.dataset.type;
-                
-                if (this.isMaxed(investmentType)) return;
-                if (this.gameState.canAffordGold(cost)) {
-                    this.makeInvestment(investmentType, cost);
-                }
+                const id = btn.dataset.id;
+                this.makeInvestment(id);
             });
         });
     }
-    
+
+    /* =============================
+     *  Investment purchase logic
+     * ============================= */
+    makeInvestment(id) {
+        const def = this.getDef(id);
+        if (!def || this.isMaxed(def)) return;
+
+        const cost = this.getInvestmentCost(def);
+        if (!this.gameState.canAffordGold(cost)) return;
+        if (!this.gameState.spendGold(cost)) return;
+
+        // Trigger first investment achievement (only once)
+        if (window.achievementSystem && !window.achievementSystem.isUnlocked('royal_investor')) {
+            window.achievementSystem.triggerFirstInvestment();
+        }
+
+        // Increment level
+        const inv = this.gameState.investments;
+        inv[id] = (inv[id] || 0) + 1;
+
+        // Log
+        const level = inv[id];
+        this.gameState.logBattleEvent?.(`${def.icon} ${def.name} upgraded to level ${level}`);
+
+        // Apply immediate effects
+        this.applyInvestmentEffect(id, level);
+
+        // Refresh UI
+        this.renderInvestments();
+        this.updateInvestmentDisplay();
+        this.updateFamilyTree(); // general/governor slots may have changed
+        this.gameState.save();
+    }
+
+    applyInvestmentEffect(id, level) {
+        switch (id) {
+            case 'productionSize':
+                // Job slots are computed dynamically in _computeJobSlots
+                // Force job system to refresh slot counts
+                if (this.gameState.jobManager) {
+                    this.gameState.jobManager.updateAvailableSlots?.();
+                    this.gameState.jobManager.updateAvailableJobs?.();
+                }
+                break;
+            case 'moPeople':
+                // Housing cap is computed dynamically in calculatePopulationCap
+                this.gameState.updatePopulationCap?.();
+                this.gameState.updateUI?.();
+                break;
+            case 'armyScouts':
+                // Expand sight immediately if world map is active
+                if (window.worldManager?.initialized) {
+                    const armies = this.gameState.getAllArmies?.() || [];
+                    for (const army of armies) {
+                        if (army.position) {
+                            const scoutBonus = this.gameState.investments.armyScouts || 0;
+                            window.worldManager.revealAround(army.position.y, army.position.x, 1 + scoutBonus);
+                        }
+                    }
+                    window.worldManager.refreshUI?.();
+                }
+                break;
+        }
+    }
+
+    /* =============================
+     *  Leadership multiplier text
+     * ============================= */
+    getLeadershipEffectText() {
+        const level = this.getInvestmentLevel('leadershipMultiplier');
+        const leadership = this.gameState.royalFamily?.currentMonarch?.skills?.leadership || 0;
+        if (level === 0) return 'Current: 1.00x production';
+        const mult = 1 + (leadership / 100) * level;
+        return `Current: ${mult.toFixed(2)}x production (${leadership} leadership)`;
+    }
+
+    /**
+     * Get the leadership production multiplier for use by other systems.
+     * Formula: 1 + (monarchLeadership / 100) * investmentLevel
+     */
+    getLeadershipProductionMultiplier() {
+        const level = this.getInvestmentLevel('leadershipMultiplier');
+        if (level === 0) return 1.0;
+        const leadership = this.gameState.royalFamily?.currentMonarch?.skills?.leadership || 0;
+        return 1 + (leadership / 100) * level;
+    }
+
+    /* =============================
+     *  Legacy Bonus Spending UI
+     * ============================= */
+    renderLegacyBonuses() {
+        const container = document.getElementById('legacy-bonuses-grid');
+        if (!container) return;
+
+        const legacy = window.legacySystem?.legacy;
+        if (!legacy) {
+            container.innerHTML = '<p style="color:#95a5a6;">Legacy system not available.</p>';
+            return;
+        }
+
+        // Update points display
+        const pointsEl = document.getElementById('legacy-points-display');
+        if (pointsEl) pointsEl.textContent = `${legacy.totalPoints} Legacy Points`;
+
+        const bonusDefs = [
+            { type: 'startingGold',       name: 'Starting Gold',       icon: '💰', perLevel: '+50 gold',         cost: 10 },
+            { type: 'startingFood',       name: 'Starting Food',       icon: '🍖', perLevel: '+25 food',         cost: 10 },
+            { type: 'startingPopulation', name: 'Starting Population', icon: '👤', perLevel: '+1 villager',      cost: 25 },
+            { type: 'productionBonus',    name: 'Production Bonus',    icon: '⚡', perLevel: '+5% production',   cost: 20 },
+            { type: 'buildSpeedBonus',    name: 'Build Speed',         icon: '🔨', perLevel: '+5% build speed',  cost: 20 },
+            { type: 'combatBonus',        name: 'Combat Bonus',        icon: '⚔️', perLevel: '+5% combat',       cost: 20 },
+            { type: 'explorationBonus',   name: 'Exploration Bonus',   icon: '🗺️', perLevel: '+10% map reveal',  cost: 15 },
+            { type: 'startingScout',      name: 'Scouting Intel',      icon: '🔍', perLevel: '+1 reveal radius', cost: 30 }
+        ];
+
+        let html = '';
+        bonusDefs.forEach(bd => {
+            const current = legacy.bonuses[bd.type] || 0;
+            const canAfford = legacy.totalPoints >= bd.cost;
+            html += `
+                <div class="legacy-bonus-item">
+                    <div class="legacy-bonus-icon">${bd.icon}</div>
+                    <div class="legacy-bonus-details">
+                        <h5>${bd.name}</h5>
+                        <p>${bd.perLevel} per purchase</p>
+                        <div class="legacy-bonus-level">Current: ${this.formatLegacyBonusValue(bd, current)}</div>
+                    </div>
+                    <button class="legacy-buy-btn" data-type="${bd.type}" data-cost="${bd.cost}" ${canAfford ? '' : 'disabled'}>
+                        ${bd.cost} pts
+                    </button>
+                </div>`;
+        });
+        container.innerHTML = html;
+
+        // Wire up buttons
+        container.querySelectorAll('.legacy-buy-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                const cost = parseInt(btn.dataset.cost);
+                this.purchaseLegacyBonus(type, cost);
+            });
+        });
+    }
+
+    formatLegacyBonusValue(def, value) {
+        if (def.type === 'startingGold') return `+${value} gold`;
+        if (def.type === 'startingFood') return `+${value} food`;
+        if (def.type === 'startingPopulation') return `+${value} villagers`;
+        if (def.type === 'productionBonus') return `+${value}%`;
+        if (def.type === 'buildSpeedBonus') return `+${value}%`;
+        if (def.type === 'combatBonus') return `+${value}%`;
+        if (def.type === 'explorationBonus') return `+${value}%`;
+        if (def.type === 'startingScout') return `+${value} radius`;
+        return `${value}`;
+    }
+
+    purchaseLegacyBonus(type, cost) {
+        if (!window.legacySystem) return;
+
+        // Handle startingScout specially since it's new
+        if (type === 'startingScout') {
+            const legacy = window.legacySystem.legacy;
+            if (legacy.totalPoints < cost) {
+                window.showToast?.('Not enough legacy points!', { type: 'warning' });
+                return;
+            }
+            legacy.totalPoints -= cost;
+            legacy.bonuses.startingScout = (legacy.bonuses.startingScout || 0) + 1;
+            window.legacySystem.saveLegacy();
+            window.showToast?.(`Scouting Intel upgraded! +1 reveal radius at start`, { type: 'success' });
+            this.renderLegacyBonuses();
+            this.updateDynastyStats();
+            return;
+        }
+
+        const result = window.legacySystem.purchaseBonus(type, cost);
+        if (result.success) {
+            window.showToast?.(result.message, { type: 'success' });
+        } else {
+            window.showToast?.(result.message, { type: 'warning' });
+        }
+        this.renderLegacyBonuses();
+        this.updateDynastyStats();
+    }
+
+    /* =============================
+     *  Setup dynasty buttons
+     * ============================= */
     setupDynastyButtons() {
         const calculateBtn = document.getElementById('calculate-inheritance-btn');
         const prestigeBtn = document.getElementById('prestige-reset-btn');
@@ -235,171 +415,94 @@ class MonarchManager {
     }
 
     /* =============================
-     *  Investment logic
-     * ============================= */
-    makeInvestment(investmentType, cost) {
-        if (this.isMaxed(investmentType)) return;
-        if (!this.gameState.spendGold(cost)) return;
-        
-        // Trigger first investment achievement (only once)
-        if (window.achievementSystem && !window.achievementSystem.isUnlocked('royal_investor')) {
-            window.achievementSystem.triggerFirstInvestment();
-            console.log('[Monarch] First investment achievement triggered');
-        }
-        
-        // Apply investment effects based on type
-        const inv = this.gameState.investments;
-        switch (investmentType) {
-            case 'productionBoost':
-                inv.productionBoost = (inv.productionBoost || 0) + 1;
-                this.gameState.logBattleEvent(`💰 Invested in production boost (Level ${inv.productionBoost})`);
-                break;
-            case 'buildingTypes':
-                inv.buildingTypes = (inv.buildingTypes || 0) + 1;
-                this.gameState.logBattleEvent('🏗️ Unlocked new building types');
-                break;
-            case 'automationLevel':
-                inv.automationLevel = (inv.automationLevel || 0) + 1;
-                this.updateAutomationLevel();
-                break;
-            case 'armyScouts':
-                inv.armyScouts = true;
-                this.gameState.logBattleEvent('🔍 Army scouts improve battle intelligence');
-                break;
-            case 'eliteGenerals':
-                inv.eliteGenerals = true;
-                this.gameState.logBattleEvent('⭐ Elite generals joined your forces');
-                break;
-            case 'tacticalAcademy':
-                inv.tacticalAcademy = true;
-                this.gameState.logBattleEvent('🎓 Tactical academy built - commanders learn faster');
-                break;
-            case 'parallelVillages':
-                inv.parallelVillages = true;
-                this.gameState.logBattleEvent('🏘️ Parallel village system activated');
-                break;
-            case 'prestigeAutomation':
-                inv.prestigeAutomation = true;
-                this.gameState.logBattleEvent('🤖 Prestige automation system online');
-                break;
-            case 'dynastyProgression':
-                inv.dynastyProgression = true;
-                this.gameState.logBattleEvent('👑 Dynasty progression unlocked');
-                break;
-        }
-        
-        this.updateInvestmentDisplay();
-        this.updateGoldDisplay();
-        this.generateAdvisorAdvice();
-        
-        // Save progress
-        this.gameState.save();
-    }
-    
-    updateAutomationLevel() {
-        const levels = ['manual', 'semi-auto', 'full-auto'];
-        const currentIndex = levels.indexOf(this.gameState.automationLevel || 'manual');
-        
-        if (currentIndex < levels.length - 1) {
-            this.gameState.automationLevel = levels[currentIndex + 1];
-            this.gameState.logBattleEvent(`🔧 Automation upgraded to ${this.gameState.automationLevel}`);
-        }
-    }
-
-    /* =============================
      *  Gold header display
      * ============================= */
     updateGoldDisplay() {
         const el = document.getElementById('monarch-gold-display');
         if (el) {
-            el.textContent = `💰 ${Math.floor(this.gameState.gold)} Gold`;
+            el.textContent = `💰 ${this.formatGold(Math.floor(this.gameState.gold))} Gold`;
         }
     }
 
+    formatGold(n) {
+        if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+        if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+        if (n >= 1e4) return (n / 1e3).toFixed(1) + 'K';
+        return n.toLocaleString();
+    }
+
     /* =============================
-     *  Investment display
+     *  Investment display update
      * ============================= */
     updateInvestmentDisplay() {
-        // Update investment button states
-        document.querySelectorAll('.investment-btn').forEach(btn => {
-            const cost = parseInt(btn.dataset.cost);
-            const type = btn.dataset.type;
-            const level = this.getInvestmentLevel(type);
-            const def = this.findInvestmentDef(type);
-            const maxLevel = def ? def.maxLevel : 1;
-            const maxed = level >= maxLevel;
+        this.investmentDefs.forEach(def => {
+            const item = document.querySelector(`.investment-item[data-investment="${def.id}"]`);
+            if (!item) return;
 
-            btn.disabled = maxed || !this.gameState.canAffordGold(cost);
-            
-            if (maxed) {
-                btn.textContent = 'MAX';
-                btn.style.opacity = '0.5';
-            } else {
-                btn.textContent = `Invest (${cost} 💰)`;
-                btn.style.opacity = this.gameState.canAffordGold(cost) ? '1' : '0.6';
+            const level = this.getInvestmentLevel(def.id);
+            const cost = this.getInvestmentCost(def);
+            const maxed = this.isMaxed(def);
+            const canAfford = this.gameState.canAffordGold(cost);
+
+            // Update level text
+            const levelEl = item.querySelector('.investment-level');
+            if (levelEl) levelEl.textContent = `Level ${level}${def.maxLevel < Infinity ? '/' + def.maxLevel : ''}`;
+
+            // Update cost text
+            const costEl = item.querySelector('.investment-cost');
+            if (costEl) costEl.textContent = maxed ? 'MAX' : `Cost: ${this.formatGold(cost)} 💰`;
+
+            // Update effect text for leadership
+            if (def.id === 'leadershipMultiplier') {
+                const effectEl = item.querySelector('.investment-effect');
+                if (effectEl) effectEl.textContent = this.getLeadershipEffectText();
             }
 
-            // Update the level indicator on the parent item
-            const item = btn.closest('.investment-item');
-            if (item) {
-                let levelEl = item.querySelector('.investment-level');
-                if (!levelEl) {
-                    levelEl = document.createElement('div');
-                    levelEl.className = 'investment-level';
-                    const details = item.querySelector('.investment-details');
-                    if (details) details.appendChild(levelEl);
-                }
-                if (maxLevel > 1) {
-                    levelEl.textContent = `Level ${level}/${maxLevel}`;
-                } else {
-                    levelEl.textContent = level >= 1 ? '✅ Unlocked' : '🔒 Locked';
-                }
+            // Update button
+            const btn = item.querySelector('.investment-btn');
+            if (btn) {
+                btn.disabled = maxed || !canAfford;
+                btn.textContent = maxed ? 'MAX' : `Invest (${this.formatGold(cost)} 💰)`;
+                btn.style.opacity = maxed ? '0.5' : canAfford ? '1' : '0.6';
             }
         });
-        
-        // Show current investment status summary
+
         this.displayInvestmentStatus();
         this.updateGoldDisplay();
     }
-    
+
     displayInvestmentStatus() {
         const statusDiv = document.getElementById('investment-status');
         if (!statusDiv) return;
         
         const inv = this.gameState.investments;
+        const leaderMult = this.getLeadershipProductionMultiplier();
+
         statusDiv.innerHTML = `
             <div class="dynasty-stats">
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.productionBoost || 0}</div>
-                    <div class="dynasty-stat-label">Production Boost</div>
+                    <div class="dynasty-stat-value">${inv.hireGeneral || 0}</div>
+                    <div class="dynasty-stat-label">General Slots</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${this.gameState.automationLevel || 'manual'}</div>
-                    <div class="dynasty-stat-label">Automation</div>
+                    <div class="dynasty-stat-value">${inv.hireGovernor || 0}</div>
+                    <div class="dynasty-stat-label">Governor Slots</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.armyScouts ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Army Scouts</div>
+                    <div class="dynasty-stat-value">${leaderMult.toFixed(2)}x</div>
+                    <div class="dynasty-stat-label">Leadership Mult</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.eliteGenerals ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Elite Generals</div>
+                    <div class="dynasty-stat-value">+${inv.armyScouts || 0}</div>
+                    <div class="dynasty-stat-label">Scout Range</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.tacticalAcademy ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Tactical Academy</div>
+                    <div class="dynasty-stat-value">+${inv.productionSize || 0}</div>
+                    <div class="dynasty-stat-label">Job Slots</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.parallelVillages ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Parallel Villages</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.prestigeAutomation ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Prestige Auto</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.dynastyProgression ? '✅' : '❌'}</div>
-                    <div class="dynasty-stat-label">Dynasty Prog.</div>
+                    <div class="dynasty-stat-value">+${inv.moPeople || 0}</div>
+                    <div class="dynasty-stat-label">Housing Cap</div>
                 </div>
             </div>
         `;
@@ -515,10 +618,23 @@ class MonarchManager {
             return;
         }
 
+        const inv = this.gameState.investments;
+        const maxGenerals = inv.hireGeneral || 0;
+        const maxGovernors = inv.hireGovernor || 0;
+        const currentGenerals = rf.royalFamily.filter(r => r.role === 'general').length;
+        const currentGovernors = rf.royalFamily.filter(r => r.role === 'governor').length;
+
         // Gather available armies for general assignment
         const armies = this.gameState.getAllArmies?.() || [];
 
         let html = '<div class="family-tree">';
+
+        // Slot summary
+        html += `<div class="role-slot-summary" style="display:flex;gap:12px;margin-bottom:10px;font-size:0.85em;color:#95a5a6;">
+            <span>⚔️ Generals: ${currentGenerals}/${maxGenerals}</span>
+            <span>🏛️ Governors: ${currentGovernors}/${maxGovernors}</span>
+        </div>`;
+
         rf.royalFamily.forEach(member => {
             const isMonarch = member.id === rf.currentMonarch?.id;
             const isHeir = member.status === 'heir';
@@ -559,19 +675,25 @@ class MonarchManager {
                 if (member.role) {
                     html += `<button class="role-btn role-unassign" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#5a2020;color:#e8d5b0;border:1px solid #8b3030;border-radius:3px;cursor:pointer;">✖ Unassign</button>`;
                 } else {
-                    // Governor option (capital)
-                    const currentGov = rf.getGovernor?.('capital');
-                    if (!currentGov) {
-                        html += `<button class="role-btn role-governor" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;">🏛️ Governor</button>`;
+                    // Governor option (if slots available)
+                    if (currentGovernors < maxGovernors) {
+                        const currentGov = rf.getGovernor?.('capital');
+                        if (!currentGov) {
+                            html += `<button class="role-btn role-governor" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;">🏛️ Governor</button>`;
+                        }
                     }
-                    // General option (show dropdown if armies exist)
-                    if (armies.length > 0) {
+                    // General option (if slots available and armies exist)
+                    if (currentGenerals < maxGenerals && armies.length > 0) {
                         armies.forEach(a => {
                             const existingGen = rf.getGeneralForArmy?.(a.id);
                             if (!existingGen) {
                                 html += `<button class="role-btn role-general" data-royal="${member.id}" data-army="${a.id}" style="font-size:0.7em;padding:2px 6px;background:#2a2a4a;color:#e8d5b0;border:1px solid #3a3a6a;border-radius:3px;cursor:pointer;">⚔️ Lead ${a.name}</button>`;
                             }
                         });
+                    }
+                    // Show hint if no slots
+                    if (maxGenerals === 0 && maxGovernors === 0) {
+                        html += `<span style="font-size:0.7em;color:#7f8c8d;font-style:italic;">Hire generals/governors in Investments</span>`;
                     }
                 }
                 html += `</div>`;
@@ -614,132 +736,6 @@ class MonarchManager {
     }
 
     /* =============================
-     *  Advisor system
-     * ============================= */
-    generateAdvisorAdvice() {
-        // Clear previous advice
-        this.advisors.forEach(advisor => advisor.advice = []);
-        
-        this.generateEconomicAdvice();
-        this.generateMilitaryAdvice();
-        this.generateTechnicalAdvice();
-        
-        this.displayAdvisorAdvice();
-    }
-    
-    generateEconomicAdvice() {
-        const advisor = this.advisors.find(a => a.specialty === 'economy');
-        const inv = this.gameState.investments;
-        
-        if (this.gameState.gold > 500 && (inv.productionBoost || 0) < 3) {
-            advisor.advice.push("Your Majesty, consider investing in production boosts to increase resource generation.");
-        }
-        
-        if ((this.gameState.buildings?.length || 0) < 5) {
-            advisor.advice.push("Perhaps we should focus on village expansion before major investments?");
-        }
-        
-        if ((this.gameState.resources?.food || 0) < 50) {
-            advisor.advice.push("Food stores are running low - more farms would benefit the kingdom.");
-        }
-
-        if (this.gameState.gold > 1000) {
-            advisor.advice.push("Our treasury overflows! Wise investments could multiply our wealth.");
-        }
-    }
-    
-    generateMilitaryAdvice() {
-        const advisor = this.advisors.find(a => a.specialty === 'military');
-        const inv = this.gameState.investments;
-        
-        if ((this.gameState.wave || 0) > 3 && !inv.armyScouts) {
-            advisor.advice.push("The enemies grow stronger. Army scouts would improve our tactical advantage.");
-        }
-        
-        if ((this.gameState.army?.length || 0) < 3) {
-            advisor.advice.push("Our forces are few. Building barracks should be a priority.");
-        }
-        
-        if (!inv.eliteGenerals && this.gameState.gold > 400) {
-            advisor.advice.push("Elite generals could turn the tide of future battles, Your Majesty.");
-        }
-
-        if (!inv.tacticalAcademy && inv.eliteGenerals) {
-            advisor.advice.push("With generals in place, a Tactical Academy would sharpen their skills.");
-        }
-    }
-    
-    generateTechnicalAdvice() {
-        const advisor = this.advisors.find(a => a.specialty === 'technology');
-        const inv = this.gameState.investments;
-        
-        if ((this.gameState.automationLevel || 'manual') === 'manual' && (this.gameState.population || 0) > 20) {
-            advisor.advice.push("With a larger population, automation upgrades would increase efficiency.");
-        }
-        
-        if (this.gameState.gold > 1000 && !inv.parallelVillages) {
-            advisor.advice.push("The parallel village system could exponentially increase our power.");
-        }
-        
-        if ((this.gameState.wave || 0) > 5 && !inv.prestigeAutomation) {
-            advisor.advice.push("Prestige automation would remember our successful strategies for future reigns.");
-        }
-
-        if (!inv.dynastyProgression && inv.parallelVillages) {
-            advisor.advice.push("Dynasty Progression — the ultimate investment — awaits, Your Majesty.");
-        }
-    }
-    
-    displayAdvisorAdvice() {
-        const advisorDiv = document.getElementById('advisor-panel');
-        if (!advisorDiv) return;
-        
-        let adviceHtml = `
-            <div class="advisor-header">
-                <span class="advisor-icon">${this.currentAdvisor.icon || '📜'}</span>
-                <h4>${this.currentAdvisor.name} advises:</h4>
-            </div>
-        `;
-        
-        if (this.currentAdvisor.advice.length > 0) {
-            adviceHtml += '<div class="advisor-advice-list">';
-            this.currentAdvisor.advice.forEach(advice => {
-                adviceHtml += `<p class="advisor-advice-item">• ${advice}</p>`;
-            });
-            adviceHtml += '</div>';
-        } else {
-            adviceHtml += `<p class="advisor-advice-empty">Your kingdom prospers under your wise rule, Your Majesty.</p>`;
-        }
-        
-        adviceHtml += `
-            <div class="advisor-buttons">
-                ${this.advisors.map(advisor => `
-                    <button class="advisor-btn ${advisor === this.currentAdvisor ? 'active' : ''}" 
-                            data-advisor="${advisor.name}">
-                        ${advisor.icon || '📜'} ${this.capitalize(advisor.specialty)}
-                    </button>
-                `).join('')}
-            </div>
-        `;
-        
-        advisorDiv.innerHTML = adviceHtml;
-        
-        // Setup advisor switching
-        advisorDiv.querySelectorAll('.advisor-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const advisorName = btn.dataset.advisor;
-                this.currentAdvisor = this.advisors.find(a => a.name === advisorName);
-                this.displayAdvisorAdvice();
-            });
-        });
-    }
-
-    capitalize(str) {
-        if (!str) return '';
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
-
-    /* =============================
      *  Full refresh — called on view switch
      * ============================= */
     refreshAll() {
@@ -748,7 +744,7 @@ class MonarchManager {
         this.updateMonarchCard();
         this.updateDynastyStats();
         this.updateFamilyTree();
-        this.generateAdvisorAdvice();
+        this.renderLegacyBonuses();
     }
 }
 

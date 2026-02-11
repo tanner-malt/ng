@@ -715,13 +715,28 @@ class VillageManager {
             const isUnlocked = this.gameState.isBuildingUnlocked(buildingType);
             const canAfford = this.gameState.canAfford(buildingType);
 
-            if (!isUnlocked) {
+            // Check maxCount limit
+            const bDef = window.BUILDING_DATA?.[buildingType];
+            let atMaxCount = false;
+            if (bDef?.maxCount) {
+                const existing = (this.gameState.buildings || []).filter(b => b.type === buildingType).length
+                               + (this.gameState.constructionManager?.constructionSites
+                                  ? [...this.gameState.constructionManager.constructionSites.values()].filter(s => s.type === buildingType).length
+                                  : 0);
+                atMaxCount = existing >= bDef.maxCount;
+            }
+
+            if (!isUnlocked || atMaxCount) {
                 row.classList.add('locked');
-                const requirementsText = window.unlockSystem ?
-                    window.unlockSystem.getUnlockRequirementsText(buildingType) :
-                    `Locked: Complete prerequisites to unlock ${buildingType}`;
-                row.title = requirementsText;
-                console.log(`[Village] Setting tooltip (row states) for ${buildingType}:`, requirementsText);
+                if (atMaxCount) {
+                    row.title = `Already built maximum ${bDef.name}${bDef.maxCount > 1 ? 's' : ''} (${bDef.maxCount})`;
+                } else {
+                    const requirementsText = window.unlockSystem ?
+                        window.unlockSystem.getUnlockRequirementsText(buildingType) :
+                        `Locked: Complete prerequisites to unlock ${buildingType}`;
+                    row.title = requirementsText;
+                    console.log(`[Village] Setting tooltip (row states) for ${buildingType}:`, requirementsText);
+                }
             } else {
                 row.classList.remove('locked');
                 if (!canAfford) {
@@ -1169,6 +1184,20 @@ class VillageManager {
 
     placeBuilding(type, x, y) {
         console.log('[Village] placeBuilding called with:', { type, x, y });
+
+        // Check build limit (e.g. Town Center maxCount: 1)
+        const bDef = window.BUILDING_DATA?.[type];
+        if (bDef?.maxCount) {
+            const existing = (this.gameState.buildings || []).filter(b => b.type === type).length
+                           + (this.gameState.constructionManager?.constructionSites
+                              ? [...this.gameState.constructionManager.constructionSites.values()].filter(s => s.type === type).length
+                              : 0);
+            if (existing >= bDef.maxCount) {
+                window.modalSystem?.showMessage('Build Limit Reached',
+                    `You can only have ${bDef.maxCount} ${bDef.name}${bDef.maxCount > 1 ? 's' : ''}.`, { type: 'warning' });
+                return false;
+            }
+        }
 
         // Check if we can afford the building
         if (!this.gameState.canAfford(type)) {

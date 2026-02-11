@@ -45,7 +45,8 @@ class LegacySystem {
                 productionBonus: 0,        // +X% all production
                 buildSpeedBonus: 0,        // +X% construction speed
                 combatBonus: 0,            // +X% combat effectiveness
-                explorationBonus: 0        // +X% exploration speed
+                explorationBonus: 0,       // +X% exploration speed
+                startingScout: 0           // +X world map sight at start
             },
             
             // Titles earned (cosmetic + minor bonuses)
@@ -222,7 +223,8 @@ class LegacySystem {
             productionBonus: 5,      // +5% per purchase
             buildSpeedBonus: 5,      // +5% per purchase
             combatBonus: 5,          // +5% per purchase
-            explorationBonus: 10     // +10% per purchase
+            explorationBonus: 10,    // +10% per purchase
+            startingScout: 1         // +1 sight radius per purchase
         };
         
         if (!bonusAmounts[bonusType]) {
@@ -251,7 +253,8 @@ class LegacySystem {
             productionMultiplier: 1 + (this.legacy.bonuses.productionBonus / 100),
             buildSpeedMultiplier: 1 + (this.legacy.bonuses.buildSpeedBonus / 100),
             combatMultiplier: 1 + (this.legacy.bonuses.combatBonus / 100),
-            explorationMultiplier: 1 + (this.legacy.bonuses.explorationBonus / 100)
+            explorationMultiplier: 1 + (this.legacy.bonuses.explorationBonus / 100),
+            scoutRange: this.legacy.bonuses.startingScout || 0
         };
     }
 

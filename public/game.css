@@ -2295,68 +2295,105 @@ body {
     font-weight: 600;
 }
 
-/* Advisor panel */
-.advisor-panel {
-    background: rgba(52, 73, 94, 0.6);
-    border-radius: 8px;
-    padding: 1.5rem;
-    border: 1px solid rgba(241, 196, 15, 0.2);
+/* Advisor panel — REMOVED, replaced by Legacy Bonuses */
+
+/* Legacy Bonuses section */
+.legacy-bonuses-header {
+    margin-bottom: 1rem;
 }
 
-.advisor-header {
+.legacy-points-badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: #fff;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.legacy-bonuses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.legacy-bonus-item {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.advisor-header h4 {
-    color: #f1c40f;
-    margin: 0;
-}
-
-.advisor-icon {
-    font-size: 1.5rem;
-}
-
-.advisor-advice-list {
-    margin-bottom: 1rem;
-}
-
-.advisor-advice-item {
-    margin-bottom: 0.75rem;
-    font-style: italic;
-    color: #ecf0f1;
-    line-height: 1.5;
-}
-
-.advisor-advice-empty {
-    font-style: italic;
-    color: #bdc3c7;
-}
-
-.advisor-buttons {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-}
-
-.advisor-btn {
-    padding: 0.5rem 1rem;
-    background: #34495e;
-    color: white;
-    border: 2px solid #2c3e50;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     transition: all 0.3s ease;
-    font-weight: 500;
 }
 
-.advisor-btn:hover {
-    background: #3498db;
-    border-color: #2980b9;
+.legacy-bonus-item:hover {
+    border-color: rgba(243, 156, 18, 0.4);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.legacy-bonus-icon {
+    font-size: 1.4rem;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.legacy-bonus-details {
+    flex: 1;
+}
+
+.legacy-bonus-details h5 {
+    margin: 0 0 0.2rem 0;
+    color: #ecf0f1;
+    font-size: 0.9rem;
+}
+
+.legacy-bonus-details p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #95a5a6;
+}
+
+.legacy-bonus-level {
+    font-size: 0.75rem;
+    color: #1abc9c;
+    margin-top: 0.2rem;
+    font-weight: 600;
+}
+
+.legacy-buy-btn {
+    padding: 0.4rem 0.7rem;
+    background: #8e44ad;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.legacy-buy-btn:hover {
+    background: #9b59b6;
+}
+
+.legacy-buy-btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Investment effect sub-text */
+.investment-effect {
+    font-size: 0.75rem;
+    color: #f39c12;
+    margin-top: 0.15rem;
+    font-style: italic;
 }
 
 .advisor-btn.active {

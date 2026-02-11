@@ -217,6 +217,15 @@ class RoyalFamilyManager {
         const royal = this.findRoyalById(royalId);
         if (!royal) return false;
         if (royal.age < 16) return false; // too young
+
+        // Check slot limit from Hire General investment
+        const maxSlots = this.gameState?.investments?.hireGeneral || 0;
+        const currentGenerals = this.royalFamily.filter(r => r.role === 'general').length;
+        if (currentGenerals >= maxSlots && royal.role !== 'general') {
+            console.warn(`[RoyalFamily] No general slots available (${currentGenerals}/${maxSlots})`);
+            return false;
+        }
+
         if (royal.role === 'governor') this.unassignRole(royalId); // remove previous role
 
         // Unassign previous general of this army (if any)
@@ -240,6 +249,15 @@ class RoyalFamilyManager {
         const royal = this.findRoyalById(royalId);
         if (!royal) return false;
         if (royal.age < 16) return false;
+
+        // Check slot limit from Hire Governor investment
+        const maxSlots = this.gameState?.investments?.hireGovernor || 0;
+        const currentGovernors = this.royalFamily.filter(r => r.role === 'governor').length;
+        if (currentGovernors >= maxSlots && royal.role !== 'governor') {
+            console.warn(`[RoyalFamily] No governor slots available (${currentGovernors}/${maxSlots})`);
+            return false;
+        }
+
         if (royal.role === 'general') this.unassignRole(royalId);
 
         // Unassign previous governor of this location

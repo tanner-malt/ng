@@ -106,16 +106,6 @@ class AchievementSystem {
             reward: { gold: 200 }
         });
 
-        // Building mastery achievements
-        this.defineAchievement('master_builder', {
-            title: 'Master Builder',
-            description: 'Built 10 buildings total',
-            icon: '🏗️',
-            type: 'building',
-            requirement: { buildings_built: 10 },
-            reward: { constructionSpeed: 0.05 }
-        });
-
         this.defineAchievement('build_and_they_will_come', {
             title: 'Build and They Will Come',
             description: 'Built your first Builders Hut',
@@ -146,15 +136,6 @@ class AchievementSystem {
                 population: 50
             },
             reward: { prestige: 50, influence: 25 }
-        });
-
-        this.defineAchievement('population_boom', {
-            title: 'Population Boom',
-            description: 'Reached 100 population',
-            icon: '👥',
-            type: 'resource',
-            requirement: { population: 100 },
-            reward: { influence: 50 }
         });
 
         this.defineAchievement('thriving_dynasty', {

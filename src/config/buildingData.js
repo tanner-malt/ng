@@ -23,6 +23,7 @@ const BUILDING_DATA = {
         description: 'The heart of your settlement. Enables tax collection from all working citizens',
         effects: '+200 storage • +2000💰 gold storage • Taxes: 1💰/citizen/day • +10% per level',
         category: 'essential',
+        maxCount: 1,
         
         costs: { wood: 50 },
         constructionPoints: 10,
@@ -48,7 +49,7 @@ const BUILDING_DATA = {
         constructionPoints: 5,
         
         production: {
-            populationCapacity: 9,
+            populationCapacity: 8,
             jobs: { gatherer: 1 }
         },
         
