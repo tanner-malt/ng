@@ -243,6 +243,9 @@ class RoyalFamilyManager {
         // Dynasty founder achievement - unlocked on first succession
         try { window.achievementSystem?.triggerDynastySuccession?.(); } catch (_) { }
 
+        // First ruler death — unlock Monarch view
+        try { window.achievementSystem?.triggerNotAnEnd?.(); } catch (_) { }
+
         try { this.gameState.save?.(); } catch (_) { }
         return newMonarch;
     }
@@ -255,16 +258,28 @@ class RoyalFamilyManager {
             const dName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
             window.legacySystem.performEndDynasty(this.gameState, dName, 'dynasty_extinct');
         } else {
-            // Fallback: show info then reload
-            if (window.showModal) {
-                window.showModal(
-                    '⚰️ Dynasty Extinct',
-                    `<p>The royal bloodline has ended with no viable heirs.</p>
-                     <p>Your legacy will be remembered...</p>`,
-                    { type: 'warning', icon: '💀' }
-                );
+            // Fallback: show non-dismissable modal then reload
+            if (window.modalSystem?.showModal) {
+                window.modalSystem.showModal({
+                    title: '⚰️ Dynasty Extinct',
+                    content: `<div style="text-align:center;padding:20px;">
+                        <div style="font-size:64px;margin-bottom:16px;">💀</div>
+                        <p>The royal bloodline has ended with no viable heirs.</p>
+                        <p>Your legacy will be remembered...</p>
+                        <button id="extinction-restart" style="margin-top:16px;padding:12px 24px;background:#c0392b;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1em;font-weight:bold;">Start Over</button>
+                    </div>`,
+                    closable: false,
+                    showCloseButton: false
+                });
+                setTimeout(() => {
+                    document.getElementById('extinction-restart')?.addEventListener('click', () => {
+                        localStorage.clear();
+                        location.reload();
+                    });
+                }, 50);
+            } else {
+                setTimeout(() => location.reload(), 2000);
             }
-            setTimeout(() => location.reload(), 2000);
         }
     }
 

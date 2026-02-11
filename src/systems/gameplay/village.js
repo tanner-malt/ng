@@ -1953,9 +1953,10 @@ class VillageManager {
             magicalTower: '🔮',
             grandLibrary: '🏛️',
             buildersHut: '🏗️',
-            storehouse: '📦'
+            storehouse: '📦',
+            huntersLodge: '🦌'
         };
-        return symbols[type] || '?';
+        return symbols[type] || (window.GameData?.getBuildingIcon?.(type)) || '?';
     }
 
     // Helper to extract common bonuses for display

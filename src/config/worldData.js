@@ -63,7 +63,7 @@ const WORLD_DATA = {
             moveCost: 2,
             description: 'Rolling hills with stone deposits',
             dangerLevel: 1,
-            defensiveBonus: 0.2
+            defensiveBonus: 0.05
         },
         mountain: {
             name: 'Mountains',
@@ -72,7 +72,7 @@ const WORLD_DATA = {
             moveCost: 4,
             description: 'Treacherous mountains, slow but defensible',
             dangerLevel: 2,
-            defensiveBonus: 0.4
+            defensiveBonus: 0.07
         },
         swamp: {
             name: 'Swamp',

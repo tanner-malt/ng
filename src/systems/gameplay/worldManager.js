@@ -310,15 +310,41 @@ class WorldManager {
         // ── Selected army command panel ──
         const selectedArmy = this.selectedArmyId ? this.gameState.getArmy?.(this.selectedArmyId) : null;
         if (selectedArmy) {
-            const statusIcon = selectedArmy.status === 'traveling' ? '🚶' : selectedArmy.status === 'fighting' ? '⚔️' : '🏕️';
-            const statusLabel = selectedArmy.status === 'traveling' ? 'Traveling' : selectedArmy.status === 'fighting' ? 'In Combat' : 'Idle';
+            const statusIcon = selectedArmy.status === 'traveling' ? '🚶' : selectedArmy.status === 'fighting' ? '⚔️' : selectedArmy.status === 'garrisoned' ? '🏰' : '🏕️';
+            const statusLabel = selectedArmy.status === 'traveling' ? 'Traveling' : selectedArmy.status === 'fighting' ? 'In Combat' : selectedArmy.status === 'garrisoned' ? 'Garrisoned' : 'Idle';
 
             html += `<div class="selected-army-panel">`;
             html += `<h4>${statusIcon} ${selectedArmy.name}</h4>`;
             html += `<p style="opacity:0.8;font-size:0.85em;margin:4px 0;">${selectedArmy.units?.length || 0} soldiers — ${statusLabel}</p>`;
             
+            // Army stats summary
+            const totalAttack = (selectedArmy.units || []).reduce((s, u) => s + (u.attack || 10), 0);
+            const totalDefense = (selectedArmy.units || []).reduce((s, u) => s + (u.defense || 5), 0);
+            const avgHealth = (selectedArmy.units || []).length > 0 ? Math.round((selectedArmy.units || []).reduce((s, u) => s + (u.health || 100), 0) / selectedArmy.units.length) : 0;
+            html += `<div style="display:flex;gap:8px;margin:6px 0;font-size:0.8em;opacity:0.85;">`;
+            html += `<span>⚔️ ${totalAttack}</span>`;
+            html += `<span>🛡️ ${totalDefense}</span>`;
+            html += `<span>❤️ ${avgHealth}%</span>`;
+            html += `</div>`;
+
             if (selectedArmy.supplies) {
                 html += `<p style="opacity:0.7;font-size:0.8em;margin:2px 0;">🍖 Supplies: ${selectedArmy.supplies.food || 0}</p>`;
+            }
+
+            // Individual soldier stat cards
+            if (selectedArmy.units && selectedArmy.units.length > 0) {
+                html += `<div style="max-height:150px;overflow-y:auto;margin:6px 0;border:1px solid #5a4230;border-radius:4px;">`;
+                selectedArmy.units.forEach(u => {
+                    const hpPct = Math.round(((u.health || 100) / (u.maxHealth || 100)) * 100);
+                    const hpColor = hpPct > 60 ? '#27ae60' : hpPct > 30 ? '#f39c12' : '#c0392b';
+                    html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-bottom:1px solid #3a2a1a;font-size:0.75em;">`;
+                    html += `<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.name || 'Soldier'}</span>`;
+                    html += `<span style="color:${hpColor};">❤${hpPct}%</span>`;
+                    html += `<span>⚔${u.attack || 10}</span>`;
+                    html += `<span>🛡${u.defense || 5}</span>`;
+                    html += `</div>`;
+                });
+                html += `</div>`;
             }
 
             html += `<div class="army-commands" style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">`;
@@ -326,6 +352,9 @@ class WorldManager {
             if (this.moveMode) {
                 html += `<p style="color:#c9a84c;font-size:0.85em;text-align:center;">📍 Click a tile to move</p>`;
                 html += `<button class="world-btn" onclick="window.worldManager.cancelMoveMode()">✖ Cancel Move</button>`;
+            } else if (selectedArmy.status === 'garrisoned') {
+                html += `<button class="world-btn" onclick="window.worldManager.deployArmy('${selectedArmy.id}')">🚶 Deploy</button>`;
+                html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
             } else if (selectedArmy.status === 'idle') {
                 html += `<button class="world-btn" onclick="window.worldManager.enterMoveMode()">🚶 Move</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Return Home</button>`;
@@ -468,7 +497,8 @@ class WorldManager {
                 originalStatus,
                 health: 80 + Math.floor(Math.random() * 20),
                 maxHealth: 100,
-                attack: 10 + Math.floor(villager.age / 10)
+                attack: 10 + Math.floor(villager.age / 10),
+                defense: 5 + Math.floor(villager.age / 15)
             });
         });
 
@@ -613,9 +643,11 @@ class WorldManager {
                 army.status = 'idle';
                 army.travelPlan = null;
 
-                // If arrived at capital, auto-disband
+                // If arrived at capital, garrison the army
                 if (dest.row === this.capitalRow && dest.col === this.capitalCol) {
-                    this.performDisband(army.id);
+                    army.status = 'garrisoned';
+                    window.showToast?.(`${army.name} garrisoned at the capital! 🏰`, { type: 'success' });
+                    this.refreshUI();
                     return;
                 }
 
@@ -651,6 +683,15 @@ class WorldManager {
     // ===================================================================
     // ARMY DISBANDING — POPULATION RESTORATION
     // ===================================================================
+
+    deployArmy(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army || army.status !== 'garrisoned') return;
+
+        army.status = 'idle';
+        window.showToast?.(`${army.name} deployed and ready for orders.`, { type: 'info' });
+        this.refreshUI();
+    }
 
     disbandArmy(armyId) {
         const army = this.gameState.getArmy?.(armyId);

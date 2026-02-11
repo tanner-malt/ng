@@ -278,7 +278,7 @@ const GameData = {
             effects: '3 Woodcutter jobs • +3🪵 wood/worker/day'
         },
         huntersLodge: {
-            icon: '🏹',
+            icon: '🦌',
             name: "Hunter's Lodge",
             description: 'Hunters track and bring back game for food',
             effects: '2 Hunter jobs • +2.5🍖 food/hunter/day • Autumn/Winter bonus'
@@ -440,7 +440,7 @@ const GameData = {
         weapons: 50,
         tools: 50,
         production: 50,
-        gold: 100    // Slightly higher base for gold
+        gold: Infinity    // Gold is uncapped
     },
 
 
@@ -565,6 +565,9 @@ const GameData = {
 
     // Calculate storage capacity for a resource (data-driven, season-invariant)
     calculateSeasonalStorageCap: function (resource, season, buildings) {
+        // Gold is uncapped — no storage limit
+        if (resource === 'gold') return Infinity;
+
         const baseCap = this.resourceCaps[resource] || 999;
         // Storage is NOT affected by seasons; seasonal modifiers apply to production only
         const seasonalMod = 1.0;

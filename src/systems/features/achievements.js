@@ -312,6 +312,15 @@ class AchievementSystem {
             reward: { prestige: 25, gold: 200 }
         });
 
+        // Monarch unlock — first ruler dies
+        this.defineAchievement('not_an_end', {
+            title: 'Not an End, New Beginning',
+            description: 'Your first ruler has passed — but the dynasty endures.',
+            icon: '⚰️',
+            type: 'special',
+            reward: { gold: 250 }
+        });
+
         // View unlock achievements
         this.defineAchievement('become_king', {
             title: 'Become King',
@@ -507,6 +516,11 @@ class AchievementSystem {
     // Trigger achievement for becoming king (unlock Monarch view)
     triggerBecomeKing() {
         this.unlock('become_king');
+    }
+
+    // Trigger achievement for first ruler death (unlock Monarch view)
+    triggerNotAnEnd() {
+        this.unlock('not_an_end');
     }
 
     // Trigger achievement for ultimate milestone (unlock Throne view)

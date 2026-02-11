@@ -122,7 +122,7 @@ const BUILDING_DATA = {
     // =========================================
     huntersLodge: {
         name: "Hunter's Lodge",
-        icon: '🏹',
+        icon: '🦌',
         description: 'Hunters track and bring back game for food. Best in autumn and winter!',
         effects: '2 Hunter jobs • +2.5🍖 food/hunter/day • Autumn/Winter bonus, Spring penalty',
         category: 'production',

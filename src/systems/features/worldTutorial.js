@@ -17,161 +17,49 @@ class WorldTutorial {
         this.steps = [
             {
                 id: 'world_overview',
-                title: '🗺️ The Known World',
+                title: 'The Known World',
                 content: `
                     <div class="tutorial-content">
-                        <h3>🏰 Your Kingdom Awaits</h3>
-                        <p>Welcome to the world map! Your kingdom sits at the center of a vast and
-                        dangerous land. The <strong>golden tile</strong> is your capital — the heart of
-                        your dynasty.</p>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 What You See:</h4>
-                            <ul>
-                                <li><strong>Explored tiles</strong> show full terrain — you can see and move through them</li>
-                                <li>Tiles adjacent to your capital are already explored and safe</li>
-                                <li>Beyond your borders lies the unknown...</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-tip">
-                            💡 <strong>Tip:</strong> Click any visible tile to see its terrain details, movement cost, and defensive bonuses.
-                        </div>
+                        <p>Your kingdom sits at the center of the map. The <strong>golden tile</strong> is your capital.</p>
+                        <ul>
+                            <li><strong>Explored</strong> tiles are fully visible and traversable</li>
+                            <li><strong>Scoutable</strong> tiles show terrain but armies can't enter yet</li>
+                            <li><strong>Hidden</strong> tiles are completely unknown</li>
+                        </ul>
+                        <p>Armies automatically explore tiles as they move, revealing neighbors. Click any tile for details.</p>
                     </div>`,
                 highlight: '.tile[data-row="2"][data-col="2"]'
             },
             {
-                id: 'fog_of_war',
-                title: '🧭 Fog of War',
-                content: `
-                    <div class="tutorial-content">
-                        <h3>🌫️ Beyond the Known</h3>
-                        <p>The world beyond your borders is shrouded in fog. There are three visibility states:</p>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 Tile Visibility:</h4>
-                            <ul>
-                                <li><strong>Explored</strong> — fully visible, your armies can move here</li>
-                                <li><strong>Scoutable 🧭</strong> — you can see the terrain type but cannot move armies there yet</li>
-                                <li><strong>Hidden ❓</strong> — completely unknown, marked with cross-hatching</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 How to Explore:</h4>
-                            <ul>
-                                <li>Armies <strong>automatically explore</strong> tiles as they move through them</li>
-                                <li>Exploring a tile also reveals its neighbors as scoutable</li>
-                                <li>Push outward from your capital to uncover the map</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-tip">
-                            💡 <strong>Tip:</strong> Scoutable tiles at the edge of your territory show you what lies ahead — plan your routes!
-                        </div>
-                    </div>`,
-                highlight: null
-            },
-            {
                 id: 'army_movement',
-                title: '⚔️ Commanding Armies',
+                title: 'Commanding Armies',
                 content: `
                     <div class="tutorial-content">
-                        <h3>🚶 Army Movement</h3>
-                        <p>Your armies are your eyes and sword in the wilderness. Use them to explore,
-                        defend, and conquer.</p>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 Deploying Forces:</h4>
-                            <ul>
-                                <li><strong>Click your capital tile</strong> and use "Draft Army" to raise troops from your population</li>
-                                <li>Select an army, then click <strong>"Move"</strong> to send it to a destination</li>
-                                <li>Armies travel along the shortest path — one tile per day</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 Terrain & Movement Cost:</h4>
-                            <ul>
-                                <li><strong>Grassland / Plains:</strong> 1 day per tile — fast and safe</li>
-                                <li><strong>Forest / Hills:</strong> 2 days per tile — slower but defensible</li>
-                                <li><strong>Swamp:</strong> 3 days per tile — treacherous</li>
-                                <li><strong>Mountains:</strong> 4 days per tile — slow but strong defense (+40%)</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-tip">
-                            💡 <strong>Tip:</strong> Use the right panel to command selected armies — move, recall, or disband them.
-                        </div>
+                        <p>Click your <strong>capital tile</strong> and use <em>Draft Army</em> to raise troops. Select an army, then click <strong>Move</strong> to send it.</p>
+                        <ul>
+                            <li><strong>Grassland/Plains:</strong> 1 day &mdash; fast</li>
+                            <li><strong>Forest/Hills:</strong> 2 days &mdash; slower, defensible</li>
+                            <li><strong>Swamp:</strong> 3 days &mdash; treacherous</li>
+                            <li><strong>Mountains:</strong> 4 days &mdash; slow, +40% defense</li>
+                        </ul>
+                        <p>Use the right panel to move, recall, or disband selected armies.</p>
                     </div>`,
                 highlight: '#world-actions'
             },
             {
                 id: 'world_dangers',
-                title: '⚠️ Dangers of the Wild',
+                title: 'Threats & Defense',
                 content: `
                     <div class="tutorial-content">
-                        <h3>🏴 Enemies Are Coming</h3>
-                        <p>The world is not empty. Hostile forces lurk in the darkness beyond your
-                        borders, and they grow bolder over time.</p>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 Enemy Threats:</h4>
-                            <ul>
-                                <li><strong>Bandits</strong> appear after ~50 days — small but persistent</li>
-                                <li><strong>Raiders</strong> emerge after ~100 days — larger and more dangerous</li>
-                                <li><strong>Warlords</strong> arrive after ~200 days — powerful armies that can devastate your kingdom</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 How Enemies Work:</h4>
-                            <ul>
-                                <li>Enemies <strong>spawn in unexplored territory</strong> at the map edges</li>
-                                <li>They <strong>march toward your capital</strong> — intercept them before they arrive!</li>
-                                <li>Enemy groups grow stronger the longer the game runs</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-tip">
-                            ⚠️ <strong>Warning:</strong> If enemies reach your capital unchallenged, they will attack your village directly!
-                        </div>
+                        <p>Enemies spawn at the map edges and march toward your capital. They grow stronger over time:</p>
+                        <ul>
+                            <li><strong>Bandits</strong> (~50 days) &mdash; small groups</li>
+                            <li><strong>Raiders</strong> (~100 days) &mdash; larger forces</li>
+                            <li><strong>Warlords</strong> (~200 days) &mdash; devastating armies</li>
+                        </ul>
+                        <p>Station armies on <strong>hills</strong> or <strong>mountains</strong> for defensive bonuses. Keep borders explored &mdash; you can't fight what you can't see!</p>
                     </div>`,
                 highlight: '#hex-info'
-            },
-            {
-                id: 'defense_strategy',
-                title: '🛡️ Defend Your Dynasty',
-                content: `
-                    <div class="tutorial-content">
-                        <h3>🏰 Strategic Defense</h3>
-                        <p>Victory belongs to those who prepare. Use terrain and positioning to
-                        protect your people.</p>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 Defense Tips:</h4>
-                            <ul>
-                                <li><strong>Station armies</strong> between your capital and the frontier</li>
-                                <li>Position forces on <strong>hills (+20%)</strong> or <strong>mountains (+40%)</strong> for defensive bonuses</li>
-                                <li>Keep your borders <strong>explored</strong> — you can't fight what you can't see</li>
-                                <li>Draft more soldiers as your population grows</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-section">
-                            <h4>🔹 What's Next:</h4>
-                            <ul>
-                                <li>Explore the tiles around your capital to secure your borders</li>
-                                <li>Draft your first army when you have soldiers to spare</li>
-                                <li>Watch for enemy movement — the info panel shows threats on selected tiles</li>
-                            </ul>
-                        </div>
-
-                        <div class="tutorial-tip">
-                            💡 <strong>Good luck, commander!</strong> The fate of your dynasty rests on the decisions you make here.
-                        </div>
-                    </div>`,
-                highlight: null
             }
         ];
 

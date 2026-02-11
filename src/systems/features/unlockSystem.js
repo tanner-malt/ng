@@ -256,7 +256,7 @@ class UnlockSystem {
             name: 'Monarch Screen',
             description: 'Manage your royal affairs and dynasty legacy',
             conditions: [
-                { type: 'achievement', achievement: 'become_king' }
+                { type: 'achievement', achievement: 'not_an_end' }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('monarch')

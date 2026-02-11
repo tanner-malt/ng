@@ -70,6 +70,13 @@ class VillageDefenseSystem {
             }
         });
         
+        // Garrisoned armies contribute to defense with 100% bonus (2x)
+        const garrisonedArmies = (this.gameState.armies || []).filter(a => a.status === 'garrisoned');
+        garrisonedArmies.forEach(army => {
+            const armyStrength = (army.units || []).reduce((s, u) => s + (u.attack || 10), 0);
+            defense += armyStrength * 2; // 100% city defense bonus
+        });
+        
         // Apply tech bonuses
         const guardEfficiency = this.gameState.techBonuses?.guardEfficiency || 0;
         defense *= (1 + guardEfficiency);
@@ -197,46 +204,43 @@ class VillageDefenseSystem {
         window.eventBus?.emit('defenseVictory', { battle, army });
     }
     
-    // Handle failed defense
+    // Handle failed defense — village is destroyed, dynasty ends
     handleDefenseFailure(battle, army) {
         battle.result = 'defeat';
         
-        // Significant casualties
-        const guardsLost = Math.floor(this.guardCount * 0.7);
-        const wallsDestroyed = Math.floor(this.wallStrength * 0.5);
+        console.log(`[VillageDefense] Defeat! Village overrun by ${army.name}`);
         
-        // Resources looted
-        const lootRatio = 0.2; // Lose 20% of resources
-        const resources = this.gameState.resources || {};
-        const loot = {};
+        window.eventBus?.emit('defenseDefeat', { battle, army });
         
-        ['food', 'wood', 'stone', 'gold'].forEach(res => {
-            loot[res] = Math.floor((resources[res] || 0) * lootRatio);
-            resources[res] = Math.max(0, (resources[res] || 0) - loot[res]);
-        });
+        // Village is destroyed — trigger dynasty end
+        const dynastyName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
         
-        // Population casualties
-        const civilianDeaths = Math.floor(Math.random() * 5) + 1;
-        
-        console.log(`[VillageDefense] Defeat! Lost ${guardsLost} guards, ${civilianDeaths} civilians`);
-        
-        this.applyCasualties(guardsLost);
-        this.wallStrength = Math.max(0, this.wallStrength - wallsDestroyed);
-        
-        // Apply civilian deaths
-        if (this.gameState.populationManager) {
-            for (let i = 0; i < civilianDeaths; i++) {
-                const population = this.gameState.populationManager.population || [];
-                if (population.length > 1) { // Keep at least 1
-                    const victim = population[Math.floor(Math.random() * population.length)];
-                    this.gameState.populationManager.killVillager(victim.id, 'Killed in enemy raid');
-                }
+        if (window.legacySystem) {
+            window.legacySystem.performEndDynasty(this.gameState, dynastyName, 'village_destroyed');
+        } else {
+            // Fallback: show modal then reload
+            if (window.modalSystem?.showModal) {
+                window.modalSystem.showModal({
+                    title: '🗡️ Village Destroyed!',
+                    content: `<div style="text-align:center;padding:20px;">
+                        <div style="font-size:64px;margin-bottom:16px;">🔥</div>
+                        <p>Your village has been overrun by <strong>${army.name}</strong>.</p>
+                        <p>The dynasty has fallen...</p>
+                        <button id="destruction-restart" style="margin-top:16px;padding:12px 24px;background:#c0392b;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1em;font-weight:bold;">Start Over</button>
+                    </div>`,
+                    closable: false,
+                    showCloseButton: false
+                });
+                setTimeout(() => {
+                    document.getElementById('destruction-restart')?.addEventListener('click', () => {
+                        localStorage.clear();
+                        location.reload();
+                    });
+                }, 50);
+            } else {
+                setTimeout(() => location.reload(), 2000);
             }
         }
-        
-        window.showToast?.(`💔 Village raid! Lost resources and ${civilianDeaths} villagers.`, { type: 'error' });
-        
-        window.eventBus?.emit('defenseDefeat', { battle, army, loot, civilianDeaths });
     }
     
     // Apply guard casualties

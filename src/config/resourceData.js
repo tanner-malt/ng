@@ -91,7 +91,7 @@ const RESOURCE_DATA = {
         displayName: 'Gold',
         icon: '💰',
         category: 'currency',
-        baseCapacity: 100,
+        baseCapacity: Infinity,
         startingAmount: 0,
         description: 'The primary currency. Used for trading and upkeep.'
     },

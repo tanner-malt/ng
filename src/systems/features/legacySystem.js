@@ -439,7 +439,8 @@ class LegacySystem {
                         </div>
                     `,
                     maxWidth: '400px',
-                    showCloseButton: false
+                    showCloseButton: false,
+                    closable: false
                 });
 
                 setTimeout(() => {

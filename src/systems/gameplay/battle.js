@@ -35,8 +35,8 @@ class StrategicCombat {
         this.terrainModifiers = {
             plains: { infantry: { attack: 1.0, defense: 1.0 } },
             forest: { infantry: { attack: 1.1, defense: 1.2 } },
-            hills: { infantry: { attack: 1.0, defense: 1.1 } },
-            mountains: { infantry: { attack: 1.1, defense: 1.3 } },
+            hills: { infantry: { attack: 1.0, defense: 1.05 } },
+            mountains: { infantry: { attack: 1.1, defense: 1.07 } },
             swamp: { infantry: { attack: 0.8, defense: 0.9 } },
             desert: { infantry: { attack: 0.9, defense: 0.8 } }
         };

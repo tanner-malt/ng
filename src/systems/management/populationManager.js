@@ -656,7 +656,7 @@ class PopulationManager {
                 const jobSkills = this.jobSkillMapping[worker.role] || ['General'];
 
                 jobSkills.forEach(skillName => {
-                    let baseXp = 1;
+                    let baseXp = 3;
                     let mentorshipBonus = 0;
 
                     // Mentorship bonus if working with more experienced person
@@ -665,7 +665,7 @@ class PopulationManager {
                         const mentorLevel = this.getSkillLevel(mentor, skillName);
 
                         if (mentorLevel.xp > workerLevel.xp) {
-                            mentorshipBonus = 1; // +1 XP bonus for learning from mentor
+                            mentorshipBonus = 2; // +2 XP bonus for learning from mentor
                         }
                     }
 
@@ -677,7 +677,7 @@ class PopulationManager {
                 if (mentor && mentor.id === worker.id && workers.length > 1) {
                     const teachingSkills = this.jobSkillMapping[mentor.role] || ['General'];
                     teachingSkills.forEach(skillName => {
-                        this.awardExperience(mentor.id, skillName, 0.5);
+                        this.awardExperience(mentor.id, skillName, 1);
                     });
                 }
             });
@@ -1557,11 +1557,11 @@ class PopulationManager {
     triggerRefugeeEvent(count = null, options = {}) {
         const { isTutorial = false } = options;
 
-        // Determine refugee count (1-3)
+        // Determine refugee count (scales with game days)
         if (count === null) {
-            count = Math.floor(Math.random() * 3) + 1;
+            count = Math.min(8, 1 + Math.floor((window.gameState?.day || 0) / 50));
         }
-        count = Math.max(1, Math.min(3, count));
+        count = Math.max(1, Math.min(8, count));
 
         // Check current population vs cap
         const cap = window.gameState?.getPopulationCap?.() || 0;
