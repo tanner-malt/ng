@@ -425,6 +425,143 @@ class TechTree {
     hasResearched(techId) {
         return this.researchedTechs.has(techId);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  RESEARCH VIEW UI
+    // ═══════════════════════════════════════════════════════════════════
+
+    show() {
+        const content = document.getElementById('research-content');
+        const locked = content?.previousElementSibling;
+        if (content) {
+            content.style.display = 'flex';
+            if (locked?.classList?.contains('locked-view')) locked.style.display = 'none';
+        }
+        this.renderResearchView();
+    }
+
+    renderResearchView() {
+        this.updateResearchHeader();
+        this.updateCurrentResearch();
+        this.renderTechTree();
+    }
+
+    updateResearchHeader() {
+        const rpEl = document.getElementById('research-rp');
+        if (rpEl) rpEl.textContent = Math.floor(this.researchPoints);
+
+        const rateEl = document.getElementById('research-rate-display');
+        if (rateEl) {
+            const buildings = this.gameState.buildings || [];
+            let rate = 0;
+            buildings.filter(b => b.type === 'academy' && b.built).forEach(a => rate += (a.workers?.length || 0) * 1);
+            buildings.filter(b => b.type === 'university' && b.built).forEach(u => rate += (u.workers?.length || 0) * 3);
+            rateEl.textContent = rate > 0 ? `(+${rate} RP/day)` : '(No scholars assigned)';
+        }
+    }
+
+    updateCurrentResearch() {
+        const panel = document.getElementById('current-research-panel');
+        if (!panel) return;
+
+        if (this.currentResearch) {
+            const tech = this.techs[this.currentResearch];
+            panel.style.display = 'block';
+            const nameEl = document.getElementById('current-research-name');
+            if (nameEl) nameEl.textContent = tech.name;
+            const pct = this.getResearchProgress();
+            const fill = document.getElementById('research-progress-fill');
+            if (fill) fill.style.width = `${pct}%`;
+            const text = document.getElementById('research-progress-text');
+            if (text) text.textContent = `${Math.floor(pct)}% (${Math.floor(this.researchProgress)}/${tech.cost} RP)`;
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    renderTechTree() {
+        const container = document.getElementById('tech-tree-container');
+        if (!container) return;
+
+        const byTier = this.getTechsByTier();
+        const tierNames = { 1: 'Primitive Era', 2: 'Settlement Era', 3: 'Kingdom Era', 4: 'Empire Era' };
+        const tierIcons = { 1: '🪨', 2: '🏘️', 3: '👑', 4: '🏛️' };
+
+        container.innerHTML = '';
+
+        for (const tier of [1, 2, 3, 4]) {
+            const techs = byTier[tier];
+            const section = document.createElement('div');
+            section.className = 'tech-tier';
+            section.innerHTML = `
+                <div class="tech-tier-header">
+                    <h3>${tierIcons[tier]} Tier ${tier}: ${tierNames[tier]}</h3>
+                    <span class="tech-tier-label">${techs.filter(t => t.researched).length}/${techs.length} researched</span>
+                </div>
+                <div class="tech-grid" id="tech-grid-tier-${tier}"></div>
+            `;
+            container.appendChild(section);
+
+            const grid = section.querySelector('.tech-grid');
+            techs.forEach(tech => {
+                const card = this.createTechCard(tech);
+                grid.appendChild(card);
+            });
+        }
+    }
+
+    createTechCard(tech) {
+        const card = document.createElement('div');
+        const isResearching = this.currentResearch === tech.id;
+
+        let stateClass = 'locked';
+        let statusIcon = '🔒';
+        if (tech.researched) { stateClass = 'researched'; statusIcon = '✅'; }
+        else if (isResearching) { stateClass = 'researching'; statusIcon = '⏳'; }
+        else if (tech.available) { stateClass = 'available'; statusIcon = '🔬'; }
+
+        card.className = `tech-card ${stateClass}`;
+
+        // Effects display
+        const effectLines = Object.entries(tech.effects || {})
+            .filter(([k]) => k !== 'unlockBuilding' && k !== 'tradingEnabled')
+            .map(([k, v]) => {
+                const sign = v > 0 ? '+' : '';
+                const pct = Math.abs(v) < 1 ? `${sign}${(v * 100).toFixed(0)}%` : `${sign}${v}`;
+                return `${pct} ${k.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+            });
+        const unlockBuilding = tech.effects?.unlockBuilding;
+        if (unlockBuilding) effectLines.push(`🏗️ Unlock: ${unlockBuilding}`);
+        if (tech.effects?.tradingEnabled) effectLines.push('🤝 Enable trading');
+
+        // Prerequisites display
+        const prereqs = tech.requires?.length > 0
+            ? `Requires: ${tech.requires.map(r => this.techs[r]?.name || r).join(', ')}`
+            : '';
+        const buildingReq = tech.requiresBuilding ? ` + ${tech.requiresBuilding}` : '';
+
+        card.innerHTML = `
+            <span class="tech-card-status">${statusIcon}</span>
+            <div class="tech-card-header">
+                <span class="tech-card-name">${tech.name}</span>
+                <span class="tech-card-cost">🧪 ${tech.cost}</span>
+            </div>
+            <div class="tech-card-description">${tech.description}</div>
+            <div class="tech-card-effects">${effectLines.join(' · ')}</div>
+            ${prereqs || buildingReq ? `<div class="tech-card-prereqs">${prereqs}${buildingReq}</div>` : ''}
+            ${!tech.researched && !tech.available && tech.reason ? `<div class="tech-card-reason">${tech.reason}</div>` : ''}
+        `;
+
+        if (tech.available && !isResearching) {
+            card.addEventListener('click', () => {
+                if (this.startResearch(tech.id)) {
+                    this.renderResearchView();
+                }
+            });
+        }
+
+        return card;
+    }
 }
 
 // Export to window

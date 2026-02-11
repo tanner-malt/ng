@@ -61,6 +61,15 @@ class EventBusIntegrations {
             this.handleUIUpdate();
         });
 
+        // Research events
+        window.eventBus.on('researchComplete', (data) => {
+            this.handleResearchComplete(data);
+        });
+
+        window.eventBus.on('researchStarted', (data) => {
+            this.handleResearchStarted(data);
+        });
+
         console.log('[EventBusIntegrations] Event listeners registered');
     }
 
@@ -171,6 +180,24 @@ class EventBusIntegrations {
         // Update various UI elements that might need refreshing
         if (window.messageHistory) {
             window.messageHistory.updateIcon();
+        }
+    }
+
+    handleResearchComplete(data) {
+        // Trigger unlock check — researched tech may unlock new buildings or features
+        if (window.unlockSystem && window.unlockSystem.checkAllUnlocks) {
+            window.unlockSystem.checkAllUnlocks(true);
+        }
+        // Refresh research view if it's active
+        if (window.techTree && typeof window.techTree.renderResearchView === 'function') {
+            window.techTree.renderResearchView();
+        }
+    }
+
+    handleResearchStarted(data) {
+        // Refresh research view to show active research
+        if (window.techTree && typeof window.techTree.renderResearchView === 'function') {
+            window.techTree.renderResearchView();
         }
     }
 }

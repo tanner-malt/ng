@@ -42,11 +42,24 @@ If the job produces/consumes a new resource, also define it in `src/config/resou
 
 ## Dev Workflow
 
-```bash
-npm run dev           # Serve at http://localhost:8000, open /public/game.html
-npm run test:run      # Run vitest tests (jsdom environment)
-npm run build:wiki    # Compile docs/wiki/ → src/config/wikiData.js (don't edit wikiData.js by hand)
+**Node.js / npm is NOT installed on this machine — do not attempt to run npm, npx, or node commands.**
+
+To test, open `public/game.html` directly in a browser or use the VS Code Live Server / Simple Browser.
+
 ```
+# These commands exist in package.json but require Node.js:
+# npm run dev           — Serve at http://localhost:8000
+# npm run test:run      — Vitest tests (jsdom)
+# npm run build:wiki    — Compile docs/wiki/ → src/config/wikiData.js
+```
+
+## Version Counter
+
+The game version lives in **two files that must stay in sync**:
+- `package.json` → `"version": "X.X.X.X"`
+- `public/version.json` → `{ "version": "X.X.X.X" }`
+
+**Increment the patch digit in both files at the end of every task/feature.** The current format is `0.0.MAJOR.MINOR` (e.g. `0.0.2.1` → `0.0.2.2`). Bump the last digit for small changes; bump the third digit for significant features.
 
 ## Script Load Order (game.html)
 
@@ -68,11 +81,15 @@ Order matters — each phase depends on the scripts above it.
 
 ## Testing Conventions
 
-Tests live in `tests/` using Vitest + jsdom. Two patterns:
+Tests live in `tests/` using Vitest + jsdom (requires Node.js, which is **not installed** on this machine).
+
+Two patterns:
 - **Integration:** Import `GameStateTestable` from `src/systems/core/gameState.testable.js` — a Node-friendly shim without DOM/global dependencies. Use `localStorage.clear()` in `beforeEach`.
 - **Unit:** Define pure logic inline and test in isolation.
 
 `GameStateTestable` must be kept in sync with the real `GameState` — it mirrors save/migration semantics with stubbed managers.
+
+**Do not run `npm run test:run` or any npm/npx commands.** Validate changes by reading code, checking for errors in the editor, and manual browser testing.
 
 ## Key Patterns
 

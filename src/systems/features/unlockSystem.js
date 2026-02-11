@@ -77,6 +77,16 @@ class UnlockSystem {
             autoUnlock: true
         });
 
+        this.registerUnlock('huntersLodge', {
+            type: 'building',
+            name: "Hunter's Lodge",
+            description: 'Hunters bring back game for food — best in autumn and winter',
+            conditions: [
+                { type: 'building_count', building: 'farm', count: 1 }
+            ],
+            autoUnlock: true
+        });
+
         this.registerUnlock('quarry', {
             type: 'building',
             name: 'Quarry',
@@ -332,8 +342,19 @@ class UnlockSystem {
             autoUnlock: true,
             callback: () => {
                 console.log('[UnlockSystem] Tech Tree unlocked!');
-                window.showToast?.('🔬 Technology Research unlocked! Visit the Academy to research new technologies.', { type: 'success' });
+                window.showToast?.('🔬 Technology Research unlocked! Visit the Research tab to advance your civilization.', { type: 'success' });
             }
+        });
+
+        // Research View - Unlocked when Academy is built
+        this.registerUnlock('research_view', {
+            type: 'view',
+            name: 'Research',
+            description: 'Research tab for technology progression',
+            conditions: [
+                { type: 'building_count', building: 'academy', count: 1 }
+            ],
+            autoUnlock: true
         });
 
         // Marriage/Diplomacy System - Requires temple and achievement
@@ -426,13 +447,14 @@ class UnlockSystem {
                     return hasEnoughBuildings;
 
                 case 'resource':
-                    const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
+                    const resourceVal = this.gameState.resources?.[condition.resource] ?? this.gameState[condition.resource];
+                    const hasEnoughResource = (resourceVal || 0) >= condition.amount;
                     return hasEnoughResource;
 
                 case 'tech':
                     return window.techTree &&
-                        typeof window.techTree.isResearched === 'function' &&
-                        window.techTree.isResearched(condition.tech);
+                        typeof window.techTree.hasResearched === 'function' &&
+                        window.techTree.hasResearched(condition.tech);
 
                 case 'tutorial_step':
                     return window.tutorialManager &&
@@ -644,11 +666,12 @@ class UnlockSystem {
                     ).length;
                     return buildingCount >= condition.count;
                 case 'resource':
-                    return this.gameState[condition.resource] >= condition.amount;
+                    const resVal = this.gameState.resources?.[condition.resource] ?? this.gameState[condition.resource];
+                    return (resVal || 0) >= condition.amount;
                 case 'tech':
                     return window.techTree &&
-                        typeof window.techTree.isResearched === 'function' &&
-                        window.techTree.isResearched(condition.tech);
+                        typeof window.techTree.hasResearched === 'function' &&
+                        window.techTree.hasResearched(condition.tech);
                 default:
                     return false;
             }
@@ -687,18 +710,19 @@ class UnlockSystem {
                         icon: this.getBuildingIcon(condition.building)
                     };
                 case 'resource':
-                    const hasEnoughResource = this.gameState[condition.resource] >= condition.amount;
+                    const reqResVal = this.gameState.resources?.[condition.resource] ?? this.gameState[condition.resource];
+                    const hasEnoughResource = (reqResVal || 0) >= condition.amount;
                     return {
                         type: 'resource',
                         description: `${condition.amount} ${condition.resource}`,
                         completed: hasEnoughResource,
-                        progress: `${this.gameState[condition.resource]}/${condition.amount}`,
+                        progress: `${Math.floor(reqResVal || 0)}/${condition.amount}`,
                         icon: this.getResourceIcon(condition.resource)
                     };
                 case 'tech':
                     const hasTech = window.techTree &&
-                        typeof window.techTree.isResearched === 'function' &&
-                        window.techTree.isResearched(condition.tech);
+                        typeof window.techTree.hasResearched === 'function' &&
+                        window.techTree.hasResearched(condition.tech);
                     const techName = condition.tech.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                     return {
                         type: 'tech',

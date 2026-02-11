@@ -49,6 +49,50 @@
       cursor: pointer;
       transition: background 0.2s, transform 0.2s;
       box-shadow: 0 2px 8px #0004;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .start-btn:hover {
+      background: linear-gradient(90deg, #8f94fb, #4e54c8);
+      transform: translateY(-2px) scale(1.04);
+    }
+    .continue-btn {
+      background: linear-gradient(90deg, #c9a84c, #e8c95a);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      padding: 0.9rem 2.2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      box-shadow: 0 2px 8px #0004;
+      text-decoration: none;
+      display: inline-block;
+      margin-bottom: 0.75rem;
+    }
+    .continue-btn:hover {
+      background: linear-gradient(90deg, #e8c95a, #c9a84c);
+      transform: translateY(-2px) scale(1.04);
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .save-info {
+      color: #8f94fb;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    .footer {
+      margin-top: 2.5rem;
+      color: #6c7a99;
+      font-size: 0.95rem;
+    }
+  </style>
+      box-shadow: 0 2px 8px #0004;
     }
     .start-btn:hover {
       background: linear-gradient(90deg, #8f94fb, #4e54c8);
@@ -65,8 +109,76 @@
   <div class="container">
     <h1>Idle Dynasty</h1>
     <p>Lead your people from humble beginnings to a thriving dynasty. Manage resources, command armies, and shape your legacy in this deep idle strategy game—all in your browser.</p>
-    <a href="public/game.html"><button class="start-btn">Start Game</button></a>
+    <div id="menu-buttons" class="btn-group">
+      <!-- Populated by script below -->
+      <a href="public/game.html" class="start-btn">Start Game</a>
+    </div>
   </div>
   <div class="footer">&copy; 2025 Idle Dynasty &mdash;</div>
+  <script>
+    // Detect existing save and show Continue / New Game options
+    (function() {
+      try {
+        const saveData = localStorage.getItem('dynastyBuilder_save');
+        const legacySave = localStorage.getItem('idleDynastyBuilder');
+        const hasSave = !!(saveData || legacySave);
+
+        if (hasSave) {
+          const container = document.getElementById('menu-buttons');
+          let saveInfo = '';
+          try {
+            const parsed = JSON.parse(saveData || legacySave);
+            const name = parsed.dynastyName || localStorage.getItem('dynastyName') || '';
+            const day = parsed.day || parsed.currentDay || 0;
+            if (name || day) {
+              saveInfo = (name ? name : 'Your Dynasty') + (day ? ' — Day ' + day : '');
+            }
+          } catch (_) {}
+
+          container.innerHTML = '';
+          if (saveInfo) {
+            const info = document.createElement('div');
+            info.className = 'save-info';
+            info.textContent = '📜 ' + saveInfo;
+            container.appendChild(info);
+          }
+
+          const continueBtn = document.createElement('a');
+          continueBtn.href = 'public/game.html';
+          continueBtn.className = 'continue-btn';
+          continueBtn.textContent = '👑 Continue Game';
+          container.appendChild(continueBtn);
+
+          const newBtn = document.createElement('a');
+          newBtn.href = '#';
+          newBtn.className = 'start-btn';
+          newBtn.textContent = 'New Game';
+          newBtn.style.fontSize = '0.95rem';
+          newBtn.style.padding = '0.6rem 1.5rem';
+          newBtn.onclick = function(e) {
+            e.preventDefault();
+            if (confirm('Start a new game? This will erase your current save.')) {
+              // Clear all game data
+              localStorage.removeItem('dynastyBuilder_save');
+              localStorage.removeItem('idleDynastyBuilder');
+              localStorage.removeItem('tutorialComplete');
+              localStorage.removeItem('tutorialProgress');
+              localStorage.removeItem('dynastyName');
+              localStorage.removeItem('buildingTutorialState');
+              localStorage.removeItem('worldTutorialState');
+              localStorage.removeItem('worldTutorialComplete');
+              localStorage.removeItem('achievements');
+              localStorage.removeItem('unlockSystem');
+              localStorage.removeItem('techTreeState');
+              localStorage.removeItem('gameSettings');
+              localStorage.removeItem('messageHistory');
+              window.location.href = 'public/game.html';
+            }
+          };
+          container.appendChild(newBtn);
+        }
+      } catch (_) {}
+    })();
+  </script>
 </body>
 </html>

@@ -112,7 +112,10 @@ class PopulationManager {
         // 4. Process daily skill progression
         this.processDailySkillProgression();
 
-        // 5. Log daily summary
+        // 5. Process daily happiness update
+        this.processDailyHappiness();
+
+        // 6. Log daily summary
         const summary = {
             startingPopulation: this.population.length + agingResult.deaths - birthResult.births,
             births: birthResult.births,
@@ -189,20 +192,31 @@ class PopulationManager {
      * Death probability starts at 180 days and increases gradually
      */
     calculateDeathProbability(age) {
-        if (age < 180) return 0; // No death before 180 days
+        // Apply tech lifespan bonus: shift effective age down
+        const lifespanBonus = window.gameState?.techBonuses?.lifespan || 0;
+        const effectiveAge = lifespanBonus > 0 ? age / (1 + lifespanBonus) : age;
+
+        if (effectiveAge < 180) return 0; // No death before 180 days
 
         // Gradual increase from 180 to 220 days
         // At 180: ~0.1% chance, At 200: ~2% chance, At 220: ~50% chance
-        if (age <= 200) {
-            const t = (age - 180) / 20; // 0..1
-            return 0.001 + t * (0.02 - 0.001);
+        let prob;
+        if (effectiveAge <= 200) {
+            const t = (effectiveAge - 180) / 20; // 0..1
+            prob = 0.001 + t * (0.02 - 0.001);
+        } else if (effectiveAge <= 220) {
+            const t = (effectiveAge - 200) / 20; // 0..1
+            prob = 0.02 + t * (0.5 - 0.02);
+        } else {
+            // Beyond 220, approach 100% with a soft cap
+            prob = Math.min(0.99, 0.5 + (effectiveAge - 220) * 0.01);
         }
-        if (age <= 220) {
-            const t = (age - 200) / 20; // 0..1
-            return 0.02 + t * (0.5 - 0.02);
-        }
-        // Beyond 220, approach 100% with a soft cap
-        return Math.min(0.99, 0.5 + (age - 220) * 0.01);
+
+        // Apply tech death chance reduction
+        const deathChanceMod = window.gameState?.techBonuses?.deathChance || 0;
+        if (deathChanceMod) prob *= (1 + deathChanceMod); // deathChance is negative (-0.30)
+
+        return Math.max(0, prob);
     }
 
     /**
@@ -294,6 +308,14 @@ class PopulationManager {
         let finalChance = baseChance * (1 + bonus);
         finalChance = Math.max(0, finalChance); // No negative chance
 
+        // Apply tech bonus for birth rate
+        const techBirthBonus = window.gameState?.techBonuses?.birthRate || 0;
+        if (techBirthBonus) finalChance *= (1 + techBirthBonus);
+
+        // Apply achievement bonus for birth rate
+        const achieveBirthBonus = window.gameState?.achievementBonuses?.birthRate || 0;
+        if (achieveBirthBonus) finalChance *= (1 + achieveBirthBonus);
+
         let births = 0;
         let twins = 0;
         for (let i = 0; i < eligibleCouples; i++) {
@@ -352,7 +374,7 @@ class PopulationManager {
             gender: details.gender || (Math.random() < 0.5 ? 'male' : 'female'),
             isChild,
             canWork,
-            happiness: details.happiness || 70,
+            happiness: details.happiness || 75,
             productivity: details.productivity || 0.8,
             health: details.health || 100, // Initialize health to 100%
             traits: details.traits || [],
@@ -721,7 +743,7 @@ class PopulationManager {
         }
 
         // Happiness factor
-        const happinessFactor = Math.max(0.5, (villager.happiness || 70) / 100);
+        const happinessFactor = Math.max(0.5, (villager.happiness || 75) / 100);
 
         return skillScore * ageFactor * happinessFactor;
     }
@@ -1139,8 +1161,132 @@ class PopulationManager {
      */
     increaseMorale(delta) {
         this.population.forEach(v => {
-            v.happiness = Math.max(0, Math.min(100, (v.happiness || 70) + delta));
+            v.happiness = Math.max(0, Math.min(100, (v.happiness || 75) + delta));
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  DAILY HAPPINESS TICK
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Process daily happiness updates for all villagers.
+     * Happiness drifts toward a "target" derived from village conditions,
+     * moving 1-3 points per day (never a jarring swing).
+     *
+     * Factors (all additive, then clamped to 0-100):
+     *   Base target:           50  (neutral)
+     *   Food surplus:         +0 to +25  (scaled by days of surplus stored)
+     *   Food shortage:        -10 to -30 (no food = terrible)
+     *   Building bonuses:     +happiness per monument/temple level
+     *   Elder wisdom:         +0 to +10  (from getElderBonuses)
+     *   Tech: medicine        +5
+     *   Tech: advancedMedicine +5
+     *   Tech: animalHusbandry +3
+     *   Starvation ongoing:   -15 (stacks with food shortage)
+     *   Recent deaths:        -5 per death in last 3 days (tracked via event)
+     */
+    processDailyHappiness() {
+        const gs = window.gameState;
+        if (!gs || this.population.length === 0) return;
+
+        // --- Calculate village-wide target happiness ---
+        let target = 50; // Neutral baseline
+
+        // Food surplus modifier (+0 to +25)
+        const food = gs.resources?.food ?? 0;
+        const pop = this.population.length;
+        const dailyFoodNeed = pop; // ~1 food per person per day as estimate
+        if (dailyFoodNeed > 0) {
+            const daysOfFood = food / dailyFoodNeed;
+            if (daysOfFood >= 30) {
+                target += 25; // 30+ days stockpiled = max bonus
+            } else if (daysOfFood >= 10) {
+                target += 15 + Math.floor((daysOfFood - 10) * 0.5); // 15-25
+            } else if (daysOfFood >= 3) {
+                target += 5 + Math.floor((daysOfFood - 3) * 1.4);  // 5-15
+            } else if (daysOfFood >= 1) {
+                target += Math.floor(daysOfFood * 2); // 0-5, food is tight
+            } else {
+                // Less than 1 day of food
+                target -= 15;
+            }
+        }
+
+        // Active starvation penalty (stacks)
+        if (gs.starvationDays > 0) {
+            target -= 15;
+        }
+
+        // Building happiness bonuses (monument, temple, etc.)
+        const buildingHappiness = this.calculateBuildingHappiness();
+        target += buildingHappiness;
+
+        // Elder wisdom bonus
+        try {
+            const elderBonuses = this.getElderBonuses();
+            // happinessBonus is a 0-0.10 percentage, convert to flat points
+            target += Math.round((elderBonuses.happinessBonus || 0) * 100); // 0-10 points
+        } catch (_) {}
+
+        // Tech happiness bonuses
+        try {
+            const techTree = window.techTree;
+            if (techTree) {
+                if (techTree.hasResearched('medicine'))         target += 5;
+                if (techTree.hasResearched('advancedMedicine')) target += 5;
+                if (techTree.hasResearched('animalHusbandry'))  target += 3;
+            }
+        } catch (_) {}
+
+        // Clamp target
+        target = Math.max(0, Math.min(100, target));
+
+        // --- Drift each villager toward target ---
+        const maxDrift = 3; // Max points per day
+        this.population.forEach(v => {
+            const current = v.happiness ?? 75;
+            const diff = target - current;
+
+            if (Math.abs(diff) <= 1) {
+                v.happiness = target;
+            } else {
+                // Move 1-3 points toward target (faster when far away)
+                const step = Math.sign(diff) * Math.min(maxDrift, Math.ceil(Math.abs(diff) * 0.15));
+                v.happiness = Math.max(0, Math.min(100, current + step));
+            }
+        });
+
+        // Emit for UI updates
+        window.eventBus?.emit('happiness_updated', {
+            target,
+            average: Math.round(this.population.reduce((s, v) => s + (v.happiness || 75), 0) / this.population.length),
+            buildingBonus: buildingHappiness
+        });
+    }
+
+    /**
+     * Sum happiness bonuses from completed buildings.
+     * Reads BUILDING_DATA production.bonuses.happiness and multiplies by building level.
+     */
+    calculateBuildingHappiness() {
+        let total = 0;
+        const gs = window.gameState;
+        if (!gs?.buildings) return total;
+
+        const BDATA = window.BUILDING_DATA;
+        if (!BDATA) return total;
+
+        gs.buildings.forEach(b => {
+            if (b.level <= 0) return; // not completed
+            const def = BDATA[b.type];
+            const bonus = def?.production?.bonuses?.happiness;
+            if (bonus) {
+                total += bonus * b.level;
+            }
+        });
+
+        return total;
     }
 
     /**
@@ -1212,7 +1358,7 @@ class PopulationManager {
                 status: age > 27 ? 'idle' : 'child',
                 skills: villagerSkills,
                 gender: Math.random() < 0.5 ? 'male' : 'female',
-                happiness: 60 + Math.floor(Math.random() * 30), // 60-90 happiness
+                happiness: 75,
                 productivity: age > 27 ? (0.7 + Math.random() * 0.6) : 0.1, // 0.7-1.3 for adults
                 traits: this.generateRandomTraits(ageGroup)
             };
@@ -1262,7 +1408,7 @@ class PopulationManager {
                 status: 'idle',
                 skills: this.getSkillsForRole('villager'),
                 gender: Math.random() < 0.5 ? 'male' : 'female',
-                happiness: 60 + Math.floor(Math.random() * 20),
+                happiness: 75,
                 productivity: 0.8 + Math.random() * 0.4,
                 traits: this.generateRandomTraits('adult')
             };
@@ -1754,7 +1900,7 @@ class PopulationManager {
             .slice(0, 10);
 
         // Calculate happiness statistics
-        const happinessValues = this.population.map(v => (v.happiness ?? 70));
+        const happinessValues = this.population.map(v => (v.happiness ?? 75));
         const happinessTotal = happinessValues.reduce((sum, h) => sum + h, 0);
         const averageHappiness = Math.round(happinessTotal / this.population.length);
 
@@ -1834,7 +1980,7 @@ class PopulationManager {
             role: person.role,
             status: person.status,
             gender: person.gender,
-            happiness: person.happiness || 50,
+            happiness: person.happiness || 75,
             productivity: person.productivity || 1.0,
             skills: person.skills || [],
             traits: person.traits || [],
@@ -1953,7 +2099,7 @@ class PopulationManager {
                 age: Math.floor(Math.random() * 15) + 18, // Age 18-32
                 role: roles[Math.floor(Math.random() * roles.length)],
                 health: Math.floor(Math.random() * 20) + 80, // Health 80-100
-                happiness: Math.floor(Math.random() * 30) + 70, // Happiness 70-100
+                happiness: 75,
                 status: 'idle',
                 location: 'village',
                 skills: this.generateStartingSkills(),

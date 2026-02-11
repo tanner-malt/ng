@@ -4092,6 +4092,14 @@ class VillageManager {
         // Upgrade building
         const newLevel = this.buildingEffectsManager.upgradeBuildingLevel(buildingType, position);
 
+        // Sync level to the building object in gameState
+        const targetBuilding = this.gameState.buildings.find(b =>
+            b.type === buildingType && `${b.x},${b.y}` === position
+        );
+        if (targetBuilding) {
+            targetBuilding.level = newLevel;
+        }
+
         window.showToast?.(
             `${buildingType} upgraded to level ${newLevel}`,
             { title: 'Building Upgraded!', type: 'success', icon: '⬆️', timeout: 3000 }

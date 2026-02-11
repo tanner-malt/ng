@@ -113,9 +113,24 @@ class JobRegistry {
         this._gameState = null;
         this.debugMode = false;
 
+        // Terrain → building type → resource → multiplier
+        // Applied on top of base production for buildings placed on matching terrain
+        this.TERRAIN_BONUSES = {
+            fertile: {
+                farm:          { food: 0.30 },
+                huntersLodge:  { food: 0.15 }
+            },
+            hills: {
+                quarry:        { stone: 0.30 },
+                mine:          { stone: 0.25, metal: 0.25 },
+                _default:      { stone: 0.10 }
+            }
+        };
+
         // Hard-coded efficiency rates per job type (mirrors old jobEfficiency Map)
         this._jobEfficiency = {
             farmer:           { food: 3.75 },
+            hunter:           { food: 2.5 },
             woodcutter:       { wood: 3 },
             builder:          { construction: 1 },
             gatherer:         {},            // RNG in calculateDailyProduction
@@ -137,6 +152,7 @@ class JobRegistry {
         // Skill mapping for worker-to-job fit
         this._skillMapping = {
             farmer: ['Agriculture'],
+            hunter: ['Hunting', 'Agriculture'],
             builder: ['Carpentry', 'Masonry', 'Engineering'],
             gatherer: ['Hunting', 'Forestry', 'Agriculture'],
             woodcutter: ['Forestry'],
@@ -536,6 +552,9 @@ class JobRegistry {
                 score += 5 + needs.foodUrgency * 10;
                 if (currentFarmers < minFarmers) score += 15;
             }
+            else if (job.jobType === 'hunter') {
+                score += 5 + needs.foodUrgency * 8;
+            }
             else if (job.jobType === 'gatherer') {
                 // Gatherer is the fallback — lowest score of any real job
                 score += 1 + needs.basicUrgency * 2;
@@ -736,6 +755,57 @@ class JobRegistry {
     //  PRODUCTION CALCULATION
     // ═══════════════════════════════════════════════════════════════════════
 
+    // Maps jobType → tech bonus key for production multipliers
+    static TECH_BONUS_MAP = {
+        farmer: 'farmProduction',
+        rockcutter: 'quarryProduction',
+        woodcutter: 'woodcutterProduction',
+        sawyer: 'lumberMillProduction',
+        miner: 'mineProduction',
+        blacksmith: 'blacksmithEfficiency'
+    };
+
+    _getTechMultiplier(jobType) {
+        const key = JobModel.TECH_BONUS_MAP[jobType];
+        if (!key) return 1;
+        const bonus = this.gameState?.techBonuses?.[key] || 0;
+        return 1 + bonus;
+    }
+
+    /**
+     * Get terrain-based production multiplier for a specific resource at a building.
+     * Returns 1 + bonus (e.g. 1.30 for a 30% bonus).
+     */
+    _getTerrainMultiplier(buildingId, resourceType) {
+        const building = (this.gameState?.buildings || []).find(b => b.id === buildingId);
+        if (!building?.terrain) return 1;
+        const terrainEntry = this.TERRAIN_BONUSES[building.terrain];
+        if (!terrainEntry) return 1;
+        const buildingBonus = terrainEntry[building.type] || terrainEntry._default;
+        if (!buildingBonus) return 1;
+        return 1 + (buildingBonus[resourceType] || 0);
+    }
+
+    /**
+     * Get seasonal multiplier for a job type.
+     * Uses per-job seasonal modifiers from JOB_DATA if available,
+     * otherwise falls back to the global GameData.seasonMultipliers for the resource.
+     */
+    _getSeasonalMultiplier(jobType, resourceType) {
+        const season = this.gameState?.season || 'Spring';
+        // Check for job-specific seasonal modifiers first
+        const jobDef = window.JOB_DATA?.[jobType];
+        if (jobDef?.seasonalModifiers?.[season] !== undefined) {
+            return jobDef.seasonalModifiers[season];
+        }
+        // Fall back to global resource-based seasonal multipliers
+        try {
+            const mults = window.GameData?.seasonMultipliers?.[season];
+            if (mults?.[resourceType]) return mults[resourceType];
+        } catch (_) {}
+        return 1.0;
+    }
+
     calculateDailyProduction() {
         const production = { food: 0, wood: 0, stone: 0, metal: 0, planks: 0, weapons: 0, tools: 0, gold: 0, production: 0 };
 
@@ -748,29 +818,22 @@ class JobRegistry {
 
             const workerEff = this.calculateWorkerEfficiency(worker, jobType);
             const efficiency = this._jobEfficiency[jobType] || {};
+            const bid = slot.get('buildingId');
 
             if (jobType === 'gatherer') {
                 // RNG: pick one of food/wood/stone
                 const choice = ['food', 'wood', 'stone'][Math.floor(Math.random() * 3)];
-                let seasonMult = 1.0;
-                try {
-                    const season = this.gameState?.season || 'Spring';
-                    const mults = window.GameData?.seasonMultipliers?.[season];
-                    if (mults?.[choice]) seasonMult = mults[choice];
-                } catch (_) {}
+                const seasonMult = this._getSeasonalMultiplier(jobType, choice);
                 production[choice] += 1 * workerEff * seasonMult;
             } else {
+                const techMult = this._getTechMultiplier(jobType);
                 Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
                     if (!(resourceType in production)) return;
-                    let seasonMult = 1.0;
-                    if (baseAmount > 0) {
-                        try {
-                            const season = this.gameState?.season || 'Spring';
-                            const mults = window.GameData?.seasonMultipliers?.[season];
-                            if (mults?.[resourceType]) seasonMult = mults[resourceType];
-                        } catch (_) {}
-                    }
-                    production[resourceType] += baseAmount * workerEff * seasonMult;
+                    const seasonMult = baseAmount > 0 ? this._getSeasonalMultiplier(jobType, resourceType) : 1.0;
+                    // Apply tech bonus only to positive production (not consumption)
+                    const mult = baseAmount > 0 ? techMult : 1;
+                    const terrainMult = baseAmount > 0 ? this._getTerrainMultiplier(bid, resourceType) : 1;
+                    production[resourceType] += baseAmount * workerEff * seasonMult * mult * terrainMult;
                 });
             }
         }
@@ -813,15 +876,14 @@ class JobRegistry {
             if (!jobAgg[jobType]) jobAgg[jobType] = { workers: 0, resources: {} };
             jobAgg[jobType].workers++;
 
+            const techMult = this._getTechMultiplier(jobType);
             Object.entries(efficiency).forEach(([rt, base]) => {
                 if (!(rt in production)) return;
-                let seasonMult = 1.0;
-                try {
-                    const season = this.gameState?.season || 'Spring';
-                    const mults = window.GameData?.seasonMultipliers?.[season];
-                    if (mults?.[rt]) seasonMult = mults[rt];
-                } catch (_) {}
-                const gen = base * workerEff * seasonMult * buildingMult;
+                const seasonMult = base > 0 ? this._getSeasonalMultiplier(jobType, rt) : 1.0;
+                // Apply tech bonus only to positive production (not consumption)
+                const mult = base > 0 ? techMult : 1;
+                const terrainMult = base > 0 ? this._getTerrainMultiplier(bid, rt) : 1;
+                const gen = base * workerEff * seasonMult * buildingMult * mult * terrainMult;
                 production[rt] += gen;
                 if (gen > 0) workerCounts[rt]++;
                 jobAgg[jobType].resources[rt] = (jobAgg[jobType].resources[rt] || 0) + gen;

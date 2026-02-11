@@ -98,6 +98,7 @@
                 <div class="nav-section nav-left">
                     <button class="nav-btn active" data-view="village">Village</button>
                     <button class="nav-btn locked" data-view="world">World</button>
+                    <button class="nav-btn locked" data-view="research">Research</button>
                     <button class="nav-btn locked" data-view="monarch">Monarch</button>
                     <button class="nav-btn locked" data-view="throne">Throne</button>
                 </div>
@@ -970,7 +971,25 @@
         <div id="monarch-content" class="monarch-content" style="display: none;">
             <div class="monarch-header">
                 <h2>👑 Royal Court & Dynasty Management</h2>
-                <p>Manage your royal investments, advisors, and dynasty legacy</p>
+                <div id="monarch-gold-display" class="gold-display">💰 0 Gold</div>
+            </div>
+
+            <!-- Current Monarch Card & Family Tree -->
+            <div class="monarch-section monarch-overview">
+                <div class="monarch-overview-grid">
+                    <div>
+                        <h3>👑 Current Monarch</h3>
+                        <div id="monarch-card">
+                            <!-- Populated by monarch.js -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3>👨‍👩‍👧‍👦 Royal Family</h3>
+                        <div id="monarch-family-tree">
+                            <!-- Populated by monarch.js -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Royal Investment System -->
@@ -1127,6 +1146,41 @@
                 <div id="investment-status" class="investment-status">
                     <!-- Will be populated by monarch.js -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Research View -->
+    <div id="research-view" class="game-view">
+        <div class="locked-view">
+            <h2>🔬 Research</h2>
+            <p class="lock-message">Build an Academy to unlock technology research.</p>
+        </div>
+
+        <div id="research-content" class="research-content" style="display: none;">
+            <div class="research-header">
+                <h2>🔬 Technology Research</h2>
+                <div class="research-stats">
+                    <span class="research-points">🧪 Research Points: <strong id="research-rp">0</strong></span>
+                    <span class="research-rate" id="research-rate-display"></span>
+                </div>
+            </div>
+
+            <!-- Current Research -->
+            <div id="current-research-panel" class="current-research-panel" style="display: none;">
+                <h3>📖 Currently Researching</h3>
+                <div class="current-research-info">
+                    <span id="current-research-name" class="current-research-name"></span>
+                    <div class="research-progress-bar">
+                        <div id="research-progress-fill" class="research-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <span id="research-progress-text" class="research-progress-text">0%</span>
+                </div>
+            </div>
+
+            <!-- Tech Tree -->
+            <div id="tech-tree-container" class="tech-tree-container">
+                <!-- Tier sections populated by techTree.js -->
             </div>
         </div>
     </div>
@@ -1667,7 +1721,9 @@
             border-radius: 12px;
             padding: 2rem;
             margin-bottom: 2rem;
-            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             border: 2px solid #1abc9c;
             box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);
         }
@@ -1679,10 +1735,31 @@
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
+        .gold-display {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #f1c40f;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+        }
+
         .monarch-header p {
             margin: 0;
             opacity: 0.9;
             font-size: 1.1rem;
+        }
+
+        .monarch-overview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .monarch-overview-grid h3 {
+            color: #f1c40f;
+            margin: 0 0 1rem 0;
+            border-bottom: 2px solid rgba(241, 196, 15, 0.3);
+            padding-bottom: 0.5rem;
         }
 
         .monarch-section {
@@ -1804,11 +1881,75 @@
             box-shadow: none;
         }
 
+        .investment-level {
+            font-size: 0.8rem;
+            color: #1abc9c;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }
+
         .advisor-panel {
             background: linear-gradient(135deg, #9b59b6, #8e44ad);
             border-radius: 8px;
             padding: 1.5rem;
             border: 2px solid #1abc9c;
+        }
+
+        .advisor-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .advisor-header h4 {
+            color: #f1c40f;
+            margin: 0;
+        }
+
+        .advisor-icon {
+            font-size: 1.5rem;
+        }
+
+        .advisor-advice-item {
+            margin-bottom: 0.75rem;
+            font-style: italic;
+            color: #ecf0f1;
+            line-height: 1.5;
+        }
+
+        .advisor-advice-empty {
+            font-style: italic;
+            color: #ddd;
+        }
+
+        .advisor-buttons {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .advisor-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .advisor-btn:hover {
+            background: rgba(255,255,255,0.25);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .advisor-btn.active {
+            background: #1abc9c;
+            border-color: #16a085;
         }
 
         .dynasty-tools {
@@ -2001,10 +2142,16 @@
 
             .monarch-header {
                 padding: 1rem;
+                flex-direction: column;
+                gap: 0.5rem;
             }
 
             .monarch-header h2 {
                 font-size: 1.5rem;
+            }
+
+            .monarch-overview-grid {
+                grid-template-columns: 1fr;
             }
 
             .investment-item {
@@ -2129,7 +2276,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             const root = document.getElementById('game-container');
             if (!root) return;
-            ['world-view', 'monarch-view', 'throne-view'].forEach(id => {
+            ['world-view', 'research-view', 'monarch-view', 'throne-view'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el && !root.contains(el)) {
                     try {

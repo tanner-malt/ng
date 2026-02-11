@@ -105,6 +105,29 @@ const JOB_DATA = {
         skillGained: 'farming'
     },
 
+    hunter: {
+        name: 'Hunter',
+        label: 'Hunter',
+        icon: '🏹',
+        description: 'Hunts game in the surrounding wilderness for food',
+        buildingType: 'huntersLodge',
+
+        production: {
+            food: 2.5
+        },
+        consumption: {},
+
+        seasonalModifiers: {
+            Spring: 0.75,
+            Summer: 1.0,
+            Autumn: 1.5,
+            Winter: 1.5
+        },
+
+        requiredSkill: 'hunting',
+        skillGained: 'hunting'
+    },
+
     // =========================================
     // RESOURCE PRODUCTION JOBS
     // =========================================

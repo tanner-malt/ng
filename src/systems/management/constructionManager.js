@@ -253,8 +253,11 @@ class ConstructionManager {
         // Technology efficiency (from research)
         site.technologyEfficiency = 1 + (this.technologyBonuses.get('construction') || 0) * 0.02; // Reduced for work-point system
 
+        // Achievement construction speed bonus
+        const achieveConstructionBonus = this.gameState?.achievementBonuses?.constructionSpeed || 0;
+
         // Calculate final daily progress with all modifiers
-        const finalMultiplier = site.teamworkBonus * site.seasonalEfficiency * site.technologyEfficiency;
+        const finalMultiplier = site.teamworkBonus * site.seasonalEfficiency * site.technologyEfficiency * (1 + achieveConstructionBonus);
         site.dailyProgress = Math.max(0, site.dailyProgress * finalMultiplier);
 
         // Update estimated completion

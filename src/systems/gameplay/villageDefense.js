@@ -74,6 +74,12 @@ class VillageDefenseSystem {
         const guardEfficiency = this.gameState.techBonuses?.guardEfficiency || 0;
         defense *= (1 + guardEfficiency);
         
+        // Apply fortification tactics tech bonus
+        const fortBonus = this.gameState.techBonuses?.fortificationDamage || 0;
+        if (fortBonus && this.wallStrength > 0) {
+            defense *= (1 + fortBonus);
+        }
+        
         this.currentDefenseRating = Math.floor(defense);
         return this.currentDefenseRating;
     }

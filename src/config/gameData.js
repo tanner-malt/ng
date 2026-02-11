@@ -30,6 +30,7 @@ const GameData = {
 
         // Production Buildings  
         woodcutterLodge: { wood: 20, stone: 40, gold: 0 }, // Gold cost removed
+        huntersLodge: { wood: 30, stone: 15 },
         quarry: { wood: 60, stone: 80, gold: 0 }, // Gold cost removed
         lumberMill: { wood: 100, stone: 60, gold: 80, planks: 20 }, // Industrial facility
         mine: { wood: 60, stone: 40 },
@@ -93,6 +94,11 @@ const GameData = {
         woodcutterLodge: {
             jobs: {
                 woodcutter: 3 // 3 woodcutters only
+            }
+        },
+        huntersLodge: {
+            jobs: {
+                hunter: 2 // 2 hunters
             }
         },
         quarry: {
@@ -199,6 +205,7 @@ const GameData = {
 
         // Production Buildings
         woodcutterLodge: 15,
+        huntersLodge: 12,
         quarry: 60,
         lumberMill: 55,
         mine: 75,
@@ -269,6 +276,12 @@ const GameData = {
             name: 'Woodcutter Lodge',
             description: 'Chop trees and haul lumber back to the village',
             effects: '3 Woodcutter jobs • +3🪵 wood/worker/day'
+        },
+        huntersLodge: {
+            icon: '🏹',
+            name: "Hunter's Lodge",
+            description: 'Hunters track and bring back game for food',
+            effects: '2 Hunter jobs • +2.5🍖 food/hunter/day • Autumn/Winter bonus'
         },
         quarry: {
             icon: '⛏️',
@@ -386,7 +399,7 @@ const GameData = {
     // Building categories for organized UI display
     buildingCategories: {
         essential: ['townCenter', 'house', 'farm', 'storehouse'],
-        production: ['woodcutterLodge', 'quarry', 'lumberMill', 'mine'],
+        production: ['huntersLodge', 'woodcutterLodge', 'quarry', 'lumberMill', 'mine'],
         craft: ['workshop', 'blacksmith', 'market'],
         military: ['barracks', 'fortifications', 'militaryAcademy', 'castle'],
         royal: ['keep', 'monument'],
@@ -529,17 +542,24 @@ const GameData = {
             // Check if building provides population capacity
             const buildingData = this.buildingProduction[building.type];
             if (buildingData && buildingData.populationCapacity) {
-                totalCap += buildingData.populationCapacity;
+                const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
+                totalCap += Math.floor(buildingData.populationCapacity * levelMult);
             }
             // Legacy support for specific building types
             else if (building.type === 'house') {
-                totalCap += this.buildingProduction.house.populationCapacity || 5;
+                const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
+                totalCap += Math.floor((this.buildingProduction.house.populationCapacity || 5) * levelMult);
             }
             // Town centers also provide some population capacity
             else if (building.type === 'townCenter') {
                 totalCap += 3; // Base capacity from town center
             }
         });
+
+        // Apply tech building capacity bonus
+        const buildingCapBonus = window.gameState?.techBonuses?.buildingCapacity || 0;
+        if (buildingCapBonus) totalCap = Math.floor(totalCap * (1 + buildingCapBonus));
+
         return totalCap; // Base case is 0, only buildings/tech provide capacity
     },
 
@@ -555,15 +575,20 @@ const GameData = {
             const def = this.buildingProduction[building.type];
             const storage = def && def.storage;
             if (!storage) return;
+            const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
             if (typeof storage.all === 'number') {
-                buildingBonus += storage.all;
+                buildingBonus += Math.floor(storage.all * levelMult);
             }
             if (typeof storage[resource] === 'number') {
-                buildingBonus += storage[resource];
+                buildingBonus += Math.floor(storage[resource] * levelMult);
             }
         });
 
-        return Math.floor((baseCap + buildingBonus) * seasonalMod);
+        // Apply tech storage capacity bonus
+        const storageBonus = window.gameState?.techBonuses?.storageCapacity || 0;
+        const techMult = storageBonus ? (1 + storageBonus) : 1;
+
+        return Math.floor((baseCap + buildingBonus) * seasonalMod * techMult);
     },
 
     // ===== POPULATION SYSTEM =====
@@ -588,6 +613,11 @@ const GameData = {
             label: 'Farmer',
             buildingType: 'farm',
             description: 'Produces food at farms.'
+        },
+        hunter: {
+            label: 'Hunter',
+            buildingType: 'huntersLodge',
+            description: 'Hunts game for food, strong in autumn and winter.'
         },
         woodcutter: {
             label: 'Woodcutter',

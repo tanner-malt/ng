@@ -68,9 +68,14 @@ class StrategicCombat {
             const terrainMod = this.calculateTerrainModifier(terrain, 'attack');
             const legacyMod = this.gameState?.legacyCombatMultiplier || 1.0;
             
-            const attackPower = (attacker.attack || 5) * terrainMod * legacyMod;
+            // Tech bonuses for player armies
+            const techStrength = 1 + (this.gameState?.techBonuses?.unitStrength || 0);
+            const techWeapon = 1 + (this.gameState?.techBonuses?.weaponQuality || 0);
+            const techBattleDmg = 1 + (this.gameState?.techBonuses?.battleDamage || 0);
+            
+            const attackPower = (attacker.attack || 5) * terrainMod * legacyMod * techStrength * techWeapon;
             const defensePower = (target.defense || 3);
-            const damage = Math.max(1, Math.round(attackPower - defensePower * 0.5 + Math.random() * 3));
+            const damage = Math.max(1, Math.round((attackPower - defensePower * 0.5 + Math.random() * 3) * techBattleDmg));
             
             target.hp -= damage;
             if (target.hp <= 0) {
@@ -87,7 +92,9 @@ class StrategicCombat {
             const target = aliveAttackers[Math.floor(Math.random() * aliveAttackers.length)];
             const terrainMod = this.calculateTerrainModifier(terrain, 'attack');
             const attackPower = (defender.attack || 5) * terrainMod;
-            const defensePower = (target.defense || 3);
+            // Player's armor tech bonus reduces damage taken
+            const techArmor = 1 + (this.gameState?.techBonuses?.armorQuality || 0);
+            const defensePower = (target.defense || 3) * techArmor;
             const damage = Math.max(1, Math.round(attackPower - defensePower * 0.5 + Math.random() * 3));
             
             target.hp -= damage;

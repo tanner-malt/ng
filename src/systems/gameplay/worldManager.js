@@ -139,8 +139,8 @@ class WorldManager {
                 if (!this.inBounds(r, c)) continue;
 
                 const hex = this.hexMap[r][c];
-                if (Math.abs(dr) + Math.abs(dc) <= radius) {
-                    // All tiles within radius become fully explored
+                // Use Chebyshev distance so diagonals count as distance 1
+                if (Math.max(Math.abs(dr), Math.abs(dc)) <= radius) {
                     hex.visibility = 'explored';
                 }
             }
@@ -595,6 +595,16 @@ class WorldManager {
 
             const plan = army.travelPlan;
             plan.index++;
+
+            // Tech travel speed bonus: extra steps per day
+            const travelBonus = window.gameState?.techBonuses?.travelSpeed || 0;
+            const extraSteps = Math.floor(travelBonus);
+            for (let s = 0; s < extraSteps && plan.index < plan.path.length - 1; s++) {
+                plan.index++;
+                const midStep = plan.path[plan.index];
+                army.position = { x: midStep.col, y: midStep.row };
+                this.exploreTile(midStep.row, midStep.col);
+            }
 
             if (plan.index >= plan.path.length) {
                 // Arrived at destination
@@ -1159,13 +1169,15 @@ class WorldManager {
             }
         }
 
-        // Explore tiles around each player army position
+        // Explore tiles around each player army position (including adjacent)
         for (const army of armies) {
             if (army.position) {
                 const ar = army.position.y;
                 const ac = army.position.x;
                 if (this.inBounds(ar, ac)) {
-                    this.exploreTile(ar, ac);
+                    // Always reveal around army, even if army tile is already explored
+                    this.hexMap[ar][ac].visibility = 'explored';
+                    this.revealAround(ar, ac, 1);
                 }
             }
         }

@@ -113,7 +113,7 @@ class LegacySystem {
         }
         
         // Achievements earned this run (5 points each)
-        const achievements = gameState.achievementSystem?.unlockedAchievements?.size || 0;
+        const achievements = gameState.achievementSystem?.unlockedAchievements?.length || 0;
         if (achievements > 0) {
             const achievePoints = achievements * 5;
             points += achievePoints;

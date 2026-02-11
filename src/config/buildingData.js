@@ -120,6 +120,26 @@ const BUILDING_DATA = {
     // =========================================
     // PRODUCTION BUILDINGS
     // =========================================
+    huntersLodge: {
+        name: "Hunter's Lodge",
+        icon: '🏹',
+        description: 'Hunters track and bring back game for food. Best in autumn and winter!',
+        effects: '2 Hunter jobs • +2.5🍖 food/hunter/day • Autumn/Winter bonus, Spring penalty',
+        category: 'production',
+
+        costs: { wood: 30, stone: 15 },
+        constructionPoints: 12,
+
+        production: {
+            jobs: { hunter: 2 }
+        },
+
+        unlockConditions: [
+            { type: 'building_count', building: 'farm', count: 1 }
+        ],
+        autoUnlock: true
+    },
+
     woodcutterLodge: {
         name: 'Woodcutter Lodge',
         icon: '🪚',

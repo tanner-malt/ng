@@ -70,7 +70,7 @@ class AchievementSystem {
             icon: '🏠',
             type: 'building',
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { refugee_families: 3, wood: 20 }
+            reward: { birthRate: 0.03, wood: 50 }
         });
 
         this.defineAchievement('feeding_people', {
@@ -86,7 +86,7 @@ class AchievementSystem {
             description: 'Built your first Barracks',
             icon: '⚔️',
             type: 'building',
-            reward: { population: 8 }
+            reward: { gold: 250 }
         });
 
         this.defineAchievement('tutorial_complete', {
@@ -113,7 +113,7 @@ class AchievementSystem {
             icon: '🏗️',
             type: 'building',
             requirement: { buildings_built: 10 },
-            reward: { population: 3 }
+            reward: { constructionSpeed: 0.05 }
         });
 
         this.defineAchievement('build_and_they_will_come', {
@@ -163,7 +163,7 @@ class AchievementSystem {
             icon: '🏘️',
             type: 'resource',
             requirement: { population: 50 },
-            reward: { population: 15, gold: 300 }
+            reward: { birthRate: 0.03, gold: 500 }
         });
 
         this.defineAchievement('migration_wave', {
@@ -172,7 +172,7 @@ class AchievementSystem {
             icon: '🚶‍♂️🚶‍♀️',
             type: 'special',
             requirement: { population: 25 },
-            reward: { population: 25, food: 200 }
+            reward: { birthRate: 0.05, food: 500 }
         });
 
         // Additional population achievements
@@ -209,7 +209,7 @@ class AchievementSystem {
             icon: '🤝',
             type: 'immigration',
             requirement: { total_immigrants: 10 },
-            reward: { population: 5, happiness: 10 }
+            reward: { birthRate: 0.02, happiness: 15 }
         });
 
         this.defineAchievement('immigration_hub', {
@@ -218,7 +218,7 @@ class AchievementSystem {
             icon: '🌍',
             type: 'immigration',
             requirement: { total_immigrants: 50 },
-            reward: { population: 15, gold: 500, influence: 50 }
+            reward: { birthRate: 0.04, gold: 800 }
         });
 
         this.defineAchievement('baby_boom', {
@@ -336,7 +336,7 @@ class AchievementSystem {
             icon: '🏗️',
             type: 'building',
             requirement: { building_types_built: 10 },
-            reward: { population: 3 }
+            reward: { constructionSpeed: 0.05 }
         });
 
         this.defineAchievement('population_boom', {
@@ -665,7 +665,17 @@ class AchievementSystem {
 
         // Handle population reward with PopulationManager
         Object.entries(rewards).forEach(([resource, amount]) => {
-            if (resource === 'population' && amount > 0) {
+            if (resource === 'birthRate' && amount > 0) {
+                // Accumulate birth rate bonus in gameState.achievementBonuses
+                if (!window.gameState.achievementBonuses) window.gameState.achievementBonuses = {};
+                window.gameState.achievementBonuses.birthRate = (window.gameState.achievementBonuses.birthRate || 0) + amount;
+                console.log(`[Achievements] Birth rate bonus +${(amount * 100).toFixed(1)}% (total: ${(window.gameState.achievementBonuses.birthRate * 100).toFixed(1)}%)`);
+            } else if (resource === 'constructionSpeed' && amount > 0) {
+                // Accumulate construction speed bonus
+                if (!window.gameState.achievementBonuses) window.gameState.achievementBonuses = {};
+                window.gameState.achievementBonuses.constructionSpeed = (window.gameState.achievementBonuses.constructionSpeed || 0) + amount;
+                console.log(`[Achievements] Construction speed bonus +${(amount * 100).toFixed(1)}% (total: ${(window.gameState.achievementBonuses.constructionSpeed * 100).toFixed(1)}%)`);
+            } else if (resource === 'population' && amount > 0) {
                 // Use generateMassPopulation for proper distribution
                 if (window.gameState?.populationManager?.generateMassPopulation) {
                     const before = window.gameState.populationManager.getAll().length;
@@ -815,9 +825,19 @@ class AchievementSystem {
                 influence: '👑',
                 prestige: '⭐',
                 military_exp: '⚔️',
-                population: '👤'
+                population: '👤',
+                birthRate: '👶',
+                constructionSpeed: '🔨',
+                happiness: '😊'
             };
             const icon = icons[resource] || '📊';
+            // Format percentage-based bonuses nicely
+            if (resource === 'birthRate') {
+                return `${icon} +${(amount * 100).toFixed(0)}% Birth Rate`;
+            }
+            if (resource === 'constructionSpeed') {
+                return `${icon} +${(amount * 100).toFixed(0)}% Construction Speed`;
+            }
             const name = resource.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
             return `${icon} ${amount} ${name}`;
         });
