@@ -9498,6 +9498,14 @@ html {
     color: #f39c12;
 }
 
+/* Per-resource affordability coloring in cost column */
+.building-resources .cost-affordable {
+    color: #27ae60;
+}
+.building-resources .cost-unaffordable {
+    color: #e74c3c;
+}
+
 /* Building locked - requirements not met */
 .building-row.building-locked {
     opacity: 0.5;

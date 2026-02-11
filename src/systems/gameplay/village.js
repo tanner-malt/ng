@@ -226,11 +226,13 @@ class VillageManager {
             // Listen for effect and season/day events to keep Active Effects panel fresh
             this.setupEffectEventListeners();
 
-            // Listen for day end events to check management lock
+            // Listen for day end events to check management lock AND refresh buildings tab
             try {
                 if (window.eventBus) {
                     // Periodic safety check on day end
                     window.eventBus.on('day-ended', () => this.ensureManagementLock());
+                    // Refresh building buttons every day so affordability, unlock progress, and new unlocks are visible
+                    window.eventBus.on('day-ended', () => this.refreshBuildingsTab());
                 }
                 // Initial lock state check
                 this.ensureManagementLock();
@@ -487,14 +489,21 @@ class VillageManager {
                         ${unlockHint}
                     `;
 
-                    // Resources column
+                    // Resources column — color-code each cost by affordability
                     const resourcesDiv = document.createElement('div');
                     resourcesDiv.className = 'building-resources';
                     const cost = GameData.buildingCosts[buildingType] || {};
-                    const costText = Object.entries(cost)
-                        .map(([resource, amount]) => `${amount} ${resource}`)
-                        .join(', ') || 'None';
-                    resourcesDiv.textContent = costText;
+                    const costEntries = Object.entries(cost);
+                    if (costEntries.length === 0) {
+                        resourcesDiv.textContent = 'None';
+                    } else {
+                        const gs = this.gameState;
+                        resourcesDiv.innerHTML = costEntries.map(([resource, amount]) => {
+                            const have = resource === 'gold' ? (gs.gold ?? 0) : (gs.resources[resource] ?? 0);
+                            const cls = have >= amount ? 'cost-affordable' : 'cost-unaffordable';
+                            return `<span class="${cls}">${amount} ${resource}</span>`;
+                        }).join(', ');
+                    }
 
                     // Work points column
                     const workPointsDiv = document.createElement('div');
@@ -639,6 +648,18 @@ class VillageManager {
                 textSpan.textContent = `${reason}. Open Leadership (👑) to manage governance or appoint a civil leader.`;
             }
         } catch (_) { /* ignore */ }
+    }
+
+    // Refresh the entire buildings tab — called on day-ended so affordability,
+    // unlock progress, and newly unlocked buildings are always up-to-date.
+    refreshBuildingsTab() {
+        try {
+            this.generateBuildingButtons();
+            this.setupBuildingButtons();
+            this.gameState?.updateBuildButtons?.();
+        } catch (e) {
+            console.warn('[Village] refreshBuildingsTab failed', e);
+        }
     }
 
     // Update available buildings based on unlock status
