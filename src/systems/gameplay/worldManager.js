@@ -344,10 +344,13 @@ class WorldManager {
             const totalAttack = (selectedArmy.units || []).reduce((s, u) => s + (u.attack || 10), 0);
             const totalDefense = (selectedArmy.units || []).reduce((s, u) => s + (u.defense || 5), 0);
             const avgHealth = (selectedArmy.units || []).length > 0 ? Math.round((selectedArmy.units || []).reduce((s, u) => s + (u.health || 100), 0) / selectedArmy.units.length) : 0;
+            const armyMorale = selectedArmy.morale ?? 100;
+            const moraleColor = armyMorale > 70 ? '#27ae60' : armyMorale > 40 ? '#f39c12' : '#c0392b';
             html += `<div style="display:flex;gap:8px;margin:6px 0;font-size:0.8em;opacity:0.85;">`;
             html += `<span>⚔️ ${totalAttack}</span>`;
             html += `<span>🛡️ ${totalDefense}</span>`;
             html += `<span>❤️ ${avgHealth}%</span>`;
+            html += `<span style="color:${moraleColor};">🔥 ${armyMorale}%</span>`;
             html += `</div>`;
 
             // Supply bar with visual indicator
@@ -388,6 +391,10 @@ class WorldManager {
                 html += `<p style="color:#c9a84c;font-size:0.85em;text-align:center;">📍 Click a tile to move</p>`;
                 html += `<button class="world-btn" onclick="window.worldManager.cancelMoveMode()">✖ Cancel Move</button>`;
             } else if (selectedArmy.status === 'garrisoned') {
+                const maxSupply = (selectedArmy.units?.length || 1) * 5;
+                const curSupply = selectedArmy.supplies?.food ?? 0;
+                const supplyPct = Math.round((curSupply / maxSupply) * 100);
+                html += `<p style="color:#27ae60;font-size:0.8em;text-align:center;margin:2px 0;">🔄 Resupplying daily (${supplyPct}% supplied)</p>`;
                 html += `<button class="world-btn" onclick="window.worldManager.deployArmy('${selectedArmy.id}')">🚶 Deploy</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
             } else if (selectedArmy.status === 'idle') {
@@ -453,24 +460,26 @@ class WorldManager {
                     const totalAttack = (a.units || []).reduce((s, u) => s + (u.attack || 10), 0);
                     const totalDefense = (a.units || []).reduce((s, u) => s + (u.defense || 5), 0);
                     const foodLeft = a.supplies?.food ?? 0;
+                    const morale = a.morale ?? 100;
                     const coords = this.formatCoords(a.position?.y ?? 0, a.position?.x ?? 0);
                     // General info
                     const general = this.gameState.royalFamily?.getGeneralForArmy?.(a.id);
                     const genLabel = general ? `<span style="color:#c9a84c;font-size:0.75em;">👑 ${general.name}</span>` : '';
 
-                    html += `<div class="army-list-item" style="cursor:pointer;padding:6px;border:1px solid #3a2a1a;border-radius:4px;margin:3px 0;background:rgba(42,31,20,0.3);" onclick="window.worldManager.selectArmy('${a.id}')">
+                    html += `<div class="army-list-item" style="cursor:pointer;padding:8px 10px;border:1px solid #5a4230;border-radius:6px;margin:4px 0;background:linear-gradient(135deg,rgba(42,31,20,0.5),rgba(60,45,30,0.4));transition:all 0.2s;" onmouseenter="this.style.borderColor='#c9a84c';this.style.background='linear-gradient(135deg,rgba(60,45,30,0.7),rgba(80,60,35,0.5))';" onmouseleave="this.style.borderColor='#5a4230';this.style.background='linear-gradient(135deg,rgba(42,31,20,0.5),rgba(60,45,30,0.4))';" onclick="window.worldManager.selectArmy('${a.id}')">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <strong>${statusIcon} ${a.name}</strong>
-                            <span style="font-size:0.75em;opacity:0.7;">${coords}</span>
+                            <strong style="font-size:0.9em;">${statusIcon} ${a.name}</strong>
+                            <span style="font-size:0.7em;opacity:0.7;">${coords}</span>
                         </div>
-                        <div style="display:flex;gap:6px;font-size:0.75em;opacity:0.8;margin-top:2px;">
-                            <span>${a.units?.length || 0} soldiers</span>
-                            <span>⚔️${totalAttack}</span>
-                            <span>🛡️${totalDefense}</span>
-                            <span>🍖${foodLeft}</span>
+                        <div style="display:flex;gap:8px;font-size:0.8em;margin-top:4px;">
+                            <span>👥 ${a.units?.length || 0}</span>
+                            <span>⚔️ ${totalAttack}</span>
+                            <span>🛡️ ${totalDefense}</span>
+                            <span>🍖 ${foodLeft}</span>
+                            <span>🔥 ${morale}%</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
-                            <span style="font-size:0.7em;opacity:0.6;">${statusLabel}</span>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px;">
+                            <span style="font-size:0.7em;padding:1px 6px;border-radius:3px;background:rgba(90,66,48,0.5);color:#c9a84c;">${statusLabel}</span>
                             ${genLabel}
                         </div>
                     </div>`;
@@ -1277,10 +1286,77 @@ class WorldManager {
         if (!this.initialized) return;
 
         this.processArmyMovement();
+        this.resupplyGarrisonedArmies();
         this.processEnemies();
         this.processCityIncome();
         this.refreshUI();
         this.saveWorldData();
+    }
+
+    /**
+     * Resupply armies that are garrisoned at the capital.
+     * Each day, garrisoned armies consume food from village stores
+     * and refill their supply pool up to max capacity.
+     */
+    resupplyGarrisonedArmies() {
+        const armies = this.gameState.getAllArmies?.() || [];
+        armies.forEach(army => {
+            if (army.status !== 'garrisoned') return;
+            if (!army.supplies) army.supplies = { food: 0 };
+
+            const unitCount = army.units?.length || 1;
+            const maxSupply = unitCount * 5;  // Same as draft supply formula
+            const currentFood = army.supplies.food;
+
+            if (currentFood >= maxSupply) return; // Already full
+
+            const needed = maxSupply - currentFood;
+            const available = this.gameState.resources?.food ?? 0;
+            const transfer = Math.min(needed, Math.floor(available * 0.1), available); // Take up to 10% of village food
+
+            if (transfer > 0) {
+                army.supplies.food += transfer;
+                this.gameState.resources.food -= transfer;
+                window.eventBus?.emit('resources-updated');
+            }
+
+            // Also heal wounded units while garrisoned
+            (army.units || []).forEach(u => {
+                if ((u.health || 100) < (u.maxHealth || 100)) {
+                    u.health = Math.min((u.maxHealth || 100), (u.health || 100) + 5);
+                }
+            });
+
+            // Restore morale while garrisoned
+            if ((army.morale || 100) < 100) {
+                army.morale = Math.min(100, (army.morale || 100) + 5);
+            }
+
+            // Drill instructor training buff: if a drill instructor is assigned,
+            // garrisoned army units slowly gain attack/defense
+            const hasDrillInstructor = this.hasDrillInstructorAssigned();
+            if (hasDrillInstructor) {
+                (army.units || []).forEach(u => {
+                    // +0.5 attack and +0.25 defense per day with instructor
+                    u.attack = Math.min((u.attack || 10) + 0.5, 30);  // cap at 30
+                    u.defense = Math.min((u.defense || 5) + 0.25, 20); // cap at 20
+                });
+            }
+        });
+    }
+
+    /**
+     * Check if a drill instructor is currently assigned to any barracks.
+     */
+    hasDrillInstructorAssigned() {
+        if (!window.jobRegistry) return false;
+        const slots = window.jobRegistry._slots?.all?.() || [];
+        for (const slot of slots) {
+            if (slot.get('jobType') === 'drillInstructor' && slot.get('workerId')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ===================================================================

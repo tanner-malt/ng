@@ -287,6 +287,26 @@ class MapRenderer {
         }
 
         marker.title = `${a.name} (${a.units?.length || 0} units) — ${a.status || 'idle'}`;
+
+        // Unit count badge (like enemy markers)
+        const unitCount = a.units?.length || 0;
+        if (unitCount > 0) {
+          const badge = document.createElement('span');
+          badge.className = 'army-count-badge';
+          badge.textContent = unitCount.toString();
+          badge.style.position = 'absolute';
+          badge.style.top = '-5px';
+          badge.style.right = '-5px';
+          badge.style.fontSize = '9px';
+          badge.style.background = '#8b6914';
+          badge.style.borderRadius = '50%';
+          badge.style.padding = '1px 4px';
+          badge.style.color = '#e8d5b0';
+          badge.style.fontWeight = 'bold';
+          badge.style.border = '1px solid #5a4230';
+          marker.appendChild(badge);
+        }
+
         // Make army markers clickable
         marker.style.pointerEvents = 'auto';
         marker.style.cursor = 'pointer';

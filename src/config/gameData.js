@@ -31,8 +31,8 @@ const GameData = {
         // Production Buildings  
         woodcutterLodge: { wood: 25, stone: 5 },
         huntersLodge: { wood: 30, stone: 15 },
-        quarry: { wood: 60, stone: 80 },
-        lumberMill: { wood: 100, stone: 60, gold: 80, planks: 20 }, // Industrial facility
+        quarry: { wood: 60, stone: 20 },
+        lumberMill: { wood: 100, stone: 60, gold: 80 }, // Industrial facility
         mine: { wood: 60, stone: 40 },
 
         // Basic Craft Buildings
@@ -57,7 +57,11 @@ const GameData = {
         magicalTower: { gold: 200, stone: 100, wood: 75, metal: 50, planks: 80 },
         grandLibrary: { gold: 150, wood: 100, stone: 75, planks: 60 },
         university: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 },
-        temple: { stone: 50, gold: 30, wood: 40 }
+        temple: { stone: 50, gold: 30, wood: 40 },
+
+        // Storage & Livestock
+        silo: { wood: 40, stone: 30 },
+        pasture: { wood: 35, stone: 10 }
     },
 
     // Building production - capabilities per building (no direct resource outputs)
@@ -192,6 +196,16 @@ const GameData = {
             jobs: {
                 priest: 1
             }
+        },
+
+        // Storage & Livestock
+        silo: {
+            storage: { food: 500 }
+        },
+        pasture: {
+            jobs: {
+                herder: 1
+            }
         }
     },
 
@@ -233,7 +247,11 @@ const GameData = {
         temple: 60,
 
         // Special Buildings
-        buildersHut: 15 // Quick to build - helps scale up construction
+        buildersHut: 15, // Quick to build - helps scale up construction
+
+        // Storage & Livestock
+        silo: 25,
+        pasture: 20
     },
 
     // Building metadata - icons, names, descriptions
@@ -255,7 +273,7 @@ const GameData = {
             icon: '🌾',
             name: 'Farm',
             description: 'Grows crops to feed your people. Production varies by season!',
-            effects: '2 Farmer jobs • +3.75🍖 food/farmer/day • Spring/Summer bonus, Winter penalty'
+            effects: '2 Farmer jobs • +5🍖 food/farmer/day • Spring/Summer bonus, Winter penalty'
         },
         buildersHut: {
             icon: '🔨',
@@ -281,7 +299,7 @@ const GameData = {
             icon: '🦌',
             name: "Hunter's Lodge",
             description: 'Hunters track and bring back game for food',
-            effects: '2 Hunter jobs • +2.5🍖 food/hunter/day • Autumn/Winter bonus'
+            effects: '2 Hunter jobs • +3.5🍖 food/hunter/day • Autumn/Winter bonus'
         },
         quarry: {
             icon: '⛏️',
@@ -392,14 +410,28 @@ const GameData = {
             name: 'Temple',
             description: 'A place of worship and spiritual guidance',
             effects: '1 Priest job • +5 happiness • Religious ceremonies'
+        },
+
+        // Storage & Livestock
+        silo: {
+            icon: '🏗️',
+            name: 'Silo',
+            description: 'A large food storage facility to stockpile reserves',
+            effects: '+500 food storage capacity'
+        },
+        pasture: {
+            icon: '🐄',
+            name: 'Pasture',
+            description: 'Grazing land for livestock that provides a steady food supply',
+            effects: '1 Herder job • +3🍖 food/day • Autumn bonus'
         }
     },
 
 
     // Building categories for organized UI display
     buildingCategories: {
-        essential: ['townCenter', 'house', 'farm', 'storehouse'],
-        production: ['huntersLodge', 'woodcutterLodge', 'quarry', 'lumberMill', 'mine'],
+        essential: ['townCenter', 'house', 'farm', 'buildersHut', 'storehouse', 'silo'],
+        production: ['huntersLodge', 'woodcutterLodge', 'quarry', 'lumberMill', 'mine', 'pasture'],
         craft: ['workshop', 'blacksmith', 'market'],
         military: ['barracks', 'fortifications', 'militaryAcademy', 'castle'],
         royal: ['keep', 'monument'],
@@ -544,12 +576,12 @@ const GameData = {
             if (buildingData && buildingData.populationCapacity) {
                 const moPeopleBonus = window.gameState?.investments?.moPeople || 0;
                 const baseCap = buildingData.populationCapacity + moPeopleBonus;
-                const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
+                const levelMult = 1 + ((building.level || 1) - 1) * 0.15;
                 totalCap += Math.floor(baseCap * levelMult);
             }
             // Legacy support for specific building types
             else if (building.type === 'house') {
-                const levelMult = 1 + ((building.level || 1) - 1) * 0.1;
+                const levelMult = 1 + ((building.level || 1) - 1) * 0.15;
                 totalCap += Math.floor((this.buildingProduction.house.populationCapacity || 5) * levelMult);
             }
             // Town centers also provide some population capacity

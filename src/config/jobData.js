@@ -24,7 +24,7 @@ const JOB_DATA = {
         buildingType: null, // Can work anywhere
         
         production: {
-            food: 1,
+            food: 1.5,
             wood: 0.5
         },
         consumption: {},
@@ -86,7 +86,7 @@ const JOB_DATA = {
         buildingType: 'farm',
         
         production: {
-            food: 3.75
+            food: 5
         },
         consumption: {},
         
@@ -113,7 +113,7 @@ const JOB_DATA = {
         buildingType: 'huntersLodge',
 
         production: {
-            food: 2.5
+            food: 3.5
         },
         consumption: {},
 
@@ -393,6 +393,33 @@ const JOB_DATA = {
         
         production: {},
         consumption: {}
+    },
+
+    herder: {
+        name: 'Herder',
+        label: 'Herder',
+        icon: '🐄',
+        description: 'Tends livestock for a steady food supply',
+        buildingType: 'pasture',
+
+        production: {
+            food: 3
+        },
+        consumption: {},
+
+        seasonalModifiers: {
+            Spring: 1.0,
+            Sprummer: 1.1,
+            Summer: 0.9,
+            Sumtumn: 1.1,
+            Autumn: 1.5,
+            Autinter: 1.2,
+            Winter: 0.8,
+            Winting: 0.9
+        },
+
+        requiredSkill: 'farming',
+        skillGained: 'farming'
     }
 };
 

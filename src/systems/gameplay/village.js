@@ -3699,12 +3699,17 @@ class VillageManager {
 
         let contentHTML = `
             <div class="building-management">
-                <div class="building-header">
-                    <div class="building-icon">${GameData.getBuildingIcon(building.type)}</div>
-                    <div class="building-details">
-                        <h3>${GameData.getBuildingName(building.type)}</h3>
-                        <p>Level ${currentLevel} ${specialization ? `(${specialization})` : ''}</p>
-                        <p class="building-location">Position: ${building.x}, ${building.y}</p>
+                <div class="building-header" style="display:flex;gap:12px;align-items:center;padding:12px;background:linear-gradient(135deg,rgba(42,31,20,0.6),rgba(60,45,30,0.4));border-radius:8px;margin-bottom:12px;">
+                    <div class="building-icon" style="font-size:2.5em;">${GameData.getBuildingIcon(building.type)}</div>
+                    <div class="building-details" style="flex:1;">
+                        <h3 style="margin:0;font-size:1.2em;">${GameData.getBuildingName(building.type)}</h3>
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                            <span style="font-size:0.85em;opacity:0.8;">Level ${currentLevel}/20</span>
+                            ${specialization ? `<span style="background:#5a4230;padding:1px 6px;border-radius:3px;font-size:0.75em;">${specialization}</span>` : ''}
+                        </div>
+                        <div style="height:4px;background:#2a1f14;border-radius:2px;margin-top:4px;overflow:hidden;">
+                            <div style="height:100%;width:${currentLevel * 5}%;background:linear-gradient(90deg,#c9a84c,#e8c56d);border-radius:2px;transition:width 0.3s;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -3773,22 +3778,37 @@ class VillageManager {
                 (this.gameState.resources[resource] || 0) >= cost
             );
 
+            const resourceIcons = { food: '🍖', wood: '🪵', stone: '🪨', metal: '⛏️', planks: '📐', gold: '💰', weapons: '⚔️', tools: '🔧' };
+            const costHtml = Object.entries(upgradeCost).map(([resource, cost]) => {
+                const have = this.gameState.resources[resource] || 0;
+                const enough = have >= cost;
+                const icon = resourceIcons[resource] || '';
+                return `<span style="color:${enough ? '#27ae60' : '#e74c3c'}">${icon}${cost}</span>`;
+            }).join(' ');
+
+            // Show what improves at next level
+            let upgradeBonus = '+10% production';
+            if (building.type === 'house') {
+                const baseCap = window.GameData?.buildingProduction?.house?.populationCapacity || 9;
+                const nextLevelCap = Math.floor(baseCap * (1 + (currentLevel) * 0.15));
+                const currentCap = Math.floor(baseCap * (1 + (currentLevel - 1) * 0.15));
+                upgradeBonus = `+${nextLevelCap - currentCap} population capacity`;
+            }
+
             contentHTML += `
                 <button class="action-btn upgrade-btn${canAfford ? '' : ' disabled'}" 
                         onclick="window.villageManager.upgradeBuilding('${building.type}', '${building.x},${building.y}')"
-                        ${canAfford ? '' : 'disabled'}>
-                    🔧 Upgrade to Level ${currentLevel + 1}
-                    <div class="cost-preview">
-                        ${Object.entries(upgradeCost).map(([resource, cost]) =>
-                `${cost} ${resource}`
-            ).join(', ')}
-                    </div>
+                        ${canAfford ? '' : 'disabled'}
+                        title="${canAfford ? 'Click to upgrade' : 'Not enough resources'}">
+                    ${canAfford ? '🔧' : '🔒'} Upgrade to Level ${currentLevel + 1}
+                    <div class="cost-preview">${costHtml}</div>
+                    <div style="font-size:0.7em;opacity:0.7;margin-top:2px;">${upgradeBonus}</div>
                 </button>
             `;
         } else {
             contentHTML += `
                 <button class="action-btn disabled" disabled>
-                    🔧 Max Level Reached
+                    🔒 Max Level Reached
                 </button>
             `;
         }
@@ -4141,6 +4161,17 @@ class VillageManager {
         );
         if (targetBuilding) {
             targetBuilding.level = newLevel;
+        }
+
+        // Re-sync job slots on every upgrade — createSlotsForBuilding adds
+        // new slots based on level and skips ones that already exist
+        if (targetBuilding && window.jobRegistry?.createSlotsForBuilding) {
+            const oldSlotCount = window.jobRegistry.getSlotsForBuilding?.(targetBuilding.id)?.length || 0;
+            window.jobRegistry.createSlotsForBuilding(targetBuilding);
+            const newSlotCount = window.jobRegistry.getSlotsForBuilding?.(targetBuilding.id)?.length || 0;
+            if (newSlotCount > oldSlotCount) {
+                window.showToast?.(`+${newSlotCount - oldSlotCount} worker slot${newSlotCount - oldSlotCount > 1 ? 's' : ''} unlocked!`, { type: 'info', icon: '👷' });
+            }
         }
 
         window.showToast?.(

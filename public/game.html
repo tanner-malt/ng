@@ -2237,8 +2237,13 @@
             if (weaponsEl && (resources.weapons > 0 || hasBlacksmith)) weaponsEl.style.display = '';
             if (toolsEl && (resources.tools > 0 || hasBlacksmith)) toolsEl.style.display = '';
             
-            // Use cap from GameData if available, else fallback to gameState
-            let popCap = (window.GameData.resourceCaps && window.GameData.resourceCaps.population) ? window.GameData.resourceCaps.population : (window.gameState.populationCap ?? 0);
+            // Use gameState.getPopulationCap() if available, else calculate from buildings
+            let popCap = 0;
+            if (window.gameState?.getPopulationCap) {
+                popCap = window.gameState.getPopulationCap();
+            } else if (window.GameData?.calculatePopulationCap && window.gameState?.buildings) {
+                popCap = window.GameData.calculatePopulationCap(window.gameState.buildings);
+            }
             document.getElementById('population-cap').textContent = popCap;
             // Season
             let season = window.gameState.season || (window.GameData.seasons ? window.GameData.seasons[0] : 'Spring');

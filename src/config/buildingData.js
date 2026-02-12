@@ -168,7 +168,7 @@ const BUILDING_DATA = {
         effects: '3 Rockcutter jobs • +3🪨 stone/worker/day',
         category: 'production',
         
-        costs: { wood: 60, stone: 80 },
+        costs: { wood: 60, stone: 20 },
         constructionPoints: 60,
         
         production: {
@@ -190,7 +190,7 @@ const BUILDING_DATA = {
         effects: '3 Sawyer jobs • Converts 2🪵→2📐 planks/worker/day',
         category: 'production',
         
-        costs: { wood: 100, stone: 60, gold: 80, planks: 20 },
+        costs: { wood: 100, stone: 60, gold: 80 },
         constructionPoints: 55,
         
         production: {
@@ -534,6 +534,47 @@ const BUILDING_DATA = {
             { type: 'resource', resource: 'gold', amount: 200 }
         ],
         autoUnlock: false
+    },
+
+    silo: {
+        name: 'Silo',
+        icon: '🏗️',
+        description: 'A large food storage facility to stockpile reserves',
+        effects: '+500 food storage capacity',
+        category: 'essential',
+
+        costs: { wood: 40, stone: 30 },
+        constructionPoints: 25,
+
+        production: {
+            storage: { food: 500 }
+        },
+
+        unlockConditions: [
+            { type: 'resource', resource: 'food', amount: 300 }
+        ],
+        autoUnlock: true
+    },
+
+    pasture: {
+        name: 'Pasture',
+        icon: '🐄',
+        description: 'Grazing land for livestock that provides a steady food supply',
+        effects: '1 Herder job • +3🍖 food/day • Autumn bonus',
+        category: 'production',
+
+        costs: { wood: 35, stone: 10 },
+        constructionPoints: 20,
+
+        production: {
+            jobs: { herder: 1 }
+        },
+
+        unlockConditions: [
+            { type: 'building_count', building: 'farm', count: 1 },
+            { type: 'resource', resource: 'food', amount: 100 }
+        ],
+        autoUnlock: true
     }
 };
 

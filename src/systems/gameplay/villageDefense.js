@@ -146,32 +146,129 @@ class VillageDefenseSystem {
         return Math.floor(strength);
     }
     
-    // Resolve a defense battle
+    // Resolve a defense battle using the BattleViewer for animated combat
     resolveBattle(battle, army) {
-        const defenderAdvantage = 1.2; // Defenders have 20% bonus
-        const adjustedDefense = battle.defenderStrength * defenderAdvantage;
-        
-        const totalStrength = battle.enemyStrength + adjustedDefense;
-        const defenseChance = adjustedDefense / totalStrength;
-        
-        // Roll for outcome
-        const roll = Math.random();
-        
-        if (roll < defenseChance) {
-            // Defense successful!
-            this.handleDefenseSuccess(battle, army);
-        } else {
-            // Defense failed
-            this.handleDefenseFailure(battle, army);
+        // Build defender units from garrisoned armies + guards
+        const defenderUnits = [];
+
+        // Add garrisoned army units
+        const garrisonedArmies = (this.gameState.armies || []).filter(a => a.status === 'garrisoned');
+        garrisonedArmies.forEach(ga => {
+            (ga.units || []).forEach(u => {
+                defenderUnits.push({
+                    id: u.id || `guard_${Math.random().toString(36).substr(2,6)}`,
+                    name: u.name || 'Soldier',
+                    health: u.health || 100,
+                    maxHealth: u.maxHealth || 100,
+                    attack: u.attack || 10,
+                    defense: u.defense || 5,
+                    alive: true
+                });
+            });
+        });
+
+        // Add virtual guard units based on defense rating (minimum 3 defenders)
+        const defenseBoost = Math.floor(this.currentDefenseRating / 15);
+        const virtualGuards = Math.max(3, defenseBoost) - defenderUnits.length;
+        for (let i = 0; i < Math.max(0, virtualGuards); i++) {
+            defenderUnits.push({
+                id: `militia_${i}`,
+                name: 'Militia',
+                health: 60,
+                maxHealth: 60,
+                attack: 6 + Math.floor(this.currentDefenseRating / 30),
+                defense: 4 + Math.floor(this.wallStrength / 50),
+                alive: true
+            });
         }
-        
-        battle.resolved = true;
-        this.underAttack = false;
-        this.currentAttacker = null;
-        
-        // Remove attacking army
-        if (this.gameState.enemySpawnSystem) {
-            this.gameState.enemySpawnSystem.removeArmy(army.id);
+
+        // Prepare enemy units
+        const enemyUnits = (army.units || []).filter(u => u.alive !== false).map(u => ({
+            id: u.id || `enemy_${Math.random().toString(36).substr(2,6)}`,
+            name: u.name || 'Raider',
+            health: u.hp || 30,
+            maxHealth: u.maxHp || 30,
+            attack: u.attack || 5,
+            defense: u.defense || 3,
+            alive: true
+        }));
+
+        // If no enemy units, generate some based on enemy strength
+        if (enemyUnits.length === 0) {
+            const count = Math.max(3, Math.ceil(battle.enemyStrength / 10));
+            for (let i = 0; i < count; i++) {
+                enemyUnits.push({
+                    id: `raider_${i}`,
+                    name: 'Raider',
+                    health: 30,
+                    maxHealth: 30,
+                    attack: 5 + Math.floor(battle.enemyStrength / count / 3),
+                    defense: 3,
+                    alive: true
+                });
+            }
+        }
+
+        // Try to use BattleViewer for animated combat
+        if (window.BattleViewer) {
+            const playerArmy = {
+                name: 'Village Defense',
+                units: defenderUnits
+            };
+            const enemyArmy = {
+                name: army.name || 'Raiders',
+                units: enemyUnits
+            };
+
+            const viewer = new window.BattleViewer((result) => {
+                // Process battle outcome
+                if (result?.victory) {
+                    this.handleDefenseSuccess(battle, army);
+                    // Update garrisoned army casualties
+                    garrisonedArmies.forEach(ga => {
+                        const surviving = result.playerSurvivors || 0;
+                        const initialCount = ga.units?.length || 0;
+                        const lossRatio = initialCount > 0 ? Math.max(0, 1 - surviving / initialCount) : 0;
+                        if (ga.units) {
+                            ga.units = ga.units.filter(() => Math.random() > lossRatio * 0.5);
+                        }
+                    });
+                } else {
+                    this.handleDefenseFailure(battle, army);
+                }
+
+                battle.resolved = true;
+                this.underAttack = false;
+                this.currentAttacker = null;
+
+                // Remove attacking army
+                if (window.worldManager) {
+                    window.worldManager.removeEnemy?.(army.id);
+                }
+            });
+
+            viewer.startBattle(playerArmy, enemyArmy, 'plains');
+        } else {
+            // Fallback: original dice-roll resolution
+            const defenderAdvantage = 1.2;
+            const adjustedDefense = battle.defenderStrength * defenderAdvantage;
+            const totalStrength = battle.enemyStrength + adjustedDefense;
+            const defenseChance = adjustedDefense / totalStrength;
+            const roll = Math.random();
+
+            if (roll < defenseChance) {
+                this.handleDefenseSuccess(battle, army);
+            } else {
+                this.handleDefenseFailure(battle, army);
+            }
+
+            battle.resolved = true;
+            this.underAttack = false;
+            this.currentAttacker = null;
+
+            if (this.gameState.enemySpawnSystem) {
+                this.gameState.enemySpawnSystem.removeArmy(army.id);
+            }
         }
     }
     

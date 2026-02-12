@@ -273,17 +273,24 @@ class UnlockSystem {
             callback: () => this.unlockView('throne')
         });
 
-        // Feature Unlocks - Achievement Gated
-        this.registerUnlock('advanced_construction', {
-            type: 'feature',
-            name: 'Advanced Construction',
-            description: 'Build multiple structures simultaneously',
+        this.registerUnlock('silo', {
+            type: 'building',
             conditions: [
-                { type: 'achievement', achievement: 'master_builder' }
+                { type: 'resource', resource: 'food', amount: 300 }
             ],
             autoUnlock: true
         });
 
+        this.registerUnlock('pasture', {
+            type: 'building',
+            conditions: [
+                { type: 'building_count', building: 'farm', count: 1 },
+                { type: 'resource', resource: 'food', amount: 100 }
+            ],
+            autoUnlock: true
+        });
+
+        // Feature Unlocks - Achievement Gated
         this.registerUnlock('trade_routes', {
             type: 'feature',
             name: 'Trade Routes',

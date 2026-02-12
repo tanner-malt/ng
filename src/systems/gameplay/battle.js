@@ -288,6 +288,16 @@ class BattleViewer {
         document.getElementById('battle-speed-4x')?.addEventListener('click', () => this.setSpeed(4));
         document.getElementById('battle-skip')?.addEventListener('click', () => this.skipToEnd());
         document.getElementById('close-battle')?.addEventListener('click', () => this.closeBattle());
+
+        // Click outside the battle container to close (only after battle finishes)
+        const overlay = document.querySelector('.battle-viewer-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay && this.battlePhase === 'finished') {
+                    this.closeBattle();
+                }
+            });
+        }
     }
     
     setSpeed(speed) {
@@ -320,11 +330,18 @@ class BattleViewer {
         this.finishBattle();
     }
     
-    startAnimation() { this.isAnimating = true; this.animate(); }
+    startAnimation() { this.isAnimating = true; this.lastTick = 0; this.tickInterval = 100; this.animate(); }
     
     animate() {
         if (!this.isAnimating) return;
-        this.update();
+        
+        const now = performance.now();
+        // Only update game logic on ticks (100ms base / speed multiplier)
+        const effectiveInterval = this.tickInterval / (this.unitSpeed / 1.5);
+        if (now - this.lastTick >= effectiveInterval) {
+            this.lastTick = now;
+            this.update();
+        }
         this.render();
         
         const playerAlive = this.playerUnits.filter(u => u.alive).length;
@@ -359,7 +376,7 @@ class BattleViewer {
                 if (!target) return;
                 const dx = target.x - unit.x, dy = target.y - unit.y, dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist > this.unitRadius * 2.5) { unit.x += (dx / dist) * this.unitSpeed; unit.y += (dy / dist) * this.unitSpeed * 0.5; }
-                else if (Math.random() < 0.1) this.attackUnit(unit, target);
+                else if (Math.random() < 0.35) this.attackUnit(unit, target);
             });
             
             allEnemyAlive.forEach(unit => {
@@ -368,7 +385,7 @@ class BattleViewer {
                 if (!target) return;
                 const dx = target.x - unit.x, dy = target.y - unit.y, dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist > this.unitRadius * 2.5) { unit.x += (dx / dist) * this.unitSpeed; unit.y += (dy / dist) * this.unitSpeed * 0.5; }
-                else if (Math.random() < 0.1) this.attackUnit(unit, target);
+                else if (Math.random() < 0.35) this.attackUnit(unit, target);
             });
         }
     }

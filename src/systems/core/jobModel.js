@@ -134,8 +134,8 @@ class JobRegistry {
 
         // Hard-coded efficiency rates per job type (mirrors old jobEfficiency Map)
         this._jobEfficiency = {
-            farmer:           { food: 3.75 },
-            hunter:           { food: 2.5 },
+            farmer:           { food: 5 },
+            hunter:           { food: 3.5 },
             woodcutter:       { wood: 3 },
             builder:          { construction: 1 },
             gatherer:         {},            // RNG in calculateDailyProduction
@@ -151,7 +151,8 @@ class JobRegistry {
             professor:        {},
             scholar:          {},
             wizard:           {},
-            priest:           {}
+            priest:           {},
+            herder:           { food: 3 }
         };
 
         // Skill mapping for worker-to-job fit
@@ -172,7 +173,8 @@ class JobRegistry {
             militaryTheorist: ['Military Theory'],
             scholar: ['Research'],
             professor: ['Research'],
-            wizard: ['Arcana']
+            wizard: ['Arcana'],
+            herder: ['Agriculture', 'Hunting']
         };
 
         console.log('[JobRegistry] Created');
@@ -318,7 +320,8 @@ class JobRegistry {
         let idx = 0;
         Object.entries(production.jobs).forEach(([jobType, count]) => {
             const level = Math.max(1, building.level || 1);
-            const slots = Math.floor(count * level);
+            // Base slots + 1 extra slot every 3 levels
+            const slots = count + Math.floor((level - 1) / 3);
             for (let i = 0; i < slots; i++) {
                 const slotId = `${bid}_${jobType}_${idx}`;
                 if (!this._slots.has(slotId)) {
@@ -609,7 +612,7 @@ class JobRegistry {
         const hasActiveConstruction = !!(gs?.constructionManager?.constructionSites?.size > 0);
 
         const pop = gs?.populationManager ? gs.populationManager.getAll().length : (gs?.population?.length || 0);
-        const minFarmers = Math.max(0, Math.ceil(pop / 8));
+        const minFarmers = Math.max(1, Math.ceil(pop / 5));
         const currentFarmers = this.countWorkersInJobType('farmer');
         const desiredBuilders = this.computeDesiredBuilders(7);
         const currentBuilders = this.countWorkersInJobType('builder');
@@ -631,12 +634,16 @@ class JobRegistry {
             // ── Scoring: every building job >= +5 floor, gatherer = +1 (lowest) ──
 
             if (job.jobType === 'farmer') {
-                score += 5 + needs.foodUrgency * 10;
+                score += 5 + needs.foodUrgency * 10 + this._computeStorageRatioBonus(job.jobType);
                 if (currentFarmers < minFarmers) score += 15;
                 score += crisisBoost;
             }
             else if (job.jobType === 'hunter') {
-                score += 5 + needs.foodUrgency * 8;
+                score += 5 + needs.foodUrgency * 8 + this._computeStorageRatioBonus(job.jobType);
+                score += crisisBoost;
+            }
+            else if (job.jobType === 'herder') {
+                score += 5 + needs.foodUrgency * 6 + this._computeStorageRatioBonus(job.jobType);
                 score += crisisBoost;
             }
             else if (job.jobType === 'gatherer') {
@@ -869,7 +876,7 @@ class JobRegistry {
         const food = res.food || 0;
 
         const foodDays = dailyFoodUse > 0 ? food / dailyFoodUse : Infinity;
-        const foodUrgency = Math.max(0, 3 - foodDays);
+        const foodUrgency = Math.max(0, 7 - foodDays);
 
         const woodUrgency = this._capUrgency(res.wood || 0, caps.wood || 50);
         const stoneUrgency = this._capUrgency(res.stone || 0, caps.stone || 50);
@@ -959,7 +966,7 @@ class JobRegistry {
                 // RNG: pick one of food/wood/stone
                 const choice = ['food', 'wood', 'stone'][Math.floor(Math.random() * 3)];
                 const seasonMult = this._getSeasonalMultiplier(jobType, choice);
-                production[choice] += 1 * workerEff * seasonMult;
+                production[choice] += 1.5 * workerEff * seasonMult;
             } else {
                 const techMult = this._getTechMultiplier(jobType);
                 Object.entries(efficiency).forEach(([resourceType, baseAmount]) => {
