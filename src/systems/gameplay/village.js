@@ -606,6 +606,21 @@ class VillageManager {
                     row.classList.add('building-available');
                     row.title = `Click to place ${GameData.getBuildingName(buildingType)}`;
                 }
+
+                // Refresh per-resource cost colors
+                const resourcesDiv = row.querySelector('.building-resources');
+                if (resourcesDiv) {
+                    const cost = GameData.buildingCosts[buildingType] || {};
+                    const costEntries = Object.entries(cost);
+                    if (costEntries.length > 0) {
+                        const gs = this.gameState;
+                        resourcesDiv.innerHTML = costEntries.map(([resource, amount]) => {
+                            const have = resource === 'gold' ? (gs.gold ?? 0) : (gs.resources[resource] ?? 0);
+                            const cls = have >= amount ? 'cost-affordable' : 'cost-unaffordable';
+                            return `<span class="${cls}">${amount} ${resource}</span>`;
+                        }).join(', ');
+                    }
+                }
             });
         });
     }

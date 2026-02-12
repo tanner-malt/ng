@@ -635,7 +635,7 @@ class JobRegistry {
             }
 
             // Soft caps for builder/foreman
-            if (job.jobType === 'builder' && desiredBuilders > 0 && currentBuilders >= desiredBuilders) score -= 30;
+            if (job.jobType === 'builder' && currentBuilders >= desiredBuilders) score -= 30;
             if (job.jobType === 'foreman' && currentForemen >= desiredForemen) score -= 30;
 
             return { ...job, score };
@@ -659,8 +659,8 @@ class JobRegistry {
             if (availableWorkers.length === 0) break;
             if (job.score === -Infinity) continue; // skip manually-assigned-only jobs (gatherer)
             if (job.jobType === 'sawyer' && (resources.wood || 0) < 3) continue;
-            if (job.jobType === 'builder' && desiredBuilders > 0 && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
-            if (job.jobType === 'foreman' && desiredForemen > 0 && this.countWorkersInJobType('foreman') >= desiredForemen) continue;
+            if (job.jobType === 'builder' && this.countWorkersInJobType('builder') >= desiredBuilders) continue;
+            if (job.jobType === 'foreman' && this.countWorkersInJobType('foreman') >= desiredForemen) continue;
 
             let slotsToFill = Math.min(job.availableSlots, availableWorkers.length);
             for (let i = 0; i < slotsToFill; i++) {
