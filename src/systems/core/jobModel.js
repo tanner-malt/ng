@@ -586,8 +586,8 @@ class JobRegistry {
                 score += crisisBoost;
             }
             else if (job.jobType === 'gatherer') {
-                // Gatherer is never auto-assigned — player must assign manually
-                return { ...job, score: -Infinity };
+                // Lowest priority fallback — only assigned when no better jobs available
+                score += 1;
             }
             else if (job.jobType === 'woodcutter') {
                 score += 5 + needs.woodUrgency * 6;
