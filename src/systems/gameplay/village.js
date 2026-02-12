@@ -571,7 +571,7 @@ class VillageManager {
                     this.enterBuildMode(buildingType);
                 } else {
                     console.log(`[Village] Cannot afford ${buildingType}`);
-                    window.modalSystem?.showMessage('Insufficient Resources', `You need more resources to build a ${buildingType}.`, { type: 'warning' });
+                    window.showToast?.(`Insufficient resources to build ${buildingType}`, { type: 'warning', icon: '⚠️', timeout: 3000 });
                 }
             });
 
@@ -1026,7 +1026,7 @@ class VillageManager {
                 // Check if we can afford the building before proceeding
                 if (!this.gameState.canAfford(this.gameState.buildMode)) {
                     console.log('[Village] Cannot afford building');
-                    window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.', { type: 'warning' });
+                    window.showToast?.('Insufficient resources to build this structure', { type: 'warning', icon: '⚠️', timeout: 3000 });
                     return;
                 }
 
@@ -1208,8 +1208,7 @@ class VillageManager {
                               ? [...this.gameState.constructionManager.constructionSites.values()].filter(s => s.type === type).length
                               : 0);
             if (existing >= bDef.maxCount) {
-                window.modalSystem?.showMessage('Build Limit Reached',
-                    `You can only have ${bDef.maxCount} ${bDef.name}${bDef.maxCount > 1 ? 's' : ''}.`, { type: 'warning' });
+                window.showToast?.(`Build limit reached: max ${bDef.maxCount} ${bDef.name}${bDef.maxCount > 1 ? 's' : ''}`, { type: 'warning', icon: '🚫', timeout: 3000 });
                 return false;
             }
         }
@@ -1217,7 +1216,7 @@ class VillageManager {
         // Check if we can afford the building
         if (!this.gameState.canAfford(type)) {
             console.log('[Village] Cannot afford building:', type);
-            window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to build this structure.', { type: 'warning' });
+            window.showToast?.('Insufficient resources to build this structure', { type: 'warning', icon: '⚠️', timeout: 3000 });
             return false;
         }
 
@@ -1763,9 +1762,9 @@ class VillageManager {
                 if (building.level === 0) {
                     this.showConstructionPriorityModal(building.id);
                 }
-                // Use new building management modal for completed buildings
+                // Use inline popover for completed buildings
                 else if (building.level > 0) {
-                    this.showBuildingManagement(building.id);
+                    this.showBuildingPopover(building.id, buildingEl);
                 }
             });
 
@@ -3673,7 +3672,116 @@ class VillageManager {
         }
     }
 
-    // Building Management Modal
+    // ─── Inline Building Popover ───────────────────────────────────────
+    closeBuildingPopover() {
+        const existing = document.getElementById('building-popover');
+        if (existing) existing.remove();
+        this._popoverDismiss && document.removeEventListener('pointerdown', this._popoverDismiss);
+        this._popoverDismiss = null;
+    }
+
+    showBuildingPopover(buildingId, anchorEl) {
+        // Close any existing popover first
+        this.closeBuildingPopover();
+
+        const building = this.gameState.buildings.find(b => b.id === buildingId);
+        if (!building) return;
+
+        const bonuses = this.buildingEffectsManager?.getActiveBonuses() || {};
+        const buildingKey = `${building.type}_${building.x},${building.y}`;
+        const buildingBonus = bonuses[buildingKey];
+        const currentLevel = buildingBonus?.level || building.level || 1;
+        const specialization = buildingBonus?.specialization;
+        const buildingInfo = GameData.buildingInfo[building.type];
+
+        // Compute upgrade state
+        const canUpgrade = this.buildingEffectsManager?.canUpgradeBuilding(building.type, `${building.x},${building.y}`);
+        let upgradeHTML = '';
+        if (canUpgrade) {
+            const upgradeCost = this.buildingEffectsManager.getBuildingUpgradeCost(building.type, `${building.x},${building.y}`);
+            const canAfford = Object.entries(upgradeCost).every(([r, c]) => (this.gameState.resources[r] || 0) >= c);
+            const resourceIcons = { food: '🍖', wood: '🪵', stone: '🪨', metal: '⛏️', planks: '📐', gold: '💰', weapons: '⚔️', tools: '🔧' };
+            const costHtml = Object.entries(upgradeCost).map(([r, c]) => {
+                const have = this.gameState.resources[r] || 0;
+                const icon = resourceIcons[r] || '';
+                return `<span style="color:${have >= c ? '#27ae60' : '#8b2020'}">${icon}${c}</span>`;
+            }).join(' ');
+
+            upgradeHTML = `<button class="popover-btn upgrade-btn${canAfford ? '' : ' disabled'}"
+                onclick="window.villageManager.upgradeBuilding('${building.type}','${building.x},${building.y}')"
+                ${canAfford ? '' : 'disabled'}
+                title="${canAfford ? 'Click to upgrade' : 'Not enough resources'}">
+                ⬆️ Upgrade Lv${currentLevel + 1} &nbsp;${costHtml}
+            </button>`;
+        }
+
+        // Effects summary
+        let effectsText = '';
+        if (buildingInfo?.effects) {
+            effectsText = `<div class="popover-effects">${buildingInfo.effects}</div>`;
+        }
+
+        // Workers summary
+        const assignedWorkers = this.getAssignedWorkers(building);
+        const workerSlots = this.getWorkerSlotsForBuilding(building);
+
+        // Build popover content
+        const popover = document.createElement('div');
+        popover.id = 'building-popover';
+        popover.innerHTML = `
+            <div class="popover-header">
+                <span class="popover-icon">${GameData.getBuildingIcon(building.type)}</span>
+                <div class="popover-title-block">
+                    <strong>${GameData.getBuildingName(building.type)}</strong>
+                    <span class="popover-level">Lv ${currentLevel}/3${specialization ? ` · ${specialization}` : ''}</span>
+                </div>
+                <button class="popover-close" onclick="window.villageManager.closeBuildingPopover()">✕</button>
+            </div>
+            <div class="popover-level-bar">
+                <div class="popover-level-fill" style="width:${Math.round(currentLevel / 3 * 100)}%"></div>
+            </div>
+            ${effectsText}
+            <div class="popover-workers">👷 ${assignedWorkers.length}/${workerSlots} workers</div>
+            <div class="popover-actions">
+                ${upgradeHTML}
+                <button class="popover-btn details-btn" onclick="window.villageManager.closeBuildingPopover();window.villageManager.showBuildingManagement(${buildingId})">
+                    📋 Details
+                </button>
+                <button class="popover-btn demolish-btn" onclick="window.villageManager.closeBuildingPopover();window.villageManager.demolishBuilding('${buildingId}')">
+                    💥 Demolish
+                </button>
+            </div>
+        `;
+
+        // Position near the anchor element
+        document.body.appendChild(popover);
+
+        const anchorRect = anchorEl.getBoundingClientRect();
+        const popRect = popover.getBoundingClientRect();
+
+        // Try to position above the building; fallback below if off-screen
+        let top = anchorRect.top - popRect.height - 8;
+        let left = anchorRect.left + (anchorRect.width / 2) - (popRect.width / 2);
+
+        if (top < 8) top = anchorRect.bottom + 8;
+        if (left < 8) left = 8;
+        if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+
+        popover.style.top = `${top}px`;
+        popover.style.left = `${left}px`;
+
+        // Click-outside dismissal (delay to avoid auto-close from the same click)
+        setTimeout(() => {
+            this._popoverDismiss = (e) => {
+                if (!popover.contains(e.target)) {
+                    this.closeBuildingPopover();
+                }
+            };
+            document.addEventListener('pointerdown', this._popoverDismiss);
+        }, 50);
+    }
+
+    // Building Management Modal (detailed view)
     showBuildingManagement(buildingId) {
         const building = this.gameState.buildings.find(b => b.id === buildingId);
         if (!building) {
@@ -3704,11 +3812,11 @@ class VillageManager {
                     <div class="building-details" style="flex:1;">
                         <h3 style="margin:0;font-size:1.2em;">${GameData.getBuildingName(building.type)}</h3>
                         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-                            <span style="font-size:0.85em;opacity:0.8;">Level ${currentLevel}/20</span>
+                            <span style="font-size:0.85em;opacity:0.8;">Level ${currentLevel}/3</span>
                             ${specialization ? `<span style="background:#5a4230;padding:1px 6px;border-radius:3px;font-size:0.75em;">${specialization}</span>` : ''}
                         </div>
                         <div style="height:4px;background:#2a1f14;border-radius:2px;margin-top:4px;overflow:hidden;">
-                            <div style="height:100%;width:${currentLevel * 5}%;background:linear-gradient(90deg,#c9a84c,#e8c56d);border-radius:2px;transition:width 0.3s;"></div>
+                            <div style="height:100%;width:${Math.round(currentLevel / 3 * 100)}%;background:linear-gradient(90deg,#c9a84c,#e8c56d);border-radius:2px;transition:width 0.3s;"></div>
                         </div>
                     </div>
                 </div>
@@ -3783,7 +3891,7 @@ class VillageManager {
                 const have = this.gameState.resources[resource] || 0;
                 const enough = have >= cost;
                 const icon = resourceIcons[resource] || '';
-                return `<span style="color:${enough ? '#27ae60' : '#e74c3c'}">${icon}${cost}</span>`;
+                return `<span style="color:${enough ? '#27ae60' : '#8b2020'}">${icon}${cost}</span>`;
             }).join(' ');
 
             // Show what improves at next level
@@ -3945,8 +4053,9 @@ class VillageManager {
         b.trainingConfig = b.trainingConfig || { enabled: false, skill: 'meleeCombat', traineeLimit: 0, traineeIds: [] };
         b.trainingConfig.enabled = !!enabled;
         this.gameState.save();
-        // Refresh modal
-        this.showBuildingManagement(buildingId);
+        // Refresh popover
+        const buildingEl = document.querySelector(`.building[data-building-id="${buildingId}"]`);
+        if (buildingEl) this.showBuildingPopover(buildingId, buildingEl);
         // Notify
         window.showToast?.(`Training ${enabled ? 'enabled' : 'disabled'} for ${b.type}`, { type: enabled ? 'success' : 'info' });
     }
@@ -3958,7 +4067,8 @@ class VillageManager {
         b.trainingConfig = b.trainingConfig || { enabled: false, skill: 'meleeCombat', traineeLimit: 0, traineeIds: [] };
         b.trainingConfig.skill = skill;
         this.gameState.save();
-        this.showBuildingManagement(buildingId);
+        const buildingEl = document.querySelector(`.building[data-building-id="${buildingId}"]`);
+        if (buildingEl) this.showBuildingPopover(buildingId, buildingEl);
     }
 
     setBuildingTrainingLimit(buildingId, limitVal) {
@@ -4018,8 +4128,9 @@ class VillageManager {
         b.trainingConfig.traineeLimit = selected.length;
         this.gameState.save();
         window.modalSystem.closeTopModal();
-        // Refresh main management modal to reflect selection
-        this.showBuildingManagement(buildingId);
+        // Refresh popover to reflect selection
+        const buildingEl = document.querySelector(`.building[data-building-id="${buildingId}"]`);
+        if (buildingEl) this.showBuildingPopover(buildingId, buildingEl);
     }
 
     // Get job information for a building
@@ -4143,7 +4254,7 @@ class VillageManager {
         );
 
         if (!canAfford) {
-            window.modalSystem?.showMessage('Insufficient Resources', 'You don\'t have enough resources to upgrade this building.', { type: 'warning' });
+            window.showToast?.('Insufficient resources to upgrade this building', { type: 'warning', icon: '⚠️', timeout: 3000 });
             return;
         }
 
@@ -4188,12 +4299,15 @@ class VillageManager {
             window.modalSystem.closeTopModal();
         }
 
-        // Find building and reopen management
+        // Find building and reopen popover
         const building = this.gameState.buildings.find(b =>
             b.type === buildingType && `${b.x},${b.y}` === position
         );
         if (building) {
-            setTimeout(() => this.showBuildingManagement(building.id), 100);
+            const buildingEl = document.querySelector(`.building[data-building-id="${building.id}"]`);
+            if (buildingEl) {
+                setTimeout(() => this.showBuildingPopover(building.id, buildingEl), 100);
+            }
         }
     }
 
@@ -4281,7 +4395,10 @@ class VillageManager {
                 b.type === buildingType && `${b.x},${b.y}` === position
             );
             if (building) {
-                setTimeout(() => this.showBuildingManagement(building.id), 100);
+                const buildingEl = document.querySelector(`.building[data-building-id="${building.id}"]`);
+                if (buildingEl) {
+                    setTimeout(() => this.showBuildingPopover(building.id, buildingEl), 100);
+                }
             }
         }
     }

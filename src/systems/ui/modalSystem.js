@@ -268,8 +268,8 @@ class ModalSystem {
 
     // Show a modal with custom content and return a Promise
     showModal(options = {}) {
-        // Always close achievement modals before opening a new modal
-        this.closeAchievementModals();
+        // Achievement modals now queue properly behind blocking modals
+        // via _handleModalRequest priority logic — no forced close needed
         return new Promise((resolve, reject) => {
             // Ensure DOM is ready
             if (document.readyState === 'loading') {

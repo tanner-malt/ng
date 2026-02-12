@@ -1193,6 +1193,95 @@ body {
     }
 }
 
+/* ─── Building Popover (inline info panel) ─── */
+#building-popover {
+    position: fixed;
+    z-index: 9999;
+    width: 260px;
+    background: linear-gradient(145deg, #2a1f14 0%, #3c2d1e 100%);
+    border: 1px solid #5a4a30;
+    border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.55);
+    color: #e8dcc8;
+    font-size: 13px;
+    padding: 0;
+    overflow: hidden;
+    animation: popoverFadeIn .15s ease-out;
+}
+@keyframes popoverFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#building-popover .popover-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px 6px;
+}
+#building-popover .popover-icon { font-size: 1.8em; line-height: 1; }
+#building-popover .popover-title-block { flex: 1; }
+#building-popover .popover-title-block strong { display: block; font-size: 1.05em; }
+#building-popover .popover-level { font-size: 0.78em; opacity: .7; }
+#building-popover .popover-close {
+    background: none; border: none; color: #e8dcc8; font-size: 1em; cursor: pointer; opacity: .6;
+    padding: 2px 4px; line-height: 1;
+}
+#building-popover .popover-close:hover { opacity: 1; }
+
+#building-popover .popover-level-bar {
+    height: 3px;
+    background: #1a1410;
+    margin: 0 12px 6px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+#building-popover .popover-level-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #c9a84c, #e8c56d);
+    border-radius: 2px;
+    transition: width .3s;
+}
+
+#building-popover .popover-effects {
+    padding: 4px 12px 6px;
+    font-size: 0.82em;
+    opacity: .85;
+    line-height: 1.35;
+}
+#building-popover .popover-workers {
+    padding: 2px 12px 8px;
+    font-size: 0.82em;
+    opacity: .75;
+}
+#building-popover .popover-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 10px 10px;
+    border-top: 1px solid rgba(90,74,48,.4);
+}
+#building-popover .popover-btn {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #5a4a30;
+    border-radius: 5px;
+    background: rgba(255,255,255,.06);
+    color: #e8dcc8;
+    font-size: 0.85em;
+    cursor: pointer;
+    text-align: left;
+    transition: background .15s;
+}
+#building-popover .popover-btn:hover { background: rgba(255,255,255,.12); }
+#building-popover .popover-btn.disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+#building-popover .popover-btn.demolish-btn { color: #c0392b; }
+#building-popover .popover-btn.demolish-btn:hover { background: rgba(192,57,43,.15); }
+
 /* Building Management Modal Styles */
 .building-management {
     padding: 20px;
@@ -9542,7 +9631,7 @@ html {
     font-weight: 600;
 }
 .building-resources .cost-unaffordable {
-    color: #e74c3c;
+    color: #8b2020;
     font-weight: 600;
 }
 

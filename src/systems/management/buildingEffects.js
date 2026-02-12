@@ -394,8 +394,8 @@ class BuildingEffectsManager {
         const bonusKey = `${buildingType}_${position}`;
         const currentLevel = this.buildingLevels.get(bonusKey) || 1;
         
-        // Max level is 20
-        return currentLevel < 20;
+        // Max level is 3
+        return currentLevel < 3;
     }
 
     // Get building upgrade cost
