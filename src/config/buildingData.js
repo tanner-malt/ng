@@ -148,7 +148,7 @@ const BUILDING_DATA = {
         effects: '3 Woodcutter jobs • +3🪵 wood/worker/day',
         category: 'production',
         
-        costs: { wood: 20, stone: 40 },
+        costs: { wood: 25, stone: 5 },
         constructionPoints: 15,
         
         production: {

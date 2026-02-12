@@ -29,9 +29,9 @@ const GameData = {
         storehouse: { wood: 40, stone: 20 },
 
         // Production Buildings  
-        woodcutterLodge: { wood: 20, stone: 40, gold: 0 }, // Gold cost removed
+        woodcutterLodge: { wood: 25, stone: 5 },
         huntersLodge: { wood: 30, stone: 15 },
-        quarry: { wood: 60, stone: 80, gold: 0 }, // Gold cost removed
+        quarry: { wood: 60, stone: 80 },
         lumberMill: { wood: 100, stone: 60, gold: 80, planks: 20 }, // Industrial facility
         mine: { wood: 60, stone: 40 },
 

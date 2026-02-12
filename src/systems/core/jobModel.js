@@ -539,6 +539,60 @@ class JobRegistry {
         return 0;                      // normal
     }
 
+    /**
+     * Compute storage-ratio bonus for a job based on what it produces vs current storage levels.
+     * If job produces abundant resources, returns penalty.
+     * If job produces scarce resources, returns bonus.
+     */
+    _computeStorageRatioBonus(jobType) {
+        const gs = this.gameState;
+        const resources = gs?.resources || {};
+        let bonus = 0;
+
+        // Get job production data from JOB_DATA
+        const jobDef = window.JOB_DATA?.[jobType];
+        if (!jobDef || !jobDef.production) return 0;
+
+        // Calculate storage caps for each resource
+        const getCap = (resourceName) => {
+            if (typeof window.GameData?.calculateSeasonalStorageCap === 'function') {
+                return window.GameData.calculateSeasonalStorageCap(resourceName, gs?.season, gs?.buildings) || 50;
+            }
+            return window.GameData?.resourceCaps?.[resourceName] || 50;
+        };
+
+        // For each resource this job produces, check storage ratio
+        Object.entries(jobDef.production).forEach(([resource, amount]) => {
+            if (amount <= 0) return;
+            const currentLevel = resources[resource] || 0;
+            const cap = getCap(resource);
+            const ratio = cap > 0 ? currentLevel / cap : 1.0;
+
+            // Abundant (>85% full): heavy penalty (-15 to -25)
+            if (ratio > 0.85) {
+                bonus -= 20;
+            }
+            // High (70-85% full): moderate penalty (-8 to -12)
+            else if (ratio > 0.7) {
+                bonus -= 10;
+            }
+            // Mid (40-70% full): no bonus/penalty (neutral)
+            else if (ratio > 0.4) {
+                bonus += 0;
+            }
+            // Low (20-40% full): small bonus (+5 to +8)
+            else if (ratio > 0.2) {
+                bonus += 6;
+            }
+            // Scarce (<20% full): big bonus (+12 to +20)
+            else {
+                bonus += 15;
+            }
+        });
+
+        return bonus;
+    }
+
     autoAssignWorkers() {
         this.debugLog('Auto-assigning workers with resource-aware optimization...');
         const crisisLevel = this._detectFoodCrisis();
@@ -586,19 +640,19 @@ class JobRegistry {
                 score += crisisBoost;
             }
             else if (job.jobType === 'gatherer') {
-                // Lowest priority fallback — only assigned when no better jobs available
-                score += 1;
+                // Lowest priority fallback when no other jobs available — but boost if resources are scarce
+                score += 1 + this._computeStorageRatioBonus(job.jobType);
             }
             else if (job.jobType === 'woodcutter') {
-                score += 5 + needs.woodUrgency * 6;
+                score += 5 + needs.woodUrgency * 6 + this._computeStorageRatioBonus(job.jobType);
                 if (crisisLevel >= 2) score -= 20; // deprioritize in crisis
             }
             else if (job.jobType === 'rockcutter' || job.jobType === 'miner') {
-                score += 5 + needs.stoneUrgency * 4;
+                score += 5 + needs.stoneUrgency * 4 + this._computeStorageRatioBonus(job.jobType);
                 if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'sawyer') {
-                score += 5;
+                score += 5 + this._computeStorageRatioBonus(job.jobType);
                 if (woodPct >= 0.4) score += 6;
                 score += ((resources.wood || 0) >= 5 ? 2 : 0);
                 score += needs.planksUrgency * 3;
@@ -606,16 +660,16 @@ class JobRegistry {
                 if (crisisLevel >= 2) score -= 25;
             }
             else if (job.jobType === 'blacksmith') {
-                score += 5 + needs.weaponsUrgency * 2 + needs.toolsUrgency * 2;
+                score += 5 + needs.weaponsUrgency * 2 + needs.toolsUrgency * 2 + this._computeStorageRatioBonus(job.jobType);
                 if ((resources.metal || 0) < 2) score -= 10;
                 if (crisisLevel >= 2) score -= 25;
             }
             else if (job.jobType === 'trader') {
-                score += 5 + needs.goldUrgency * 1.5;
+                score += 5 + needs.goldUrgency * 1.5 + this._computeStorageRatioBonus(job.jobType);
                 if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'engineer') {
-                score += 5 + needs.productionUrgency * 1;
+                score += 5 + needs.productionUrgency * 1 + this._computeStorageRatioBonus(job.jobType);
                 if (crisisLevel >= 2) score -= 20;
             }
             else if (job.jobType === 'builder') {
