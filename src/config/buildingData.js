@@ -189,7 +189,7 @@ const BUILDING_DATA = {
         effects: '3 Sawyer jobs • Converts 2🪵→2📐 planks/worker/day',
         category: 'production',
         
-        costs: { wood: 100, stone: 60, gold: 80 },
+        costs: { wood: 100, stone: 60, gold: 200 },
         constructionPoints: 55,
         
         production: {
@@ -235,7 +235,7 @@ const BUILDING_DATA = {
         effects: '3 Engineer jobs • +3⚙️ production/worker/day',
         category: 'craft',
         
-        costs: { wood: 35, stone: 25, gold: 15 },
+        costs: { wood: 35, stone: 25, gold: 40 },
         constructionPoints: 50,
         
         production: {
@@ -322,7 +322,7 @@ const BUILDING_DATA = {
         effects: 'Defense bonus in battles • Reduces raid damage',
         category: 'military',
         
-        costs: { stone: 60, wood: 40, gold: 30, planks: 15 },
+        costs: { stone: 60, wood: 40, gold: 80, planks: 15 },
         constructionPoints: 65,
         
         production: {
@@ -343,7 +343,7 @@ const BUILDING_DATA = {
         effects: '1 Military Theorist • Improves army effectiveness',
         category: 'military',
         
-        costs: { wood: 80, stone: 50, gold: 40, planks: 25 },
+        costs: { wood: 80, stone: 50, gold: 100, planks: 25 },
         constructionPoints: 90,
         
         production: {
@@ -390,7 +390,7 @@ const BUILDING_DATA = {
         effects: 'Unlocks Throne View • +2 Royal Capacity • Dynasty management',
         category: 'royal',
         
-        costs: { gold: 100, wood: 50, stone: 30, planks: 25 },
+        costs: { gold: 250, wood: 50, stone: 30, planks: 25 },
         constructionPoints: 80,
         
         production: {
@@ -410,7 +410,7 @@ const BUILDING_DATA = {
         effects: '+10 village happiness • Boosts prestige',
         category: 'royal',
         
-        costs: { stone: 75, gold: 50, wood: 25, planks: 20 },
+        costs: { stone: 75, gold: 120, wood: 25, planks: 20 },
         constructionPoints: 200,
         
         production: {
@@ -454,7 +454,7 @@ const BUILDING_DATA = {
         effects: '1 Professor job • Unlocks advanced technologies',
         category: 'knowledge',
         
-        costs: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 },
+        costs: { wood: 200, stone: 100, gold: 150, metal: 30, planks: 120 },
         constructionPoints: 180,
         
         production: {
@@ -478,7 +478,7 @@ const BUILDING_DATA = {
         effects: '1 Wizard job • Future magical abilities',
         category: 'advanced',
         
-        costs: { gold: 200, stone: 100, wood: 75, metal: 50, planks: 80 },
+        costs: { gold: 500, stone: 100, wood: 75, metal: 50, planks: 80 },
         constructionPoints: 120,
         
         production: {
@@ -499,7 +499,7 @@ const BUILDING_DATA = {
         effects: '10 Scholar jobs • Preserves dynasty history • Research bonus',
         category: 'advanced',
         
-        costs: { gold: 150, wood: 100, stone: 75, planks: 60 },
+        costs: { gold: 350, wood: 100, stone: 75, planks: 60 },
         constructionPoints: 110,
         
         production: {
@@ -519,7 +519,7 @@ const BUILDING_DATA = {
         effects: '+5 happiness • Enables religious ceremonies',
         category: 'royal',
         
-        costs: { stone: 50, gold: 30, wood: 40 },
+        costs: { stone: 50, gold: 80, wood: 40 },
         constructionPoints: 60,
         
         production: {

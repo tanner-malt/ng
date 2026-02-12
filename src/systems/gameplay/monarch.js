@@ -25,8 +25,8 @@ class MonarchManager {
                 icon: '🛡️',
                 category: 'kingdom',
                 description: '+10% combat effectiveness per level',
-                baseCost: 200,
-                costMult: 2,
+                baseCost: 400,
+                costMult: 2.5,
                 maxLevel: 10
             },
             {
@@ -35,8 +35,8 @@ class MonarchManager {
                 icon: '👑',
                 category: 'kingdom',
                 description: 'Monarch leadership skill boosts all production',
-                baseCost: 500,
-                costMult: 2,
+                baseCost: 800,
+                costMult: 2.5,
                 maxLevel: 10
             },
             {
@@ -45,8 +45,8 @@ class MonarchManager {
                 icon: '🔍',
                 category: 'kingdom',
                 description: '+1 sight range on the world map',
-                baseCost: 1000,
-                costMult: 20,
+                baseCost: 1500,
+                costMult: 25,
                 maxLevel: Infinity
             },
             {
@@ -55,8 +55,8 @@ class MonarchManager {
                 icon: '🔨',
                 category: 'infrastructure',
                 description: '+1 job slot in production buildings',
-                baseCost: 100,
-                costMult: 100,
+                baseCost: 250,
+                costMult: 150,
                 maxLevel: Infinity
             },
             {
@@ -65,19 +65,19 @@ class MonarchManager {
                 icon: '🏠',
                 category: 'infrastructure',
                 description: '+1 housing capacity per house',
-                baseCost: 100,
-                costMult: 10,
+                baseCost: 200,
+                costMult: 12,
                 maxLevel: Infinity
             }
         ];
 
         // ── Staff hiring costs ──
-        this.generalBaseCost = 800;
-        this.generalCostMult = 2.5;
-        this.governorBaseCost = 800;
-        this.governorCostMult = 2.5;
-        this.betrothalBaseCost = 500;
-        this.betrothalCostMult = 2;
+        this.generalBaseCost = 1200;
+        this.generalCostMult = 3;
+        this.governorBaseCost = 1200;
+        this.governorCostMult = 3;
+        this.betrothalBaseCost = 800;
+        this.betrothalCostMult = 2.5;
     }
     
     init() {

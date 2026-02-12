@@ -17,7 +17,7 @@ class StrategicCombat {
                 name: 'Infantry',
                 icon: '⚔️',
                 stats: { hp: 30, attack: 5, defense: 3, speed: 2 },
-                cost: { food: 20, gold: 10 },
+                cost: { food: 20, gold: 25 },
                 isHuman: true,
                 description: 'Standard infantry soldiers'
             }
@@ -1750,7 +1750,7 @@ class BattleManager {
             
             // Regular battle completion
             this.gameState.defeatedArmies = (this.gameState.defeatedArmies || 0) + 1;
-            const goldReward = Math.floor(50 * (1 + this.gameState.defeatedArmies * 0.1));
+            const goldReward = Math.floor(25 * (1 + this.gameState.defeatedArmies * 0.1));
             this.gameState.gold += goldReward;
             this.gameState.logBattleEvent(`🎉 Victory! Enemy army defeated!`);
             

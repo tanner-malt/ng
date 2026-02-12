@@ -287,7 +287,7 @@ class VillageDefenseSystem {
         this.wallStrength = Math.max(0, this.wallStrength - wallDamage);
         
         // Rewards
-        const goldReward = Math.floor(army.totalStrength * 5);
+        const goldReward = Math.floor(army.totalStrength * 2);
         if (this.gameState.resources) {
             this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
         }

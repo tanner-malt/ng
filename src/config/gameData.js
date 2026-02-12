@@ -32,11 +32,11 @@ const GameData = {
         woodcutterLodge: { wood: 25, stone: 5 },
         huntersLodge: { wood: 30, stone: 15 },
         quarry: { wood: 60, stone: 20 },
-        lumberMill: { wood: 100, stone: 60, gold: 80 }, // Industrial facility
+        lumberMill: { wood: 100, stone: 60, gold: 200 }, // Industrial facility
         mine: { wood: 60, stone: 40 },
 
         // Basic Craft Buildings
-        workshop: { wood: 35, stone: 25, gold: 15 },
+        workshop: { wood: 35, stone: 25, gold: 40 },
         blacksmith: { wood: 50, stone: 30, metal: 20 },
 
         // Trade & Culture Buildings
@@ -44,20 +44,20 @@ const GameData = {
         academy: { wood: 120, stone: 80, planks: 40 },
 
         // Royal Buildings
-        keep: { gold: 100, wood: 50, stone: 30, planks: 25 },
-        monument: { stone: 75, gold: 50, wood: 25, planks: 20 },
+        keep: { gold: 250, wood: 50, stone: 30, planks: 25 },
+        monument: { stone: 75, gold: 120, wood: 25, planks: 20 },
 
         // Military Buildings
         barracks: { wood: 30, stone: 20 }, // Accessible early game - unlocks World view
-        fortifications: { stone: 60, wood: 40, gold: 30, planks: 15 },
-        militaryAcademy: { wood: 80, stone: 50, gold: 40, planks: 25 },
+        fortifications: { stone: 60, wood: 40, gold: 80, planks: 15 },
+        militaryAcademy: { wood: 80, stone: 50, gold: 100, planks: 25 },
         castle: { wood: 50, stone: 150, metal: 75, planks: 100 },
 
         // Advanced Buildings (Planks-heavy)
-        magicalTower: { gold: 200, stone: 100, wood: 75, metal: 50, planks: 80 },
-        grandLibrary: { gold: 150, wood: 100, stone: 75, planks: 60 },
-        university: { wood: 200, stone: 100, gold: 50, metal: 30, planks: 120 },
-        temple: { stone: 50, gold: 30, wood: 40 },
+        magicalTower: { gold: 500, stone: 100, wood: 75, metal: 50, planks: 80 },
+        grandLibrary: { gold: 350, wood: 100, stone: 75, planks: 60 },
+        university: { wood: 200, stone: 100, gold: 150, metal: 30, planks: 120 },
+        temple: { stone: 50, gold: 80, wood: 40 },
 
         // Storage & Livestock
         silo: { wood: 40, stone: 30 },

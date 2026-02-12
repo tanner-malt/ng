@@ -16,13 +16,13 @@ class EconomySystem {
         
         // Military upkeep costs per unit per day
         this.upkeepCosts = {
-            militia: 1,
-            archer: 2,
-            soldier: 3,
-            veteran: 4,
-            knight: 6,
-            elite: 8,
-            guard: 2  // Village guards
+            militia: 2,
+            archer: 4,
+            soldier: 5,
+            veteran: 7,
+            knight: 10,
+            elite: 14,
+            guard: 3  // Village guards
         };
         
         // Trading state

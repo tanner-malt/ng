@@ -53,7 +53,7 @@ class AchievementSystem {
             description: 'Named your noble dynasty',
             icon: '👑',
             type: 'tutorial',
-            reward: { gold: 150 }
+            reward: { gold: 50 }
         });
 
         this.defineAchievement('town_center_built', {
@@ -61,7 +61,7 @@ class AchievementSystem {
             description: 'Built your first Town Center',
             icon: '🏛️',
             type: 'building',
-            reward: { gold: 700 }
+            reward: { gold: 250 }
         });
 
         this.defineAchievement('sheltering_citizens', {
@@ -70,7 +70,7 @@ class AchievementSystem {
             icon: '🏠',
             type: 'building',
             requirement: { houses_built: 3 }, // Requires 3 houses built
-            reward: { birthRate: 0.03, gold: 100 }
+            reward: { birthRate: 0.03, gold: 40 }
         });
 
         this.defineAchievement('feeding_people', {
@@ -78,7 +78,7 @@ class AchievementSystem {
             description: 'Built your first Farm',
             icon: '🌾',
             type: 'building',
-            reward: { gold: 100 }
+            reward: { gold: 40 }
         });
 
         this.defineAchievement('military_establishment', {
@@ -86,7 +86,7 @@ class AchievementSystem {
             description: 'Built your first Barracks',
             icon: '⚔️',
             type: 'building',
-            reward: { gold: 250 }
+            reward: { gold: 75 }
         });
 
         this.defineAchievement('village_governor', {
@@ -94,7 +94,7 @@ class AchievementSystem {
             description: 'Built a barracks and established military authority',
             icon: '🏛️',
             type: 'tutorial',
-            reward: { gold: 100 }
+            reward: { gold: 40 }
         });
 
         // Building achievements
@@ -103,7 +103,7 @@ class AchievementSystem {
             description: 'Built your first farm',
             icon: '🌾',
             type: 'building',
-            reward: { gold: 200 }
+            reward: { gold: 60 }
         });
 
         this.defineAchievement('build_and_they_will_come', {
@@ -111,7 +111,7 @@ class AchievementSystem {
             description: 'Built your first Builders Hut',
             icon: '🔨',
             type: 'building',
-            reward: { gold: 100, prestige: 25 },
+            reward: { gold: 40, prestige: 25 },
             unlocks: ['keep'] // Unlocks the keep building
         });
 
@@ -144,7 +144,7 @@ class AchievementSystem {
             icon: '🏘️',
             type: 'resource',
             requirement: { population: 50 },
-            reward: { birthRate: 0.03, gold: 500 }
+            reward: { birthRate: 0.03, gold: 150 }
         });
 
         this.defineAchievement('migration_wave', {
@@ -153,7 +153,7 @@ class AchievementSystem {
             icon: '🚶‍♂️🚶‍♀️',
             type: 'special',
             requirement: { population: 25 },
-            reward: { birthRate: 0.05, gold: 1000 }
+            reward: { birthRate: 0.05, gold: 300 }
         });
 
         // Additional population achievements
@@ -163,7 +163,7 @@ class AchievementSystem {
             icon: '🏡',
             type: 'population',
             requirement: { population: 10 },
-            reward: { gold: 350 }
+            reward: { gold: 100 }
         });
 
         this.defineAchievement('great_city', {
@@ -172,7 +172,7 @@ class AchievementSystem {
             icon: '🏙️',
             type: 'population',
             requirement: { population: 200 },
-            reward: { gold: 1000, influence: 100 }
+            reward: { gold: 300, influence: 100 }
         });
 
         this.defineAchievement('metropolis', {
@@ -181,7 +181,7 @@ class AchievementSystem {
             icon: '🌆',
             type: 'population',
             requirement: { population: 500 },
-            reward: { gold: 5000, influence: 500, prestige: 200 }
+            reward: { gold: 1500, influence: 500, prestige: 200 }
         });
 
         this.defineAchievement('welcoming_refuge', {
@@ -199,7 +199,7 @@ class AchievementSystem {
             icon: '🌍',
             type: 'immigration',
             requirement: { total_immigrants: 50 },
-            reward: { birthRate: 0.04, gold: 800 }
+            reward: { birthRate: 0.04, gold: 250 }
         });
 
         this.defineAchievement('baby_boom', {
@@ -208,7 +208,7 @@ class AchievementSystem {
             icon: '👶',
             type: 'births',
             requirement: { total_births: 25 },
-            reward: { gold: 600, happiness: 15 }
+            reward: { gold: 200, happiness: 15 }
         });
 
         this.defineAchievement('generational_legacy', {
@@ -217,7 +217,7 @@ class AchievementSystem {
             icon: '👨‍👩‍👧‍👦',
             type: 'births',
             requirement: { total_births: 100 },
-            reward: { gold: 1500, influence: 100, prestige: 100 }
+            reward: { gold: 500, influence: 100, prestige: 100 }
         });
 
         this.defineAchievement('content_populace', {
@@ -226,7 +226,7 @@ class AchievementSystem {
             icon: '😊',
             type: 'happiness',
             requirement: { avg_happiness: 85, min_population: 20 },
-            reward: { happiness: 20, gold: 300 }
+            reward: { happiness: 20, gold: 100 }
         });
 
         this.defineAchievement('utopian_society', {
@@ -235,7 +235,7 @@ class AchievementSystem {
             icon: '🌟',
             type: 'happiness',
             requirement: { avg_happiness: 95, min_population: 50 },
-            reward: { happiness: 30, gold: 1000, influence: 200, prestige: 150 }
+            reward: { happiness: 30, gold: 300, influence: 200, prestige: 150 }
         });
 
         this.defineAchievement('dynasty_pinnacle', {
@@ -244,7 +244,7 @@ class AchievementSystem {
             icon: '👑',
             type: 'peak_population',
             requirement: { peak_population: 1000 },
-            reward: { gold: 10000, influence: 1000, prestige: 500 }
+            reward: { gold: 2500, influence: 1000, prestige: 500 }
         });
 
         // Combat achievements
@@ -272,7 +272,7 @@ class AchievementSystem {
             description: 'Explored a tile in the world view',
             icon: '🗺️',
             type: 'exploration',
-            reward: { gold: 75, influence: 10 }
+            reward: { gold: 30, influence: 10 }
         });
 
         // Throne room achievements
@@ -290,7 +290,7 @@ class AchievementSystem {
             description: 'Made your first prestige investment',
             icon: '💎',
             type: 'special',
-            reward: { prestige: 25, gold: 200 }
+            reward: { prestige: 25, gold: 75 }
         });
 
         // Monarch unlock — first ruler dies
@@ -299,7 +299,7 @@ class AchievementSystem {
             description: 'A dynasty has ended — but the legacy endures.',
             icon: '⚰️',
             type: 'special',
-            reward: { gold: 250 }
+            reward: { gold: 75 }
         });
 
         // View unlock achievements
@@ -308,7 +308,7 @@ class AchievementSystem {
             description: 'Ascended to the throne and established royal authority',
             icon: '👑',
             type: 'special',
-            reward: { prestige: 100, influence: 75, gold: 1000 }
+            reward: { prestige: 100, influence: 75, gold: 300 }
         });
 
         this.defineAchievement('all_things_end', {
@@ -316,7 +316,7 @@ class AchievementSystem {
             description: 'Achieved the ultimate milestone and unlocked the throne\'s full power',
             icon: '🏰',
             type: 'special',
-            reward: { prestige: 500, influence: 200, gold: 5000 }
+            reward: { prestige: 500, influence: 200, gold: 1500 }
         });
 
         // High-priority achievements from wiki analysis
@@ -335,7 +335,7 @@ class AchievementSystem {
             icon: '👥',
             type: 'population',
             requirement: { total_population: 100 },
-            reward: { gold: 500 }
+            reward: { gold: 150 }
         });
 
         this.defineAchievement('royal_bloodline', {
@@ -353,7 +353,7 @@ class AchievementSystem {
             icon: '⚔️',
             type: 'combat',
             requirement: { unit_types_available: 7 },
-            reward: { gold: 5750 }
+            reward: { gold: 1500 }
         });
 
         this.defineAchievement('seasonal_master', {
@@ -362,7 +362,7 @@ class AchievementSystem {
             icon: '🌸',
             type: 'survival',
             requirement: { seasons_survived: 8 },
-            reward: { gold: 5000 }
+            reward: { gold: 1000 }
         });
 
         this.defineAchievement('master_craftsman', {
@@ -371,7 +371,7 @@ class AchievementSystem {
             icon: '🔨',
             type: 'population',
             requirement: { grandmaster_villagers: 1 },
-            reward: { gold: 800, prestige: 150 }
+            reward: { gold: 250, prestige: 150 }
         });
 
         this.defineAchievement('multi_generational', {
@@ -389,7 +389,7 @@ class AchievementSystem {
             icon: '🗺️',
             type: 'exploration',
             requirement: { map_revealed_percent: 50 },
-            reward: { gold: 600, influence: 100 }
+            reward: { gold: 200, influence: 100 }
         });
 
         this.defineAchievement('balanced_economy', {
@@ -398,7 +398,7 @@ class AchievementSystem {
             icon: '💰',
             type: 'economic',
             requirement: { balanced_resources: true },
-            reward: { gold: 1000, prestige: 100 }
+            reward: { gold: 300, prestige: 100 }
         });
 
         console.log('[Achievements] Initialized', Object.keys(this.achievements).length, 'achievements');

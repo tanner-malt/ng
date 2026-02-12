@@ -1319,7 +1319,7 @@ class WorldManager {
             if (viewerResult.victory) {
                 // Player wins via viewer
                 enemy.status = 'defeated';
-                const goldReward = 5 + Math.floor(Math.random() * 15) * (enemy.units?.length || 1);
+                const goldReward = 2 + Math.floor(Math.random() * 8) * (enemy.units?.length || 1);
                 if (this.gameState.resources) {
                     this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
                 }
@@ -1380,7 +1380,7 @@ class WorldManager {
             }
 
             enemy.status = 'defeated';
-            const goldReward = 5 + Math.floor(Math.random() * 15) * enemy.units.length;
+            const goldReward = 2 + Math.floor(Math.random() * 8) * enemy.units.length;
             if (this.gameState.resources) {
                 this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
             }
@@ -1659,7 +1659,7 @@ class WorldManager {
             // Check if battle is over
             if (enemy.units.length === 0) {
                 enemy.status = 'defeated';
-                const goldReward = 5 + Math.floor(Math.random() * 10) * battle.originalEnemyCount;
+                const goldReward = 2 + Math.floor(Math.random() * 5) * battle.originalEnemyCount;
                 if (this.gameState.resources) {
                     this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
                 }
