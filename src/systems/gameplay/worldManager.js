@@ -596,7 +596,8 @@ class WorldManager {
                 unitType = battleMgr.determineUnitTypeFromVillager?.(v) || 'militia';
                 stats = battleMgr.calculateUnitStats?.(v, unitType) || stats;
             }
-            const topSkills = (v.skills || []).slice(0, 2);
+            const rawSkills = v.skills || {};
+            const topSkills = (Array.isArray(rawSkills) ? rawSkills : Object.keys(rawSkills)).slice(0, 2);
             return { ...v, unitType, stats, topSkills };
         });
 

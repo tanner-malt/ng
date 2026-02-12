@@ -1415,7 +1415,7 @@ class BattleManager {
                 speed: unitStats.speed,
                 morale: unitStats.morale,
                 experience: 0,
-                skills: villager.skills || [],
+                skills: Array.isArray(villager.skills) ? villager.skills : Object.keys(villager.skills || {}),
                 x: Math.random() * 150 + 50,
                 y: Math.random() * 200 + 100,
                 originalVillager: {
@@ -1443,21 +1443,24 @@ class BattleManager {
 
     // Determine unit type based on villager skills and characteristics
     determineUnitTypeFromVillager(villager) {
-        const skills = villager.skills || [];
+        // skills can be an object { farming: {level, xp} } or legacy array
+        const rawSkills = villager.skills || {};
+        const skills = Array.isArray(rawSkills) ? rawSkills : Object.keys(rawSkills);
         const role = villager.role;
 
-        // Skill-based unit assignment priority
-        if (skills.includes('Fighting') || role === 'guard') {
+        // Skill-based unit assignment priority (case-insensitive check)
+        const hasSkill = (name) => skills.some(s => s.toLowerCase() === name.toLowerCase());
+        if (hasSkill('fighting') || hasSkill('combat') || role === 'guard') {
             return 'veteran_soldier';
-        } else if (skills.includes('Blacksmithing') || role === 'blacksmith') {
+        } else if (hasSkill('blacksmithing') || role === 'blacksmith') {
             return 'heavy_infantry';
-        } else if (skills.includes('Woodcutting') || skills.includes('Farming')) {
+        } else if (hasSkill('woodcutting') || hasSkill('farming')) {
             return 'archer';
-        } else if (skills.includes('Building') || role === 'builder') {
+        } else if (hasSkill('building') || role === 'builder') {
             return 'engineer';
-        } else if (skills.includes('Trading') || role === 'merchant') {
+        } else if (hasSkill('trading') || role === 'merchant') {
             return 'scout';
-        } else if (skills.includes('Mining') || role === 'miner') {
+        } else if (hasSkill('mining') || role === 'miner') {
             return 'sapper';
         } else {
             return 'militia'; // Default for peasants
@@ -1474,8 +1477,10 @@ class BattleManager {
         // Happiness affects morale
         const happinessFactor = (villager.happiness || 75) / 100;
         
-        // Skills provide bonuses
-        const skillBonus = this.calculateSkillBonus(villager.skills || [], unitType);
+        // Skills provide bonuses (normalise object form to array of keys)
+        const rawSkills = villager.skills || {};
+        const skillNames = Array.isArray(rawSkills) ? rawSkills : Object.keys(rawSkills);
+        const skillBonus = this.calculateSkillBonus(skillNames, unitType);
         
         return {
             health: Math.floor(baseStats.health * ageFactor * (1 + skillBonus.health)),
@@ -1505,9 +1510,13 @@ class BattleManager {
     calculateSkillBonus(skills, unitType) {
         let bonus = { health: 0, attack: 0, defense: 0, speed: 0, morale: 0 };
         
-        skills.forEach(skill => {
+        // Normalise: skills may be object keys or legacy string array
+        const skillList = Array.isArray(skills) ? skills : Object.keys(skills || {});
+        skillList.forEach(rawSkill => {
+            // Capitalise first letter to match switch cases
+            const skill = rawSkill.charAt(0).toUpperCase() + rawSkill.slice(1).toLowerCase();
             switch (skill) {
-                case 'Fighting':
+                case 'Fighting': case 'Combat':
                     bonus.attack += 0.15;
                     bonus.defense += 0.1;
                     bonus.morale += 0.1;

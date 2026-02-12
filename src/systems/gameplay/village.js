@@ -4094,9 +4094,14 @@ class VillageManager {
                         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
                             <span style="font-size:0.85em;opacity:0.8;">Level ${currentLevel}/3</span>
                             ${specialization ? `<span style="background:#5a4230;padding:1px 6px;border-radius:3px;font-size:0.75em;">${specialization}</span>` : ''}
+                            ${currentLevel === 3 ? '<span style="background:#2ecc71;color:#1a1a1a;padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:600;">MAX LEVEL</span>' : ''}
                         </div>
                         <div style="height:4px;background:#2a1f14;border-radius:2px;margin-top:4px;overflow:hidden;">
                             <div style="height:100%;width:${Math.round(currentLevel / 3 * 100)}%;background:linear-gradient(90deg,#c9a84c,#e8c56d);border-radius:2px;transition:width 0.3s;"></div>
+                        </div>
+                        <div style="font-size:0.75em;color:#bdc3c7;margin-top:4px;">
+                            ${currentLevel >= 2 ? '<span style="margin-right:12px;">✓ +10% efficiency</span>' : ''}
+                            ${currentLevel >= 3 ? '<span>✓ Max efficiency reached</span>' : ''}
                         </div>
                     </div>
                 </div>
@@ -4224,34 +4229,53 @@ class VillageManager {
                 </div>
 
                 <div class="building-workers">
-                    <h4>👷 Workers</h4>
+                    <h4>👷 Worker Details</h4>
                     <div class="worker-info">
         `;
 
-        // Show assigned workers
+        // Show assigned workers with detailed information
         const assignedWorkers = this.getAssignedWorkers(building);
         const workerSlots = this.getWorkerSlotsForBuilding(building);
 
         contentHTML += `
-                        <p>Assigned: ${assignedWorkers.length} / ${workerSlots} workers</p>
-                        <div class="worker-list">
+                        <p style="margin-bottom: 12px; font-weight: 600;">Assigned: ${assignedWorkers.length} / ${workerSlots} workers</p>
         `;
 
-        assignedWorkers.forEach(worker => {
-            contentHTML += `
-                            <div class="worker-item">
-                                <span class="worker-name">${worker.name}</span>
-                                <span class="worker-role">(${worker.role})</span>
-                            </div>
-            `;
-        });
-
         if (assignedWorkers.length === 0) {
-            contentHTML += `<p class="no-workers">No workers assigned</p>`;
+            contentHTML += `<p class="no-workers" style="color: #95a5a6; text-align: center; padding: 20px;">No workers assigned to this building</p>`;
+        } else {
+            contentHTML += `<div class="worker-list" style="display: flex; flex-direction: column; gap: 10px;">`;
+            assignedWorkers.forEach(worker => {
+                const age = worker.age ? `${worker.age} yrs` : 'N/A';
+                const status = worker.status || 'working';
+                const skills = worker.skills || {};
+                const skillDisplay = Object.entries(skills).slice(0, 2).map(([skill, xp]) => {
+                    let level = 'Novice';
+                    if (xp >= 1001) level = 'Master';
+                    else if (xp >= 601) level = 'Expert';
+                    else if (xp >= 301) level = 'Journeyman';
+                    else if (xp >= 101) level = 'Apprentice';
+                    return `<span style="background: rgba(52, 152, 219, 0.2); color: #3498db; padding: 2px 6px; border-radius: 3px; font-size: 11px; white-space: nowrap;">${skill}: ${level}</span>`;
+                }).join('');
+
+                contentHTML += `
+                            <div class="worker-item" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 6px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
+                                    <div>
+                                        <span class="worker-name" style="font-weight: 600; color: #ecf0f1;">${worker.name}</span>
+                                        <span style="margin-left: 8px; font-size: 0.85em; color: #bdc3c7;">${age}</span>
+                                    </div>
+                                    <span style="font-size: 0.75em; color: #95a5a6; text-transform: uppercase;">${status}</span>
+                                </div>
+                                ${skillDisplay ? `<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px;">${skillDisplay}</div>` : ''}
+                                <div style="font-size: 0.85em; color: #bdc3c7;">Health: <span style="color: #2ecc71;">█████</span></div>
+                            </div>
+                `;
+            });
+            contentHTML += `</div>`;
         }
 
         contentHTML += `
-                        </div>
                     </div>
                 </div>
             </div>
