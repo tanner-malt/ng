@@ -584,31 +584,140 @@ class WorldManager {
         // Army size cap: 5 base, 10 with a free general
         const hasGeneralAvailable = this._hasFreeGeneral();
         const maxArmySize = hasGeneralAvailable ? 10 : 5;
+        const currentArmyCount = (this.gameState.armies?.length || 0);
+        const foodAvailable = Math.floor(this.gameState.resources?.food || 0);
 
-        let html = `<h2>⚔️ Draft Army</h2>`;
-        html += `<p>Select villagers to draft (${available.length} available, max ${maxArmySize}):</p>`;
-        if (!hasGeneralAvailable) {
-            html += `<p style="font-size:0.8em;color:#f39c12;">💡 Assign a royal as General to raise the cap to 10</p>`;
-        }
-        html += `<div class="draft-list" style="max-height:300px;overflow-y:auto;">`;
-
-        available.slice(0, 12).forEach((v, i) => {
-            const checked = i < Math.min(3, maxArmySize) ? 'checked' : '';
-            html += `<label class="draft-option">
-                <input type="checkbox" value="${v.id}" ${checked} data-max="${maxArmySize}">
-                ${v.name || 'Villager'} (age ${v.age}, ${v.role || 'idle'})
-            </label><br>`;
+        // Predict unit types and stats for each villager
+        const battleMgr = window.battleManager || window.game?.battleManager;
+        const enriched = available.map(v => {
+            let unitType = 'militia';
+            let stats = { attack: 10, defense: 5, health: 80 };
+            if (battleMgr) {
+                unitType = battleMgr.determineUnitTypeFromVillager?.(v) || 'militia';
+                stats = battleMgr.calculateUnitStats?.(v, unitType) || stats;
+            }
+            const topSkills = (v.skills || []).slice(0, 2);
+            return { ...v, unitType, stats, topSkills };
         });
-        html += `</div>`;
-        html += `<div style="margin-top:12px;">
-            <label>Army name: <input type="text" id="draft-army-name" value="Army ${(this.gameState.armies?.length || 0) + 1}" /></label>
-        </div>`;
-        html += `<div class="modal-buttons" style="margin-top:12px;">
-            <button class="btn-primary" onclick="window.worldManager.confirmDraft()">Confirm Draft</button>
-            <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
+
+        // Sort: guards/fighters first, then by attack desc
+        enriched.sort((a, b) => (b.stats.attack + b.stats.defense) - (a.stats.attack + a.stats.defense));
+
+        const unitTypeLabels = {
+            militia: '🗡️ Militia',
+            archer: '🏹 Archer',
+            veteran_soldier: '⚔️ Veteran',
+            heavy_infantry: '🛡️ Heavy',
+            engineer: '🔧 Engineer',
+            scout: '🏃 Scout',
+            sapper: '💣 Sapper'
+        };
+
+        let html = `
+        <div class="draft-modal-container">
+            <div class="draft-info-bar">
+                <div class="draft-info-item">
+                    <span class="draft-info-label">Available</span>
+                    <span class="draft-info-value">${available.length}</span>
+                </div>
+                <div class="draft-info-item">
+                    <span class="draft-info-label">Max Size</span>
+                    <span class="draft-info-value">${maxArmySize}</span>
+                </div>
+                <div class="draft-info-item">
+                    <span class="draft-info-label">Armies</span>
+                    <span class="draft-info-value">${currentArmyCount}</span>
+                </div>
+                <div class="draft-info-item">
+                    <span class="draft-info-label">Food</span>
+                    <span class="draft-info-value">🌾 ${foodAvailable}</span>
+                </div>
+            </div>
+            ${!hasGeneralAvailable ? '<div class="draft-hint">💡 Assign a royal as General to raise the army cap from 5 → 10</div>' : ''}
+            <div class="draft-controls">
+                <label class="draft-army-name-label">Army Name:
+                    <input type="text" id="draft-army-name" class="draft-name-input" value="Army ${currentArmyCount + 1}" />
+                </label>
+                <div class="draft-select-btns">
+                    <button class="btn-secondary btn-sm" onclick="document.querySelectorAll('.draft-table input[type=checkbox]').forEach((cb,i) => {if(i<${maxArmySize}) cb.checked=true}); window.worldManager._updateDraftSummary(${maxArmySize})">Select ${maxArmySize}</button>
+                    <button class="btn-secondary btn-sm" onclick="document.querySelectorAll('.draft-table input[type=checkbox]').forEach(cb => cb.checked=false); window.worldManager._updateDraftSummary(${maxArmySize})">Clear All</button>
+                </div>
+            </div>
+            <div class="draft-table-wrapper">
+                <table class="draft-table">
+                    <thead>
+                        <tr>
+                            <th style="width:30px;"></th>
+                            <th>Name</th>
+                            <th>Age</th>
+                            <th>Role</th>
+                            <th>Skills</th>
+                            <th>Unit Type</th>
+                            <th>⚔️</th>
+                            <th>🛡️</th>
+                            <th>❤️</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        enriched.forEach((v, i) => {
+            const checked = i < Math.min(3, maxArmySize) ? 'checked' : '';
+            const skillBadges = v.topSkills.map(s => `<span class="draft-skill-badge">${s}</span>`).join('');
+            const typeLabel = unitTypeLabels[v.unitType] || '🗡️ Militia';
+
+            html += `<tr class="draft-row" onclick="const cb=this.querySelector('input');cb.checked=!cb.checked;window.worldManager._updateDraftSummary(${maxArmySize})">
+                <td><input type="checkbox" value="${v.id}" ${checked} data-max="${maxArmySize}" onclick="event.stopPropagation();window.worldManager._updateDraftSummary(${maxArmySize})"></td>
+                <td class="draft-name">${v.name || 'Villager'}</td>
+                <td>${v.age}</td>
+                <td>${v.role || 'idle'}</td>
+                <td>${skillBadges || '<span style="color:#666;">—</span>'}</td>
+                <td class="draft-unit-type">${typeLabel}</td>
+                <td class="draft-stat-atk">${v.stats.attack}</td>
+                <td class="draft-stat-def">${v.stats.defense}</td>
+                <td class="draft-stat-hp">${v.stats.health}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div>
+            <div class="draft-summary" id="draft-summary">
+                <span id="draft-selected-count">0</span> / ${maxArmySize} selected
+                · ~<span id="draft-supply-cost">0</span> 🌾 supplies
+            </div>
+            <div class="draft-actions">
+                <button class="btn-primary" onclick="window.worldManager.confirmDraft()">⚔️ Confirm Draft</button>
+                <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
+            </div>
         </div>`;
 
-        window.modalSystem?.showModal({ title: '⚔️ Draft Army', content: html });
+        window.modalSystem?.showModal({ title: '⚔️ Draft Army', content: html, width: '650px' });
+
+        // Initial summary update
+        setTimeout(() => this._updateDraftSummary(maxArmySize), 50);
+    }
+
+    /** Update the draft modal summary footer */
+    _updateDraftSummary(maxArmySize) {
+        const checkboxes = document.querySelectorAll('.draft-table input[type=checkbox]');
+        let selected = 0;
+        checkboxes.forEach(cb => {
+            if (cb.checked) selected++;
+        });
+        // Enforce max
+        if (selected > maxArmySize) {
+            // Uncheck excess
+            let count = 0;
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    count++;
+                    if (count > maxArmySize) cb.checked = false;
+                }
+            });
+            selected = maxArmySize;
+        }
+        const countEl = document.getElementById('draft-selected-count');
+        const costEl = document.getElementById('draft-supply-cost');
+        if (countEl) countEl.textContent = selected;
+        if (costEl) costEl.textContent = selected * 5;
     }
 
     confirmDraft() {

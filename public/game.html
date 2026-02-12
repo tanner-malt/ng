@@ -157,12 +157,12 @@
                 <div class="village-header">
                     <h2>🏘️ Your Village</h2>
                     <div class="resource-panel">
-                        <span><i class="res-icon gold"></i>Gold: <span id="gold-count"></span><span id="gold-cap-wrapper">/<span id="gold-cap"></span></span></span>
-                        <span><i class="res-icon food"></i>Food: <span id="food-count"></span>/<span id="food-cap"></span></span>
-                        <span><i class="res-icon wood"></i>Wood: <span id="wood-count"></span>/<span id="wood-cap"></span></span>
-                        <span><i class="res-icon stone"></i>Stone: <span id="stone-count"></span>/<span id="stone-cap"></span></span>
-                        <span id="metal-resource" style="display:none;"><i class="res-icon metal"></i>Metal: <span id="metal-count"></span>/<span id="metal-cap"></span></span>
-                        <span id="planks-resource" style="display:none;"><i class="res-icon planks"></i>Planks: <span id="planks-count">0</span>/<span id="planks-cap">50</span></span>
+                        <span><i class="res-icon gold"></i>Gold: <span id="gold-count"></span><span id="gold-cap-wrapper">/<span id="gold-cap"></span></span><span id="gold-trend" class="res-trend"></span></span>
+                        <span><i class="res-icon food"></i>Food: <span id="food-count"></span>/<span id="food-cap"></span><span id="food-trend" class="res-trend"></span></span>
+                        <span><i class="res-icon wood"></i>Wood: <span id="wood-count"></span>/<span id="wood-cap"></span><span id="wood-trend" class="res-trend"></span></span>
+                        <span><i class="res-icon stone"></i>Stone: <span id="stone-count"></span>/<span id="stone-cap"></span><span id="stone-trend" class="res-trend"></span></span>
+                        <span id="metal-resource" style="display:none;"><i class="res-icon metal"></i>Metal: <span id="metal-count"></span>/<span id="metal-cap"></span><span id="metal-trend" class="res-trend"></span></span>
+                        <span id="planks-resource" style="display:none;"><i class="res-icon planks"></i>Planks: <span id="planks-count">0</span>/<span id="planks-cap">50</span><span id="planks-trend" class="res-trend"></span></span>
                         <span id="weapons-resource" style="display:none;"><i class="res-icon weapons"></i>Weapons: <span id="weapons-count">0</span>/<span id="weapons-cap">100</span></span>
                         <span id="tools-resource" style="display:none;"><i class="res-icon tools"></i>Tools: <span id="tools-count">0</span>/<span id="tools-cap">100</span></span>
                         <span><i class="res-icon population"></i>Pop: <span id="population-count"></span>/<span id="population-cap"></span></span>
@@ -408,9 +408,9 @@
                                             <span class="production-icon">🌾</span>
                                             <span class="resource-name">Food</span>
                                         </div>
-                                        <div class="gain-cell">+<span id="daily-food-production">0</span></div>
-                                        <div class="loss-cell">-<span id="daily-food-consumption">0</span></div>
-                                        <div class="net-cell"><span id="daily-food-net">0</span></div>
+                                        <div class="gain-cell">+<span id="prod-food-production">0</span></div>
+                                        <div class="loss-cell">-<span id="prod-food-consumption">0</span></div>
+                                        <div class="net-cell"><span id="prod-food-net">0</span></div>
                                     </div>
                                     <div class="production-sources" id="food-sources">
                                         <div class="sources-detail">Sources: <span class="sources-list"></span></div>
@@ -420,9 +420,9 @@
                                             <span class="production-icon">🪵</span>
                                             <span class="resource-name">Wood</span>
                                         </div>
-                                        <div class="gain-cell">+<span id="daily-wood-production">0</span></div>
-                                        <div class="loss-cell">-<span id="daily-wood-consumption">0</span></div>
-                                        <div class="net-cell"><span id="daily-wood-net">0</span></div>
+                                        <div class="gain-cell">+<span id="prod-wood-production">0</span></div>
+                                        <div class="loss-cell">-<span id="prod-wood-consumption">0</span></div>
+                                        <div class="net-cell"><span id="prod-wood-net">0</span></div>
                                     </div>
                                     <div class="production-sources" id="wood-sources">
                                         <div class="sources-detail">Sources: <span class="sources-list"></span></div>
@@ -432,9 +432,9 @@
                                             <span class="production-icon">🗿</span>
                                             <span class="resource-name">Stone</span>
                                         </div>
-                                        <div class="gain-cell">+<span id="daily-stone-production">0</span></div>
-                                        <div class="loss-cell">-<span id="daily-stone-consumption">0</span></div>
-                                        <div class="net-cell"><span id="daily-stone-net">0</span></div>
+                                        <div class="gain-cell">+<span id="prod-stone-production">0</span></div>
+                                        <div class="loss-cell">-<span id="prod-stone-consumption">0</span></div>
+                                        <div class="net-cell"><span id="prod-stone-net">0</span></div>
                                     </div>
                                     <div class="production-sources" id="stone-sources">
                                         <div class="sources-detail">Sources: <span class="sources-list"></span></div>
@@ -444,9 +444,9 @@
                                             <span class="production-icon">⚒️</span>
                                             <span class="resource-name">Metal</span>
                                         </div>
-                                        <div class="gain-cell">+<span id="daily-metal-production">0</span></div>
-                                        <div class="loss-cell">-<span id="daily-metal-consumption">0</span></div>
-                                        <div class="net-cell"><span id="daily-metal-net">0</span></div>
+                                        <div class="gain-cell">+<span id="prod-metal-production">0</span></div>
+                                        <div class="loss-cell">-<span id="prod-metal-consumption">0</span></div>
+                                        <div class="net-cell"><span id="prod-metal-net">0</span></div>
                                     </div>
                                     <div class="production-sources" id="metal-sources">
                                         <div class="sources-detail">Sources: <span class="sources-list"></span></div>
@@ -463,6 +463,9 @@
                                     <div class="production-sources" id="gold-sources">
                                         <div class="sources-detail">Sources: <span class="sources-list"></span></div>
                                     </div>
+                                </div>
+                                <div style="margin-top:12px;text-align:center;">
+                                    <button class="action-btn secondary" onclick="window.villageManager?.showProductionInsightModal()">📊 Production Insight</button>
                                 </div>
                             </div>
                         </div>

@@ -938,11 +938,12 @@ class VillageManager {
             if (!this.gameState.buildMode) return;
 
             const rect = this.villageGrid.getBoundingClientRect();
-            // Adjust coordinates for the current view offset
+            // Adjust coordinates for the current view offset and zoom
             const offsetX = this.viewOffsetX || 0;
             const offsetY = this.viewOffsetY || 0;
-            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
-            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
+            const zoom = this.zoomLevel || 1;
+            const x = Math.floor((e.clientX - rect.left - offsetX) / (this.gridSize * zoom)) * this.gridSize;
+            const y = Math.floor((e.clientY - rect.top - offsetY) / (this.gridSize * zoom)) * this.gridSize;
 
             // Remove existing ghost
             if (ghostBuilding) {
@@ -1010,11 +1011,12 @@ class VillageManager {
             }
 
             const rect = this.villageGrid.getBoundingClientRect();
-            // Adjust coordinates for the current view offset if it exists
+            // Adjust coordinates for the current view offset and zoom level
             const offsetX = this.viewOffsetX || 0;
             const offsetY = this.viewOffsetY || 0;
-            const x = Math.floor((e.clientX - rect.left - offsetX) / this.gridSize) * this.gridSize;
-            const y = Math.floor((e.clientY - rect.top - offsetY) / this.gridSize) * this.gridSize;
+            const zoom = this.zoomLevel || 1;
+            const x = Math.floor((e.clientX - rect.left - offsetX) / (this.gridSize * zoom)) * this.gridSize;
+            const y = Math.floor((e.clientY - rect.top - offsetY) / (this.gridSize * zoom)) * this.gridSize;
 
             // Check if position is free and within bounds (tile-based)
             const t = this.toTile(x, y);
@@ -1096,6 +1098,7 @@ class VillageManager {
         let lastY = 0;
         let viewOffsetX = 0;
         let viewOffsetY = 0;
+        let zoomLevel = 1.0;
 
         // Create a container for all grid content that can be moved
         const gridContent = document.createElement('div');
@@ -1106,6 +1109,7 @@ class VillageManager {
         gridContent.style.top = '0';
         gridContent.style.left = '0';
         gridContent.style.transition = 'none';
+        gridContent.style.transformOrigin = '0 0';
 
         // Move all existing grid children into the content container
         while (this.villageGrid.firstChild) {
@@ -1113,10 +1117,21 @@ class VillageManager {
         }
         this.villageGrid.appendChild(gridContent);
 
+        // Add zoom indicator
+        const zoomIndicator = document.createElement('div');
+        zoomIndicator.className = 'grid-zoom-indicator';
+        zoomIndicator.textContent = '100%';
+        this.villageGrid.appendChild(zoomIndicator);
+
         // Store reference to content container and offset for building placement
         this.villageGridContent = gridContent;
         this.viewOffsetX = 0;
         this.viewOffsetY = 0;
+        this.zoomLevel = 1.0;
+
+        const applyTransform = () => {
+            this.villageGridContent.style.transform = `translate(${viewOffsetX}px, ${viewOffsetY}px) scale(${zoomLevel})`;
+        };
 
         this.villageGrid.addEventListener('mousedown', (e) => {
             // Start dragging on left mouse button
@@ -1139,8 +1154,8 @@ class VillageManager {
             viewOffsetX += deltaX;
             viewOffsetY += deltaY;
 
-            // Apply bounds to prevent panning too far
-            const maxOffset = 400;
+            // Apply bounds scaled to zoom level
+            const maxOffset = 400 * zoomLevel;
             viewOffsetX = Math.max(-maxOffset, Math.min(maxOffset, viewOffsetX));
             viewOffsetY = Math.max(-maxOffset, Math.min(maxOffset, viewOffsetY));
 
@@ -1148,7 +1163,7 @@ class VillageManager {
             this.viewOffsetX = viewOffsetX;
             this.viewOffsetY = viewOffsetY;
 
-            this.villageGridContent.style.transform = `translate(${viewOffsetX}px, ${viewOffsetY}px)`;
+            applyTransform();
 
             lastX = e.clientX;
             lastY = e.clientY;
@@ -1162,14 +1177,49 @@ class VillageManager {
             }
         });
 
+        // Wheel zoom
+        this.villageGrid.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const oldZoom = zoomLevel;
+            const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomLevel = Math.max(0.5, Math.min(2.0, zoomLevel + zoomDelta));
+            this.zoomLevel = zoomLevel;
+
+            // Zoom toward cursor position
+            const rect = this.villageGrid.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            // Adjust pan so the point under cursor stays fixed
+            viewOffsetX = cursorX - (cursorX - viewOffsetX) * (zoomLevel / oldZoom);
+            viewOffsetY = cursorY - (cursorY - viewOffsetY) * (zoomLevel / oldZoom);
+            this.viewOffsetX = viewOffsetX;
+            this.viewOffsetY = viewOffsetY;
+
+            applyTransform();
+
+            // Update indicator
+            zoomIndicator.textContent = `${Math.round(zoomLevel * 100)}%`;
+            zoomIndicator.classList.add('visible');
+            clearTimeout(this._zoomFadeTimer);
+            this._zoomFadeTimer = setTimeout(() => zoomIndicator.classList.remove('visible'), 1200);
+        }, { passive: false });
+
         // Reset view on double-click
         this.villageGrid.addEventListener('dblclick', (e) => {
             if (!this.gameState.buildMode) {
                 viewOffsetX = 0;
                 viewOffsetY = 0;
+                zoomLevel = 1.0;
                 this.viewOffsetX = 0;
                 this.viewOffsetY = 0;
-                this.villageGridContent.style.transform = 'translate(0px, 0px)';
+                this.zoomLevel = 1.0;
+                this.villageGridContent.style.transition = 'transform 0.3s ease';
+                applyTransform();
+                setTimeout(() => { this.villageGridContent.style.transition = 'none'; }, 300);
+                zoomIndicator.textContent = '100%';
+                zoomIndicator.classList.add('visible');
+                clearTimeout(this._zoomFadeTimer);
+                this._zoomFadeTimer = setTimeout(() => zoomIndicator.classList.remove('visible'), 1200);
                 e.preventDefault();
             }
         });
@@ -1700,7 +1750,6 @@ class VillageManager {
         container.querySelectorAll('.building:not(.building-site)').forEach(el => el.remove());
 
         console.log('[Village] Rendering buildings - count:', this.gameState.buildings.length);
-        console.log('[Village] Container size:', container.offsetWidth, 'x', container.offsetHeight);
 
         // Group buildings by coordinates to detect overlaps
         const buildingsByPosition = {};
@@ -1721,8 +1770,6 @@ class VillageManager {
 
         // Render all buildings (both completed and under construction)
         this.gameState.buildings.forEach(building => {
-            console.log('[Village] Rendering building:', building.type, 'at pixel coords', building.x, building.y, 'level:', building.level, 'built:', building.built);
-
             const buildingEl = document.createElement('div');
             buildingEl.className = `building ${building.type}`;
             buildingEl.style.left = building.x + 'px';
@@ -1734,18 +1781,68 @@ class VillageManager {
             buildingEl.style.position = 'absolute';
             buildingEl.style.zIndex = '10';
 
+            const isUnderConstruction = building.level === 0 || !building.built;
+            const displayName = window.GameData?.buildingInfo?.[building.type]?.name || building.type;
+
             // Only override colors for construction status, let CSS handle the rest
-            if (building.level === 0 || !building.built) {
+            if (isUnderConstruction) {
                 buildingEl.style.border = '2px solid #f1c40f';
                 buildingEl.style.backgroundColor = 'rgba(241, 196, 15, 0.7)';
-                buildingEl.title = `${building.type} (Under Construction) - Click for info`;
+                buildingEl.title = `${displayName} (Under Construction) - Click for info`;
             } else {
-                // Let CSS handle the styling for completed buildings
-                buildingEl.title = `${building.type} (Level ${building.level}) - Click for info`;
+                buildingEl.title = `${displayName} (Level ${building.level}) - Click for info`;
             }
 
             buildingEl.textContent = this.getBuildingSymbol(building.type, building.level !== undefined ? building.level : 1);
             buildingEl.dataset.buildingId = building.id;
+
+            // === Building Overlays ===
+
+            // Level badge (top-right corner) — only for built buildings level 2+
+            if (!isUnderConstruction && building.level >= 2) {
+                const levelBadge = document.createElement('span');
+                levelBadge.className = 'building-level-badge';
+                levelBadge.textContent = building.level;
+                buildingEl.appendChild(levelBadge);
+            }
+
+            // Employment indicator (bottom-left dot)
+            if (!isUnderConstruction) {
+                const slots = this.getWorkerSlotsForBuilding(building);
+                if (slots > 0) {
+                    const assigned = this.getAssignedWorkers(building);
+                    const assignedCount = Array.isArray(assigned) ? assigned.length : 0;
+                    const empDot = document.createElement('span');
+                    empDot.className = 'building-emp-dot';
+                    if (assignedCount >= slots) {
+                        empDot.classList.add('emp-full');
+                        empDot.title = `Fully staffed (${assignedCount}/${slots})`;
+                    } else if (assignedCount > 0) {
+                        empDot.classList.add('emp-partial');
+                        empDot.title = `Partially staffed (${assignedCount}/${slots})`;
+                    } else {
+                        empDot.classList.add('emp-empty');
+                        empDot.title = `Unstaffed (0/${slots})`;
+                    }
+                    buildingEl.appendChild(empDot);
+                }
+            }
+
+            // Construction progress bar (bottom)
+            if (isUnderConstruction) {
+                const progress = this.gameState.constructionManager?.getConstructionProgress(building.id);
+                if (progress) {
+                    const progressBar = document.createElement('div');
+                    progressBar.className = 'building-progress-bar';
+                    const fill = document.createElement('div');
+                    fill.className = 'building-progress-fill';
+                    fill.style.width = `${progress.progressPercent}%`;
+                    progressBar.appendChild(fill);
+                    buildingEl.appendChild(progressBar);
+
+                    buildingEl.title = `${displayName} - ${progress.progressPercent}% (${progress.assignedBuilders} builders)`;
+                }
+            }
 
             // Add hover effect
             buildingEl.addEventListener('mouseenter', () => {
@@ -1773,11 +1870,9 @@ class VillageManager {
             });
 
             container.appendChild(buildingEl);
-            console.log('[Village] Added building element to container:', building.type, 'at', building.x, building.y);
         });
 
-        console.log(`[Village] Rendered ${this.gameState.buildings.length} buildings to container`);
-        console.log('[Village] Container now has', container.querySelectorAll('.building').length, 'building elements');
+        console.log(`[Village] Rendered ${this.gameState.buildings.length} buildings`);
     }
 
     showBuildingInfo(building) {
@@ -2362,59 +2457,79 @@ class VillageManager {
         const detailedProduction = this.gameState.jobManager.calculateDetailedDailyProduction();
         const currentProduction = detailedProduction.production;
 
-        // Update basic production numbers
-        const foodProdEl = document.getElementById('daily-food-production');
-        const woodProdEl = document.getElementById('daily-wood-production');
-        const stoneProdEl = document.getElementById('daily-stone-production');
-        const metalProdEl = document.getElementById('daily-metal-production');
-        const productionGainEl = document.getElementById('daily-production-gain');
+        // Production tab uses prod-* IDs to avoid collision with Overview tab
+        const foodProdEl = document.getElementById('prod-food-production');
+        const woodProdEl = document.getElementById('prod-wood-production');
+        const stoneProdEl = document.getElementById('prod-stone-production');
+        const metalProdEl = document.getElementById('prod-metal-production');
 
-        if (foodProdEl) foodProdEl.textContent = Math.round(currentProduction.food);
-        if (woodProdEl) woodProdEl.textContent = Math.round(currentProduction.wood);
-        if (stoneProdEl) stoneProdEl.textContent = Math.round(currentProduction.stone);
-        if (metalProdEl) metalProdEl.textContent = Math.round(currentProduction.metal);
-        if (productionGainEl) productionGainEl.textContent = Math.round(currentProduction.production);
+        if (foodProdEl) foodProdEl.textContent = currentProduction.food.toFixed(2);
+        if (woodProdEl) woodProdEl.textContent = currentProduction.wood.toFixed(2);
+        if (stoneProdEl) stoneProdEl.textContent = currentProduction.stone.toFixed(2);
+        if (metalProdEl) metalProdEl.textContent = currentProduction.metal.toFixed(2);
 
         // Helper to format net values with +/- sign and add styling class
         const formatNetValue = (value, el) => {
             if (!el) return;
-            const rounded = Math.round(value);
-            el.textContent = (rounded >= 0 ? '+' : '') + rounded;
+            const formatted = value.toFixed(2);
+            el.textContent = (value >= 0 ? '+' : '') + formatted;
+            // Apply class to parent .net-cell for CSS targeting
+            const parent = el.parentElement;
+            if (parent && parent.classList.contains('net-cell')) {
+                parent.classList.remove('positive', 'negative');
+                if (value > 0.005) parent.classList.add('positive');
+                else if (value < -0.005) parent.classList.add('negative');
+            }
             el.classList.remove('positive', 'negative');
-            if (rounded > 0) el.classList.add('positive');
-            else if (rounded < 0) el.classList.add('negative');
+            if (value > 0.005) el.classList.add('positive');
+            else if (value < -0.005) el.classList.add('negative');
         };
 
         // Calculate and display net values
         const foodConsumption = this.gameState.population;
-        const foodConsumptionEl = document.getElementById('daily-food-consumption');
-        const foodNetEl = document.getElementById('daily-food-net');
+        const foodConsumptionEl = document.getElementById('prod-food-consumption');
+        const foodNetEl = document.getElementById('prod-food-net');
 
         if (foodConsumptionEl) foodConsumptionEl.textContent = foodConsumption;
         formatNetValue(currentProduction.food - foodConsumption, foodNetEl);
 
-        const woodConsumptionEl = document.getElementById('daily-wood-consumption');
-        const woodNetEl = document.getElementById('daily-wood-net');
+        const woodConsumptionEl = document.getElementById('prod-wood-consumption');
+        const woodNetEl = document.getElementById('prod-wood-net');
         if (woodConsumptionEl) woodConsumptionEl.textContent = '0';
         formatNetValue(currentProduction.wood, woodNetEl);
 
-        const stoneConsumptionEl = document.getElementById('daily-stone-consumption');
-        const stoneNetEl = document.getElementById('daily-stone-net');
+        const stoneConsumptionEl = document.getElementById('prod-stone-consumption');
+        const stoneNetEl = document.getElementById('prod-stone-net');
         if (stoneConsumptionEl) stoneConsumptionEl.textContent = '0';
         formatNetValue(currentProduction.stone, stoneNetEl);
 
-        const metalConsumptionEl = document.getElementById('daily-metal-consumption');
-        const metalNetEl = document.getElementById('daily-metal-net');
+        const metalConsumptionEl = document.getElementById('prod-metal-consumption');
+        const metalNetEl = document.getElementById('prod-metal-net');
         if (metalConsumptionEl) metalConsumptionEl.textContent = '0';
         formatNetValue(currentProduction.metal, metalNetEl);
 
-        const productionConsumptionEl = document.getElementById('daily-production-consumption');
-        const productionNetEl = document.getElementById('daily-production-net');
-        if (productionConsumptionEl) productionConsumptionEl.textContent = '0';
-        formatNetValue(currentProduction.production, productionNetEl);
+        // Also update the Overview tab summary net values
+        this.updateOverviewNetValues(currentProduction, foodConsumption);
 
         // Update production sources
         this.updateProductionSources();
+    }
+
+    updateOverviewNetValues(currentProduction, foodConsumption) {
+        // Overview tab uses daily-*-net IDs
+        const formatOverviewNet = (value, elId) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const formatted = value.toFixed(2);
+            el.textContent = (value >= 0 ? '+' : '') + formatted;
+            el.classList.remove('positive', 'negative');
+            if (value > 0.005) el.classList.add('positive');
+            else if (value < -0.005) el.classList.add('negative');
+        };
+        formatOverviewNet(currentProduction.food - foodConsumption, 'daily-food-net');
+        formatOverviewNet(currentProduction.wood, 'daily-wood-net');
+        formatOverviewNet(currentProduction.stone, 'daily-stone-net');
+        formatOverviewNet(currentProduction.metal, 'daily-metal-net');
     }
 
     updateProductionSources() {
@@ -2430,21 +2545,22 @@ class VillageManager {
             if (!el) return;
             const items = [];
             (breakdown[resource]?.income || []).forEach(item => {
-                items.push({ label: item.label, amount: Math.round(item.amount), isIncome: true });
+                items.push({ label: item.label, amount: item.amount, isIncome: true });
             });
             (breakdown[resource]?.expense || []).forEach(item => {
-                items.push({ label: item.label, amount: Math.round(item.amount), isIncome: false });
+                items.push({ label: item.label, amount: item.amount, isIncome: false });
             });
             if (items.length === 0) {
                 el.innerHTML = '<em style="color:#888;">No activity</em>';
                 return;
             }
             el.innerHTML = items.map(item => {
+                const formatted = item.amount.toFixed(2);
                 const sign = item.isIncome ? '+' : '';
                 const color = item.isIncome ? '#4ade80' : (item.amount < 0 ? '#f87171' : '#ccc');
                 return `<div style="display:flex;justify-content:space-between;padding:1px 0;">`
                     + `<span style="color:#ccc;">${item.label}</span>`
-                    + `<span style="color:${color};font-weight:500;">${sign}${item.amount}</span></div>`;
+                    + `<span style="color:${color};font-weight:500;">${sign}${formatted}</span></div>`;
             }).join('');
         };
 
@@ -2497,10 +2613,10 @@ class VillageManager {
         const totalIncome = taxIncome + marketIncome;
         const netGold = totalIncome - upkeep;
 
-        if (goldIncomeEl) goldIncomeEl.textContent = totalIncome;
-        if (goldUpkeepEl) goldUpkeepEl.textContent = upkeep;
+        if (goldIncomeEl) goldIncomeEl.textContent = totalIncome.toFixed(1);
+        if (goldUpkeepEl) goldUpkeepEl.textContent = upkeep.toFixed(1);
         if (goldNetEl) {
-            goldNetEl.textContent = (netGold >= 0 ? '+' : '') + netGold;
+            goldNetEl.textContent = (netGold >= 0 ? '+' : '') + netGold.toFixed(1);
             goldNetEl.classList.remove('positive', 'negative');
             if (netGold > 0) goldNetEl.classList.add('positive');
             else if (netGold < 0) goldNetEl.classList.add('negative');
@@ -2512,9 +2628,161 @@ class VillageManager {
             if (taxIncome > 0) lines.push(`Taxes (${taxPop} citizens): +${taxIncome}`);
             if (marketIncome > 0) lines.push(`Markets: +${marketIncome}`);
             if (upkeep > 0) lines.push(`Military Upkeep: -${upkeep}`);
+            // Building upkeep
+            const bldUpkeep = this.gameState.economySystem?.lastBuildingUpkeep || 0;
+            if (bldUpkeep > 0) lines.push(`Building Upkeep: -${bldUpkeep.toFixed(1)}`);
             if (lines.length === 0) lines.push('Build Town Center to collect taxes');
             goldSourcesEl.textContent = lines.join(', ');
         }
+    }
+
+    /**
+     * Show the Production Insight modal with detailed breakdown and historical trends.
+     */
+    showProductionInsightModal() {
+        if (!window.modalSystem) return;
+
+        const gs = this.gameState;
+        const history = gs.resourceHistory || [];
+        const resources = ['food', 'wood', 'stone', 'gold', 'metal'];
+        const resourceIcons = { food: '🌾', wood: '🪵', stone: '🗿', gold: '💰', metal: '⛏️' };
+
+        // Current production rates
+        let currentProd = {};
+        let breakdown = {};
+        if (gs.jobManager && typeof gs.jobManager.calculateDetailedDailyProduction === 'function') {
+            const detailed = gs.jobManager.calculateDetailedDailyProduction();
+            currentProd = detailed.production || {};
+            breakdown = detailed.breakdown || {};
+        }
+        const foodConsumption = gs.population || 0;
+
+        // Economy data
+        const econ = gs.economySystem;
+        const taxIncome = econ?.lastTaxIncome || 0;
+        const militaryUpkeep = econ?.lastUpkeep || 0;
+        const buildingUpkeep = econ?.lastBuildingUpkeep || 0;
+
+        // Build current net summary table
+        let summaryRows = '';
+        resources.forEach(res => {
+            let gain = currentProd[res] || 0;
+            let loss = 0;
+            if (res === 'food') loss = foodConsumption;
+            if (res === 'gold') {
+                gain = taxIncome;
+                // Add market income
+                const buildings = gs.buildings || [];
+                buildings.forEach(b => {
+                    if (b.type === 'market') gain += (b.workers?.length || 0) * 3;
+                });
+                loss = militaryUpkeep + buildingUpkeep;
+            }
+            const net = gain - loss;
+            const netColor = net > 0 ? '#4ade80' : (net < 0 ? '#f87171' : '#aaa');
+            const netSign = net >= 0 ? '+' : '';
+            const stored = res === 'gold' ? (gs.gold || gs.resources?.gold || 0) : (gs.resources[res] || 0);
+            const storedDisplay = stored % 1 === 0 ? Math.floor(stored) : stored.toFixed(2);
+            summaryRows += `<tr>
+                <td>${resourceIcons[res]} ${res.charAt(0).toUpperCase() + res.slice(1)}</td>
+                <td style="color:#4ade80;">+${gain.toFixed(2)}</td>
+                <td style="color:#f87171;">-${loss.toFixed(2)}</td>
+                <td style="color:${netColor};font-weight:600;">${netSign}${net.toFixed(2)}</td>
+                <td>${storedDisplay}</td>
+            </tr>`;
+        });
+
+        // Build sparkline-style history table (last 30 days)
+        const recentHistory = history.slice(-30);
+        let historySection = '';
+        if (recentHistory.length > 0) {
+            historySection = `<h4 style="margin-top:16px;color:#e0e0e0;">📈 Resource Trend (Last ${recentHistory.length} days)</h4>`;
+            resources.forEach(res => {
+                const values = recentHistory.map(h => h.resources?.[res] || 0);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const range = max - min || 1;
+                const current = values[values.length - 1];
+                const start = values[0];
+                const change = current - start;
+                const changeColor = change > 0 ? '#4ade80' : (change < 0 ? '#f87171' : '#aaa');
+                const changeSign = change >= 0 ? '+' : '';
+
+                // Build mini bar chart
+                const barWidth = Math.max(2, Math.floor(200 / values.length));
+                const bars = values.map(v => {
+                    const height = Math.max(2, Math.round(((v - min) / range) * 24));
+                    const barColor = v >= start ? '#4ade80' : '#f87171';
+                    return `<div style="display:inline-block;width:${barWidth}px;height:${height}px;background:${barColor};margin:0 0.5px;border-radius:1px;vertical-align:bottom;"></div>`;
+                }).join('');
+
+                historySection += `<div style="display:flex;align-items:center;gap:8px;margin:6px 0;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <span style="width:60px;font-size:0.8rem;">${resourceIcons[res]} ${res.charAt(0).toUpperCase() + res.slice(1)}</span>
+                    <div style="flex:1;height:28px;display:flex;align-items:flex-end;background:rgba(0,0,0,0.2);border-radius:4px;padding:2px;">${bars}</div>
+                    <span style="width:80px;text-align:right;font-size:0.75rem;color:${changeColor}">${changeSign}${change.toFixed(0)}</span>
+                </div>`;
+            });
+        } else {
+            historySection = `<p style="color:#888;margin-top:12px;font-style:italic;">No history yet — play a few days to see trends.</p>`;
+        }
+
+        // Build per-resource breakdown
+        let breakdownSection = `<h4 style="margin-top:16px;color:#e0e0e0;">📋 Production Breakdown</h4>`;
+        resources.forEach(res => {
+            if (res === 'gold') return; // Gold is handled separately via economy system
+            const incomeItems = breakdown[res]?.income || [];
+            const expenseItems = breakdown[res]?.expense || [];
+            if (incomeItems.length === 0 && expenseItems.length === 0) return;
+
+            breakdownSection += `<div style="margin:4px 0;">
+                <strong style="color:#e0e0e0;font-size:0.8rem;">${resourceIcons[res]} ${res.charAt(0).toUpperCase() + res.slice(1)}</strong>
+                <div style="padding-left:12px;font-size:0.75rem;">`;
+            incomeItems.forEach(item => {
+                breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">${item.label}</span><span style="color:#4ade80;">+${item.amount.toFixed(2)}</span></div>`;
+            });
+            expenseItems.forEach(item => {
+                breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">${item.label}</span><span style="color:#f87171;">${item.amount.toFixed(2)}</span></div>`;
+            });
+            breakdownSection += `</div></div>`;
+        });
+
+        // Gold breakdown
+        breakdownSection += `<div style="margin:4px 0;">
+            <strong style="color:#e0e0e0;font-size:0.8rem;">💰 Gold</strong>
+            <div style="padding-left:12px;font-size:0.75rem;">`;
+        if (taxIncome > 0) breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">Tax Income</span><span style="color:#4ade80;">+${taxIncome.toFixed(2)}</span></div>`;
+        const buildings = gs.buildings || [];
+        let marketIncome = 0;
+        buildings.forEach(b => { if (b.type === 'market') marketIncome += (b.workers?.length || 0) * 3; });
+        if (marketIncome > 0) breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">Market Trade</span><span style="color:#4ade80;">+${marketIncome.toFixed(2)}</span></div>`;
+        if (militaryUpkeep > 0) breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">Military Upkeep</span><span style="color:#f87171;">-${militaryUpkeep.toFixed(2)}</span></div>`;
+        if (buildingUpkeep > 0) breakdownSection += `<div style="display:flex;justify-content:space-between;"><span style="color:#ccc;">Building Upkeep</span><span style="color:#f87171;">-${buildingUpkeep.toFixed(2)}</span></div>`;
+        breakdownSection += `</div></div>`;
+
+        const content = `
+            <div class="production-insight-modal">
+                <h4 style="color:#e0e0e0;margin-bottom:8px;">⚡ Current Daily Rates</h4>
+                <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                    <thead><tr style="border-bottom:1px solid #555;">
+                        <th style="text-align:left;padding:4px;">Resource</th>
+                        <th style="text-align:left;padding:4px;">Gain</th>
+                        <th style="text-align:left;padding:4px;">Loss</th>
+                        <th style="text-align:left;padding:4px;">Net</th>
+                        <th style="text-align:left;padding:4px;">Stored</th>
+                    </tr></thead>
+                    <tbody>${summaryRows}</tbody>
+                </table>
+                ${historySection}
+                ${breakdownSection}
+            </div>
+        `;
+
+        window.modalSystem.showModal({
+            title: '📊 Production Insight',
+            content: content,
+            modalType: 'production-insight',
+            width: '600px'
+        });
     }
 
     // Population View System
@@ -3729,6 +3997,13 @@ class VillageManager {
         const assignedWorkers = this.getAssignedWorkers(building);
         const workerSlots = this.getWorkerSlotsForBuilding(building);
 
+        // Upkeep cost
+        const baseUpkeep = window.GameData?.buildingUpkeep?.[building.type] || 0;
+        const upkeepCost = baseUpkeep * currentLevel;
+        const upkeepHTML = upkeepCost > 0
+            ? `<div class="popover-upkeep">💰 ${upkeepCost.toFixed(1)} gold/day upkeep</div>`
+            : '';
+
         // Build popover content
         const popover = document.createElement('div');
         popover.id = 'building-popover';
@@ -3746,6 +4021,7 @@ class VillageManager {
             </div>
             ${effectsText}
             <div class="popover-workers">👷 ${assignedWorkers.length}/${workerSlots} workers</div>
+            ${upkeepHTML}
             <div class="popover-actions">
                 ${upgradeHTML}
                 <button class="popover-btn details-btn" onclick="window.villageManager.closeBuildingPopover();window.villageManager.showBuildingManagement(${buildingId})">

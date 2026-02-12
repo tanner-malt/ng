@@ -19,6 +19,37 @@ const GameData = {
         population: '👥'
     },
 
+    // Daily gold upkeep per building (multiplied by building level)
+    // Buildings cost gold each day for maintenance, staffing, etc.
+    buildingUpkeep: {
+        townCenter: 3,
+        house: 0.5,
+        farm: 1,
+        buildersHut: 1,
+        storehouse: 1,
+        woodcutterLodge: 1,
+        huntersLodge: 1.5,
+        quarry: 2,
+        lumberMill: 3,
+        mine: 2.5,
+        workshop: 2,
+        blacksmith: 2.5,
+        market: 3,
+        academy: 4,
+        keep: 5,
+        monument: 3,
+        barracks: 2,
+        fortifications: 3,
+        militaryAcademy: 4,
+        castle: 8,
+        magicalTower: 6,
+        grandLibrary: 5,
+        university: 5,
+        temple: 2,
+        silo: 0.5,
+        pasture: 1
+    },
+
     // Building costs - what resources are required to build each building
     buildingCosts: {
         // Essential Buildings

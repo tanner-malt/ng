@@ -40,6 +40,7 @@ class EconomySystem {
         this.lastTaxPopulation = 0;
         this.lastTownCenterLevel = 0;
         this.lastUpkeep = 0;
+        this.lastBuildingUpkeep = 0;
     }
     
     init() {
@@ -50,6 +51,7 @@ class EconomySystem {
     
     // Process daily upkeep costs
     processDaily() {
+        this.processBuildingUpkeep();
         this.processMilitaryUpkeep();
         this.processTaxCollection();
         this.processMarketIncome();
@@ -128,6 +130,34 @@ class EconomySystem {
         }
     }
     
+    // Calculate and deduct building maintenance upkeep
+    processBuildingUpkeep() {
+        const buildings = this.gameState.buildings || [];
+        const upkeepTable = window.GameData?.buildingUpkeep || {};
+        let totalUpkeep = 0;
+
+        buildings.forEach(building => {
+            if (!building.built || building.level === 0) return; // Skip under-construction
+            const baseUpkeep = upkeepTable[building.type] || 0;
+            const level = building.level || 1;
+            totalUpkeep += baseUpkeep * level;
+        });
+
+        this.lastBuildingUpkeep = totalUpkeep;
+
+        if (totalUpkeep > 0 && this.gameState.resources) {
+            const gold = this.gameState.resources.gold || 0;
+            if (gold >= totalUpkeep) {
+                this.gameState.resources.gold -= totalUpkeep;
+                console.log(`[EconomySystem] Building upkeep: ${totalUpkeep.toFixed(1)} gold`);
+            } else {
+                // Partial payment — deduct what we can
+                this.gameState.resources.gold = 0;
+                console.log(`[EconomySystem] Cannot afford full building upkeep (${totalUpkeep.toFixed(1)} gold, had ${gold.toFixed(1)})`);
+            }
+        }
+    }
+
     // Calculate and deduct military upkeep
     processMilitaryUpkeep() {
         let totalUpkeep = 0;
@@ -342,10 +372,18 @@ class EconomySystem {
         // Apply tech bonus
         const logisticsBonus = this.gameState.techBonuses?.armyUpkeep || 0;
         totalUpkeep = Math.floor(totalUpkeep * (1 + logisticsBonus));
+
+        // Building upkeep
+        const buildingUpkeep = this.lastBuildingUpkeep || 0;
+        if (buildingUpkeep > 0) {
+            totalUpkeep += buildingUpkeep;
+            breakdown.buildings = buildingUpkeep;
+        }
         
         return {
             total: totalUpkeep,
             breakdown,
+            buildingUpkeep,
             canAfford: (this.gameState.resources?.gold || 0) >= totalUpkeep
         };
     }

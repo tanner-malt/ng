@@ -790,6 +790,27 @@ body {
     font-weight: 700;
 }
 
+/* Resource trend arrows */
+.res-trend {
+    font-size: 0.7rem;
+    margin-left: 2px;
+    background: none !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+.res-trend.trend-up {
+    color: #4ade80;
+}
+
+.res-trend.trend-down {
+    color: #f87171;
+}
+
+.res-trend.trend-neutral {
+    color: #888;
+}
+
 /* Objective Bar */
 .objective-bar {
     display: flex;
@@ -1193,6 +1214,91 @@ body {
     }
 }
 
+/* ─── Grid Zoom Indicator ─── */
+.grid-zoom-indicator {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.65);
+    color: #ccc;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    z-index: 20;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.grid-zoom-indicator.visible {
+    opacity: 1;
+}
+
+/* ─── Building Overlay Badges ─── */
+.building-level-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: linear-gradient(135deg, #ffd700, #ffb300);
+    color: #1a1a2e;
+    font-size: 0.5rem;
+    font-weight: 800;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(0,0,0,0.3);
+    z-index: 12;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.building-emp-dot {
+    position: absolute;
+    bottom: -2px;
+    left: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.4);
+    z-index: 12;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.building-emp-dot.emp-full {
+    background: #4ade80;
+}
+
+.building-emp-dot.emp-partial {
+    background: #fbbf24;
+}
+
+.building-emp-dot.emp-empty {
+    background: #6b7280;
+}
+
+.building-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 2px;
+    right: 2px;
+    height: 4px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 2px;
+    overflow: hidden;
+    z-index: 12;
+}
+
+.building-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f1c40f, #2ecc71);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
 /* ─── Building Popover (inline info panel) ─── */
 #building-popover {
     position: fixed;
@@ -1249,9 +1355,15 @@ body {
     line-height: 1.35;
 }
 #building-popover .popover-workers {
-    padding: 2px 12px 8px;
+    padding: 2px 12px 4px;
     font-size: 0.82em;
     opacity: .75;
+}
+#building-popover .popover-upkeep {
+    padding: 0 12px 8px;
+    font-size: 0.78em;
+    color: #f39c12;
+    opacity: .85;
 }
 #building-popover .popover-actions {
     display: flex;
@@ -1915,6 +2027,170 @@ body {
     background: #d32f2f;
     transform: scale(1.1);
     box-shadow: var(--shadow-medium);
+}
+
+/* ==============================
+   DRAFT ARMY MODAL
+   ============================== */
+
+.draft-modal-container {
+    font-size: 0.85rem;
+}
+
+.draft-info-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.draft-info-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 6px 12px;
+    text-align: center;
+    flex: 1;
+    min-width: 70px;
+}
+
+.draft-info-label {
+    display: block;
+    font-size: 0.65rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.draft-info-value {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+
+.draft-hint {
+    font-size: 0.75rem;
+    color: #f39c12;
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    background: rgba(243, 156, 18, 0.1);
+    border-radius: 4px;
+    border-left: 3px solid #f39c12;
+}
+
+.draft-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.draft-name-input {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #e0e0e0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    width: 140px;
+}
+
+.draft-select-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-sm {
+    padding: 3px 8px;
+    font-size: 0.7rem;
+}
+
+.draft-table-wrapper {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.draft-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.draft-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.draft-table th {
+    background: rgba(30,40,60,0.95);
+    color: #aaa;
+    font-weight: 600;
+    padding: 6px 5px;
+    text-align: left;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.draft-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.draft-row:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.draft-row td {
+    padding: 5px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.draft-name {
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.draft-unit-type {
+    font-size: 0.7rem;
+}
+
+.draft-stat-atk { color: #f87171; font-weight: 600; text-align: center; }
+.draft-stat-def { color: #60a5fa; font-weight: 600; text-align: center; }
+.draft-stat-hp { color: #4ade80; font-weight: 600; text-align: center; }
+
+.draft-skill-badge {
+    display: inline-block;
+    background: rgba(76, 175, 80, 0.15);
+    color: #4ade80;
+    padding: 1px 5px;
+    border-radius: 8px;
+    font-size: 0.6rem;
+    margin-right: 2px;
+}
+
+.draft-summary {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #ccc;
+}
+
+.draft-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
 }
 
 /* ==============================
@@ -4160,11 +4436,13 @@ html {
     color: var(--accent-warning);
 }
 
-.net-cell.positive {
+.net-cell.positive,
+.net-cell .positive {
     color: var(--accent-success);
 }
 
-.net-cell.negative {
+.net-cell.negative,
+.net-cell .negative {
     color: var(--accent-error);
 }
 
@@ -6842,11 +7120,13 @@ html {
     color: #f39c12;
 }
 
-.net-cell.positive {
+.net-cell.positive,
+.net-cell .positive {
     color: #27ae60;
 }
 
-.net-cell.negative {
+.net-cell.negative,
+.net-cell .negative {
     color: #e74c3c;
 }
 
@@ -10002,17 +10282,17 @@ html {
 
 /* Building unaffordable - unlocked but can't afford */
 .building-row.building-unaffordable {
-    background: rgba(255, 193, 7, 0.05);
-    border-color: rgba(255, 193, 7, 0.15);
+    background: rgba(140, 30, 30, 0.15);
+    border-color: rgba(140, 30, 30, 0.35);
 }
 
 .building-row.building-unaffordable:hover {
-    background: rgba(255, 193, 7, 0.1);
-    border-color: rgba(255, 193, 7, 0.3);
+    background: rgba(140, 30, 30, 0.25);
+    border-color: rgba(140, 30, 30, 0.5);
 }
 
 .building-row.building-unaffordable .building-resources {
-    color: #f39c12;
+    color: #c0392b;
 }
 
 /* Per-resource affordability coloring in cost column */
