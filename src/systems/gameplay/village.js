@@ -3060,6 +3060,9 @@ class VillageManager {
             this.gameState.ensureJobManager();
         }
 
+        // Refresh available job slots from current buildings
+        this.gameState.jobManager.updateAvailableJobs();
+
         const assigned = this.gameState.jobManager.autoAssignWorkers();
 
         if (window.showToast) {
