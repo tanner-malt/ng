@@ -2,42 +2,23 @@
 class MonarchManager {
     constructor(gameState) {
         this.gameState = gameState;
+        this.activeTab = 'overview';
 
-        // ── Investment Definitions ──
-        // Cost formula: baseCost * (costMult ^ currentLevel)
-        // All reset every run (stored in gameState.investments)
+        // ── Trait mechanical effects ──
+        this.traitInfo = {
+            magical_potential: { icon: '✨', label: 'Magical Potential', cat: 'Magic', desc: 'Latent arcane affinity' },
+            strong:     { icon: '💪', label: 'Strong',     cat: 'Physical', desc: '+10% army HP' },
+            agile:      { icon: '🏃', label: 'Agile',      cat: 'Physical', desc: '+5% army speed' },
+            enduring:   { icon: '🛡️', label: 'Enduring',   cat: 'Physical', desc: '+10% defense' },
+            healthy:    { icon: '❤️', label: 'Healthy',     cat: 'Physical', desc: 'Slower aging' },
+            intelligent:{ icon: '🧠', label: 'Intelligent', cat: 'Mental', desc: '+10% research speed' },
+            wise:       { icon: '📖', label: 'Wise',        cat: 'Mental', desc: '+5% all production' },
+            charismatic:{ icon: '👑', label: 'Charismatic', cat: 'Mental', desc: '+10% trade income' },
+            cunning:    { icon: '🦊', label: 'Cunning',     cat: 'Mental', desc: '+5% combat tactics' }
+        };
+
+        // ── Investment Definitions (no longer includes general/governor/betrothal) ──
         this.investmentDefs = [
-            {
-                id: 'hireGeneral',
-                name: 'Hire General',
-                icon: '⚔️',
-                category: 'kingdom',
-                description: 'Unlocks a general slot for your armies',
-                baseCost: 1000,
-                costMult: 10,
-                maxLevel: Infinity
-            },
-            {
-                id: 'hireGovernor',
-                name: 'Hire Governor',
-                icon: '🏛️',
-                category: 'kingdom',
-                description: 'Unlocks a governor slot for your cities',
-                baseCost: 1000,
-                costMult: 10,
-                maxLevel: Infinity
-            },
-            {
-                id: 'lookForBetrothal',
-                name: 'Look for Betrothal',
-                icon: '💍',
-                category: 'kingdom',
-                description: 'Find a suitable marriage partner for your monarch',
-                baseCost: 500,
-                costMult: 2,
-                maxLevel: Infinity,
-                special: 'betrothal'
-            },
             {
                 id: 'combatTraining',
                 name: 'Combat Training',
@@ -73,7 +54,7 @@ class MonarchManager {
                 name: 'Increase Production Size',
                 icon: '🔨',
                 category: 'infrastructure',
-                description: '+1 job slot in primary production buildings',
+                description: '+1 job slot in production buildings',
                 baseCost: 100,
                 costMult: 100,
                 maxLevel: Infinity
@@ -89,13 +70,19 @@ class MonarchManager {
                 maxLevel: Infinity
             }
         ];
+
+        // ── Staff hiring costs ──
+        this.generalBaseCost = 800;
+        this.generalCostMult = 2.5;
+        this.governorBaseCost = 800;
+        this.governorCostMult = 2.5;
+        this.betrothalBaseCost = 500;
+        this.betrothalCostMult = 2;
     }
     
     init() {
-        // Check if monarch view is unlocked and toggle locked overlay
         const monarchContent = document.getElementById('monarch-content');
         const lockedView = document.querySelector('#monarch-view .locked-view');
-        
         const isUnlocked = window.unlockSystem && window.unlockSystem.isViewUnlocked('monarch');
         
         if (isUnlocked) {
@@ -106,15 +93,44 @@ class MonarchManager {
             if (monarchContent) monarchContent.style.display = 'none';
         }
 
+        this.setupTabNavigation();
         this.setupDynastyButtons();
-        this.renderInvestments();
-        this.renderLegacyBonuses();
-        this.updateInvestmentDisplay();
-        this.updateDynastyStats();
-        this.updateMonarchCard();
-        this.updateFamilyTree();
+        this.renderActiveTab();
 
-        // Listen for unlock event to toggle overlay later
+        // Show monarch tutorial on first view entry
+        if (!localStorage.getItem('monarchTutorialShown')) {
+            localStorage.setItem('monarchTutorialShown', 'true');
+            setTimeout(() => {
+                if (window.modalSystem?.showModal) {
+                    window.modalSystem.showModal({
+                        title: '👑 Welcome to the Royal Court!',
+                        content: `
+                            <div style="padding:8px;">
+                                <p style="color:#bdc3c7;margin-bottom:12px;">Your dynasty has begun! Explore the tabs above to manage your kingdom:</p>
+                                <div style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:8px;">
+                                    <h4 style="color:#f39c12;margin:0 0 6px;">⚔️ Staff</h4>
+                                    <p style="color:#bdc3c7;margin:0;font-size:0.85em;">Hire generals and governors. Arrange royal marriages.</p>
+                                </div>
+                                <div style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:8px;">
+                                    <h4 style="color:#f39c12;margin:0 0 6px;">💰 Investments</h4>
+                                    <p style="color:#bdc3c7;margin:0;font-size:0.85em;">Spend gold on combat training, production, and infrastructure.</p>
+                                </div>
+                                <div style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:8px;">
+                                    <h4 style="color:#f39c12;margin:0 0 6px;">🏛️ Legacy</h4>
+                                    <p style="color:#bdc3c7;margin:0;font-size:0.85em;">Permanent bonuses that persist across dynasties.</p>
+                                </div>
+                                <div style="background:#2c3e50;border-radius:8px;padding:12px;">
+                                    <h4 style="color:#f39c12;margin:0 0 6px;">⚰️ Dynasty</h4>
+                                    <p style="color:#bdc3c7;margin:0;font-size:0.85em;">After Day 100, end your dynasty to earn legacy points and start fresh!</p>
+                                </div>
+                            </div>
+                        `,
+                        maxWidth: '480px'
+                    });
+                }
+            }, 100);
+        }
+
         if (window.eventBus) {
             window.eventBus.on('content_unlocked', (data) => {
                 if (data && data.unlockId === 'monarch_view') {
@@ -125,9 +141,62 @@ class MonarchManager {
         }
     }
 
-    /* =============================
-     *  Investment helpers
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  TAB NAVIGATION
+    // ═══════════════════════════════════════════════════════════════
+
+    setupTabNavigation() {
+        document.querySelectorAll('.monarch-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                this.switchTab(tab.dataset.tab);
+            });
+        });
+    }
+
+    switchTab(tabId) {
+        this.activeTab = tabId;
+        // Update tab buttons
+        document.querySelectorAll('.monarch-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.tab === tabId);
+        });
+        // Update tab content
+        document.querySelectorAll('.monarch-tab-content').forEach(c => {
+            c.classList.toggle('active', c.dataset.tabContent === tabId);
+        });
+        this.renderActiveTab();
+    }
+
+    renderActiveTab() {
+        this.updateGoldDisplay();
+        switch (this.activeTab) {
+            case 'overview':
+                this.updateMonarchCard();
+                this.displayInvestmentStatus();
+                this.updateDynastyStats();
+                break;
+            case 'family':
+                this.renderFamilyTreeTab();
+                break;
+            case 'staff':
+                this.renderStaffTab();
+                this.updateFamilyTree();
+                break;
+            case 'investments':
+                this.renderInvestments();
+                break;
+            case 'legacy':
+                this.renderLegacyBonuses();
+                break;
+            case 'dynasty':
+                this.updatePrestigeButton();
+                break;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  INVESTMENT HELPERS
+    // ═══════════════════════════════════════════════════════════════
+
     getInvestmentLevel(id) {
         const val = this.gameState.investments[id];
         return typeof val === 'number' ? val : 0;
@@ -146,9 +215,10 @@ class MonarchManager {
         return this.investmentDefs.find(d => d.id === id);
     }
 
-    /* =============================
-     *  Render investments into DOM
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  RENDER INVESTMENTS (upgraded cards with pips)
+    // ═══════════════════════════════════════════════════════════════
+
     renderInvestments() {
         const container = document.getElementById('investment-categories');
         if (!container) return;
@@ -169,24 +239,35 @@ class MonarchManager {
                 const level = this.getInvestmentLevel(def.id);
                 const cost = this.getInvestmentCost(def);
                 const maxed = this.isMaxed(def);
+                const canAfford = this.gameState.canAffordGold(cost);
                 const goldIcon = '<i class="res-icon gold"></i>';
-                // For betrothal, show "Search" instead of level tracking
-                const levelText = def.special === 'betrothal' ? '' : `<div class="investment-level">Level ${level}${def.maxLevel < Infinity ? '/' + def.maxLevel : ''}</div>`;
+
+                // Level pips (show up to 10 for finite, or current count for infinite)
+                let pipsHtml = '';
+                if (def.maxLevel <= 10) {
+                    pipsHtml = '<div class="investment-level-pips">';
+                    for (let i = 0; i < def.maxLevel; i++) {
+                        const filled = i < level;
+                        pipsHtml += `<span class="pip${filled ? ' filled' : ''}${filled && maxed ? ' maxed' : ''}"></span>`;
+                    }
+                    pipsHtml += '</div>';
+                } else {
+                    pipsHtml = `<div class="investment-level" style="margin-top:4px;">Level ${level}</div>`;
+                }
+
                 const effectText = def.id === 'leadershipMultiplier' ? `<div class="investment-effect">${this.getLeadershipEffectText()}</div>` : '';
-                const btnLabel = def.special === 'betrothal'
-                    ? `Search (${this.formatGold(cost)} ${goldIcon})`
-                    : maxed ? 'MAX' : `Invest (${this.formatGold(cost)} ${goldIcon})`;
+                const btnLabel = maxed ? '✓ MAX' : `${this.formatGold(cost)} ${goldIcon}`;
+
                 html += `
-                    <div class="investment-item" data-investment="${def.id}">
+                    <div class="investment-item${maxed ? ' maxed' : ''}" data-investment="${def.id}">
                         <div class="investment-icon">${def.icon}</div>
                         <div class="investment-details">
                             <h5>${def.name}</h5>
                             <p>${def.description}</p>
-                            ${levelText}
-                            <div class="investment-cost">${maxed ? 'MAX' : 'Cost: ' + this.formatGold(cost) + ' ' + goldIcon}</div>
+                            ${pipsHtml}
                             ${effectText}
                         </div>
-                        <button class="investment-btn" data-id="${def.id}" ${maxed ? 'disabled' : ''}>
+                        <button class="investment-btn" data-id="${def.id}" ${maxed || !canAfford ? 'disabled' : ''}>
                             ${btnLabel}
                         </button>
                     </div>`;
@@ -196,76 +277,55 @@ class MonarchManager {
 
         container.innerHTML = html;
 
-        // Wire up buttons
         container.querySelectorAll('.investment-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const id = btn.dataset.id;
-                this.makeInvestment(id);
+                this.makeInvestment(btn.dataset.id);
             });
         });
     }
 
-    /* =============================
-     *  Investment purchase logic
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  INVESTMENT PURCHASE LOGIC
+    // ═══════════════════════════════════════════════════════════════
+
     makeInvestment(id) {
         const def = this.getDef(id);
         if (!def || this.isMaxed(def)) return;
-
-        // Special handling for betrothal
-        if (def.special === 'betrothal') {
-            this.handleBetrothal(def);
-            return;
-        }
 
         const cost = this.getInvestmentCost(def);
         if (!this.gameState.canAffordGold(cost)) return;
         if (!this.gameState.spendGold(cost)) return;
 
-        // Trigger first investment achievement (only once)
         if (window.achievementSystem && !window.achievementSystem.isUnlocked('royal_investor')) {
             window.achievementSystem.triggerFirstInvestment();
         }
 
-        // Increment level
         const inv = this.gameState.investments;
         inv[id] = (inv[id] || 0) + 1;
-
-        // Log
         const level = inv[id];
         this.gameState.logBattleEvent?.(`${def.icon} ${def.name} upgraded to level ${level}`);
-
-        // Apply immediate effects
         this.applyInvestmentEffect(id, level);
-
-        // Refresh UI
         this.renderInvestments();
-        this.updateInvestmentDisplay();
-        this.updateFamilyTree(); // general/governor slots may have changed
+        this.displayInvestmentStatus();
         this.gameState.save();
     }
 
     applyInvestmentEffect(id, level) {
         switch (id) {
             case 'productionSize':
-                // Job slots are computed dynamically in _computeJobSlots
-                // Force job system to refresh slot counts
                 if (this.gameState.jobManager) {
                     this.gameState.jobManager.updateAvailableSlots?.();
                     this.gameState.jobManager.updateAvailableJobs?.();
                 }
                 break;
             case 'moPeople':
-                // Housing cap is computed dynamically in calculatePopulationCap
                 this.gameState.updatePopulationCap?.();
                 this.gameState.updateUI?.();
                 break;
             case 'combatTraining':
-                // Combat bonus is applied dynamically via getCombatTrainingMultiplier()
                 window.showToast?.(`Combat Training level ${level}: +${level * 10}% combat effectiveness`, { type: 'success' });
                 break;
             case 'armyScouts':
-                // Expand sight immediately if world map is active
                 if (window.worldManager?.initialized) {
                     const armies = this.gameState.getAllArmies?.() || [];
                     for (const army of armies) {
@@ -280,9 +340,6 @@ class MonarchManager {
         }
     }
 
-    /* =============================
-     *  Leadership multiplier text
-     * ============================= */
     getLeadershipEffectText() {
         const level = this.getInvestmentLevel('leadershipMultiplier');
         const leadership = this.gameState.royalFamily?.currentMonarch?.skills?.leadership || 0;
@@ -291,10 +348,6 @@ class MonarchManager {
         return `Current: ${mult.toFixed(2)}x production (${leadership} leadership)`;
     }
 
-    /**
-     * Get the leadership production multiplier for use by other systems.
-     * Formula: 1 + (monarchLeadership / 100) * investmentLevel
-     */
     getLeadershipProductionMultiplier() {
         const level = this.getInvestmentLevel('leadershipMultiplier');
         if (level === 0) return 1.0;
@@ -302,19 +355,324 @@ class MonarchManager {
         return 1 + (leadership / 100) * level;
     }
 
-    /**
-     * Get the combat training multiplier for use by battle systems.
-     * Formula: 1 + level * 0.1 (10% per level)
-     */
     getCombatTrainingMultiplier() {
         const level = this.getInvestmentLevel('combatTraining');
         return 1 + level * 0.1;
     }
 
-    /* =============================
-     *  Betrothal System
-     * ============================= */
-    handleBetrothal(def) {
+    // ═══════════════════════════════════════════════════════════════
+    //  STAFF TAB — Hire generals, governors, betrothal
+    // ═══════════════════════════════════════════════════════════════
+
+    renderStaffTab() {
+        this._renderStaffActions();
+        this._renderStaffRoster();
+    }
+
+    _getStaffHireCost(type) {
+        const staff = this.gameState.hiredStaff || [];
+        const count = staff.filter(s => s.role === type).length;
+        if (type === 'general') return Math.floor(this.generalBaseCost * Math.pow(this.generalCostMult, count));
+        if (type === 'governor') return Math.floor(this.governorBaseCost * Math.pow(this.governorCostMult, count));
+        return 0;
+    }
+
+    _getBetrothalCost() {
+        const searches = this.gameState.investments.lookForBetrothal || 0;
+        return Math.floor(this.betrothalBaseCost * Math.pow(this.betrothalCostMult, searches));
+    }
+
+    _renderStaffActions() {
+        const el = document.getElementById('staff-actions');
+        if (!el) return;
+
+        const generalCost = this._getStaffHireCost('general');
+        const governorCost = this._getStaffHireCost('governor');
+        const betrothalCost = this._getBetrothalCost();
+        const goldIcon = '<i class="res-icon gold"></i>';
+
+        const rf = this.gameState.royalFamily;
+        const hasSpouse = rf?.currentMonarch?.spouse;
+
+        el.innerHTML = `
+            <button class="staff-hire-btn" id="hire-general-btn">
+                <span class="staff-hire-icon">⚔️</span>
+                <span class="staff-hire-label">Hire General</span>
+                <span class="staff-hire-cost">${this.formatGold(generalCost)} ${goldIcon}</span>
+            </button>
+            <button class="staff-hire-btn" id="hire-governor-btn">
+                <span class="staff-hire-icon">🏛️</span>
+                <span class="staff-hire-label">Hire Governor</span>
+                <span class="staff-hire-cost">${this.formatGold(governorCost)} ${goldIcon}</span>
+            </button>
+            <button class="staff-hire-btn" id="find-betrothal-btn" ${hasSpouse ? 'disabled style="opacity:0.5;"' : ''}>
+                <span class="staff-hire-icon">💍</span>
+                <span class="staff-hire-label">${hasSpouse ? 'Monarch Married' : 'Find Betrothal'}</span>
+                <span class="staff-hire-cost">${hasSpouse ? '—' : this.formatGold(betrothalCost) + ' ' + goldIcon}</span>
+            </button>
+        `;
+
+        document.getElementById('hire-general-btn')?.addEventListener('click', () => this.offerCandidates('general'));
+        document.getElementById('hire-governor-btn')?.addEventListener('click', () => this.offerCandidates('governor'));
+        document.getElementById('find-betrothal-btn')?.addEventListener('click', () => this.handleBetrothal());
+    }
+
+    _renderStaffRoster() {
+        const el = document.getElementById('staff-roster');
+        if (!el) return;
+
+        const staff = this.gameState.hiredStaff || [];
+        if (staff.length === 0) {
+            el.innerHTML = '<p style="color:#7f8c8d;font-style:italic;padding:8px 0;">No hired staff yet. Use the buttons above to recruit generals and governors.</p>';
+            return;
+        }
+
+        const armies = this.gameState.getAllArmies?.() || [];
+        let html = '';
+        staff.forEach((s, idx) => {
+            const isGeneral = s.role === 'general';
+            const skillKey = isGeneral ? 'military' : 'economics';
+            const skillVal = s.skills?.[skillKey] || 0;
+            const skillPct = Math.min(100, Math.round((skillVal / 30) * 100));
+            const skillColor = isGeneral ? '#e74c3c' : '#2ecc71';
+            const traits = (s.traits || []).map(t => {
+                const info = this.traitInfo[t] || { icon: '❓', label: t };
+                return `<span class="staff-trait">${info.icon} ${info.label}</span>`;
+            }).join('');
+
+            let assignmentHtml = '';
+            if (isGeneral) {
+                const assignedArmy = s.assignedTo ? armies.find(a => a.id === s.assignedTo) : null;
+                if (assignedArmy) {
+                    assignmentHtml = `<div style="font-size:0.8em;color:#e74c3c;margin-top:4px;">⚔️ Leading ${assignedArmy.name}</div>`;
+                } else if (armies.length > 0) {
+                    assignmentHtml = `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">`;
+                    armies.forEach(a => {
+                        // Check if army already has a general
+                        const existingGen = staff.find(ss => ss.role === 'general' && ss.assignedTo === a.id);
+                        if (!existingGen) {
+                            assignmentHtml += `<button class="staff-assign-btn" data-staff-idx="${idx}" data-army-id="${a.id}" style="font-size:0.72em;padding:3px 8px;background:#2a2a4a;color:#e8d5b0;border:1px solid #3a3a6a;border-radius:3px;cursor:pointer;">⚔️ Assign to ${a.name}</button>`;
+                        }
+                    });
+                    assignmentHtml += '</div>';
+                } else {
+                    assignmentHtml = `<div style="font-size:0.78em;color:#7f8c8d;margin-top:4px;font-style:italic;">No armies available — draft one on the World Map</div>`;
+                }
+            } else {
+                // Governor
+                if (s.assignedTo) {
+                    assignmentHtml = `<div style="font-size:0.8em;color:#2ecc71;margin-top:4px;">🏛️ Governing ${s.assignedTo === 'capital' ? 'Capital' : s.assignedTo}</div>`;
+                } else {
+                    const currentGov = staff.find(ss => ss.role === 'governor' && ss.assignedTo === 'capital');
+                    if (!currentGov) {
+                        assignmentHtml = `<button class="staff-assign-gov-btn" data-staff-idx="${idx}" style="font-size:0.72em;padding:3px 8px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;margin-top:6px;">🏛️ Assign to Capital</button>`;
+                    } else {
+                        assignmentHtml = `<div style="font-size:0.78em;color:#7f8c8d;margin-top:4px;font-style:italic;">Capital already governed</div>`;
+                    }
+                }
+            }
+
+            html += `
+                <div class="staff-card ${s.role}">
+                    <div class="staff-name">${s.name}</div>
+                    <div class="staff-role">${isGeneral ? '⚔️ General' : '🏛️ Governor'} · ${(s.origin || 'Unknown').replace(/_/g, ' ')}</div>
+                    <div style="font-size:0.82em;color:#bdc3c7;margin-bottom:4px;">${isGeneral ? 'Military' : 'Economics'}: ${skillVal}</div>
+                    <div class="staff-skill-bar"><div class="fill" style="width:${skillPct}%;background:${skillColor};"></div></div>
+                    <div style="margin-top:6px;">${traits}</div>
+                    ${assignmentHtml}
+                    <button class="staff-dismiss-btn" data-staff-idx="${idx}">✖ Dismiss</button>
+                </div>
+            `;
+        });
+
+        el.innerHTML = html;
+
+        // Wire assignment buttons
+        el.querySelectorAll('.staff-assign-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.staffIdx);
+                const armyId = btn.dataset.armyId;
+                this._assignStaffGeneral(idx, armyId);
+            });
+        });
+        el.querySelectorAll('.staff-assign-gov-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.staffIdx);
+                this._assignStaffGovernor(idx, 'capital');
+            });
+        });
+        el.querySelectorAll('.staff-dismiss-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.staffIdx);
+                this._dismissStaff(idx);
+            });
+        });
+    }
+
+    _assignStaffGeneral(idx, armyId) {
+        const staff = this.gameState.hiredStaff;
+        if (!staff || !staff[idx]) return;
+        // Unassign any existing general from this army
+        staff.forEach(s => { if (s.role === 'general' && s.assignedTo === armyId) s.assignedTo = null; });
+        staff[idx].assignedTo = armyId;
+        window.showToast?.(`${staff[idx].name} assigned as General!`, { type: 'success' });
+        this.renderStaffTab();
+        this.gameState.save();
+    }
+
+    _assignStaffGovernor(idx, locationKey) {
+        const staff = this.gameState.hiredStaff;
+        if (!staff || !staff[idx]) return;
+        // Unassign any existing governor
+        staff.forEach(s => { if (s.role === 'governor' && s.assignedTo === locationKey) s.assignedTo = null; });
+        staff[idx].assignedTo = locationKey;
+        window.showToast?.(`${staff[idx].name} assigned as Governor!`, { type: 'success' });
+        this.renderStaffTab();
+        this.gameState.save();
+    }
+
+    _dismissStaff(idx) {
+        const staff = this.gameState.hiredStaff;
+        if (!staff || !staff[idx]) return;
+        const name = staff[idx].name;
+        staff.splice(idx, 1);
+        window.showToast?.(`${name} has been dismissed.`, { type: 'info' });
+        this.renderStaffTab();
+        this.gameState.save();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  CANDIDATE OFFERING SYSTEM (generals / governors)
+    // ═══════════════════════════════════════════════════════════════
+
+    offerCandidates(role) {
+        const cost = this._getStaffHireCost(role);
+        if (!this.gameState.canAffordGold(cost)) {
+            window.showToast?.(`Need ${this.formatGold(cost)} gold to recruit.`, { type: 'warning' });
+            return;
+        }
+
+        // Generate 2 candidates
+        const candidates = [this._generateCandidate(role), this._generateCandidate(role)];
+
+        const isGeneral = role === 'general';
+        const roleLabel = isGeneral ? '⚔️ General' : '🏛️ Governor';
+        const primarySkill = isGeneral ? 'military' : 'economics';
+        const secondarySkill = isGeneral ? 'leadership' : 'diplomacy';
+
+        let html = `<p style="color:#bdc3c7;margin-bottom:12px;">Choose a ${role} to hire for <span style="color:#f39c12;font-weight:bold;">${this.formatGold(cost)}</span> <i class="res-icon gold"></i>:</p>`;
+        html += '<div class="candidate-grid">';
+
+        candidates.forEach((c, i) => {
+            const traits = (c.traits || []).map(t => {
+                const info = this.traitInfo[t] || { icon: '❓', label: t };
+                return `<span class="staff-trait">${info.icon} ${info.label}</span>`;
+            }).join('');
+
+            const skillEntries = [
+                { key: primarySkill, val: c.skills[primarySkill] || 0, color: isGeneral ? '#e74c3c' : '#2ecc71' },
+                { key: secondarySkill, val: c.skills[secondarySkill] || 0, color: isGeneral ? '#e67e22' : '#3498db' }
+            ];
+
+            let skillHtml = skillEntries.map(s => {
+                const pct = Math.min(100, Math.round((s.val / 30) * 100));
+                return `<div class="candidate-skill">
+                    <span style="text-transform:capitalize;min-width:70px;">${s.key}</span>
+                    <span style="margin-left:auto;color:#f1c40f;font-weight:600;">${s.val}</span>
+                    <div class="bar"><div class="fill" style="width:${pct}%;background:${s.color};"></div></div>
+                </div>`;
+            }).join('');
+
+            html += `
+                <div class="candidate-card" data-idx="${i}">
+                    <div class="candidate-name">${c.name}</div>
+                    <div class="candidate-origin">${(c.origin || 'Unknown').replace(/_/g, ' ')}</div>
+                    ${skillHtml}
+                    <div style="margin-top:8px;">${traits || '<span style="color:#7f8c8d;">No traits</span>'}</div>
+                    <button class="candidate-choose-btn" data-idx="${i}">Hire ${c.name}</button>
+                </div>`;
+        });
+        html += '</div>';
+
+        window.modalSystem?.showModal({
+            title: `${roleLabel} Recruitment`,
+            content: html,
+            maxWidth: '520px'
+        });
+
+        setTimeout(() => {
+            document.querySelectorAll('.candidate-choose-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.idx);
+                    this._hireCandidate(candidates[idx], role, cost);
+                });
+            });
+        }, 50);
+    }
+
+    _generateCandidate(role) {
+        const rf = this.gameState.royalFamily;
+        const isGeneral = role === 'general';
+        const maleNames = ['Marcus', 'Aldric', 'Hector', 'Roland', 'Thurston', 'Gareth', 'Osric', 'Cedric', 'Alaric', 'Balthazar'];
+        const femaleNames = ['Elara', 'Brenna', 'Sigrid', 'Isolde', 'Rowena', 'Astrid', 'Helga', 'Morwen', 'Freya', 'Dahlia'];
+        const origins = ['local_nobility', 'foreign_court', 'merchant_family', 'military_dynasty', 'scholarly_house'];
+        const isFemale = Math.random() < 0.5;
+        const nameList = isFemale ? femaleNames : maleNames;
+
+        // Skills: primary skill biased higher
+        const skills = {
+            leadership: Math.floor(Math.random() * 15) + 5,
+            military: Math.floor(Math.random() * 15) + 5,
+            diplomacy: Math.floor(Math.random() * 15) + 5,
+            economics: Math.floor(Math.random() * 15) + 5
+        };
+        // Bias primary skill
+        const primaryKey = isGeneral ? 'military' : 'economics';
+        skills[primaryKey] = Math.floor(Math.random() * 15) + 12; // 12-27
+
+        const traits = rf?.generateRoyalTraits?.() || [];
+        return {
+            name: nameList[Math.floor(Math.random() * nameList.length)],
+            age: 20 + Math.floor(Math.random() * 25),
+            origin: origins[Math.floor(Math.random() * origins.length)],
+            traits,
+            skills,
+            role,
+            assignedTo: null
+        };
+    }
+
+    _hireCandidate(candidate, role, cost) {
+        if (!this.gameState.canAffordGold(cost)) {
+            window.showToast?.('Not enough gold!', { type: 'warning' });
+            return;
+        }
+        if (!this.gameState.spendGold(cost)) return;
+
+        if (!this.gameState.hiredStaff) this.gameState.hiredStaff = [];
+        this.gameState.hiredStaff.push({
+            id: `staff_${Date.now()}_${Math.floor(Math.random() * 999)}`,
+            name: candidate.name,
+            age: candidate.age,
+            origin: candidate.origin,
+            traits: candidate.traits,
+            skills: candidate.skills,
+            role: role,
+            assignedTo: null
+        });
+
+        window.modalSystem?.closeTopModal();
+        window.showToast?.(`${candidate.name} hired as ${role}!`, { type: 'success' });
+        this.renderStaffTab();
+        this.displayInvestmentStatus();
+        this.gameState.save();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  BETROTHAL SYSTEM
+    // ═══════════════════════════════════════════════════════════════
+
+    handleBetrothal() {
         const rf = this.gameState.royalFamily;
         if (!rf || !rf.currentMonarch) {
             window.showToast?.('No monarch to arrange betrothal for.', { type: 'warning' });
@@ -325,77 +683,85 @@ class MonarchManager {
             return;
         }
 
-        const cost = this.getInvestmentCost(def);
+        const cost = this._getBetrothalCost();
         if (!this.gameState.canAffordGold(cost)) {
             window.showToast?.(`Need ${this.formatGold(cost)} gold for betrothal search.`, { type: 'warning' });
             return;
         }
         if (!this.gameState.spendGold(cost)) return;
 
-        // Increment betrothal level (increases cost for next search)
         const inv = this.gameState.investments;
         inv.lookForBetrothal = (inv.lookForBetrothal || 0) + 1;
 
-        // Generate 2-3 betrothal candidates
-        const candidateCount = 2 + (Math.random() < 0.5 ? 1 : 0);
-        const candidates = [];
-        const origins = ['local_nobility', 'foreign_court', 'merchant_family', 'scholarly_house', 'military_dynasty'];
+        // Generate 2 candidates
         const femaleNames = ['Isabella', 'Eleanor', 'Margaret', 'Catherine', 'Elizabeth', 'Victoria', 'Arabella', 'Sophia', 'Helena', 'Lydia'];
         const maleNames = ['Alexander', 'William', 'Henry', 'Richard', 'Edward', 'Arthur', 'Charles', 'Frederick', 'Leopold', 'Theodore'];
+        const origins = ['local_nobility', 'foreign_court', 'merchant_family', 'scholarly_house', 'military_dynasty'];
         const monarchAge = rf.currentMonarch.age || 25;
 
-        for (let i = 0; i < candidateCount; i++) {
+        const candidates = [];
+        for (let i = 0; i < 2; i++) {
             const isFemale = Math.random() < 0.5;
             const nameList = isFemale ? femaleNames : maleNames;
-            const traits = rf.generateRoyalTraits();
-            const skills = rf.generateRoyalSkills();
-            const origin = origins[Math.floor(Math.random() * origins.length)];
             candidates.push({
                 name: nameList[Math.floor(Math.random() * nameList.length)],
                 age: monarchAge + Math.floor(Math.random() * 10) - 5,
-                origin,
-                traits,
-                skills
+                origin: origins[Math.floor(Math.random() * origins.length)],
+                traits: rf.generateRoyalTraits(),
+                skills: rf.generateRoyalSkills()
             });
         }
 
-        // Show betrothal candidate selection modal
         this.showBetrothalModal(candidates);
-        this.renderInvestments();
-        this.updateInvestmentDisplay();
+        this.renderStaffTab();
         this.gameState.save();
     }
 
     showBetrothalModal(candidates) {
-        let html = '<div style="margin-bottom:12px;color:#bdc3c7;">Choose a marriage partner for your monarch:</div>';
+        let html = '<p style="color:#bdc3c7;margin-bottom:12px;">Choose a marriage partner for your monarch:</p>';
+        html += '<div class="candidate-grid">';
         candidates.forEach((c, i) => {
-            const traitStr = (c.traits || []).join(', ') || 'None';
+            const traits = (c.traits || []).map(t => {
+                const info = this.traitInfo[t] || { icon: '❓', label: t };
+                return `<span class="staff-trait">${info.icon} ${info.label}</span>`;
+            }).join('');
+
+            const skillEntries = [
+                { key: 'leadership', val: c.skills.leadership || 0, color: '#e67e22' },
+                { key: 'diplomacy',  val: c.skills.diplomacy || 0,  color: '#3498db' },
+                { key: 'economics',  val: c.skills.economics || 0,  color: '#2ecc71' }
+            ];
+            let skillHtml = skillEntries.map(s => {
+                const pct = Math.min(100, Math.round((s.val / 30) * 100));
+                return `<div class="candidate-skill">
+                    <span style="text-transform:capitalize;min-width:70px;">${s.key}</span>
+                    <span style="margin-left:auto;color:#f1c40f;font-weight:600;">${s.val}</span>
+                    <div class="bar"><div class="fill" style="width:${pct}%;background:${s.color};"></div></div>
+                </div>`;
+            }).join('');
+
             html += `
-                <div class="betrothal-candidate" style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:10px;border:1px solid #34495e;">
-                    <h5 style="color:#f39c12;margin:0 0 6px;">💍 ${c.name}</h5>
-                    <div style="color:#bdc3c7;font-size:0.85em;">
-                        <p style="margin:2px 0;">Age: ${c.age} · Origin: ${c.origin.replace(/_/g, ' ')}</p>
-                        <p style="margin:2px 0;">Traits: ${traitStr}</p>
-                        <p style="margin:2px 0;">Skills: ⚔️${c.skills.military} 📊${c.skills.economics} 🗣️${c.skills.diplomacy} 👑${c.skills.leadership}</p>
-                    </div>
-                    <button class="betrothal-select-btn" data-idx="${i}" style="margin-top:8px;padding:6px 14px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">
-                        Choose ${c.name}
-                    </button>
+                <div class="candidate-card" data-idx="${i}">
+                    <div class="candidate-name">💍 ${c.name}</div>
+                    <div class="candidate-origin">Age ${c.age} · ${(c.origin || 'Unknown').replace(/_/g, ' ')}</div>
+                    ${skillHtml}
+                    <div style="margin-top:8px;">${traits || '<span style="color:#7f8c8d;">No traits</span>'}</div>
+                    <button class="candidate-choose-btn" data-idx="${i}">Choose ${c.name}</button>
                 </div>`;
         });
+        html += '</div>';
 
         window.modalSystem?.showModal({
             title: '💍 Betrothal Candidates',
             content: html,
-            maxWidth: '450px'
+            maxWidth: '520px'
         });
 
         setTimeout(() => {
-            document.querySelectorAll('.betrothal-select-btn').forEach(btn => {
+            document.querySelectorAll('.candidate-choose-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const idx = parseInt(btn.dataset.idx);
-                    const chosen = candidates[idx];
-                    this.completeBetrothal(chosen);
+                    this.completeBetrothal(candidates[idx]);
                 });
             });
         }, 50);
@@ -415,12 +781,18 @@ class MonarchManager {
 
         if (result) {
             window.showToast?.(`${rf.currentMonarch.name} married ${candidate.name}!`, { type: 'success' });
-            this.updateFamilyTree();
+            this.renderStaffTab();
             this.updateMonarchCard();
+            this.renderFamilyTreeTab();
         } else {
             window.showToast?.('Marriage arrangement failed.', { type: 'error' });
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  LEGACY BONUSES
+    // ═══════════════════════════════════════════════════════════════
+
     renderLegacyBonuses() {
         const container = document.getElementById('legacy-bonuses-grid');
         if (!container) return;
@@ -431,7 +803,6 @@ class MonarchManager {
             return;
         }
 
-        // Update points display
         const pointsEl = document.getElementById('legacy-points-display');
         if (pointsEl) pointsEl.textContent = `${legacy.totalPoints} Legacy Points`;
 
@@ -467,12 +838,9 @@ class MonarchManager {
         });
         container.innerHTML = html;
 
-        // Wire up buttons
         container.querySelectorAll('.legacy-buy-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const type = btn.dataset.type;
-                const baseCost = parseInt(btn.dataset.baseCost);
-                this.purchaseLegacyBonus(type, baseCost);
+                this.purchaseLegacyBonus(btn.dataset.type, parseInt(btn.dataset.baseCost));
             });
         });
     }
@@ -490,8 +858,6 @@ class MonarchManager {
 
     purchaseLegacyBonus(type, baseCost) {
         if (!window.legacySystem) return;
-
-        // All bonus types now go through the unified purchaseBonus with exponential scaling
         const result = window.legacySystem.purchaseBonus(type, baseCost);
         if (result.success) {
             window.showToast?.(result.message, { type: 'success' });
@@ -502,19 +868,17 @@ class MonarchManager {
         this.updateDynastyStats();
     }
 
-    /* =============================
-     *  Setup dynasty buttons
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  DYNASTY BUTTONS & RENAME
+    // ═══════════════════════════════════════════════════════════════
+
     setupDynastyButtons() {
         const calculateBtn = document.getElementById('calculate-inheritance-btn');
         const prestigeBtn = document.getElementById('prestige-reset-btn');
         const renameBtn = document.getElementById('rename-dynasty-btn');
 
-        // Rename dynasty button
         if (renameBtn) {
-            renameBtn.addEventListener('click', () => {
-                this.showRenameDynastyModal();
-            });
+            renameBtn.addEventListener('click', () => this.showRenameDynastyModal());
         }
         
         if (calculateBtn) {
@@ -522,35 +886,29 @@ class MonarchManager {
                 if (!window.legacySystem) return;
                 const { total, breakdown } = window.legacySystem.calculateLegacyPoints(this.gameState);
                 const breakdownHtml = breakdown.map(b =>
-                    `<div class="inheritance-item" style="display:flex;justify-content:space-between;padding:4px 0;">
-                        <span class="inheritance-label">${b.label}:</span>
-                        <span class="inheritance-value">+${b.value} (${b.detail})</span>
+                    `<div style="display:flex;justify-content:space-between;padding:4px 0;">
+                        <span>${b.label}:</span>
+                        <span>+${b.value} (${b.detail})</span>
                     </div>`
                 ).join('');
-                if (window.showModal) {
-                    window.showModal(
-                        'Legacy Point Preview',
-                        `<div class="dynasty-calculation">
-                            <h3>🏆 Current Legacy Value</h3>
-                            <p>If your dynasty ended today, you would earn:</p>
-                            <div class="inheritance-breakdown">
-                                ${breakdownHtml}
-                                <hr style="margin: 1rem 0; border-color: #444;">
-                                <div class="inheritance-total" style="display:flex;justify-content:space-between;padding:4px 0;">
-                                    <span class="inheritance-label"><strong>Total Legacy Points:</strong></span>
-                                    <span class="inheritance-value"><strong>${total}</strong></span>
-                                </div>
-                            </div>
-                        </div>`,
-                        { icon: '🏆', type: 'info' }
-                    );
-                }
+                window.showModal?.('Legacy Point Preview',
+                    `<div style="max-width:400px;">
+                        <h4 style="color:#f1c40f;margin-bottom:8px;">🏆 Current Legacy Value</h4>
+                        <p style="color:#bdc3c7;margin-bottom:12px;">If your dynasty ended today:</p>
+                        ${breakdownHtml}
+                        <hr style="margin:12px 0;border-color:#444;">
+                        <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:1.1em;">
+                            <span>Total Legacy Points:</span>
+                            <span style="color:#f39c12;">${total}</span>
+                        </div>
+                    </div>`,
+                    { icon: '🏆', type: 'info' }
+                );
             });
         }
         
         if (prestigeBtn) {
             prestigeBtn.addEventListener('click', () => {
-                // Day-100 gate: cannot end dynasty before day 100
                 if ((this.gameState.day || 0) < 100) {
                     window.showToast?.(`Cannot end dynasty before Day 100 (current: Day ${this.gameState.day || 0})`, { type: 'warning' });
                     return;
@@ -560,16 +918,11 @@ class MonarchManager {
                         this.gameState,
                         localStorage.getItem('dynastyName') || this.gameState.dynastyName || 'Unknown'
                     );
-                } else {
-                    console.warn('[Monarch] Legacy system not available for prestige');
                 }
             });
         }
     }
 
-    /* =============================
-     *  Dynasty Rename
-     * ============================= */
     showRenameDynastyModal() {
         const currentName = this.gameState.dynastyName || localStorage.getItem('dynastyName') || 'New Dynasty';
         const html = `
@@ -592,7 +945,6 @@ class MonarchManager {
             const input = document.getElementById('rename-dynasty-input');
             input?.focus();
             input?.select();
-
             document.getElementById('confirm-rename-dynasty')?.addEventListener('click', () => {
                 const newName = input?.value?.trim();
                 if (!newName || newName.length < 2) {
@@ -612,14 +964,13 @@ class MonarchManager {
         }, 50);
     }
 
-    /* =============================
-     *  Gold header display
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  GOLD DISPLAY & FORMATTING
+    // ═══════════════════════════════════════════════════════════════
+
     updateGoldDisplay() {
         const el = document.getElementById('monarch-gold-display');
-        if (el) {
-            el.innerHTML = `<i class="res-icon gold"></i> ${this.formatGold(Math.floor(this.gameState.gold))} Gold`;
-        }
+        if (el) el.innerHTML = `<i class="res-icon gold"></i> ${this.formatGold(Math.floor(this.gameState.gold))} Gold`;
     }
 
     formatGold(n) {
@@ -629,75 +980,41 @@ class MonarchManager {
         return n.toLocaleString();
     }
 
-    /* =============================
-     *  Investment display update
-     * ============================= */
-    updateInvestmentDisplay() {
-        this.investmentDefs.forEach(def => {
-            const item = document.querySelector(`.investment-item[data-investment="${def.id}"]`);
-            if (!item) return;
-
-            const level = this.getInvestmentLevel(def.id);
-            const cost = this.getInvestmentCost(def);
-            const maxed = this.isMaxed(def);
-            const canAfford = this.gameState.canAffordGold(cost);
-
-            // Update level text
-            const levelEl = item.querySelector('.investment-level');
-            if (levelEl) levelEl.textContent = `Level ${level}${def.maxLevel < Infinity ? '/' + def.maxLevel : ''}`;
-
-            // Update cost text
-            const costEl = item.querySelector('.investment-cost');
-            if (costEl) costEl.innerHTML = maxed ? 'MAX' : `Cost: ${this.formatGold(cost)} <i class="res-icon gold"></i>`;
-
-            // Update effect text for leadership
-            if (def.id === 'leadershipMultiplier') {
-                const effectEl = item.querySelector('.investment-effect');
-                if (effectEl) effectEl.textContent = this.getLeadershipEffectText();
-            }
-
-            // Update button
-            const btn = item.querySelector('.investment-btn');
-            if (btn) {
-                btn.disabled = maxed || !canAfford;
-                if (def.special === 'betrothal') {
-                    btn.innerHTML = `Search (${this.formatGold(cost)} <i class="res-icon gold"></i>)`;
-                } else {
-                    btn.innerHTML = maxed ? 'MAX' : `Invest (${this.formatGold(cost)} <i class="res-icon gold"></i>)`;
-                }
-                btn.style.opacity = maxed ? '0.5' : canAfford ? '1' : '0.6';
-            }
-        });
-
-        this.displayInvestmentStatus();
-        this.updateGoldDisplay();
-    }
+    // ═══════════════════════════════════════════════════════════════
+    //  INVESTMENT STATUS DISPLAY (Overview tab)
+    // ═══════════════════════════════════════════════════════════════
 
     displayInvestmentStatus() {
         const statusDiv = document.getElementById('investment-status');
         if (!statusDiv) return;
         
         const inv = this.gameState.investments;
+        const staff = this.gameState.hiredStaff || [];
         const leaderMult = this.getLeadershipProductionMultiplier();
         const combatMult = this.getCombatTrainingMultiplier();
+        const generals = staff.filter(s => s.role === 'general').length;
+        const governors = staff.filter(s => s.role === 'governor').length;
+
+        // Check wise trait
+        const hasWise = this.gameState.royalFamily?.currentMonarch?.traits?.includes('wise');
 
         statusDiv.innerHTML = `
             <div class="dynasty-stats">
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.hireGeneral || 0}</div>
-                    <div class="dynasty-stat-label">General Slots</div>
+                    <div class="dynasty-stat-value">${generals}</div>
+                    <div class="dynasty-stat-label">Generals</div>
                 </div>
                 <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${inv.hireGovernor || 0}</div>
-                    <div class="dynasty-stat-label">Governor Slots</div>
+                    <div class="dynasty-stat-value">${governors}</div>
+                    <div class="dynasty-stat-label">Governors</div>
                 </div>
                 <div class="dynasty-stat">
                     <div class="dynasty-stat-value">${leaderMult.toFixed(2)}x</div>
-                    <div class="dynasty-stat-label">Leadership Mult</div>
+                    <div class="dynasty-stat-label">Leadership</div>
                 </div>
                 <div class="dynasty-stat">
                     <div class="dynasty-stat-value">${combatMult.toFixed(1)}x</div>
-                    <div class="dynasty-stat-label">Combat Training</div>
+                    <div class="dynasty-stat-label">Combat</div>
                 </div>
                 <div class="dynasty-stat">
                     <div class="dynasty-stat-value">+${inv.armyScouts || 0}</div>
@@ -709,15 +1026,25 @@ class MonarchManager {
                 </div>
                 <div class="dynasty-stat">
                     <div class="dynasty-stat-value">+${inv.moPeople || 0}</div>
-                    <div class="dynasty-stat-label">Housing Cap</div>
+                    <div class="dynasty-stat-label">Housing</div>
                 </div>
+                ${hasWise ? `<div class="dynasty-stat">
+                    <div class="dynasty-stat-value">📖 +5%</div>
+                    <div class="dynasty-stat-label">Wise Bonus</div>
+                </div>` : ''}
             </div>
         `;
     }
 
-    /* =============================
-     *  Monarch card (current ruler)
-     * ============================= */
+    updateInvestmentDisplay() {
+        this.displayInvestmentStatus();
+        this.updateGoldDisplay();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  MONARCH CARD
+    // ═══════════════════════════════════════════════════════════════
+
     updateMonarchCard() {
         const el = document.getElementById('monarch-card');
         if (!el) return;
@@ -731,31 +1058,49 @@ class MonarchManager {
 
         const reignDays = (this.gameState.day || 0) - (m.reignStart || 0);
         const skills = m.skills || {};
-        const traits = (m.traits || []).map(t => `<span class="trait-badge">${t}</span>`).join(' ') || '<span style="color:#95a5a6;">None</span>';
+        const traits = (m.traits || []).map(t => {
+            const info = this.traitInfo[t] || { icon: '❓', label: t, desc: '' };
+            return `<span class="trait-badge" title="${info.desc}">${info.icon} ${info.label}</span>`;
+        }).join(' ') || '<span style="color:#95a5a6;">None</span>';
+
+        const skillColors = { leadership: '#e67e22', military: '#e74c3c', diplomacy: '#3498db', economics: '#2ecc71' };
+        let skillBars = Object.entries(skills).map(([key, val]) => {
+            const pct = Math.min(100, Math.round((val / 50) * 100));
+            const color = skillColors[key] || '#888';
+            return `<div style="margin-bottom:4px;">
+                <div style="display:flex;justify-content:space-between;font-size:0.82em;margin-bottom:1px;">
+                    <span style="text-transform:capitalize;">${key}</span>
+                    <span style="color:${color};font-weight:600;">${val}</span>
+                </div>
+                <div style="background:#111;border-radius:3px;height:6px;overflow:hidden;">
+                    <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
+                </div>
+            </div>`;
+        }).join('');
 
         el.innerHTML = `
-            <div class="monarch-card">
+            <div class="monarch-card" style="cursor:pointer;" title="Click for full genetics view">
                 <div class="monarch-info">
                     <div class="monarch-portrait">👑</div>
                     <div class="monarch-details">
                         <h4>${m.name || 'Unknown Monarch'}</h4>
-                        <p style="margin:0;color:#555;">Age: ${m.age || '?'} · Reign: ${reignDays} days</p>
-                        <div style="margin-top:0.5rem;">${traits}</div>
+                        <p style="margin:0;color:#95a5a6;font-size:0.85em;">Age: ${m.age || '?'} · Reign: ${reignDays} days</p>
+                        <div style="margin-top:0.4rem;">${traits}</div>
                     </div>
                 </div>
-                <div class="monarch-stats">
-                    <div class="stat-item"><strong>${skills.leadership || 0}</strong><br>Leadership</div>
-                    <div class="stat-item"><strong>${skills.military || 0}</strong><br>Military</div>
-                    <div class="stat-item"><strong>${skills.diplomacy || 0}</strong><br>Diplomacy</div>
-                    <div class="stat-item"><strong>${skills.economics || 0}</strong><br>Economics</div>
-                </div>
+                <div style="margin-top:10px;">${skillBars}</div>
             </div>
         `;
+
+        el.querySelector('.monarch-card')?.addEventListener('click', () => {
+            if (m.id) this.showGeneticsViewer(m.id);
+        });
     }
 
-    /* =============================
-     *  Dynasty stats
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  DYNASTY STATS
+    // ═══════════════════════════════════════════════════════════════
+
     updateDynastyStats() {
         const el = document.getElementById('dynasty-stats');
         if (!el) return;
@@ -768,93 +1113,169 @@ class MonarchManager {
         const reignDays = rf?.currentMonarch ? ((gs.day || 0) - (rf.currentMonarch.reignStart || 0)) : 0;
         const pop = gs.populationManager?.getAll()?.length || gs.population || 0;
         const buildingCount = gs.buildings?.length || 0;
-
-        // Legacy stats
         const legacy = window.legacySystem?.legacy;
         const legacyPoints = legacy?.totalPoints || 0;
         const dynastiesCompleted = legacy?.dynastiesCompleted || 0;
 
         el.innerHTML = `
             <div class="dynasty-stats">
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">👑 ${monarchName}</div>
-                    <div class="dynasty-stat-label">Current Ruler</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${reignDays}</div>
-                    <div class="dynasty-stat-label">Reign (days)</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${familySize}</div>
-                    <div class="dynasty-stat-label">Royal Family</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${heirs}</div>
-                    <div class="dynasty-stat-label">Eligible Heirs</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${pop}</div>
-                    <div class="dynasty-stat-label">Population</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${buildingCount}</div>
-                    <div class="dynasty-stat-label">Buildings</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${legacyPoints}</div>
-                    <div class="dynasty-stat-label">Legacy Points</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${dynastiesCompleted}</div>
-                    <div class="dynasty-stat-label">Past Dynasties</div>
-                </div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">👑 ${monarchName}</div><div class="dynasty-stat-label">Current Ruler</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${reignDays}</div><div class="dynasty-stat-label">Reign (days)</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${familySize}</div><div class="dynasty-stat-label">Royal Family</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${heirs}</div><div class="dynasty-stat-label">Eligible Heirs</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${pop}</div><div class="dynasty-stat-label">Population</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${buildingCount}</div><div class="dynasty-stat-label">Buildings</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${legacyPoints}</div><div class="dynasty-stat-label">Legacy Points</div></div>
+                <div class="dynasty-stat"><div class="dynasty-stat-value">${dynastiesCompleted}</div><div class="dynasty-stat-label">Past Dynasties</div></div>
             </div>
         `;
     }
 
-    /* =============================
-     *  Royal family tree display
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  FAMILY TREE TAB (lineage visualization)
+    // ═══════════════════════════════════════════════════════════════
+
+    renderFamilyTreeTab() {
+        const el = document.getElementById('family-tree-visual');
+        if (!el) return;
+
+        const rf = this.gameState.royalFamily;
+        if (!rf || !rf.royalFamily || rf.royalFamily.length === 0) {
+            el.innerHTML = '<p style="color:#bdc3c7;">No royal family members.</p>';
+            return;
+        }
+
+        const monarch = rf.currentMonarch;
+        const monarchId = monarch?.id;
+
+        // Categorize: Main Lineage = monarch + spouse + direct children
+        // Cousin Lineage = everyone else descended from original founder
+        const mainLineage = [];
+        const cousinLineage = [];
+
+        rf.royalFamily.forEach(member => {
+            const isMonarch = member.id === monarchId;
+            const isSpouse = member.status === 'royal_spouse' && member.spouse === monarchId;
+            const isDirectChild = member.parents && member.parents.includes(monarchId);
+            const isMonarchSpouseChild = monarch?.spouse && member.parents && member.parents.includes(monarch.spouse);
+
+            if (isMonarch || isSpouse || isDirectChild || isMonarchSpouseChild) {
+                mainLineage.push(member);
+            } else {
+                cousinLineage.push(member);
+            }
+        });
+
+        let html = '';
+
+        // Main Lineage
+        html += '<div class="lineage-section">';
+        html += '<h4>👑 Main Lineage</h4>';
+        html += '<div class="tree-members">';
+        mainLineage.forEach(m => { html += this._renderTreeNode(m, monarchId); });
+        html += '</div></div>';
+
+        // Cousin Lineage
+        if (cousinLineage.length > 0) {
+            html += '<div class="lineage-section">';
+            html += '<h4>🏰 Extended Family</h4>';
+            html += '<div class="tree-members">';
+            cousinLineage.forEach(m => { html += this._renderTreeNode(m, monarchId); });
+            html += '</div></div>';
+        }
+
+        // Hired Staff (shown as reference)
+        const staff = this.gameState.hiredStaff || [];
+        if (staff.length > 0) {
+            html += '<div class="lineage-section">';
+            html += '<h4>📋 Hired Staff</h4>';
+            html += '<div class="tree-members">';
+            staff.forEach(s => {
+                const roleIcon = s.role === 'general' ? '⚔️' : '🏛️';
+                const traits = (s.traits || []).map(t => {
+                    const info = this.traitInfo[t] || { icon: '❓', label: t };
+                    return `<span class="staff-trait">${info.icon} ${info.label}</span>`;
+                }).join('');
+                html += `
+                    <div class="tree-node" style="border-left-color:${s.role === 'general' ? '#e74c3c' : '#2ecc71'};">
+                        <div class="node-icon">${roleIcon}</div>
+                        <div class="node-name">${s.name}</div>
+                        <div class="node-info">${s.role === 'general' ? 'General' : 'Governor'} · Age ${s.age || '?'}</div>
+                        <div class="node-traits">${traits}</div>
+                    </div>`;
+            });
+            html += '</div></div>';
+        }
+
+        el.innerHTML = html;
+
+        // Wire click → genetics viewer on family nodes
+        el.querySelectorAll('.tree-node[data-royal-id]').forEach(node => {
+            node.addEventListener('click', () => {
+                this.showGeneticsViewer(node.dataset.royalId);
+            });
+        });
+    }
+
+    _renderTreeNode(member, monarchId) {
+        const isMonarch = member.id === monarchId;
+        const isHeir = member.status === 'heir';
+        const isSpouse = member.status === 'royal_spouse';
+        let cls = 'tree-node';
+        if (isMonarch) cls += ' monarch';
+        else if (isHeir) cls += ' heir';
+        else if (isSpouse) cls += ' spouse';
+        else cls += ' child';
+
+        const icon = isMonarch ? '👑' : member.role === 'general' ? '⚔️' : member.role === 'governor' ? '🏛️' : isHeir ? '🏰' : isSpouse ? '💍' : '👤';
+        let statusLabel = isMonarch ? 'Monarch' : isHeir ? 'Heir' : isSpouse ? 'Spouse' : member.status || '';
+        if (member.role === 'general') statusLabel = 'General';
+        if (member.role === 'governor') statusLabel = 'Governor';
+
+        const traits = (member.traits || []).map(t => {
+            const info = this.traitInfo[t] || { icon: '❓', label: t };
+            return `<span class="staff-trait">${info.icon} ${info.label}</span>`;
+        }).join('');
+
+        const skills = member.skills || {};
+        return `
+            <div class="${cls}" data-royal-id="${member.id}" title="Click to view genetics">
+                <div class="node-icon">${icon}</div>
+                <div class="node-name">${member.name || 'Unknown'}</div>
+                <div class="node-info">Age ${member.age || '?'} · ${statusLabel}</div>
+                <div class="node-skill-row">⚔️${skills.military || 0} 📊${skills.economics || 0} 🗣️${skills.diplomacy || 0} 👑${skills.leadership || 0}</div>
+                <div class="node-traits">${traits}</div>
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  FAMILY ROLE ASSIGNMENTS (Staff tab — legacy family assignment)
+    // ═══════════════════════════════════════════════════════════════
+
     updateFamilyTree() {
         const el = document.getElementById('monarch-family-tree');
         if (!el) return;
 
         const rf = this.gameState.royalFamily;
         if (!rf || !rf.royalFamily || rf.royalFamily.length === 0) {
-            el.innerHTML = `<p style="color:#bdc3c7;">No royal family members.</p>`;
+            el.innerHTML = `<p style="color:#bdc3c7;">No royal family members available for assignment.</p>`;
             return;
         }
 
-        const inv = this.gameState.investments;
-        const maxGenerals = inv.hireGeneral || 0;
-        const maxGovernors = inv.hireGovernor || 0;
-        const currentGenerals = rf.royalFamily.filter(r => r.role === 'general').length;
-        const currentGovernors = rf.royalFamily.filter(r => r.role === 'governor').length;
-
-        // Gather available armies for general assignment
+        const staff = this.gameState.hiredStaff || [];
         const armies = this.gameState.getAllArmies?.() || [];
+        const assignable = rf.royalFamily.filter(m => m.age >= 16 && m.id !== rf.currentMonarch?.id);
+
+        if (assignable.length === 0) {
+            el.innerHTML = '<p style="color:#7f8c8d;font-style:italic;">No family members old enough (16+) for assignment.</p>';
+            return;
+        }
 
         let html = '<div class="family-tree">';
-
-        // Slot summary
-        html += `<div class="role-slot-summary" style="display:flex;gap:12px;margin-bottom:10px;font-size:0.85em;color:#95a5a6;">
-            <span>⚔️ Generals: ${currentGenerals}/${maxGenerals}</span>
-            <span>🏛️ Governors: ${currentGovernors}/${maxGovernors}</span>
-        </div>`;
-
-        rf.royalFamily.forEach(member => {
-            const isMonarch = member.id === rf.currentMonarch?.id;
-            const isHeir = member.status === 'heir';
-            const isSpouse = member.status === 'royal_spouse';
-            const canAssign = member.age >= 16 && !isMonarch;
-            let classStr = 'family-member';
-            if (isHeir) classStr += ' heir';
-            if (isSpouse) classStr += ' spouse';
-            if (!isHeir && !isSpouse && !isMonarch) classStr += ' child';
-
-            const icon = isMonarch ? '👑' : member.role === 'general' ? '⚔️' : member.role === 'governor' ? '🏛️' : isHeir ? '🏰' : isSpouse ? '💍' : '👤';
-            let statusLabel = isMonarch ? 'Monarch' : member.status === 'heir' ? 'Heir' : member.status === 'royal_spouse' ? 'Spouse' : member.status;
-            // Show active role
+        assignable.forEach(member => {
+            const icon = member.role === 'general' ? '⚔️' : member.role === 'governor' ? '🏛️' : member.status === 'heir' ? '🏰' : member.status === 'royal_spouse' ? '💍' : '👤';
+            let statusLabel = member.status === 'heir' ? 'Heir' : member.status === 'royal_spouse' ? 'Spouse' : member.status;
             if (member.role === 'general') {
                 const army = armies.find(a => a.id === member.assignedTo);
                 statusLabel = `General of ${army?.name || 'Army'}`;
@@ -862,135 +1283,101 @@ class MonarchManager {
                 statusLabel = `Governor of ${member.assignedTo === 'capital' ? 'Capital' : member.assignedTo}`;
             }
 
-            const traits = (member.traits || []).map(t => `<span class="trait-badge">${t}</span>`).join(' ');
             const skills = member.skills || {};
-
             html += `
-                <div class="${classStr}" data-royal-id="${member.id}" style="cursor:pointer;" title="Click to view genetics">
+                <div class="family-member${member.status === 'heir' ? ' heir' : ''}${member.status === 'royal_spouse' ? ' spouse' : ''}" data-royal-id="${member.id}" style="cursor:pointer;" title="Click to view genetics">
                     <div class="member-icon">${icon}</div>
                     <div class="member-details">
                         <div class="member-name">${member.name || 'Unknown'}</div>
                         <div class="member-info">Age: ${member.age || '?'} · ${statusLabel}</div>
-                        <div class="member-skills" style="font-size:0.8em;opacity:0.7;margin-top:2px;">
-                            ⚔️${skills.military || 0} 📊${skills.economics || 0} 🗣️${skills.diplomacy || 0}
-                        </div>
-                        ${traits ? `<div class="member-traits">${traits}</div>` : ''}`;
+                        <div style="font-size:0.8em;opacity:0.7;margin-top:2px;">⚔️${skills.military || 0} 📊${skills.economics || 0} 🗣️${skills.diplomacy || 0}</div>`;
 
-            // Role assignment buttons (only for age 16+ non-monarch members)
-            if (canAssign) {
-                html += `<div class="role-buttons" style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">`;
-                if (member.role) {
-                    html += `<button class="role-btn role-unassign" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#5a2020;color:#e8d5b0;border:1px solid #8b3030;border-radius:3px;cursor:pointer;">✖ Unassign</button>`;
-                } else {
-                    // Governor option (if slots available)
-                    if (currentGovernors < maxGovernors) {
-                        const currentGov = rf.getGovernor?.('capital');
-                        if (!currentGov) {
-                            html += `<button class="role-btn role-governor" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;">🏛️ Governor</button>`;
-                        }
-                    }
-                    // General option (if slots available and armies exist)
-                    if (currentGenerals < maxGenerals && armies.length > 0) {
-                        armies.forEach(a => {
-                            const existingGen = rf.getGeneralForArmy?.(a.id);
-                            if (!existingGen) {
-                                html += `<button class="role-btn role-general" data-royal="${member.id}" data-army="${a.id}" style="font-size:0.7em;padding:2px 6px;background:#2a2a4a;color:#e8d5b0;border:1px solid #3a3a6a;border-radius:3px;cursor:pointer;">⚔️ Lead ${a.name}</button>`;
-                            }
-                        });
-                    }
-                    // Show hint if no slots
-                    if (maxGenerals === 0 && maxGovernors === 0) {
-                        html += `<span style="font-size:0.7em;color:#7f8c8d;font-style:italic;">Hire generals/governors in Investments</span>`;
-                    }
+            // Role buttons
+            html += '<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">';
+            if (member.role) {
+                html += `<button class="role-btn role-unassign" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#5a2020;color:#e8d5b0;border:1px solid #8b3030;border-radius:3px;cursor:pointer;">✖ Unassign</button>`;
+            } else {
+                // Governor (no slot limit — family can serve alongside hired staff)
+                const currentFamilyGov = rf.getGovernor?.('capital');
+                if (!currentFamilyGov) {
+                    html += `<button class="role-btn role-governor" data-royal="${member.id}" style="font-size:0.7em;padding:2px 6px;background:#2a4a2a;color:#e8d5b0;border:1px solid #3a6a3a;border-radius:3px;cursor:pointer;">🏛️ Governor</button>`;
                 }
-                html += `</div>`;
+                // General
+                if (armies.length > 0) {
+                    armies.forEach(a => {
+                        const existingGen = rf.getGeneralForArmy?.(a.id);
+                        const hiredGen = staff.find(s => s.role === 'general' && s.assignedTo === a.id);
+                        if (!existingGen && !hiredGen) {
+                            html += `<button class="role-btn role-general" data-royal="${member.id}" data-army="${a.id}" style="font-size:0.7em;padding:2px 6px;background:#2a2a4a;color:#e8d5b0;border:1px solid #3a3a6a;border-radius:3px;cursor:pointer;">⚔️ Lead ${a.name}</button>`;
+                        }
+                    });
+                }
             }
-
-            html += `
-                    </div>
-                </div>
-            `;
+            html += '</div></div></div>';
         });
         html += '</div>';
         el.innerHTML = html;
 
-        // Wire up role buttons
+        // Wire buttons
         el.querySelectorAll('.role-governor').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const royalId = btn.dataset.royal;
-                rf.assignGovernor?.(royalId, 'capital');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                rf.assignGovernor?.(btn.dataset.royal, 'capital');
                 this.updateFamilyTree();
-                window.showToast?.('Governor assigned to Capital — production boost active!', { type: 'success' });
+                window.showToast?.('Governor assigned to Capital!', { type: 'success' });
             });
         });
         el.querySelectorAll('.role-general').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const royalId = btn.dataset.royal;
-                const armyId = btn.dataset.army;
-                rf.assignGeneral?.(royalId, armyId);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                rf.assignGeneral?.(btn.dataset.royal, btn.dataset.army);
                 this.updateFamilyTree();
-                window.showToast?.('General assigned — combat bonus active!', { type: 'success' });
+                window.showToast?.('General assigned!', { type: 'success' });
             });
         });
         el.querySelectorAll('.role-unassign').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const royalId = btn.dataset.royal;
-                rf.unassignRole?.(royalId);
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                rf.unassignRole?.(btn.dataset.royal);
                 this.updateFamilyTree();
                 window.showToast?.('Role removed.', { type: 'info' });
             });
         });
-
-        // Wire up genetics viewer on member card click
         el.querySelectorAll('.family-member[data-royal-id]').forEach(card => {
             card.addEventListener('click', (e) => {
-                // Don't open genetics when clicking role buttons
                 if (e.target.closest('button')) return;
-                const royalId = card.dataset.royalId;
-                this.showGeneticsViewer(royalId);
+                this.showGeneticsViewer(card.dataset.royalId);
             });
         });
     }
 
-    /* =============================
-     *  Royal Genetics Viewer
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  GENETICS VIEWER MODAL
+    // ═══════════════════════════════════════════════════════════════
+
     showGeneticsViewer(royalId) {
         const rf = this.gameState.royalFamily;
         if (!rf) return;
         const member = rf.findRoyalById(royalId);
         if (!member) return;
 
-        // Trait display info
-        const traitInfo = {
-            magical_potential: { icon: '✨', label: 'Magical Potential', cat: 'Magic' },
-            strong:     { icon: '💪', label: 'Strong',     cat: 'Physical' },
-            agile:      { icon: '🏃', label: 'Agile',      cat: 'Physical' },
-            enduring:   { icon: '🛡️', label: 'Enduring',   cat: 'Physical' },
-            healthy:    { icon: '❤️', label: 'Healthy',     cat: 'Physical' },
-            intelligent:{ icon: '🧠', label: 'Intelligent', cat: 'Mental' },
-            wise:       { icon: '📖', label: 'Wise',        cat: 'Mental' },
-            charismatic:{ icon: '👑', label: 'Charismatic', cat: 'Mental' },
-            cunning:    { icon: '🦊', label: 'Cunning',     cat: 'Mental' }
-        };
-
-        // Build traits section
+        // Traits
         const traits = member.traits || [];
         let traitsHtml = '';
         if (traits.length === 0) {
             traitsHtml = '<span style="color:#7f8c8d;font-style:italic;">No traits</span>';
         } else {
             traitsHtml = traits.map(t => {
-                const info = traitInfo[t] || { icon: '❓', label: t, cat: 'Unknown' };
+                const info = this.traitInfo[t] || { icon: '❓', label: t, cat: 'Unknown', desc: '' };
                 return `<span style="display:inline-block;background:#2a2a3e;border:1px solid #4a4a6a;border-radius:4px;padding:3px 8px;margin:2px;font-size:0.85em;">
-                    ${info.icon} ${info.label} <span style="color:#888;font-size:0.8em;">(${info.cat})</span>
+                    ${info.icon} ${info.label} <span style="color:#f39c12;font-size:0.8em;">${info.desc}</span>
                 </span>`;
             }).join('');
         }
 
-        // Build skills section with bars
+        // Skills
         const skills = member.skills || { leadership: 0, military: 0, diplomacy: 0, economics: 0 };
-        const skillMax = 100;
+        const skillMax = 50;
         const skillColors = { leadership: '#e67e22', military: '#e74c3c', diplomacy: '#3498db', economics: '#2ecc71' };
         let skillsHtml = Object.entries(skills).map(([key, val]) => {
             const pct = Math.min(100, Math.round((val / skillMax) * 100));
@@ -998,7 +1385,7 @@ class MonarchManager {
             return `<div style="margin-bottom:6px;">
                 <div style="display:flex;justify-content:space-between;font-size:0.85em;margin-bottom:2px;">
                     <span style="text-transform:capitalize;">${key}</span>
-                    <span style="color:#ccc;">${val}</span>
+                    <span style="color:${color};font-weight:600;">${val}</span>
                 </div>
                 <div style="background:#1a1a2e;border-radius:3px;height:8px;overflow:hidden;">
                     <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;transition:width 0.3s;"></div>
@@ -1006,18 +1393,14 @@ class MonarchManager {
             </div>`;
         }).join('');
 
-        // Build lineage section
+        // Lineage
         let lineageHtml = '';
         if (member.parents && member.parents.length > 0) {
             const parentNames = member.parents.map(pid => {
                 const p = rf.findRoyalById(pid);
                 return p ? p.name : 'Unknown';
             });
-            lineageHtml = `<div style="margin-top:8px;">
-                <strong>Parents:</strong> ${parentNames.join(' & ')}
-            </div>`;
-
-            // Show inherited vs unique traits
+            lineageHtml = `<div style="margin-top:8px;"><strong>Parents:</strong> ${parentNames.join(' & ')}</div>`;
             const parentTraits = new Set();
             member.parents.forEach(pid => {
                 const p = rf.findRoyalById(pid);
@@ -1026,25 +1409,21 @@ class MonarchManager {
             const inherited = traits.filter(t => parentTraits.has(t));
             const unique = traits.filter(t => !parentTraits.has(t));
             if (inherited.length > 0) {
-                lineageHtml += `<div style="margin-top:4px;font-size:0.85em;color:#a8d8a8;">
-                    🧬 Inherited: ${inherited.map(t => (traitInfo[t]?.label || t)).join(', ')}
-                </div>`;
+                lineageHtml += `<div style="margin-top:4px;font-size:0.85em;color:#a8d8a8;">🧬 Inherited: ${inherited.map(t => (this.traitInfo[t]?.label || t)).join(', ')}</div>`;
             }
             if (unique.length > 0) {
-                lineageHtml += `<div style="margin-top:4px;font-size:0.85em;color:#d8a8d8;">
-                    ⚡ Mutation: ${unique.map(t => (traitInfo[t]?.label || t)).join(', ')}
-                </div>`;
+                lineageHtml += `<div style="margin-top:4px;font-size:0.85em;color:#d8a8d8;">⚡ Mutation: ${unique.map(t => (this.traitInfo[t]?.label || t)).join(', ')}</div>`;
             }
         } else {
             lineageHtml = '<div style="margin-top:8px;color:#7f8c8d;font-style:italic;">Founder — no parent lineage</div>';
         }
 
-        // Spouse info
+        // Spouse
         let spouseHtml = '';
         if (member.spouse) {
             const spouse = rf.findRoyalById(member.spouse);
             if (spouse) {
-                const spouseTraits = (spouse.traits || []).map(t => (traitInfo[t]?.icon || '') + ' ' + (traitInfo[t]?.label || t)).join(', ') || 'None';
+                const spouseTraits = (spouse.traits || []).map(t => (this.traitInfo[t]?.icon || '') + ' ' + (this.traitInfo[t]?.label || t)).join(', ') || 'None';
                 spouseHtml = `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #333;">
                     <strong>💍 Spouse:</strong> ${spouse.name}
                     <div style="font-size:0.85em;color:#ccc;margin-top:3px;">Traits: ${spouseTraits}</div>
@@ -1052,24 +1431,17 @@ class MonarchManager {
             }
         }
 
-        // Children info
+        // Children
         let childrenHtml = '';
         if (member.children && member.children.length > 0) {
             const childItems = member.children.map(cid => {
                 const c = rf.findRoyalById(cid);
                 return c ? `${c.name} (age ${c.age})` : 'Unknown';
             }).join(', ');
-            childrenHtml = `<div style="margin-top:6px;font-size:0.85em;">
-                <strong>👶 Children:</strong> ${childItems}
-            </div>`;
+            childrenHtml = `<div style="margin-top:6px;font-size:0.85em;"><strong>👶 Children:</strong> ${childItems}</div>`;
         }
 
-        // Inheritance rules info
-        const inheritInfoHtml = `<div style="margin-top:12px;padding-top:8px;border-top:1px solid #333;font-size:0.8em;color:#888;">
-            <strong>Inheritance Rules:</strong> 50% chance per parent trait · 10% mutation chance · Skills start at 0 for heirs
-        </div>`;
-
-        // Experience section (for active members)
+        // Experience
         let expHtml = '';
         if (member.experience) {
             const exp = member.experience;
@@ -1107,29 +1479,23 @@ class MonarchManager {
                 ${spouseHtml}
                 ${childrenHtml}
                 ${expHtml}
-                ${inheritInfoHtml}
+                <div style="margin-top:12px;padding-top:8px;border-top:1px solid #333;font-size:0.8em;color:#888;">
+                    <strong>Inheritance Rules:</strong> 50% chance per parent trait · 10% mutation chance · Skills start at 0 for heirs
+                </div>
             </div>
         `;
 
         window.showModal?.('🧬 Royal Genetics — ' + member.name, body, { type: 'info', icon: '🧬' });
     }
 
-    /* =============================
-     *  Full refresh — called on view switch
-     * ============================= */
+    // ═══════════════════════════════════════════════════════════════
+    //  FULL REFRESH & PRESTIGE BUTTON
+    // ═══════════════════════════════════════════════════════════════
+
     refreshAll() {
-        this.updateGoldDisplay();
-        this.updateInvestmentDisplay();
-        this.updateMonarchCard();
-        this.updateDynastyStats();
-        this.updateFamilyTree();
-        this.renderLegacyBonuses();
-        this.updatePrestigeButton();
+        this.renderActiveTab();
     }
 
-    /**
-     * Update the End Dynasty button based on the day-100 gate.
-     */
     updatePrestigeButton() {
         const btn = document.getElementById('prestige-reset-btn');
         if (!btn) return;

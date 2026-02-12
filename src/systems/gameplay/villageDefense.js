@@ -357,9 +357,9 @@ class VillageDefenseSystem {
                     const worker = workers.pop();
                     remaining--;
                     
-                    // Mark as dead in population
+                    // Remove dead defender from population
                     if (this.gameState.populationManager) {
-                        this.gameState.populationManager.killVillager(worker, 'Killed defending the village');
+                        this.gameState.populationManager.removeInhabitant(worker.id || worker);
                     }
                 }
             }

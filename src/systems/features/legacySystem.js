@@ -457,20 +457,45 @@ class LegacySystem {
         };
 
         setTimeout(() => {
+            // Customize modal based on end reason
+            let modalIcon, modalTitle, modalEmoji, flavorText;
+            switch (reason) {
+                case 'starvation':
+                    modalIcon = '💀'; modalTitle = 'Famine Claims Your Dynasty';
+                    modalEmoji = '🦴';
+                    flavorText = 'Your people starved to death. The fields lay barren and the village is silent.';
+                    break;
+                case 'village_destroyed':
+                    modalIcon = '🔥'; modalTitle = 'Village Destroyed!';
+                    modalEmoji = '🗡️';
+                    flavorText = 'Enemy forces overran your village. Your dynasty has fallen to invaders.';
+                    break;
+                case 'dynasty_extinct':
+                    modalIcon = '⚰️'; modalTitle = 'Dynasty Extinct';
+                    modalEmoji = '👑';
+                    flavorText = 'The royal bloodline has ended with no heirs to carry on.';
+                    break;
+                default:
+                    modalIcon = '🌟'; modalTitle = 'Legacy Secured!';
+                    modalEmoji = '🏛️'; flavorText = '';
+                    break;
+            }
+
             if (window.modalSystem?.showModal) {
                 window.modalSystem.showModal({
-                    title: '🌟 Legacy Secured!',
+                    title: `${modalIcon} ${modalTitle}`,
                     content: `
                         <div style="text-align:center;padding:20px;">
-                            <div style="font-size:64px;margin-bottom:16px;">🏛️</div>
+                            <div style="font-size:64px;margin-bottom:16px;">${modalEmoji}</div>
+                            ${flavorText ? `<p style="color:#e0b0b0;margin-bottom:16px;font-style:italic;">${flavorText}</p>` : ''}
                             <h3 style="color:#f39c12;margin-bottom:16px;">
-                                +${result.legacyPoints} Legacy Points Earned!
+                                +${result.legacyPoints} Legacy Points Earned
                             </h3>
                             <p style="color:#bdc3c7;margin-bottom:20px;">
                                 Total Legacy: ${result.totalLegacy} points<br/>
                                 Dynasty #${result.dynastyNumber} Complete
                             </p>
-                            <button id="start-new-dynasty" style="padding:14px 28px;background:#27ae60;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1.1em;font-weight:bold;">
+                            <button id="start-new-dynasty" style="padding:14px 28px;background:${reason === 'voluntary' ? '#27ae60' : '#c0392b'};color:white;border:none;border-radius:8px;cursor:pointer;font-size:1.1em;font-weight:bold;">
                                 🌱 Start New Dynasty
                             </button>
                         </div>

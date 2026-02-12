@@ -304,13 +304,14 @@ class JobRegistry {
         });
     }
 
-    /** Linear slot scaling by building level + productionSize investment (primary production only) */
+    /** Linear slot scaling by building level + productionSize investment (primary + intermediate production) */
     _computeJobSlots(baseSlots, building) {
         const level = Math.max(1, building?.level || 1);
         const btype = building?.type || building?.get?.('type');
-        // productionSize only applies to primary production buildings, not intermediates
+        // productionSize applies to primary and intermediate production buildings
         const PRIMARY_PRODUCTION = ['farm', 'woodcutterLodge', 'huntersLodge', 'quarry', 'mine', 'pasture'];
-        const prodSizeBonus = PRIMARY_PRODUCTION.includes(btype)
+        const INTERMEDIATE_PRODUCTION = ['lumberMill', 'workshop', 'blacksmith'];
+        const prodSizeBonus = (PRIMARY_PRODUCTION.includes(btype) || INTERMEDIATE_PRODUCTION.includes(btype))
             ? (window.gameState?.investments?.productionSize || 0)
             : 0;
         return Math.max(0, Math.floor((baseSlots + prodSizeBonus) * level));
@@ -995,6 +996,16 @@ class JobRegistry {
             }
         }
 
+        // Apply Wise trait bonus (+5% all production) if current monarch has 'wise'
+        const monarchTraits = window.gameState?.royalFamily?.currentMonarch?.traits || [];
+        if (monarchTraits.includes('wise')) {
+            for (const key of Object.keys(production)) {
+                if (production[key] > 0) {
+                    production[key] *= 1.05;
+                }
+            }
+        }
+
         return production;
     }
 
@@ -1087,6 +1098,20 @@ class JobRegistry {
                     production[key] *= leadershipMult;
                     if (breakdown[key]) {
                         breakdown[key].income.push({ label: `Leadership Bonus (×${leadershipMult.toFixed(2)})`, workers: 0, amount: Number(bonus.toFixed(2)) });
+                    }
+                }
+            }
+        }
+
+        // Apply Wise trait bonus (+5% all production) if current monarch has 'wise'
+        const monarchTraits = window.gameState?.royalFamily?.currentMonarch?.traits || [];
+        if (monarchTraits.includes('wise')) {
+            for (const key of Object.keys(production)) {
+                if (production[key] > 0) {
+                    const bonus = production[key] * 0.05;
+                    production[key] *= 1.05;
+                    if (breakdown[key]) {
+                        breakdown[key].income.push({ label: '📖 Wise Monarch (+5%)', workers: 0, amount: Number(bonus.toFixed(2)) });
                     }
                 }
             }

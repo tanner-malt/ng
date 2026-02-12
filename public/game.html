@@ -991,74 +991,91 @@
         <!-- Unlocked Monarch Content -->
         <div id="monarch-content" class="monarch-content" style="display: none;">
             <div class="monarch-header">
-                <h2>👑 Royal Court & Dynasty Management</h2>
+                <h2>👑 Royal Court</h2>
                 <div id="monarch-gold-display" class="gold-display">💰 0 Gold</div>
             </div>
 
-            <!-- Current Monarch Card & Family Tree -->
-            <div class="monarch-section monarch-overview">
+            <!-- Sub-tab Navigation -->
+            <div class="monarch-tab-bar">
+                <button class="monarch-tab active" data-tab="overview">👑 Overview</button>
+                <button class="monarch-tab" data-tab="family">🌳 Family Tree</button>
+                <button class="monarch-tab" data-tab="staff">⚔️ Staff</button>
+                <button class="monarch-tab" data-tab="investments">💰 Investments</button>
+                <button class="monarch-tab" data-tab="legacy">🏛️ Legacy</button>
+                <button class="monarch-tab" data-tab="dynasty">⚰️ Dynasty</button>
+            </div>
+
+            <!-- TAB: Overview -->
+            <div class="monarch-tab-content active" data-tab-content="overview">
                 <div class="monarch-overview-grid">
                     <div>
                         <h3>👑 Current Monarch</h3>
-                        <div id="monarch-card">
-                            <!-- Populated by monarch.js -->
-                        </div>
+                        <div id="monarch-card"></div>
                     </div>
                     <div>
-                        <h3>👨‍👩‍👧‍👦 Royal Family</h3>
-                        <div id="monarch-family-tree">
-                            <!-- Populated by monarch.js -->
+                        <h3>📈 Kingdom Summary</h3>
+                        <div id="investment-status" class="investment-status"></div>
+                    </div>
+                </div>
+                <div class="monarch-section" style="margin-top:1rem;">
+                    <h3>📊 Dynasty Status</h3>
+                    <div id="dynasty-stats" class="dynasty-stats"></div>
+                </div>
+            </div>
+
+            <!-- TAB: Family Tree -->
+            <div class="monarch-tab-content" data-tab-content="family">
+                <div class="monarch-section">
+                    <h3>🌳 Royal Lineage</h3>
+                    <div id="family-tree-visual" class="family-tree-visual"></div>
+                </div>
+            </div>
+
+            <!-- TAB: Staff -->
+            <div class="monarch-tab-content" data-tab-content="staff">
+                <div class="monarch-section">
+                    <h3>👥 Royal Appointments</h3>
+                    <p class="section-subtitle">Hire and manage generals, governors, and arrange marriages for the royal family.</p>
+                    <div id="staff-actions" class="staff-actions"></div>
+                    <div id="staff-roster" class="staff-roster"></div>
+                    <div class="monarch-section" style="margin-top:1rem;">
+                        <h3>👨‍👩‍👧‍👦 Family Role Assignments</h3>
+                        <div id="monarch-family-tree"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Investments -->
+            <div class="monarch-tab-content" data-tab-content="investments">
+                <div class="monarch-section">
+                    <h3>💰 Royal Investments</h3>
+                    <div id="investment-categories" class="investment-categories"></div>
+                </div>
+            </div>
+
+            <!-- TAB: Legacy -->
+            <div class="monarch-tab-content" data-tab-content="legacy">
+                <div class="monarch-section">
+                    <h3>🏛️ Legacy Bonuses</h3>
+                    <div class="legacy-bonuses-header">
+                        <span id="legacy-points-display" class="legacy-points-badge">0 Legacy Points</span>
+                        <p style="color:#95a5a6;font-size:0.85em;margin:4px 0 0;">Permanent bonuses that persist across all future dynasties</p>
+                    </div>
+                    <div id="legacy-bonuses-grid" class="legacy-bonuses-grid"></div>
+                </div>
+            </div>
+
+            <!-- TAB: Dynasty -->
+            <div class="monarch-tab-content" data-tab-content="dynasty">
+                <div class="monarch-section">
+                    <h3>⚰️ Dynasty Management</h3>
+                    <div class="dynasty-tools">
+                        <div class="prestige-actions">
+                            <button id="rename-dynasty-btn" class="dynasty-btn">✏️ Rename Dynasty</button>
+                            <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
+                            <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige Reset)</button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Royal Investment System -->
-            <div class="monarch-section">
-                <h3>💰 Royal Investments</h3>
-                <div id="investment-categories" class="investment-categories">
-                    <!-- Dynamically populated by monarch.js renderInvestments() -->
-                </div>
-            </div>
-
-            <!-- Legacy Bonus Spending -->
-            <div class="monarch-section">
-                <h3>🏛️ Legacy Bonuses</h3>
-                <div class="legacy-bonuses-header">
-                    <span id="legacy-points-display" class="legacy-points-badge">0 Legacy Points</span>
-                    <p style="color:#95a5a6;font-size:0.85em;margin:4px 0 0;">Spend legacy points to improve starting conditions for future dynasties</p>
-                </div>
-                <div id="legacy-bonuses-grid" class="legacy-bonuses-grid">
-                    <!-- Dynamically populated by monarch.js renderLegacyBonuses() -->
-                </div>
-            </div>
-
-            <!-- Dynasty Reset Tools -->
-            <div class="monarch-section">
-                <h3>⚰️ Dynasty Management</h3>
-                <div class="dynasty-tools">
-                    <div class="dynasty-info">
-                        <h4>📊 Current Dynasty Status</h4>
-                        <div id="dynasty-stats" class="dynasty-stats">
-                            <!-- Will be populated by monarch.js -->
-                        </div>
-                    </div>
-
-                    <div class="prestige-actions">
-                        <h4>🔄 Dynasty Actions</h4>
-                        <button id="rename-dynasty-btn" class="dynasty-btn">✏️ Rename Dynasty</button>
-                        <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
-                        <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige
-                            Reset)</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Investment Status Display -->
-            <div class="monarch-section">
-                <h3>📈 Active Investments</h3>
-                <div id="investment-status" class="investment-status">
-                    <!-- Will be populated by monarch.js -->
                 </div>
             </div>
         </div>

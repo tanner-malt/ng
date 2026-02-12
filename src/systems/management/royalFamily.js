@@ -218,14 +218,6 @@ class RoyalFamilyManager {
         if (!royal) return false;
         if (royal.age < 16) return false; // too young
 
-        // Check slot limit from Hire General investment
-        const maxSlots = this.gameState?.investments?.hireGeneral || 0;
-        const currentGenerals = this.royalFamily.filter(r => r.role === 'general').length;
-        if (currentGenerals >= maxSlots && royal.role !== 'general') {
-            console.warn(`[RoyalFamily] No general slots available (${currentGenerals}/${maxSlots})`);
-            return false;
-        }
-
         if (royal.role === 'governor') this.unassignRole(royalId); // remove previous role
 
         // Unassign previous general of this army (if any)
@@ -249,14 +241,6 @@ class RoyalFamilyManager {
         const royal = this.findRoyalById(royalId);
         if (!royal) return false;
         if (royal.age < 16) return false;
-
-        // Check slot limit from Hire Governor investment
-        const maxSlots = this.gameState?.investments?.hireGovernor || 0;
-        const currentGovernors = this.royalFamily.filter(r => r.role === 'governor').length;
-        if (currentGovernors >= maxSlots && royal.role !== 'governor') {
-            console.warn(`[RoyalFamily] No governor slots available (${currentGovernors}/${maxSlots})`);
-            return false;
-        }
 
         if (royal.role === 'general') this.unassignRole(royalId);
 
@@ -293,9 +277,14 @@ class RoyalFamilyManager {
     /**
      * Calculate the attack multiplier a General provides to their army.
      * +10% per military skill point, capped at +100% (2.0x).
+     * Checks both royal family members and hired staff.
      */
     getGeneralAttackMultiplier(armyId) {
-        const general = this.getGeneralForArmy(armyId);
+        let general = this.getGeneralForArmy(armyId);
+        // Also check hired staff
+        if (!general && this.gameState.hiredStaff) {
+            general = this.gameState.hiredStaff.find(s => s.role === 'general' && s.assignedTo === armyId) || null;
+        }
         if (!general) return 1.0;
         const mil = general.skills?.military || 0;
         return 1.0 + Math.min(mil * 0.10, 1.0);
@@ -304,9 +293,14 @@ class RoyalFamilyManager {
     /**
      * Calculate the production multiplier a Governor provides.
      * +5% per economics skill point, capped at +100% (2.0x).
+     * Checks both royal family members and hired staff.
      */
     getGovernorProductionMultiplier(locationKey = 'capital') {
-        const governor = this.getGovernor(locationKey);
+        let governor = this.getGovernor(locationKey);
+        // Also check hired staff
+        if (!governor && this.gameState.hiredStaff) {
+            governor = this.gameState.hiredStaff.find(s => s.role === 'governor' && s.assignedTo === locationKey) || null;
+        }
         if (!governor) return 1.0;
         const econ = governor.skills?.economics || 0;
         return 1.0 + Math.min(econ * 0.05, 1.0);
