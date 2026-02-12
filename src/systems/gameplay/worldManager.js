@@ -33,6 +33,9 @@ class WorldManager {
         // Enemy groups advancing toward the village
         this.enemies = [];
 
+        // Active multi-day battles (resolved partially each day)
+        this.activeBattles = [];
+
         // UI state
         this.selectedHex = null;
         this.pendingPath = null;
@@ -82,7 +85,10 @@ class WorldManager {
     // ===================================================================
 
     generateMap() {
-        const terrainPool = this.buildTerrainPool();
+        // Use simplex noise for natural terrain distribution
+        const seed = Date.now() % 100000;
+        const noise = window.SimplexNoise ? new window.SimplexNoise(seed) : null;
+        const moistureNoise = window.SimplexNoise ? new window.SimplexNoise(seed + 1000) : null;
 
         this.hexMap = [];
         for (let r = 0; r < this.mapHeight; r++) {
@@ -92,7 +98,7 @@ class WorldManager {
                 const isCapital = (r === this.capitalRow && c === this.capitalCol);
 
                 this.hexMap[r][c] = {
-                    terrain: isCapital ? 'village' : this.pickTerrain(dist, terrainPool),
+                    terrain: isCapital ? 'village' : this.pickTerrain(r, c, dist, noise, moistureNoise),
                     visibility: isCapital ? 'explored' : 'hidden',
                     isPlayerVillage: isCapital
                 };
@@ -105,20 +111,58 @@ class WorldManager {
         const legacyScoutBonus = window.legacySystem?.legacy?.bonuses?.startingScout || 0;
         this.revealAround(this.capitalRow, this.capitalCol, baseRadius + scoutBonus + legacyScoutBonus);
 
-        console.log('[WorldManager] Map generated');
+        console.log('[WorldManager] Map generated with', noise ? 'simplex noise' : 'fallback random');
     }
 
-    buildTerrainPool() {
-        // Zone-weighted pools based on distance from capital (9×9 map)
-        return {
+    /**
+     * Pick terrain using simplex noise for elevation + moisture.
+     * Falls back to zone-weighted random if SimplexNoise is unavailable.
+     */
+    pickTerrain(row, col, dist, noise, moistureNoise) {
+        if (!noise) {
+            // Fallback: original zone-weighted random
+            return this._pickTerrainFallback(dist);
+        }
+
+        // Sample noise at map scale (0.4 gives good feature size for 9×9)
+        const scale = 0.4;
+        const elevation = noise.fbm(col * scale, row * scale, 3);         // -1 to 1
+        const moisture = moistureNoise.fbm(col * scale, row * scale, 3);  // -1 to 1
+
+        // Normalize to 0–1
+        const e = (elevation + 1) / 2; // 0 = low, 1 = high
+        const m = (moisture + 1) / 2;  // 0 = dry, 1 = wet
+
+        // Distance influence: farther tiles skew toward extreme terrain
+        const distFactor = Math.min(dist / 4, 1); // 0 at capital, 1 at edges
+
+        // Terrain selection based on elevation + moisture biome chart
+        if (e > 0.7 + distFactor * 0.1) {
+            return 'mountain';
+        } else if (e > 0.55) {
+            return 'hill';
+        } else if (e < 0.2 && m > 0.6) {
+            return 'swamp';
+        } else if (e < 0.3 && m < 0.3) {
+            return 'desert';
+        } else if (m > 0.55) {
+            return 'forest';
+        } else if (m > 0.35 || dist <= 1) {
+            return 'grass';
+        } else {
+            // Higher chance of ruins at extreme distance
+            if (distFactor > 0.7 && Math.random() < 0.15) return 'ruins';
+            return 'plains';
+        }
+    }
+
+    /** Fallback terrain picker when SimplexNoise isn't loaded */
+    _pickTerrainFallback(dist) {
+        const pool = {
             inner: ['grass', 'plains', 'grass', 'plains', 'forest', 'hill'],
             mid:   ['grass', 'plains', 'forest', 'forest', 'hill', 'hill', 'desert', 'swamp'],
             outer: ['forest', 'hill', 'mountain', 'swamp', 'desert', 'ruins', 'forest', 'hill', 'mountain']
         };
-    }
-
-    pickTerrain(dist, pool) {
-        // dist 1 = inner, 2 = mix inner+mid, 3 = mid, 4+ = outer
         let choices;
         if (dist <= 1) {
             choices = pool.inner;
@@ -346,11 +390,14 @@ class WorldManager {
             const avgHealth = (selectedArmy.units || []).length > 0 ? Math.round((selectedArmy.units || []).reduce((s, u) => s + (u.health || 100), 0) / selectedArmy.units.length) : 0;
             const armyMorale = selectedArmy.morale ?? 100;
             const moraleColor = armyMorale > 70 ? '#27ae60' : armyMorale > 40 ? '#f39c12' : '#c0392b';
+            const armyCohesion = selectedArmy.cohesion ?? 50;
+            const cohesionColor = armyCohesion > 70 ? '#3498db' : armyCohesion > 40 ? '#9b59b6' : '#7f8c8d';
             html += `<div style="display:flex;gap:8px;margin:6px 0;font-size:0.8em;opacity:0.85;">`;
             html += `<span>⚔️ ${totalAttack}</span>`;
             html += `<span>🛡️ ${totalDefense}</span>`;
             html += `<span>❤️ ${avgHealth}%</span>`;
             html += `<span style="color:${moraleColor};">🔥 ${armyMorale}%</span>`;
+            html += `<span style="color:${cohesionColor};" title="Cohesion — improves while resting, affects combat">🤝 ${armyCohesion}%</span>`;
             html += `</div>`;
 
             // Supply bar with visual indicator
@@ -534,14 +581,21 @@ class WorldManager {
             return;
         }
 
+        // Army size cap: 5 base, 10 with a free general
+        const hasGeneralAvailable = this._hasFreeGeneral();
+        const maxArmySize = hasGeneralAvailable ? 10 : 5;
+
         let html = `<h2>⚔️ Draft Army</h2>`;
-        html += `<p>Select villagers to draft (${available.length} available):</p>`;
+        html += `<p>Select villagers to draft (${available.length} available, max ${maxArmySize}):</p>`;
+        if (!hasGeneralAvailable) {
+            html += `<p style="font-size:0.8em;color:#f39c12;">💡 Assign a royal as General to raise the cap to 10</p>`;
+        }
         html += `<div class="draft-list" style="max-height:300px;overflow-y:auto;">`;
 
         available.slice(0, 12).forEach((v, i) => {
-            const checked = i < 3 ? 'checked' : '';
+            const checked = i < Math.min(3, maxArmySize) ? 'checked' : '';
             html += `<label class="draft-option">
-                <input type="checkbox" value="${v.id}" ${checked}>
+                <input type="checkbox" value="${v.id}" ${checked} data-max="${maxArmySize}">
                 ${v.name || 'Villager'} (age ${v.age}, ${v.role || 'idle'})
             </label><br>`;
         });
@@ -564,6 +618,14 @@ class WorldManager {
 
         if (ids.length < 1) {
             window.showToast?.('Select at least 1 villager.', { type: 'warning' });
+            return;
+        }
+
+        // Enforce army size cap
+        const hasGeneralAvailable = this._hasFreeGeneral();
+        const maxArmySize = hasGeneralAvailable ? 10 : 5;
+        if (ids.length > maxArmySize) {
+            window.showToast?.(`Army size limited to ${maxArmySize} soldiers.` + (!hasGeneralAvailable ? ' Assign a General to raise the cap.' : ''), { type: 'warning' });
             return;
         }
 
@@ -607,6 +669,7 @@ class WorldManager {
             originalStatus: u.originalStatus
         }));
         army.supplies = { food: Math.min(units.length * 5, this.gameState.resources?.food || 0) };
+        army.cohesion = 50; // New armies start at 50% cohesion — improves while idle
 
         // Deduct food for supplies
         if (this.gameState.resources) {
@@ -1122,7 +1185,49 @@ class WorldManager {
             );
 
             if (armyOnTile) {
+                // Reinforcements: merge in adjacent friendly armies
+                this._pullReinforcements(armyOnTile);
                 this.resolveCombat(armyOnTile, enemy);
+            }
+        });
+    }
+
+    /**
+     * Pull reinforcements from adjacent tiles into the primary army before combat.
+     * Nearby idle armies within 1 hex are merged automatically.
+     */
+    _pullReinforcements(primaryArmy) {
+        const armies = this.gameState.getAllArmies?.() || [];
+        const px = primaryArmy.position.x;
+        const py = primaryArmy.position.y;
+
+        armies.forEach(ally => {
+            if (ally.id === primaryArmy.id) return;
+            if (ally.status !== 'idle') return;
+            const dx = Math.abs(ally.position.x - px);
+            const dy = Math.abs(ally.position.y - py);
+            if (dx <= 1 && dy <= 1 && (dx + dy) > 0) {
+                // Merge ally units into primary army
+                const reinforceCount = (ally.units || []).length;
+                if (reinforceCount === 0) return;
+
+                (ally.units || []).forEach(u => primaryArmy.units.push(u));
+                if (ally.draftedVillagers) {
+                    if (!primaryArmy.draftedVillagers) primaryArmy.draftedVillagers = [];
+                    ally.draftedVillagers.forEach(dv => primaryArmy.draftedVillagers.push(dv));
+                }
+                // Average cohesion
+                const c1 = primaryArmy.cohesion ?? 50;
+                const c2 = ally.cohesion ?? 50;
+                const n1 = primaryArmy.units.length - reinforceCount;
+                primaryArmy.cohesion = Math.round((c1 * n1 + c2 * reinforceCount) / primaryArmy.units.length);
+
+                // Disband the ally army (units now in primary)
+                ally.units = [];
+                ally.draftedVillagers = [];
+                this.performDisband(ally.id);
+
+                window.showToast?.(`🤝 ${reinforceCount} reinforcements from ${ally.name} joined ${primaryArmy.name}!`, { type: 'success' });
             }
         });
     }
@@ -1136,6 +1241,19 @@ class WorldManager {
         // Apply General bonus (+10% per military skill, cap +100%)
         const generalMult = this.gameState.royalFamily?.getGeneralAttackMultiplier?.(army.id) || 1.0;
         armyStrength *= generalMult;
+
+        // Apply Combat Training investment bonus
+        const combatTrainingMult = window.monarchManager?.getCombatTrainingMultiplier?.() || 1.0;
+        armyStrength *= combatTrainingMult;
+
+        // Apply legacy combat bonus
+        const legacyCombatMult = this.gameState.legacyCombatMultiplier || 1.0;
+        armyStrength *= legacyCombatMult;
+
+        // Apply cohesion multiplier (0.5 at 0% cohesion, 1.0 at 100%)
+        const cohesion = army.cohesion ?? 50;
+        const cohesionMult = 0.5 + (cohesion / 200); // ranges 0.5 to 1.0
+        armyStrength *= cohesionMult;
 
         // General gains military experience from combat
         if (generalMult > 1.0) {
@@ -1168,17 +1286,49 @@ class WorldManager {
             };
             window.battleViewer.showBattle(playerArmy, enemyArmy, battleTerrain, (result) => {
                 // After animation completes, apply the actual combat result
-                this._applyCombatResult(army, enemy, armyStrength, enemyStrength);
+                this._applyCombatResult(army, enemy, armyStrength, enemyStrength, result);
             });
             return; // Combat result applied in callback
         }
 
         // Fallback: instant resolve without viewer
-        this._applyCombatResult(army, enemy, armyStrength, enemyStrength);
+        this._applyCombatResult(army, enemy, armyStrength, enemyStrength, null);
     }
 
     /** Internal: apply combat outcome after viewer animation or instant */
-    _applyCombatResult(army, enemy, armyStrength, enemyStrength) {
+    _applyCombatResult(army, enemy, armyStrength, enemyStrength, viewerResult) {
+        // Handle retreat — the battle viewer already killed rearguard units
+        if (viewerResult && viewerResult.retreat) {
+            // Sync unit alive state from viewer back to army
+            this._syncBattleCasualties(army, viewerResult);
+            // Move army back toward capital (1 tile)
+            this._retreatArmy(army);
+            // Enemy stays alive but loses no additional units
+            window.showToast?.(`🏳️ ${army.name} retreated! ${viewerResult.playerLosses} soldiers lost covering retreat.`, { type: 'warning' });
+
+            window.eventBus?.emit('combat_resolved', { army: army.id, enemy: enemy.id, retreat: true });
+            if (army.cohesion !== undefined) army.cohesion = Math.max(0, army.cohesion - 20);
+            this.refreshUI();
+            return;
+        }
+
+        // Multi-day battle: if combined unit count > 10 and no viewer result,
+        // defer to daily processing instead of instant resolution
+        const totalUnits = (army.units?.length || 0) + (enemy.units?.length || 0);
+        if (totalUnits > 10 && !viewerResult) {
+            army.status = 'fighting';
+            this.activeBattles.push({
+                armyId: army.id,
+                enemyId: enemy.id,
+                day: 0,
+                originalEnemyCount: enemy.units.length
+            });
+            window.showToast?.(`⚔️ ${army.name} engaged ${enemy.name} in a prolonged battle!`, { type: 'warning' });
+            if (army.cohesion !== undefined) army.cohesion = Math.max(0, army.cohesion - 10);
+            this.refreshUI();
+            return;
+        }
+
         // Simple auto-resolve: compare total strength with some randomness
         const armyRoll = armyStrength * (0.8 + Math.random() * 0.4);
         const enemyRoll = enemyStrength * (0.8 + Math.random() * 0.4);
@@ -1239,7 +1389,55 @@ class WorldManager {
         }
 
         window.eventBus?.emit('combat_resolved', { army: army.id, enemy: enemy.id });
+
+        // Combat reduces cohesion
+        if (army.cohesion !== undefined) {
+            army.cohesion = Math.max(0, army.cohesion - 20);
+        }
+
         this.refreshUI();
+    }
+
+    /**
+     * Sync battle viewer casualties back to the actual army.
+     * Removes dead units from army.units and army.draftedVillagers,
+     * and kills them in population.
+     */
+    _syncBattleCasualties(army, viewerResult) {
+        // viewerResult.playerLosses tells us how many died, but we need exact IDs.
+        // The battle viewer marks units alive=false. Since we mapped units 1:1,
+        // we count from the end to remove the right number of casualties.
+        const casualties = viewerResult.playerLosses || 0;
+        for (let i = 0; i < casualties && army.units.length > 0; i++) {
+            const deadIdx = Math.floor(Math.random() * army.units.length);
+            const dead = army.units.splice(deadIdx, 1)[0];
+            if (army.draftedVillagers) {
+                const dvIdx = army.draftedVillagers.findIndex(dv => dv.id === dead.villagerId);
+                if (dvIdx !== -1) army.draftedVillagers.splice(dvIdx, 1);
+            }
+            if (dead.villagerId && this.gameState.populationManager) {
+                this.gameState.populationManager.removeInhabitant?.(dead.villagerId);
+            }
+        }
+        if (army.units.length === 0) {
+            this.performDisband(army.id);
+        }
+    }
+
+    /**
+     * Move army one tile toward capital after retreat.
+     */
+    _retreatArmy(army) {
+        if (!army || army.units.length === 0) return;
+        const dx = this.capitalCol - army.position.x;
+        const dy = this.capitalRow - army.position.y;
+        // Move one step toward capital
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            army.position.x += Math.sign(dx);
+        } else {
+            army.position.y += Math.sign(dy);
+        }
+        army.status = 'idle';
     }
 
     // ===================================================================
@@ -1287,6 +1485,8 @@ class WorldManager {
 
         this.processArmyMovement();
         this.resupplyGarrisonedArmies();
+        this.updateArmyCohesion();
+        this.processActiveBattles();
         this.processEnemies();
         this.processCityIncome();
         this.refreshUI();
@@ -1357,6 +1557,118 @@ class WorldManager {
             }
         }
         return false;
+    }
+
+    // ===================================================================
+    // ARMY COHESION — daily tick
+    // ===================================================================
+
+    /**
+     * Update cohesion for all armies each day.
+     * Garrisoned/idle: +5/day. Traveling: -2/day.
+     * Cohesion affects combat effectiveness (multiplier 0.5–1.0).
+     */
+    updateArmyCohesion() {
+        const armies = this.gameState.getAllArmies?.() || [];
+        armies.forEach(army => {
+            if (army.cohesion === undefined) army.cohesion = 50;
+            if (army.status === 'garrisoned' || army.status === 'idle') {
+                army.cohesion = Math.min(100, army.cohesion + 5);
+            } else if (army.status === 'traveling') {
+                army.cohesion = Math.max(0, army.cohesion - 2);
+            }
+            // Fighting armies lose cohesion more slowly (handled in combat)
+        });
+    }
+
+    /**
+     * Process multi-day battles. Large engagements (>10 combined units)
+     * resolve partially each day instead of instantly.
+     */
+    processActiveBattles() {
+        if (!this.activeBattles || this.activeBattles.length === 0) return;
+
+        const resolved = [];
+        this.activeBattles.forEach((battle, idx) => {
+            const army = this.gameState.getArmy?.(battle.armyId);
+            const enemy = this.enemies.find(e => e.id === battle.enemyId);
+
+            if (!army || !enemy || army.units.length === 0) {
+                resolved.push(idx);
+                return;
+            }
+            if (enemy.status === 'defeated') {
+                resolved.push(idx);
+                if (army.status === 'fighting') army.status = 'idle';
+                return;
+            }
+
+            // Each day of battle: both sides lose ~15% of their units
+            const armyLosses = Math.max(1, Math.ceil(army.units.length * 0.15));
+            const enemyLosses = Math.max(1, Math.ceil(enemy.units.length * 0.15));
+
+            // Apply army casualties
+            for (let i = 0; i < armyLosses && army.units.length > 0; i++) {
+                const deadIdx = Math.floor(Math.random() * army.units.length);
+                const dead = army.units.splice(deadIdx, 1)[0];
+                if (army.draftedVillagers) {
+                    const dvIdx = army.draftedVillagers.findIndex(dv => dv.id === dead.villagerId);
+                    if (dvIdx !== -1) army.draftedVillagers.splice(dvIdx, 1);
+                }
+                if (dead.villagerId && this.gameState.populationManager) {
+                    this.gameState.populationManager.removeInhabitant?.(dead.villagerId);
+                }
+            }
+
+            // Apply enemy casualties
+            for (let i = 0; i < enemyLosses && enemy.units.length > 0; i++) {
+                enemy.units.splice(Math.floor(Math.random() * enemy.units.length), 1);
+            }
+
+            battle.day++;
+
+            // Check if battle is over
+            if (enemy.units.length === 0) {
+                enemy.status = 'defeated';
+                const goldReward = 5 + Math.floor(Math.random() * 10) * battle.originalEnemyCount;
+                if (this.gameState.resources) {
+                    this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
+                }
+                army.status = 'idle';
+                window.showToast?.(`⚔️ ${army.name} won a ${battle.day}-day battle vs ${enemy.name}! +${goldReward} gold.`, { type: 'success' });
+                resolved.push(idx);
+            } else if (army.units.length === 0) {
+                army.status = 'idle';
+                window.showToast?.(`💀 ${army.name} was destroyed after ${battle.day} days of battle vs ${enemy.name}!`, { type: 'error' });
+                this.performDisband(army.id);
+                resolved.push(idx);
+            } else {
+                // Battle continues — show daily status
+                window.showToast?.(`⚔️ Day ${battle.day} of battle: ${army.name} (${army.units.length}) vs ${enemy.name} (${enemy.units.length})`, { type: 'info' });
+            }
+        });
+
+        // Remove resolved battles (reverse order to preserve indices)
+        resolved.sort((a, b) => b - a).forEach(idx => this.activeBattles.splice(idx, 1));
+    }
+
+    /**
+     * Check if there is a royal family member assigned as general
+     * who is not yet assigned to an existing army.
+     */
+    _hasFreeGeneral() {
+        const rf = this.gameState.royalFamily;
+        if (!rf) return false;
+        const generals = (rf.royalFamily || []).filter(m => m.role === 'general');
+        if (generals.length === 0) return false;
+        // Check if any general is not yet assigned to an army
+        const armies = this.gameState.getAllArmies?.() || [];
+        const assignedGeneralIds = new Set();
+        armies.forEach(a => {
+            const gen = rf.getGeneralForArmy?.(a.id);
+            if (gen) assignedGeneralIds.add(gen.id);
+        });
+        return generals.some(g => !assignedGeneralIds.has(g.id));
     }
 
     // ===================================================================

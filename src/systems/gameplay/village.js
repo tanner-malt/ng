@@ -365,7 +365,7 @@ class VillageManager {
         console.log('[Village] Generating organized building buttons');
 
         // Clear all category containers and track which have buildings
-        const categories = ['essential', 'production', 'craft', 'military', 'royal', 'knowledge', 'advanced'];
+        const categories = ['essential', 'production', 'intermediate', 'craft', 'military', 'royal', 'knowledge', 'advanced'];
         categories.forEach(category => {
             const container = document.getElementById(`${category}-buildings`);
             if (container) {

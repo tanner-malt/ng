@@ -242,6 +242,7 @@ class BattleViewer {
                         <button id="battle-speed-1x" class="speed-btn active">1x</button>
                         <button id="battle-speed-2x" class="speed-btn">2x</button>
                         <button id="battle-speed-4x" class="speed-btn">4x</button>
+                        <button id="battle-retreat" class="skip-btn" style="background:#7f8c8d;">🏳️ Retreat</button>
                         <button id="battle-skip" class="skip-btn">Skip to End</button>
                     </div>
                     <div id="battle-result" class="battle-result" style="display:none;">
@@ -287,6 +288,7 @@ class BattleViewer {
         document.getElementById('battle-speed-2x')?.addEventListener('click', () => this.setSpeed(2));
         document.getElementById('battle-speed-4x')?.addEventListener('click', () => this.setSpeed(4));
         document.getElementById('battle-skip')?.addEventListener('click', () => this.skipToEnd());
+        document.getElementById('battle-retreat')?.addEventListener('click', () => this.retreat());
         document.getElementById('close-battle')?.addEventListener('click', () => this.closeBattle());
 
         // Click outside the battle container to close (only after battle finishes)
@@ -310,6 +312,51 @@ class BattleViewer {
         this.isAnimating = false;
         if (this.animationId) cancelAnimationFrame(this.animationId);
         this.resolveBattleInstant();
+    }
+
+    /**
+     * Retreat: surviving player units flee, but 20% die covering the retreat.
+     * The battle ends immediately as a retreat (not victory/defeat).
+     */
+    retreat() {
+        if (this.battlePhase === 'finished') return;
+        this.isAnimating = false;
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+
+        const alive = this.playerUnits.filter(u => u.alive);
+        // 20% of surviving units die covering the retreat
+        const rearguardCount = Math.max(1, Math.ceil(alive.length * 0.2));
+        let killed = 0;
+        for (let i = 0; i < rearguardCount && alive.length > killed; i++) {
+            const idx = Math.floor(Math.random() * alive.length);
+            if (alive[idx].alive) {
+                alive[idx].alive = false;
+                killed++;
+            }
+        }
+
+        this.battlePhase = 'finished';
+        const playerAlive = this.playerUnits.filter(u => u.alive).length;
+        this.result = {
+            victory: false,
+            retreat: true,
+            playerSurvivors: playerAlive,
+            playerLosses: this.playerUnits.length - playerAlive,
+            enemySurvivors: this.enemyUnits.filter(u => u.alive).length,
+            enemyLosses: this.enemyUnits.length - this.enemyUnits.filter(u => u.alive).length
+        };
+
+        document.getElementById('battle-phase').textContent = '🏳️ RETREAT';
+        document.getElementById('result-title').textContent = '🏳️ Retreat';
+        document.getElementById('result-details').innerHTML = `
+            <strong>Your Army:</strong> ${playerAlive} retreated, ${this.result.playerLosses} lost covering retreat<br>
+            <strong>Enemy:</strong> ${this.result.enemySurvivors} remaining
+        `;
+        document.getElementById('battle-result').style.display = 'block';
+        // Disable retreat button
+        const retreatBtn = document.getElementById('battle-retreat');
+        if (retreatBtn) retreatBtn.disabled = true;
+        this.render();
     }
     
     resolveBattleInstant() {

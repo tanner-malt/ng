@@ -304,10 +304,15 @@ class JobRegistry {
         });
     }
 
-    /** Linear slot scaling by building level + productionSize investment */
+    /** Linear slot scaling by building level + productionSize investment (primary production only) */
     _computeJobSlots(baseSlots, building) {
         const level = Math.max(1, building?.level || 1);
-        const prodSizeBonus = window.gameState?.investments?.productionSize || 0;
+        const btype = building?.type || building?.get?.('type');
+        // productionSize only applies to primary production buildings, not intermediates
+        const PRIMARY_PRODUCTION = ['farm', 'woodcutterLodge', 'huntersLodge', 'quarry', 'mine', 'pasture'];
+        const prodSizeBonus = PRIMARY_PRODUCTION.includes(btype)
+            ? (window.gameState?.investments?.productionSize || 0)
+            : 0;
         return Math.max(0, Math.floor((baseSlots + prodSizeBonus) * level));
     }
 

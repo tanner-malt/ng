@@ -25,6 +25,7 @@
     <script src="../src/systems/core/modelBridge.js"></script>
     <!-- World Map Data -->
     <script src="../src/config/worldData.js"></script>
+    <script src="../src/utils/simplexNoise.js"></script>
     <script src="../src/systems/core/skillSystem.js"></script>
     <script src="../src/systems/management/populationManager.js"></script>
     <script src="../src/systems/core/gameState.js"></script>
@@ -314,6 +315,18 @@
                                     </div>
                                     <div class="building-container" id="production-buildings">
                                         <!-- Resource gathering and processing -->
+                                    </div>
+                                </div>
+                                <div class="building-category">
+                                    <h4>Intermediate Buildings</h4>
+                                    <div class="building-row-header">
+                                        <div>Building</div>
+                                        <div>Description</div>
+                                        <div>Resources</div>
+                                        <div>Work Pts</div>
+                                    </div>
+                                    <div class="building-container" id="intermediate-buildings">
+                                        <!-- Processing and refining -->
                                     </div>
                                 </div>
                                 <div class="building-category">
@@ -828,6 +841,7 @@
                                 const containers = {
                                     essential: document.getElementById('essential-buildings'),
                                     production: document.getElementById('production-buildings'),
+                                    intermediate: document.getElementById('intermediate-buildings'),
                                     craft: document.getElementById('craft-buildings'),
                                     military: document.getElementById('military-buildings'),
                                     royal: document.getElementById('royal-buildings'),
@@ -1032,6 +1046,7 @@
 
                     <div class="prestige-actions">
                         <h4>🔄 Dynasty Actions</h4>
+                        <button id="rename-dynasty-btn" class="dynasty-btn">✏️ Rename Dynasty</button>
                         <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
                         <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige
                             Reset)</button>

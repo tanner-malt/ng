@@ -210,14 +210,10 @@ class LegacySystem {
 
     /**
      * Spend legacy points on permanent bonuses.
+     * Cost scales exponentially: baseCost * 1.5^purchaseCount
      */
-    purchaseBonus(bonusType, cost) {
-        if (this.legacy.totalPoints < cost) {
-            return { success: false, message: 'Not enough legacy points' };
-        }
-        
+    purchaseBonus(bonusType, baseCost) {
         const bonusAmounts = {
-            startingGold: 50,        // +50 gold per purchase
             startingFood: 25,        // +25 food per purchase
             startingPopulation: 1,   // +1 villager per purchase
             productionBonus: 5,      // +5% per purchase
@@ -230,9 +226,20 @@ class LegacySystem {
         if (!bonusAmounts[bonusType]) {
             return { success: false, message: 'Invalid bonus type' };
         }
+
+        // Calculate exponential cost based on purchase count
+        const purchaseCount = this.getBonusPurchaseCount(bonusType);
+        const actualCost = Math.floor(baseCost * Math.pow(1.5, purchaseCount));
         
-        this.legacy.totalPoints -= cost;
+        if (this.legacy.totalPoints < actualCost) {
+            return { success: false, message: 'Not enough legacy points' };
+        }
+        
+        this.legacy.totalPoints -= actualCost;
         this.legacy.bonuses[bonusType] += bonusAmounts[bonusType];
+        // Track purchase count for cost scaling
+        if (!this.legacy.bonusPurchases) this.legacy.bonusPurchases = {};
+        this.legacy.bonusPurchases[bonusType] = (this.legacy.bonusPurchases[bonusType] || 0) + 1;
         this.saveLegacy();
         
         return { 
@@ -243,11 +250,26 @@ class LegacySystem {
     }
 
     /**
+     * Get the number of times a bonus has been purchased (for cost scaling).
+     */
+    getBonusPurchaseCount(bonusType) {
+        return this.legacy.bonusPurchases?.[bonusType] || 0;
+    }
+
+    /**
+     * Calculate the current cost for a legacy bonus purchase.
+     */
+    getLegacyBonusCost(baseCost, bonusType) {
+        const purchaseCount = this.getBonusPurchaseCount(bonusType);
+        return Math.floor(baseCost * Math.pow(1.5, purchaseCount));
+    }
+
+    /**
      * Get starting bonuses for a new dynasty.
      */
     getStartingBonuses() {
         return {
-            gold: this.legacy.bonuses.startingGold,
+            gold: 0,  // No starting gold from legacy — gold carries over via preserved gold instead
             food: this.legacy.bonuses.startingFood,
             population: this.legacy.bonuses.startingPopulation,
             productionMultiplier: 1 + (this.legacy.bonuses.productionBonus / 100),
@@ -321,10 +343,10 @@ class LegacySystem {
                 <div style="background:#1a3a2f;border-radius:8px;padding:16px;margin-bottom:20px;">
                     <h4 style="color:#2ecc71;margin:0 0 10px;">✨ What Persists:</h4>
                     <ul style="color:#bdc3c7;margin:0;padding-left:20px;">
+                        <li>Your gold carries over to the next dynasty</li>
                         <li>Legacy points (spend on bonuses)</li>
                         <li>Purchased permanent upgrades</li>
                         <li>Titles and dynasty history</li>
-                        <li>Unlocked knowledge (future feature)</li>
                     </ul>
                 </div>
                 
@@ -396,6 +418,15 @@ class LegacySystem {
         const lastEntry = this.legacy.dynastyHistory[this.legacy.dynastyHistory.length - 1];
         if (lastEntry) lastEntry.endReason = reason;
         this.saveLegacy();
+
+        // Preserve ending gold for carry-over to next dynasty
+        try {
+            const endingGold = Math.floor(gameState.gold || 0);
+            if (endingGold > 0) {
+                localStorage.setItem('dynastyBuilder_preservedGold', JSON.stringify(endingGold));
+                console.log(`[Legacy] Preserved ${endingGold} gold for next dynasty`);
+            }
+        } catch (_) { /* noop */ }
 
         console.log(`[Legacy] Dynasty ended (${reason}). +${result.legacyPoints} pts, total ${result.totalLegacy}`);
 

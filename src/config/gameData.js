@@ -431,7 +431,8 @@ const GameData = {
     // Building categories for organized UI display
     buildingCategories: {
         essential: ['townCenter', 'house', 'farm', 'buildersHut', 'storehouse', 'silo'],
-        production: ['huntersLodge', 'woodcutterLodge', 'quarry', 'lumberMill', 'mine', 'pasture'],
+        production: ['huntersLodge', 'woodcutterLodge', 'quarry', 'pasture'],
+        intermediate: ['lumberMill', 'mine', 'workshop', 'blacksmith'],
         craft: ['workshop', 'blacksmith', 'market'],
         military: ['barracks', 'fortifications', 'militaryAcademy', 'castle'],
         royal: ['keep', 'monument'],
@@ -443,6 +444,7 @@ const GameData = {
     categoryDescriptions: {
         essential: 'Basic buildings needed to start and grow your settlement',
         production: 'Buildings that gather and process raw materials',
+        intermediate: 'Processing buildings that refine raw materials into advanced goods',
         craft: 'Buildings for crafting, trading, and equipment production',
         military: 'Buildings for defense, training, and military operations',
         royal: 'Buildings related to dynasty management and prestige',
