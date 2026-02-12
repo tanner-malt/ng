@@ -1312,6 +1312,35 @@ class WorldManager {
             return;
         }
 
+        // Viewer-resolved victory or defeat — use the viewer's actual casualties
+        if (viewerResult && !viewerResult.retreat) {
+            this._syncBattleCasualties(army, viewerResult);
+
+            if (viewerResult.victory) {
+                // Player wins via viewer
+                enemy.status = 'defeated';
+                const goldReward = 5 + Math.floor(Math.random() * 15) * (enemy.units?.length || 1);
+                if (this.gameState.resources) {
+                    this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
+                }
+                window.showToast?.(`⚔️ ${army.name} defeated ${enemy.name}! +${goldReward} gold. Lost ${viewerResult.playerLosses || 0} soldiers.`, { type: 'success' });
+            } else {
+                // Player loses via viewer
+                const enemyCasualties = Math.floor((enemy.units?.length || 0) * 0.2);
+                if (enemy.units) enemy.units.splice(0, enemyCasualties);
+                window.showToast?.(`💀 ${army.name} was defeated by ${enemy.name}! Lost ${viewerResult.playerLosses || 0} soldiers.`, { type: 'error' });
+            }
+
+            if (army.units.length === 0) {
+                this.performDisband(army.id);
+            }
+
+            window.eventBus?.emit('combat_resolved', { army: army.id, enemy: enemy.id, victory: viewerResult.victory });
+            if (army.cohesion !== undefined) army.cohesion = Math.max(0, army.cohesion - 20);
+            this.refreshUI();
+            return;
+        }
+
         // Multi-day battle: if combined unit count > 10 and no viewer result,
         // defer to daily processing instead of instant resolution
         const totalUnits = (army.units?.length || 0) + (enemy.units?.length || 0);

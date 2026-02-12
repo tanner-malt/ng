@@ -89,12 +89,12 @@ class AchievementSystem {
             reward: { gold: 250 }
         });
 
-        this.defineAchievement('tutorial_complete', {
-            title: 'Royal Education Complete',
-            description: 'Completed the tutorial and unlocked Battle Mode',
-            icon: '🎓',
+        this.defineAchievement('village_governor', {
+            title: 'Village Governor',
+            description: 'Built a barracks and established military authority',
+            icon: '🏛️',
             type: 'tutorial',
-            reward: { gold: 500, influence: 25, prestige: 50 }
+            reward: { gold: 100 }
         });
 
         // Building achievements
@@ -476,7 +476,7 @@ class AchievementSystem {
 
     // Trigger achievement for tutorial completion
     triggerTutorialComplete() {
-        this.unlock('tutorial_complete');
+        this.unlock('village_governor');
     }
 
     // Trigger achievement for exploring a tile
@@ -841,56 +841,41 @@ class AchievementSystem {
     }
 
     showAchievementModal(achievement) {
-        const content = `
-            <div class="achievement-toast-content">
-                <div class="achievement-icon">${achievement.icon}</div>
-                <div class="achievement-text">
-                    <h3>Achievement Unlocked!</h3>
-                    <div class="achievement-title">${achievement.title}</div>
-                    <p class="achievement-description">${achievement.description}</p>
-                    <div class="achievement-rewards">
-                        <strong>Rewards:</strong> ${this.formatRewards(achievement.reward)}
-                    </div>
-                </div>
-                <button class="achievement-ok-btn" onclick="window.modalSystem?.closeTopModal() || (document.querySelector('.modal-overlay') && (document.querySelector('.modal-overlay').style.display = 'none'))">
-                    OK
-                </button>
+        // Render in dedicated overlay — completely independent of modal system
+        let overlay = document.getElementById('achievement-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'achievement-overlay';
+            document.body.appendChild(overlay);
+        }
+
+        const card = document.createElement('div');
+        card.className = 'achievement-card';
+        card.innerHTML = `
+            <div class="achievement-card-icon">${achievement.icon}</div>
+            <div class="achievement-card-body">
+                <div class="achievement-card-header">Achievement Unlocked!</div>
+                <div class="achievement-card-title">${achievement.title}</div>
+                <div class="achievement-card-desc">${achievement.description}</div>
+                <div class="achievement-card-rewards">Rewards: ${this.formatRewards(achievement.reward)}</div>
             </div>
         `;
 
-        // Show modal with toast-like style positioned in center
-        if (window.modalSystem) {
-            window.modalSystem.showModal({
-                title: '',
-                content: content,
-                width: '400px',
-                className: 'achievement-toast-modal',
-                closable: true,
-                showCloseButton: true,
-                modalType: 'achievement-notification'
-            });
-        } else if (window.showModal) {
-            window.showModal('', content, {
-                icon: '🏆',
-                closable: true,
-                confirmText: 'OK',
-                style: {
-                    background: '#232946',
-                    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
-                    width: '320px',
-                    maxWidth: '90vw'
-                },
-                clickOutsideToClose: true
-            });
-        }
+        // Click to dismiss
+        card.addEventListener('click', () => {
+            card.classList.add('achievement-card-exit');
+            setTimeout(() => card.remove(), 400);
+        });
 
-        // Attach close button handler after modal is rendered
+        overlay.appendChild(card);
+
+        // Auto-dismiss after 6 seconds
         setTimeout(() => {
-            const btn = document.getElementById('ach-modal-close-btn');
-            if (btn) btn.onclick = () => {
-                if (window.modalSystem) window.modalSystem.closeTopModal();
-            };
-        }, 50);
+            if (card.parentNode) {
+                card.classList.add('achievement-card-exit');
+                setTimeout(() => card.remove(), 400);
+            }
+        }, 6000);
     }
 
     checkRequirements() {
@@ -1335,7 +1320,8 @@ class AchievementSystem {
 // Create global instance
 if (!window.achievementSystem) {
     window.achievementSystem = new AchievementSystem();
-    console.log('[Achievements] Achievement system ready');
+    window.achievementSystem.startPeriodicCheck();
+    console.log('[Achievements] Achievement system ready (periodic check started)');
 
     // Add debug function globally
     window.debugAchievements = () => {

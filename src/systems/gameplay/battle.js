@@ -801,10 +801,10 @@ class BattleManager {
         
         if (result.victory) {
             this.logBattleEvent('🏆 Victory! Your army has defeated the enemy.');
-            this.handleVictory();
+            this.victory();
         } else {
             this.logBattleEvent('💀 Defeat! Your army has been routed.');
-            this.handleDefeat();
+            this.defeat();
         }
         
         // Update army with survivors

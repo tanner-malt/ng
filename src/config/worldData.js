@@ -104,8 +104,8 @@ const WORLD_DATA = {
     // ENEMY TYPES (time-scaled)
     // =========================================
     enemyTypes: {
-        bandits:  { name: 'Bandits',  icon: '⚔️', color: '#e74c3c', minDay: 30,  maxDay: 999 },
-        raiders:  { name: 'Raiders',  icon: '🏴', color: '#8e44ad', minDay: 75, maxDay: 999 },
+        bandits:  { name: 'Bandits',  icon: '⚔️', color: '#e74c3c', minDay: 60,  maxDay: 999 },
+        raiders:  { name: 'Raiders',  icon: '🏴', color: '#8e44ad', minDay: 100, maxDay: 999 },
         warlords: { name: 'Warlords', icon: '👹', color: '#2c3e50', minDay: 150, maxDay: 999 }
     },
 
@@ -113,14 +113,14 @@ const WORLD_DATA = {
     // ENEMY SPAWN CONFIG
     // =========================================
     enemySpawnConfig: {
-        startDay: 30,
-        baseChance: 0.05,      // 5% on day 30
-        chancePerDay: 0.003,    // +0.3% per day after 30
+        startDay: 60,
+        baseChance: 0.05,      // 5% on day 60
+        chancePerDay: 0.003,    // +0.3% per day after 60
         groupSizeBase: 3,
         groupSizeGrowthDays: 50, // +1 unit per 50 days
-        unitBaseHealth: 30,
-        unitBaseAttack: 10,
-        scalingPerDay: 0.01     // +1% per day after 30
+        unitBaseHealth: 15,
+        unitBaseAttack: 5,
+        scalingPerDay: 0.01     // +1% per day after 60
     },
 
     // =========================================

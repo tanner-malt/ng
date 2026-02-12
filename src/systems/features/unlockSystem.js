@@ -275,6 +275,8 @@ class UnlockSystem {
 
         this.registerUnlock('silo', {
             type: 'building',
+            name: 'Silo',
+            description: 'A large food storage facility to stockpile reserves',
             conditions: [
                 { type: 'resource', resource: 'food', amount: 300 }
             ],
@@ -283,6 +285,8 @@ class UnlockSystem {
 
         this.registerUnlock('pasture', {
             type: 'building',
+            name: 'Pasture',
+            description: 'Grazing land for livestock that provides a steady food supply',
             conditions: [
                 { type: 'building_count', building: 'farm', count: 1 },
                 { type: 'resource', resource: 'food', amount: 100 }

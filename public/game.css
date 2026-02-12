@@ -10304,3 +10304,112 @@ html {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* =========================================
+   ACHIEVEMENT OVERLAY (independent of modal system)
+   ========================================= */
+#achievement-overlay {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+    max-height: 80vh;
+    overflow: visible;
+}
+
+.achievement-card {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid #f1c40f;
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 320px;
+    max-width: 400px;
+    box-shadow: 0 4px 24px rgba(241, 196, 15, 0.3), 0 0 40px rgba(241, 196, 15, 0.1);
+    cursor: pointer;
+    animation: achievement-slide-in 0.5s ease-out;
+    transition: transform 0.2s, opacity 0.3s;
+}
+
+.achievement-card:hover {
+    transform: scale(1.02);
+}
+
+.achievement-card-exit {
+    animation: achievement-slide-out 0.4s ease-in forwards;
+}
+
+.achievement-card-icon {
+    font-size: 2.2rem;
+    flex-shrink: 0;
+}
+
+.achievement-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.achievement-card-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #f1c40f;
+    margin-bottom: 2px;
+}
+
+.achievement-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.achievement-card-desc {
+    font-size: 0.85rem;
+    color: #b0b0c0;
+    margin-bottom: 4px;
+}
+
+.achievement-card-rewards {
+    font-size: 0.8rem;
+    color: #27ae60;
+    font-weight: 600;
+}
+
+@keyframes achievement-slide-in {
+    from { transform: translateX(100px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes achievement-slide-out {
+    from { transform: translateX(0);     opacity: 1; }
+    to   { transform: translateX(100px); opacity: 0; }
+}
+
+/* =========================================
+   BUILDING MAX COUNT (already built) BADGE
+   ========================================= */
+.building-row.building-maxcount {
+    opacity: 0.55;
+    cursor: default;
+    background: rgba(39, 174, 96, 0.05);
+    border-color: rgba(39, 174, 96, 0.2);
+}
+
+.building-row.building-maxcount:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.building-built-badge {
+    color: #27ae60;
+    font-weight: 600;
+    font-size: 0.9rem;
+}

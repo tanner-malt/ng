@@ -742,9 +742,13 @@ class VillageManager {
             }
 
             if (!isUnlocked || atMaxCount) {
-                row.classList.add('locked');
+                row.classList.add('locked', 'building-locked');
                 if (atMaxCount) {
-                    row.title = `Already built maximum ${bDef.name}${bDef.maxCount > 1 ? 's' : ''} (${bDef.maxCount})`;
+                    row.classList.add('building-maxcount');
+                    row.title = `✓ Already built (max ${bDef.maxCount})`;
+                    // Show "Built" badge in resource column
+                    const resDiv = row.querySelector('.building-resources');
+                    if (resDiv) resDiv.innerHTML = '<span class="building-built-badge">✓ Built</span>';
                 } else {
                     const requirementsText = window.unlockSystem ?
                         window.unlockSystem.getUnlockRequirementsText(buildingType) :
@@ -753,7 +757,7 @@ class VillageManager {
                     console.log(`[Village] Setting tooltip (row states) for ${buildingType}:`, requirementsText);
                 }
             } else {
-                row.classList.remove('locked');
+                row.classList.remove('locked', 'building-locked', 'building-maxcount');
                 if (!canAfford) {
                     row.title = `Insufficient resources for ${buildingType}`;
                 } else {

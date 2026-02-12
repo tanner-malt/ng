@@ -122,9 +122,9 @@ class WorldTutorial {
                         <p>The wilds are not empty. Enemy forces spawn at the <strong>map edges</strong>
                         and march toward your capital. They grow stronger over time:</p>
                         <ul>
-                            <li><strong>⚔️ Bandits</strong> — appear around day 50, small groups.</li>
+                            <li><strong>⚔️ Bandits</strong> — appear around day 60, small groups.</li>
                             <li><strong>🏴 Raiders</strong> — appear around day 100, larger warbands.</li>
-                            <li><strong>👹 Warlords</strong> — appear around day 200, devastating armies.</li>
+                            <li><strong>👹 Warlords</strong> — appear around day 150, devastating armies.</li>
                         </ul>
                         <p>Station your armies on <strong>hills</strong> or <strong>mountains</strong> for
                         a defensive terrain bonus. Keep your borders explored — you can't fight

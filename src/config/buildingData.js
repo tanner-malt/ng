@@ -176,9 +176,8 @@ const BUILDING_DATA = {
         },
         
         unlockConditions: [
-            { type: 'achievement', achievement: 'prosperous_kingdom' },
-            { type: 'building_count', building: 'house', count: 8 },
-            { type: 'resource', resource: 'stone', amount: 50 }
+            { type: 'building_count', building: 'house', count: 5 },
+            { type: 'resource', resource: 'stone', amount: 30 }
         ],
         autoUnlock: true
     },
