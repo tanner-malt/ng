@@ -225,7 +225,21 @@ class MapRenderer {
   updateEntities() {
     if (!this.entityLayer) return;
     this.entityLayer.innerHTML = '';
-    
+
+    // Track entities per tile for displacement when multiple share a tile
+    const tileCounts = {};
+    const getTileKey = (row, col) => `${row},${col}`;
+    const getDisplacement = (row, col) => {
+      const key = getTileKey(row, col);
+      const idx = tileCounts[key] || 0;
+      tileCounts[key] = idx + 1;
+      if (idx === 0) return 0;            // first entity centered
+      const sign = idx % 2 === 1 ? 1 : -1; // odd right, even left
+      const magnitude = Math.ceil(idx / 2);
+      const size = this.currentTileSize || 60;
+      return sign * magnitude * (size * 0.25);
+    };
+
     // path preview (pending move before confirmation)
     if (this.world.pendingPath && this.world.pendingPath.length) {
       this.renderPathArrows(this.world.pendingPath, 'pending');
@@ -315,6 +329,11 @@ class MapRenderer {
           if (this.world.selectArmy) this.world.selectArmy(a.id);
         });
         this.positionEntity(marker, a.position.y, a.position.x);
+        // Displace if multiple entities share this tile
+        const armyOffset = getDisplacement(a.position.y, a.position.x);
+        if (armyOffset !== 0) {
+          marker.style.left = (parseFloat(marker.style.left) + armyOffset) + 'px';
+        }
         this.entityLayer.appendChild(marker);
       });
     }
@@ -349,7 +368,12 @@ class MapRenderer {
           badge.style.border = '1px solid #5a1010';
           marker.appendChild(badge);
         }
-        
+
+        // Displace if multiple entities share this tile
+        const enemyOffset = getDisplacement(enemy.position.row, enemy.position.col);
+        if (enemyOffset !== 0) {
+          marker.style.left = (parseFloat(marker.style.left) + enemyOffset) + 'px';
+        }
         this.entityLayer.appendChild(marker);
       });
     }

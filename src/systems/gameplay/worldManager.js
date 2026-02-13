@@ -1828,9 +1828,10 @@ class WorldManager {
         // Determine terrain for this battle
         const battleTerrain = this.hexMap[enemy.position.row]?.[enemy.position.col]?.terrain || 'plains';
 
-        // Show BattleViewer if available (animated combat) — skip during autoplay
+        // Show BattleViewer if available (animated combat) — skip during autoplay and non-world views
         const autoPlayActive = this.gameState.autoPlayActive || window.gameState?.autoPlayActive;
-        if (!autoPlayActive && window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
+        const isWorldView = window.game?.currentView === 'world';
+        if (!autoPlayActive && isWorldView && window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
             const playerArmy = {
                 name: army.name,
                 units: (army.units || []).map(u => ({
@@ -1922,14 +1923,24 @@ class WorldManager {
         }
 
         // Simple auto-resolve: compare total strength with some randomness
+        // Unit defense contributes to damage reduction
+        const avgPlayerDefense = army.units.length > 0
+            ? army.units.reduce((s, u) => s + (u.defense || 5), 0) / army.units.length
+            : 5;
+        const avgEnemyDefense = enemy.units.length > 0
+            ? enemy.units.reduce((s, u) => s + (u.defense || 5), 0) / enemy.units.length
+            : 5;
+
         const armyRoll = armyStrength * (0.8 + Math.random() * 0.4);
         const enemyRoll = enemyStrength * (0.8 + Math.random() * 0.4);
 
         if (armyRoll >= enemyRoll) {
-            // Player wins — apply veteran training reduction
+            // Player wins — unit defense and veteran training reduce casualties
             const vetReduction = window.monarchManager?.getVeteranTrainingReduction?.() || 0;
+            const defenseReduction = Math.min(0.15, avgPlayerDefense / 200);
             const baseCasualtyRate = 0.3;
-            const casualties = Math.floor(Math.random() * Math.ceil(army.units.length * Math.max(0.05, baseCasualtyRate - vetReduction)));
+            const effectiveRate = Math.max(0.05, baseCasualtyRate - vetReduction - defenseReduction);
+            const casualties = Math.floor(Math.random() * Math.ceil(army.units.length * effectiveRate));
             for (let i = 0; i < casualties && army.units.length > 0; i++) {
                 const deadIdx = Math.floor(Math.random() * army.units.length);
                 const dead = army.units.splice(deadIdx, 1)[0];
@@ -1957,9 +1968,10 @@ class WorldManager {
                 this.performDisband(army.id);
             }
         } else {
-            // Enemy wins — veteran training still reduces casualties somewhat
+            // Enemy wins — unit defense still reduces casualties somewhat
             const vetReductionLoss = window.monarchManager?.getVeteranTrainingReduction?.() || 0;
-            const casualties = Math.ceil(army.units.length * Math.max(0.15, 0.5 - vetReductionLoss));
+            const defenseReduction = Math.min(0.10, avgPlayerDefense / 250);
+            const casualties = Math.ceil(army.units.length * Math.max(0.15, 0.5 - vetReductionLoss - defenseReduction));
             for (let i = 0; i < casualties && army.units.length > 0; i++) {
                 const deadIdx = Math.floor(Math.random() * army.units.length);
                 const dead = army.units.splice(deadIdx, 1)[0];
@@ -2207,9 +2219,15 @@ class WorldManager {
             // Pull reinforcements from adjacent idle armies each day of battle
             this._pullReinforcements(army);
 
-            // Each day of battle: both sides lose ~15% of their units
-            const armyLosses = Math.max(1, Math.ceil(army.units.length * 0.15));
-            const enemyLosses = Math.max(1, Math.ceil(enemy.units.length * 0.15));
+            // Each day of battle: losses scale with opposing attack vs own defense
+            const avgArmyDef = army.units.length > 0
+                ? army.units.reduce((s, u) => s + (u.defense || 5), 0) / army.units.length : 5;
+            const avgEnemyDef = enemy.units.length > 0
+                ? enemy.units.reduce((s, u) => s + (u.defense || 5), 0) / enemy.units.length : 5;
+            const armyLossRate = Math.max(0.08, 0.15 - avgArmyDef / 300);
+            const enemyLossRate = Math.max(0.08, 0.15 - avgEnemyDef / 300);
+            const armyLosses = Math.max(1, Math.ceil(army.units.length * armyLossRate));
+            const enemyLosses = Math.max(1, Math.ceil(enemy.units.length * enemyLossRate));
 
             // Apply army casualties
             for (let i = 0; i < armyLosses && army.units.length > 0; i++) {

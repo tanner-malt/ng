@@ -228,8 +228,9 @@ class VillageDefenseSystem {
             }
         }
 
-        // Try to use BattleViewer for animated combat
-        if (window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
+        // Try to use BattleViewer for animated combat (only when in world view)
+        const isWorldView = window.game?.currentView === 'world';
+        if (isWorldView && window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
             const playerArmy = {
                 name: 'Village Defense',
                 units: defenderUnits
