@@ -189,6 +189,7 @@ class MonarchManager {
                 break;
             case 'dynasty':
                 this.updatePrestigeButton();
+                this.renderDynastyHistory();
                 break;
         }
     }
@@ -970,7 +971,18 @@ class MonarchManager {
 
     updateGoldDisplay() {
         const el = document.getElementById('monarch-gold-display');
-        if (el) el.innerHTML = `<i class="res-icon gold"></i> ${this.formatGold(Math.floor(this.gameState.gold))} Gold`;
+        if (el) el.innerHTML = `<i class="res-icon gold"></i> <span>${this.formatGold(Math.floor(this.gameState.gold))}</span> Gold`;
+        
+        // Update dynasty subtitle
+        const subtitle = document.getElementById('monarch-dynasty-subtitle');
+        if (subtitle) {
+            const name = this.gameState.dynastyName || localStorage.getItem('dynastyName') || 'Unknown';
+            subtitle.textContent = `House ${name}`;
+        }
+
+        // Update day display
+        const dayEl = document.getElementById('monarch-day-display');
+        if (dayEl) dayEl.textContent = `Day ${this.gameState.day || 1}`;
     }
 
     formatGold(n) {
@@ -998,40 +1010,28 @@ class MonarchManager {
         // Check wise trait
         const hasWise = this.gameState.royalFamily?.currentMonarch?.traits?.includes('wise');
 
+        const statItems = [
+            { icon: '⚔️', value: generals, label: 'Generals', color: '#e74c3c' },
+            { icon: '🏛️', value: governors, label: 'Governors', color: '#2ecc71' },
+            { icon: '👑', value: `${leaderMult.toFixed(2)}x`, label: 'Leadership', color: '#e67e22' },
+            { icon: '🛡️', value: `${combatMult.toFixed(1)}x`, label: 'Combat', color: '#e74c3c' },
+            { icon: '🔍', value: `+${inv.armyScouts || 0}`, label: 'Scout Range', color: '#3498db' },
+            { icon: '🔨', value: `+${inv.productionSize || 0}`, label: 'Job Slots', color: '#f39c12' },
+            { icon: '🏠', value: `+${inv.moPeople || 0}`, label: 'Housing', color: '#9b59b6' },
+        ];
+        if (hasWise) {
+            statItems.push({ icon: '📖', value: '+5%', label: 'Wise Bonus', color: '#1abc9c' });
+        }
+
         statusDiv.innerHTML = `
-            <div class="dynasty-stats">
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${generals}</div>
-                    <div class="dynasty-stat-label">Generals</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${governors}</div>
-                    <div class="dynasty-stat-label">Governors</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${leaderMult.toFixed(2)}x</div>
-                    <div class="dynasty-stat-label">Leadership</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">${combatMult.toFixed(1)}x</div>
-                    <div class="dynasty-stat-label">Combat</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">+${inv.armyScouts || 0}</div>
-                    <div class="dynasty-stat-label">Scout Range</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">+${inv.productionSize || 0}</div>
-                    <div class="dynasty-stat-label">Job Slots</div>
-                </div>
-                <div class="dynasty-stat">
-                    <div class="dynasty-stat-value">+${inv.moPeople || 0}</div>
-                    <div class="dynasty-stat-label">Housing</div>
-                </div>
-                ${hasWise ? `<div class="dynasty-stat">
-                    <div class="dynasty-stat-value">📖 +5%</div>
-                    <div class="dynasty-stat-label">Wise Bonus</div>
-                </div>` : ''}
+            <div class="kingdom-summary-grid">
+                ${statItems.map(s => `
+                    <div class="kingdom-stat-item">
+                        <div class="kingdom-stat-icon">${s.icon}</div>
+                        <div class="kingdom-stat-value" style="color:${s.color};">${s.value}</div>
+                        <div class="kingdom-stat-label">${s.label}</div>
+                    </div>
+                `).join('')}
             </div>
         `;
     }
@@ -1052,7 +1052,7 @@ class MonarchManager {
         const rf = this.gameState.royalFamily;
         const m = rf?.currentMonarch;
         if (!m) {
-            el.innerHTML = `<p style="color:#bdc3c7;">No reigning monarch.</p>`;
+            el.innerHTML = `<p style="color:#7f8c8d;font-style:italic;">No reigning monarch.</p>`;
             return;
         }
 
@@ -1061,34 +1061,42 @@ class MonarchManager {
         const traits = (m.traits || []).map(t => {
             const info = this.traitInfo[t] || { icon: '❓', label: t, desc: '' };
             return `<span class="trait-badge" title="${info.desc}">${info.icon} ${info.label}</span>`;
-        }).join(' ') || '<span style="color:#95a5a6;">None</span>';
+        }).join(' ') || '<span style="color:#7f8c8d;font-size:0.85em;">No traits</span>';
+
+        const spouse = m.spouse ? rf?.findRoyalById?.(m.spouse) : null;
+        const spouseHtml = spouse
+            ? `<div style="margin-top:2px;font-size:0.82em;color:#e8b4c8;">💍 ${spouse.name}</div>`
+            : '';
+
+        const heirs = rf?.successionOrder?.length || 0;
 
         const skillColors = { leadership: '#e67e22', military: '#e74c3c', diplomacy: '#3498db', economics: '#2ecc71' };
         let skillBars = Object.entries(skills).map(([key, val]) => {
             const pct = Math.min(100, Math.round((val / 50) * 100));
             const color = skillColors[key] || '#888';
-            return `<div style="margin-bottom:4px;">
-                <div style="display:flex;justify-content:space-between;font-size:0.82em;margin-bottom:1px;">
-                    <span style="text-transform:capitalize;">${key}</span>
+            return `<div class="monarch-skill-row">
+                <div class="monarch-skill-header">
+                    <span>${key}</span>
                     <span style="color:${color};font-weight:600;">${val}</span>
                 </div>
-                <div style="background:#111;border-radius:3px;height:6px;overflow:hidden;">
-                    <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
+                <div class="monarch-skill-track">
+                    <div class="monarch-skill-fill" style="width:${pct}%;background:${color};"></div>
                 </div>
             </div>`;
         }).join('');
 
         el.innerHTML = `
-            <div class="monarch-card" style="cursor:pointer;" title="Click for full genetics view">
+            <div class="monarch-card" title="Click for full genetics view">
                 <div class="monarch-info">
                     <div class="monarch-portrait">👑</div>
                     <div class="monarch-details">
                         <h4>${m.name || 'Unknown Monarch'}</h4>
-                        <p style="margin:0;color:#95a5a6;font-size:0.85em;">Age: ${m.age || '?'} · Reign: ${reignDays} days</p>
+                        <p style="margin:0;color:#95a5a6;font-size:0.85em;">Age ${m.age || '?'} · Reign: ${reignDays} days · ${heirs} heir${heirs !== 1 ? 's' : ''}</p>
+                        ${spouseHtml}
                         <div style="margin-top:0.4rem;">${traits}</div>
                     </div>
                 </div>
-                <div style="margin-top:10px;">${skillBars}</div>
+                <div class="monarch-skill-bar-container">${skillBars}</div>
             </div>
         `;
 
@@ -1117,16 +1125,25 @@ class MonarchManager {
         const legacyPoints = legacy?.totalPoints || 0;
         const dynastiesCompleted = legacy?.dynastiesCompleted || 0;
 
+        const stats = [
+            { icon: '👑', value: monarchName, label: 'Current Ruler' },
+            { icon: '📅', value: reignDays, label: 'Reign (days)' },
+            { icon: '👪', value: familySize, label: 'Royal Family' },
+            { icon: '🏰', value: heirs, label: 'Eligible Heirs' },
+            { icon: '👥', value: pop, label: 'Population' },
+            { icon: '🏗️', value: buildingCount, label: 'Buildings' },
+            { icon: '🏛️', value: legacyPoints, label: 'Legacy Points' },
+            { icon: '📜', value: dynastiesCompleted, label: 'Past Dynasties' },
+        ];
+
         el.innerHTML = `
             <div class="dynasty-stats">
-                <div class="dynasty-stat"><div class="dynasty-stat-value">👑 ${monarchName}</div><div class="dynasty-stat-label">Current Ruler</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${reignDays}</div><div class="dynasty-stat-label">Reign (days)</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${familySize}</div><div class="dynasty-stat-label">Royal Family</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${heirs}</div><div class="dynasty-stat-label">Eligible Heirs</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${pop}</div><div class="dynasty-stat-label">Population</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${buildingCount}</div><div class="dynasty-stat-label">Buildings</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${legacyPoints}</div><div class="dynasty-stat-label">Legacy Points</div></div>
-                <div class="dynasty-stat"><div class="dynasty-stat-value">${dynastiesCompleted}</div><div class="dynasty-stat-label">Past Dynasties</div></div>
+                ${stats.map(s => `
+                    <div class="dynasty-stat">
+                        <div class="dynasty-stat-value">${s.icon} ${s.value}</div>
+                        <div class="dynasty-stat-label">${s.label}</div>
+                    </div>
+                `).join('')}
             </div>
         `;
     }
@@ -1489,6 +1506,55 @@ class MonarchManager {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  DYNASTY HISTORY
+    // ═══════════════════════════════════════════════════════════════
+
+    renderDynastyHistory() {
+        const el = document.getElementById('dynasty-history-list');
+        if (!el) return;
+
+        const legacy = window.legacySystem?.legacy;
+        const history = legacy?.dynastyHistory || [];
+
+        if (history.length === 0) {
+            el.innerHTML = '<p style="color:#7f8c8d;font-style:italic;">No past dynasties yet. Complete your first dynasty to see history here.</p>';
+            return;
+        }
+
+        const reasonLabels = {
+            voluntary: '🏛️ Abdicated',
+            starvation: '💀 Famine',
+            village_destroyed: '🔥 Destroyed',
+            dynasty_extinct: '⚰️ Extinct',
+        };
+
+        let html = '';
+        // Show most recent first
+        const reversed = [...history].reverse();
+        reversed.forEach((entry, i) => {
+            const rank = history.length - i;
+            const reason = reasonLabels[entry.endReason] || entry.endReason || '—';
+            const daysStr = entry.daysRuled ? `${entry.daysRuled} days` : '—';
+            const popStr = entry.peakPopulation ? `👥 ${entry.peakPopulation}` : '';
+            const buildStr = entry.buildings ? `🏗️ ${entry.buildings}` : '';
+            const goldStr = entry.gold ? `💰 ${this.formatGold(entry.gold)}` : '';
+            const detailParts = [daysStr, popStr, buildStr, goldStr, reason].filter(Boolean);
+
+            html += `
+                <div class="dynasty-history-entry">
+                    <div class="dynasty-history-rank">#${rank}</div>
+                    <div class="dynasty-history-info">
+                        <div class="history-name">${entry.name || 'Unknown Dynasty'}</div>
+                        <div class="history-detail">${detailParts.join(' · ')}</div>
+                    </div>
+                    <div class="dynasty-history-legacy">+${entry.legacyEarned || 0} pts</div>
+                </div>`;
+        });
+
+        el.innerHTML = html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  FULL REFRESH & PRESTIGE BUTTON
     // ═══════════════════════════════════════════════════════════════
 
@@ -1503,12 +1569,12 @@ class MonarchManager {
         if (day < 100) {
             btn.disabled = true;
             btn.title = `Available on Day 100 (current: Day ${day})`;
-            btn.textContent = `⚰️ End Dynasty (Day ${day}/100)`;
+            btn.textContent = `Day ${day}/100`;
             btn.style.opacity = '0.5';
         } else {
             btn.disabled = false;
             btn.title = 'End your dynasty and start fresh with legacy points';
-            btn.textContent = '⚰️ End Dynasty (Prestige Reset)';
+            btn.textContent = 'End Dynasty';
             btn.style.opacity = '1';
         }
     }

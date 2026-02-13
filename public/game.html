@@ -996,34 +996,43 @@
         <!-- Unlocked Monarch Content -->
         <div id="monarch-content" class="monarch-content" style="display: none;">
             <div class="monarch-header">
-                <h2>👑 Royal Court</h2>
-                <div id="monarch-gold-display" class="gold-display">💰 0 Gold</div>
+                <div class="monarch-header-left">
+                    <div class="monarch-header-crown">👑</div>
+                    <div class="monarch-header-text">
+                        <h2>Royal Court</h2>
+                        <div id="monarch-dynasty-subtitle" class="monarch-dynasty-subtitle">House Unknown</div>
+                    </div>
+                </div>
+                <div class="monarch-header-right">
+                    <div id="monarch-gold-display" class="gold-display-badge"><i class="res-icon gold"></i> <span>0</span> Gold</div>
+                    <div id="monarch-day-display" class="day-display-badge">Day 1</div>
+                </div>
             </div>
 
             <!-- Sub-tab Navigation -->
             <div class="monarch-tab-bar">
-                <button class="monarch-tab active" data-tab="overview">👑 Overview</button>
-                <button class="monarch-tab" data-tab="family">🌳 Family Tree</button>
-                <button class="monarch-tab" data-tab="staff">⚔️ Staff</button>
-                <button class="monarch-tab" data-tab="investments">💰 Investments</button>
-                <button class="monarch-tab" data-tab="legacy">🏛️ Legacy</button>
-                <button class="monarch-tab" data-tab="dynasty">⚰️ Dynasty</button>
+                <button class="monarch-tab active" data-tab="overview"><span class="tab-icon">👑</span><span class="tab-label">Overview</span></button>
+                <button class="monarch-tab" data-tab="family"><span class="tab-icon">🌳</span><span class="tab-label">Family</span></button>
+                <button class="monarch-tab" data-tab="staff"><span class="tab-icon">⚔️</span><span class="tab-label">Staff</span></button>
+                <button class="monarch-tab" data-tab="investments"><span class="tab-icon">💰</span><span class="tab-label">Investments</span></button>
+                <button class="monarch-tab" data-tab="legacy"><span class="tab-icon">🏛️</span><span class="tab-label">Legacy</span></button>
+                <button class="monarch-tab" data-tab="dynasty"><span class="tab-icon">⚰️</span><span class="tab-label">Dynasty</span></button>
             </div>
 
             <!-- TAB: Overview -->
             <div class="monarch-tab-content active" data-tab-content="overview">
                 <div class="monarch-overview-grid">
-                    <div>
-                        <h3>👑 Current Monarch</h3>
+                    <div class="monarch-overview-panel">
+                        <div class="panel-header"><span class="panel-icon">👑</span> Current Monarch</div>
                         <div id="monarch-card"></div>
                     </div>
-                    <div>
-                        <h3>📈 Kingdom Summary</h3>
+                    <div class="monarch-overview-panel">
+                        <div class="panel-header"><span class="panel-icon">📈</span> Kingdom Summary</div>
                         <div id="investment-status" class="investment-status"></div>
                     </div>
                 </div>
-                <div class="monarch-section" style="margin-top:1rem;">
-                    <h3>📊 Dynasty Status</h3>
+                <div class="monarch-overview-panel" style="margin-top:1rem;">
+                    <div class="panel-header"><span class="panel-icon">📊</span> Dynasty Status</div>
                     <div id="dynasty-stats" class="dynasty-stats"></div>
                 </div>
             </div>
@@ -1054,6 +1063,7 @@
             <div class="monarch-tab-content" data-tab-content="investments">
                 <div class="monarch-section">
                     <h3>💰 Royal Investments</h3>
+                    <p class="section-subtitle">Spend gold to improve your kingdom's infrastructure and military.</p>
                     <div id="investment-categories" class="investment-categories"></div>
                 </div>
             </div>
@@ -1074,12 +1084,38 @@
             <div class="monarch-tab-content" data-tab-content="dynasty">
                 <div class="monarch-section">
                     <h3>⚰️ Dynasty Management</h3>
-                    <div class="dynasty-tools">
-                        <div class="prestige-actions">
-                            <button id="rename-dynasty-btn" class="dynasty-btn">✏️ Rename Dynasty</button>
-                            <button id="calculate-inheritance-btn" class="dynasty-btn">💰 Calculate Inheritance</button>
-                            <button id="prestige-reset-btn" class="dynasty-btn danger">⚰️ End Dynasty (Prestige Reset)</button>
+                    <p class="section-subtitle">Manage your dynasty's legacy. End a dynasty to earn legacy points and start anew.</p>
+                    <div class="dynasty-management-grid">
+                        <div class="dynasty-mgmt-card">
+                            <div class="dynasty-mgmt-icon">✏️</div>
+                            <div class="dynasty-mgmt-info">
+                                <h4>Rename Dynasty</h4>
+                                <p>Change the name of your ruling house</p>
+                            </div>
+                            <button id="rename-dynasty-btn" class="dynasty-btn compact">Rename</button>
                         </div>
+                        <div class="dynasty-mgmt-card">
+                            <div class="dynasty-mgmt-icon">💰</div>
+                            <div class="dynasty-mgmt-info">
+                                <h4>Calculate Inheritance</h4>
+                                <p>Preview legacy points you would earn</p>
+                            </div>
+                            <button id="calculate-inheritance-btn" class="dynasty-btn compact">Calculate</button>
+                        </div>
+                        <div class="dynasty-mgmt-card danger-card">
+                            <div class="dynasty-mgmt-icon">⚰️</div>
+                            <div class="dynasty-mgmt-info">
+                                <h4>End Dynasty</h4>
+                                <p>Prestige reset — earn legacy points and begin again</p>
+                            </div>
+                            <button id="prestige-reset-btn" class="dynasty-btn danger compact">End Dynasty</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="monarch-section" style="margin-top:1rem;">
+                    <h3>📜 Dynasty History</h3>
+                    <div id="dynasty-history-list" class="dynasty-history-list">
+                        <p style="color:#7f8c8d;font-style:italic;">No past dynasties yet. Complete your first dynasty to see history here.</p>
                     </div>
                 </div>
             </div>
@@ -1643,458 +1679,7 @@
             border-bottom: none;
         }
 
-        /* Monarch View Styles */
-        .monarch-content {
-            background: #1a1a1a;
-            color: #e0e0e0;
-            padding: 2rem;
-            overflow-y: auto;
-            height: calc(100vh - 120px);
-        }
-
-        .monarch-header {
-            background: linear-gradient(135deg, #8e44ad, #9b59b6);
-            border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 2px solid #1abc9c;
-            box-shadow: 0 4px 15px rgba(142, 68, 173, 0.3);
-        }
-
-        .monarch-header h2 {
-            margin: 0 0 0.5rem 0;
-            color: #f1c40f;
-            font-size: 2rem;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        .gold-display {
-            font-size: 1.4rem;
-            font-weight: bold;
-            color: #f1c40f;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            white-space: nowrap;
-        }
-
-        .monarch-header p {
-            margin: 0;
-            opacity: 0.9;
-            font-size: 1.1rem;
-        }
-
-        .monarch-overview-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-
-        .monarch-overview-grid h3 {
-            color: #f1c40f;
-            margin: 0 0 1rem 0;
-            border-bottom: 2px solid rgba(241, 196, 15, 0.3);
-            padding-bottom: 0.5rem;
-        }
-
-        .monarch-section {
-            background: #222;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .monarch-section h3 {
-            color: #1abc9c;
-            margin: 0 0 1rem 0;
-            font-size: 1.4rem;
-            border-bottom: 2px solid #333;
-            padding-bottom: 0.5rem;
-        }
-
-        .investment-categories {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .investment-category {
-            background: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 1rem;
-        }
-
-        .investment-category h4 {
-            color: #f39c12;
-            margin: 0 0 1rem 0;
-            font-size: 1.1rem;
-        }
-
-        .investment-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-        }
-
-        .investment-item {
-            background: #1a1a1a;
-            border: 2px solid #333;
-            border-radius: 8px;
-            padding: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .investment-item:hover {
-            border-color: #1abc9c;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.3);
-        }
-
-        .investment-icon {
-            font-size: 2rem;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #34495e, #2c3e50);
-            border-radius: 50%;
-            border: 2px solid #1abc9c;
-            box-shadow: 0 2px 8px rgba(26, 188, 156, 0.2);
-        }
-
-        .investment-details {
-            flex: 1;
-        }
-
-        .investment-details h5 {
-            color: #ecf0f1;
-            margin: 0 0 0.5rem 0;
-            font-size: 1rem;
-        }
-
-        .investment-details p {
-            color: #bdc3c7;
-            margin: 0 0 0.5rem 0;
-            font-size: 0.9rem;
-        }
-
-        .investment-cost {
-            color: #f1c40f;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        .investment-btn {
-            background: linear-gradient(135deg, #27ae60, #2ecc71);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 0.75rem 1.5rem;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 6px rgba(39, 174, 96, 0.3);
-        }
-
-        .investment-btn:hover {
-            background: linear-gradient(135deg, #229954, #27ae60);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
-        }
-
-        .investment-btn:disabled {
-            background: #555;
-            color: #888;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .investment-level {
-            font-size: 0.8rem;
-            color: #1abc9c;
-            font-weight: 600;
-            margin-top: 0.25rem;
-        }
-
-        .advisor-panel {
-            background: linear-gradient(135deg, #9b59b6, #8e44ad);
-            border-radius: 8px;
-            padding: 1.5rem;
-            border: 2px solid #1abc9c;
-        }
-
-        .advisor-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .advisor-header h4 {
-            color: #f1c40f;
-            margin: 0;
-        }
-
-        .advisor-icon {
-            font-size: 1.5rem;
-        }
-
-        .advisor-advice-item {
-            margin-bottom: 0.75rem;
-            font-style: italic;
-            color: #ecf0f1;
-            line-height: 1.5;
-        }
-
-        .advisor-advice-empty {
-            font-style: italic;
-            color: #ddd;
-        }
-
-        .advisor-buttons {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin-top: 1rem;
-        }
-
-        .advisor-btn {
-            padding: 0.5rem 1rem;
-            background: rgba(255,255,255,0.15);
-            color: white;
-            border: 2px solid rgba(255,255,255,0.2);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-
-        .advisor-btn:hover {
-            background: rgba(255,255,255,0.25);
-            border-color: rgba(255,255,255,0.4);
-        }
-
-        .advisor-btn.active {
-            background: #1abc9c;
-            border-color: #16a085;
-        }
-
-        .dynasty-tools {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .dynasty-info,
-        .prestige-actions {
-            background: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 1.5rem;
-        }
-
-        .dynasty-info h4,
-        .prestige-actions h4 {
-            color: #e74c3c;
-            margin: 0 0 1rem 0;
-            font-size: 1.1rem;
-        }
-
-        .dynasty-btn {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 0.75rem 1.5rem;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 0.5rem 0.5rem 0.5rem 0;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3);
-        }
-
-        .dynasty-btn:hover {
-            background: linear-gradient(135deg, #2980b9, #3498db);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
-        }
-
-        .dynasty-btn.danger {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
-        }
-
-        .dynasty-btn.danger:hover {
-            background: linear-gradient(135deg, #c0392b, #e74c3c);
-            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-        }
-
-        .investment-status {
-            background: #2a2a2a;
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 1.5rem;
-        }
-
-        .dynasty-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        .dynasty-stat {
-            background: #1a1a1a;
-            border: 1px solid #333;
-            border-radius: 6px;
-            padding: 1rem;
-            text-align: center;
-        }
-
-        .dynasty-stat-label {
-            color: #bdc3c7;
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .dynasty-stat-value {
-            color: #f1c40f;
-            font-size: 1.5rem;
-            font-weight: bold;
-        }
-
-        /* Legacy System Styles */
-        .dynasty-stat-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .dynasty-stat-group h4 {
-            color: #ecf0f1;
-            margin: 0 0 12px 0;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #34495e;
-        }
-
-        .dynasty-stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 12px;
-        }
-
-        .legacy-stats {
-            background: linear-gradient(135deg, rgba(52, 73, 94, 0.3) 0%, rgba(44, 62, 80, 0.3) 100%);
-            border: 1px solid #3498db;
-            border-radius: 8px;
-            padding: 16px;
-        }
-
-        .legacy-titles {
-            margin-top: 16px;
-            padding-top: 12px;
-            border-top: 1px solid #34495e;
-        }
-
-        .legacy-titles h5,
-        .legacy-bonuses h5 {
-            color: #bdc3c7;
-            font-size: 0.9em;
-            margin: 0 0 8px 0;
-        }
-
-        .title-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .title-badge {
-            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-            color: #fff;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
-        .legacy-bonuses {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #34495e;
-        }
-
-        .bonus-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            color: #2ecc71;
-            font-size: 0.9em;
-        }
-
-        .bonus-list li {
-            padding: 4px 0;
-        }
-
-        .dynasty-btn.danger {
-            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1em;
-            transition: all 0.2s;
-        }
-
-        .dynasty-btn.danger:hover {
-            background: linear-gradient(135deg, #a93226 0%, #c0392b 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .dynasty-tools {
-                grid-template-columns: 1fr;
-            }
-
-            .investment-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .monarch-content {
-                padding: 1rem;
-            }
-
-            .monarch-header {
-                padding: 1rem;
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .monarch-header h2 {
-                font-size: 1.5rem;
-            }
-
-            .monarch-overview-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .investment-item {
-                flex-direction: column;
-                text-align: center;
-            }
-        }
+        /* Monarch View Styles - see game.css for canonical styles */
 
         /* Inheritance Calculation Modal Styles */
         .dynasty-calculation {

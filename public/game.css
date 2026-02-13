@@ -2571,22 +2571,80 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
-    padding: 1rem;
-    background: linear-gradient(135deg, #8e44ad, #9b59b6);
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 40%, #44266a 100%);
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+    border: 1px solid rgba(142, 68, 173, 0.3);
+    position: relative;
+    overflow: hidden;
 }
-
-.monarch-header h2 {
-    color: #fff;
-    font-size: 1.5rem;
+.monarch-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(241,196,15,0.08), transparent 60%);
+    pointer-events: none;
 }
-
-.gold-display {
-    font-size: 1.3rem;
-    font-weight: bold;
+.monarch-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 1;
+}
+.monarch-header-crown {
+    font-size: 2rem;
+    filter: drop-shadow(0 2px 6px rgba(241,196,15,0.4));
+    animation: crown-glow 3s ease-in-out infinite;
+}
+@keyframes crown-glow {
+    0%, 100% { filter: drop-shadow(0 2px 6px rgba(241,196,15,0.3)); }
+    50% { filter: drop-shadow(0 2px 12px rgba(241,196,15,0.6)); }
+}
+.monarch-header-text h2 {
     color: #f1c40f;
-    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    font-size: 1.3rem;
+    margin: 0;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    letter-spacing: 0.5px;
+}
+.monarch-dynasty-subtitle {
+    color: #b8a9c9;
+    font-size: 0.85rem;
+    margin-top: 2px;
+    font-style: italic;
+}
+.monarch-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 1;
+}
+.gold-display-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(241,196,15,0.15), rgba(243,156,18,0.1));
+    border: 1px solid rgba(241,196,15,0.3);
+    border-radius: 20px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f1c40f;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.gold-display-badge .res-icon {
+    width: 16px;
+    height: 16px;
+}
+.day-display-badge {
+    padding: 6px 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    font-size: 0.82rem;
+    color: #b8a9c9;
+    font-weight: 600;
 }
 
 .monarch-content {
@@ -2597,45 +2655,67 @@ body {
 /* ── Monarch Sub-tab Navigation ── */
 .monarch-tab-bar {
     display: flex;
-    gap: 2px;
-    margin-bottom: 1.5rem;
-    background: rgba(0,0,0,0.3);
-    border-radius: 8px;
+    gap: 3px;
+    margin-bottom: 1.25rem;
+    background: rgba(0,0,0,0.35);
+    border-radius: 10px;
     padding: 4px;
     overflow-x: auto;
+    border: 1px solid rgba(255,255,255,0.04);
 }
 .monarch-tab {
     flex: 1;
-    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 6px 8px;
     background: transparent;
-    color: #95a5a6;
+    color: #7f8c8d;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 600;
     transition: all 0.25s ease;
     white-space: nowrap;
     min-width: 0;
 }
+.monarch-tab .tab-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+.monarch-tab .tab-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
 .monarch-tab:hover {
     background: rgba(255,255,255,0.06);
-    color: #ecf0f1;
+    color: #bdc3c7;
 }
 .monarch-tab.active {
-    background: linear-gradient(135deg, #8e44ad, #9b59b6);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(142,68,173,0.4);
+    background: linear-gradient(135deg, #44266a, #5b34a0);
+    color: #f1c40f;
+    box-shadow: 0 2px 10px rgba(91,52,160,0.5);
 }
 .monarch-tab-content {
     display: none;
 }
 .monarch-tab-content.active {
     display: block;
+    animation: fadeInTab 0.3s ease;
+}
+@keyframes fadeInTab {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 @media (max-width: 768px) {
     .monarch-tab-bar { flex-wrap: wrap; }
-    .monarch-tab { flex: none; min-width: 80px; font-size: 0.78rem; padding: 8px 6px; }
+    .monarch-tab { flex: none; min-width: 70px; padding: 8px 4px 6px; }
+    .monarch-tab .tab-label { font-size: 0.68rem; }
+    .monarch-header { flex-direction: column; gap: 8px; text-align: center; }
+    .monarch-header-right { justify-content: center; }
 }
 
 /* ── Section subtitle ── */
@@ -2652,16 +2732,18 @@ body {
 }
 
 .investment-category {
-    background: linear-gradient(135deg, #34495e, #2c3e50);
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, #1a1a2e, #222240);
+    border-radius: 10px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255,255,255,0.06);
 }
 
-.investment-category h3 {
-    color: #1abc9c;
+.investment-category h3,
+.investment-category h4 {
+    color: #b8a9c9;
     margin-bottom: 1rem;
-    border-bottom: 2px solid #1abc9c;
+    border-bottom: 1px solid rgba(184,169,201,0.2);
     padding-bottom: 0.5rem;
 }
 
@@ -2691,11 +2773,11 @@ body {
     transform: none;
 }
 
-/* Monarch Overview (card + family tree side by side) */
+/* Monarch Overview (card + kingdom summary side by side) */
 .monarch-overview-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    gap: 1rem;
 }
 
 @media (max-width: 768px) {
@@ -2704,26 +2786,44 @@ body {
     }
 }
 
-.monarch-overview-grid h3 {
+.monarch-overview-panel {
+    background: linear-gradient(135deg, #1a1a2e, #222240);
+    border-radius: 10px;
+    padding: 1.25rem;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+}
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 1rem;
+    font-weight: 700;
     color: #f1c40f;
     margin-bottom: 1rem;
-    border-bottom: 2px solid rgba(241, 196, 15, 0.3);
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid rgba(241, 196, 15, 0.2);
+}
+.panel-header .panel-icon {
+    font-size: 1.1rem;
 }
 
 .monarch-section {
-    background: linear-gradient(135deg, #2c3e50, #34495e);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(135deg, #1a1a2e, #222240);
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
 }
 
 .monarch-section h3 {
-    color: #1abc9c;
+    color: #b8a9c9;
     margin-bottom: 1rem;
-    border-bottom: 2px solid rgba(26, 188, 156, 0.3);
+    border-bottom: 1px solid rgba(184, 169, 201, 0.2);
     padding-bottom: 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
 }
 
 /* Investment grid layout */
@@ -2794,12 +2894,13 @@ body {
 
 .legacy-points-badge {
     display: inline-block;
-    padding: 0.4rem 0.8rem;
-    background: linear-gradient(135deg, #f39c12, #e67e22);
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #8e44ad, #9b59b6);
     color: #fff;
-    border-radius: 6px;
+    border-radius: 8px;
     font-weight: bold;
     font-size: 1rem;
+    box-shadow: 0 2px 8px rgba(142,68,173,0.3);
 }
 
 .legacy-bonuses-grid {
@@ -2886,6 +2987,46 @@ body {
     font-style: italic;
 }
 
+/* Kingdom Summary Grid (Overview tab) */
+.kingdom-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+.kingdom-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.6rem 0.25rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.2s ease;
+}
+.kingdom-stat-item:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.12);
+}
+.kingdom-stat-icon {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+}
+.kingdom-stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.kingdom-stat-label {
+    font-size: 0.65rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 1px;
+}
+@media (max-width: 768px) {
+    .kingdom-summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 .advisor-btn.active {
     background: #1abc9c;
     border-color: #16a085;
@@ -2896,6 +3037,122 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
+}
+
+/* Dynasty Management Grid (redesigned) */
+.dynasty-management-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.dynasty-mgmt-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    transition: all 0.25s ease;
+}
+.dynasty-mgmt-card:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(241,196,15,0.2);
+}
+.dynasty-mgmt-card.danger-card {
+    border-color: rgba(231,76,60,0.2);
+}
+.dynasty-mgmt-card.danger-card:hover {
+    border-color: rgba(231,76,60,0.4);
+    background: rgba(231,76,60,0.05);
+}
+.dynasty-mgmt-icon {
+    font-size: 1.5rem;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+.dynasty-mgmt-info {
+    flex: 1;
+}
+.dynasty-mgmt-info h4 {
+    margin: 0 0 2px 0;
+    color: #ecf0f1;
+    font-size: 0.95rem;
+}
+.dynasty-mgmt-info p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.8rem;
+}
+.dynasty-btn.compact {
+    padding: 8px 20px;
+    min-width: 100px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Dynasty History List */
+.dynasty-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.dynasty-history-entry {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    border-left: 3px solid #8e44ad;
+    transition: all 0.2s ease;
+}
+.dynasty-history-entry:hover {
+    background: rgba(255,255,255,0.06);
+}
+.dynasty-history-rank {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(142,68,173,0.3);
+    color: #b8a9c9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.dynasty-history-info {
+    flex: 1;
+}
+.dynasty-history-info .history-name {
+    font-weight: 700;
+    color: #ecf0f1;
+    font-size: 0.9rem;
+}
+.dynasty-history-info .history-detail {
+    color: #7f8c8d;
+    font-size: 0.78rem;
+    margin-top: 2px;
+}
+.dynasty-history-legacy {
+    padding: 4px 10px;
+    background: rgba(243,156,18,0.15);
+    border: 1px solid rgba(243,156,18,0.25);
+    border-radius: 12px;
+    font-size: 0.78rem;
+    color: #f39c12;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
@@ -3408,12 +3665,19 @@ body {
 
 /* Monarch Card */
 .monarch-card {
-    background: linear-gradient(135deg, #f1c40f, #f39c12);
-    color: #2c3e50;
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 12px rgba(241, 196, 15, 0.3);
-    border: 2px solid #d35400;
+    background: linear-gradient(135deg, #1a1a2e, #2a2a4a);
+    color: #ecf0f1;
+    border-radius: 10px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(241, 196, 15, 0.15);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.monarch-card:hover {
+    border-color: rgba(241, 196, 15, 0.4);
+    box-shadow: 0 6px 20px rgba(241, 196, 15, 0.1);
+    transform: translateY(-1px);
 }
 
 .monarch-info {
@@ -3424,37 +3688,52 @@ body {
 }
 
 .monarch-portrait {
-    width: 60px;
-    height: 60px;
-    background: #2c3e50;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #44266a, #5b34a0);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     color: #f1c40f;
-    border: 3px solid #fff;
+    border: 2px solid rgba(241,196,15,0.4);
+    box-shadow: 0 0 15px rgba(241,196,15,0.15);
 }
 
 .monarch-details h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.2rem;
+    margin: 0 0 0.3rem 0;
+    font-size: 1.1rem;
     font-weight: bold;
+    color: #f1c40f;
 }
 
-.monarch-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
-    margin-top: 1rem;
+.monarch-skill-bar-container {
+    margin-top: 12px;
 }
-
-.stat-item {
-    background: rgba(44, 62, 80, 0.5);
-    padding: 0.5rem;
+.monarch-skill-row {
+    margin-bottom: 6px;
+}
+.monarch-skill-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82em;
+    margin-bottom: 2px;
+}
+.monarch-skill-header span:first-child {
+    text-transform: capitalize;
+    color: #bdc3c7;
+}
+.monarch-skill-track {
+    background: rgba(255,255,255,0.06);
     border-radius: 4px;
-    text-align: center;
-    color: #fff;
+    height: 6px;
+    overflow: hidden;
+}
+.monarch-skill-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
 }
 
 /* Family Tree */
@@ -3527,11 +3806,12 @@ body {
 }
 
 .trait-badge {
-    background: #1abc9c;
-    color: #fff;
+    background: rgba(142,68,173,0.2);
+    border: 1px solid rgba(142,68,173,0.35);
+    color: #d2b4e0;
     padding: 0.2rem 0.5rem;
     border-radius: 12px;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 500;
 }
 
@@ -3602,28 +3882,36 @@ body {
 /* Dynasty Stats */
 .dynasty-stats {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
 }
 
 .dynasty-stat {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 1rem;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.85rem 0.75rem;
+    border-radius: 8px;
     text-align: center;
-    border: 1px solid rgba(26, 188, 156, 0.3);
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.25s ease;
+}
+.dynasty-stat:hover {
+    border-color: rgba(241,196,15,0.2);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .dynasty-stat-value {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: bold;
-    color: #1abc9c;
-    margin-bottom: 0.25rem;
+    color: #f1c40f;
+    margin-bottom: 0.2rem;
+    line-height: 1.2;
 }
 
 .dynasty-stat-label {
-    font-size: 0.85rem;
-    color: #bdc3c7;
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 /* Merge Tab Updates */
@@ -3999,7 +4287,7 @@ body {
     }
 
     .dynasty-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .merge-container {
