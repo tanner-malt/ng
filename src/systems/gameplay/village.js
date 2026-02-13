@@ -343,6 +343,16 @@ class VillageManager {
                 }
             });
 
+            // Listen for refugees joining to update building employment indicators
+            window.eventBus.on('refugees_accepted', () => {
+                console.log('[Village] Refugees accepted, refreshing building indicators');
+                try {
+                    this.renderBuildings();
+                } catch (e) {
+                    console.warn('[Village] Failed to refresh buildings after refugees arrival:', e);
+                }
+            });
+
             console.log('[Village] Event listeners setup complete');
         }
     }

@@ -668,8 +668,15 @@ class WorldManager {
                 unitType = battleMgr.determineUnitTypeFromVillager?.(v) || 'militia';
                 stats = battleMgr.calculateUnitStats?.(v, unitType) || stats;
             }
+            // Humanize skill keys: "resourceProduction.agriculture" → "agriculture"
             const rawSkills = v.skills || {};
-            const topSkills = (Array.isArray(rawSkills) ? rawSkills : Object.keys(rawSkills)).slice(0, 2);
+            const topSkills = (Array.isArray(rawSkills) ? rawSkills : Object.keys(rawSkills))
+                .map(s => {
+                    // Take the part after the last dot, then capitalize first letter
+                    const short = s.includes('.') ? s.split('.').pop() : s;
+                    return short.replace(/([A-Z])/g, ' $1').trim().replace(/^./, c => c.toUpperCase());
+                })
+                .slice(0, 2);
             return { ...v, unitType, stats, topSkills };
         });
 
@@ -755,8 +762,47 @@ class WorldManager {
             <div class="draft-summary" id="draft-summary">
                 <span id="draft-selected-count">0</span> / ${maxArmySize} selected
                 · ~<span id="draft-supply-cost">0</span> 🌾 supplies
-            </div>
-            <div class="draft-actions">
+            </div>`;
+
+        // Commander selection section
+        const rf = this.gameState.royalFamily;
+        const royals = rf?.royalFamily || [];
+        const eligibleCommanders = royals.filter(m => m.age >= 16 && m.status !== 'dead');
+        if (eligibleCommanders.length > 0) {
+            html += `<div class="draft-commander-section">
+                <div class="draft-commander-label">👑 Assign Commander</div>
+                <div class="draft-commander-list">
+                    <label class="draft-commander-option">
+                        <input type="radio" name="draft-commander" value="" checked>
+                        <span class="commander-card">
+                            <span class="commander-icon">—</span>
+                            <span class="commander-details">
+                                <span class="commander-name">No Commander</span>
+                                <span class="commander-role">Army capped at 5 soldiers</span>
+                            </span>
+                        </span>
+                    </label>`;
+            eligibleCommanders.forEach(m => {
+                const isMonarch = m.status === 'monarch';
+                const icon = isMonarch ? '👑' : m.role === 'general' ? '⚔️' : m.role === 'governor' ? '🏛️' : m.status === 'heir' ? '🏰' : '👤';
+                const currentRole = m.role ? `Currently: ${m.role}` : (isMonarch ? 'Monarch' : m.status === 'heir' ? 'Heir' : 'Available');
+                const alreadyAssigned = m.role === 'general' && m.assignedTo;
+                const note = alreadyAssigned ? ' (will reassign)' : '';
+                html += `<label class="draft-commander-option">
+                        <input type="radio" name="draft-commander" value="${m.id}" onchange="window.worldManager._onCommanderSelected(${maxArmySize})">
+                        <span class="commander-card">
+                            <span class="commander-icon">${icon}</span>
+                            <span class="commander-details">
+                                <span class="commander-name">${m.name}${note}</span>
+                                <span class="commander-role">${currentRole} · Age ${m.age}</span>
+                            </span>
+                        </span>
+                    </label>`;
+            });
+            html += `</div></div>`;
+        }
+
+        html += `<div class="draft-actions">
                 <button class="btn-primary" onclick="window.worldManager.confirmDraft()">⚔️ Confirm Draft</button>
                 <button class="btn-secondary" onclick="window.modalSystem?.closeTopModal()">Cancel</button>
             </div>
@@ -793,8 +839,24 @@ class WorldManager {
         if (costEl) costEl.textContent = selected * 5;
     }
 
+    /** Called when commander radio changes — update max army size */
+    _onCommanderSelected(baseMax) {
+        const selectedRadio = document.querySelector('input[name="draft-commander"]:checked');
+        const hasCommander = selectedRadio && selectedRadio.value !== '';
+        const newMax = hasCommander ? 10 : 5;
+        // Update summary display
+        const summaryEl = document.getElementById('draft-summary');
+        if (summaryEl) {
+            const countEl = document.getElementById('draft-selected-count');
+            const current = countEl ? parseInt(countEl.textContent) || 0 : 0;
+            summaryEl.innerHTML = `<span id="draft-selected-count">${current}</span> / ${newMax} selected · ~<span id="draft-supply-cost">${current * 5}</span> 🌾 supplies`;
+        }
+        this._updateDraftSummary(newMax);
+    }
+
     confirmDraft() {
-        const checkboxes = document.querySelectorAll('.draft-list input[type=checkbox]:checked');
+        // Fix: query .draft-table (not .draft-list)
+        const checkboxes = document.querySelectorAll('.draft-table input[type=checkbox]:checked');
         const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
         const armyName = document.getElementById('draft-army-name')?.value || 'Army';
 
@@ -803,14 +865,19 @@ class WorldManager {
             return;
         }
 
+        // Check if a commander was selected
+        const selectedCommander = document.querySelector('input[name="draft-commander"]:checked');
+        const commanderId = selectedCommander?.value || '';
+        const hasCommander = commanderId !== '';
+
         // Enforce army size cap
-        const hasGeneralAvailable = this._hasFreeGeneral();
-        const maxArmySize = hasGeneralAvailable ? 10 : 5;
+        const maxArmySize = hasCommander ? 10 : 5;
         if (ids.length > maxArmySize) {
-            window.showToast?.(`Army size limited to ${maxArmySize} soldiers.` + (!hasGeneralAvailable ? ' Assign a General to raise the cap.' : ''), { type: 'warning' });
+            window.showToast?.(`Army size limited to ${maxArmySize} soldiers.` + (!hasCommander ? ' Select a commander to raise the cap.' : ''), { type: 'warning' });
             return;
         }
 
+        const battleMgr = window.battleManager || window.game?.battleManager;
         const units = [];
         ids.forEach(id => {
             const villager = this.gameState.populationManager.getInhabitant(id);
@@ -819,6 +886,14 @@ class WorldManager {
             const originalRole = villager.role;
             const originalStatus = villager.status;
 
+            // Determine unit type and stats from BattleManager
+            let unitType = 'militia';
+            let stats = { health: 80, attack: 12, defense: 8 };
+            if (battleMgr) {
+                unitType = battleMgr.determineUnitTypeFromVillager?.(villager) || 'militia';
+                stats = battleMgr.calculateUnitStats?.(villager, unitType) || stats;
+            }
+
             // Mark drafted in population
             this.gameState.populationManager.updateStatus(villager.id, 'drafted');
 
@@ -826,12 +901,16 @@ class WorldManager {
                 id: `unit_${villager.id}`,
                 villagerId: villager.id,
                 name: villager.name || 'Soldier',
+                type: unitType,
                 originalRole,
                 originalStatus,
-                health: 80 + Math.floor(Math.random() * 20),
-                maxHealth: 100,
-                attack: 10 + Math.floor(villager.age / 10),
-                defense: 5 + Math.floor(villager.age / 15)
+                alive: true,
+                health: stats.health || 80,
+                maxHealth: stats.health || 80,
+                attack: stats.attack || 12,
+                defense: stats.defense || 8,
+                speed: stats.speed || 10,
+                morale: stats.morale || 60
             });
         });
 
@@ -842,6 +921,16 @@ class WorldManager {
             x: this.capitalCol,
             y: this.capitalRow
         });
+
+        // Assign commander if selected
+        if (hasCommander && this.gameState.royalFamily) {
+            this.gameState.royalFamily.assignGeneral(commanderId, army.id);
+            const commander = this.gameState.royalFamily.findRoyalById(commanderId);
+            if (commander) {
+                army.commanderName = commander.name;
+                army.commanderId = commanderId;
+            }
+        }
 
         // Store drafted villager data on the army for restoration on disband
         army.draftedVillagers = units.map(u => ({
@@ -863,7 +952,8 @@ class WorldManager {
             .filter(v => v.status !== 'drafted').length;
 
         window.modalSystem?.closeTopModal();
-        window.showToast?.(`${armyName} formed with ${units.length} soldiers!`, { type: 'success' });
+        const cmdMsg = army.commanderName ? ` Commander: ${army.commanderName}.` : '';
+        window.showToast?.(`${armyName} formed with ${units.length} soldiers!${cmdMsg}`, { type: 'success' });
         window.eventBus?.emit('army_drafted', { army });
 
         this.refreshUI();

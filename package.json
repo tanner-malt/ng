@@ -1,6 +1,6 @@
 {
   "name": "idle-dynasty-builder",
-  "version": "0.0.3.15",
+  "version": "0.0.3.18",
   "description": "Idle: Dynasty Builder - Lead your people from humble beginnings to a thriving dynasty in this idle strategy game.",
   "scripts": {
     "start": "npx serve . -l 8000",

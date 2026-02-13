@@ -2193,6 +2193,80 @@ body {
     justify-content: center;
 }
 
+/* Commander Selection */
+.draft-commander-section {
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+}
+
+.draft-commander-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f39c12;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.draft-commander-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.draft-commander-option {
+    cursor: pointer;
+    flex: 1;
+    min-width: 140px;
+}
+
+.draft-commander-option input[type="radio"] {
+    display: none;
+}
+
+.commander-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.draft-commander-option input[type="radio"]:checked + .commander-card {
+    border-color: #f39c12;
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.commander-card:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.commander-icon {
+    font-size: 1.4rem;
+}
+
+.commander-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.commander-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.commander-role {
+    font-size: 0.65rem;
+    color: #888;
+}
+
 /* ==============================
    RANDOM EVENTS MODAL
    ============================== */
