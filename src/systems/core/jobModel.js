@@ -780,6 +780,22 @@ class JobRegistry {
 
         if ((res.wood || 0) < 3) this.releaseWorkersFromJobType('sawyer', Infinity);
 
+        // Release gatherers when better food-producing slots are available
+        // Gatherers produce ~0.5 food/day vs farmers at 5.0 food/day
+        const foodJobs = ['farmer', 'hunter', 'herder'];
+        let totalFoodSlotsMissing = 0;
+        for (const fj of foodJobs) {
+            totalFoodSlotsMissing += this.getMissingSlotsForJobType(fj);
+        }
+        if (totalFoodSlotsMissing > 0) {
+            const gathererCount = this.countWorkersInJobType('gatherer');
+            const toRelease = Math.min(gathererCount, totalFoodSlotsMissing);
+            if (toRelease > 0) {
+                this.releaseWorkersFromJobType('gatherer', toRelease);
+                this.debugLog(`Released ${toRelease} gatherers for ${totalFoodSlotsMissing} unfilled food job slots`);
+            }
+        }
+
         // Crisis response: progressively release non-food workers
         if (crisisLevel >= 2) {
             // Severe crisis: release all luxury/non-essential workers
@@ -790,7 +806,9 @@ class JobRegistry {
             ['rockcutter', 'miner', 'sawyer', 'woodcutter'].forEach(j =>
                 this.releaseWorkersFromJobType(j, Infinity)
             );
-            this.debugLog(`FOOD CRISIS (level ${crisisLevel}): released all non-food workers`);
+            // Also release all gatherers — farmers produce 10x more food
+            this.releaseWorkersFromJobType('gatherer', Infinity);
+            this.debugLog(`FOOD CRISIS (level ${crisisLevel}): released all non-food workers + gatherers`);
         } else if (crisisLevel >= 1) {
             // Warning: release some non-essential workers
             ['trader', 'rockcutter', 'miner', 'blacksmith', 'engineer'].forEach(j =>

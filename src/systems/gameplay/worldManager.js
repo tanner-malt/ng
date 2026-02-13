@@ -1652,6 +1652,8 @@ class WorldManager {
                 a.position.x === enemy.position.col
             );
             if (blockingArmy) {
+                // Pull reinforcements from adjacent idle armies before combat
+                this._pullReinforcements(blockingArmy);
                 // Fight the blocking army instead of moving
                 this.resolveCombat(blockingArmy, enemy);
                 return; // Don't move this turn — fighting uses the day
@@ -1691,6 +1693,8 @@ class WorldManager {
                 if (blocker) {
                     // Move onto the tile and fight
                     enemy.position = { row: nextRow, col: nextCol };
+                    // Pull reinforcements from adjacent idle armies before combat
+                    this._pullReinforcements(blocker);
                     this.resolveCombat(blocker, enemy);
                     return;
                 }
@@ -2199,6 +2203,9 @@ class WorldManager {
                 if (army.status === 'fighting') army.status = 'idle';
                 return;
             }
+
+            // Pull reinforcements from adjacent idle armies each day of battle
+            this._pullReinforcements(army);
 
             // Each day of battle: both sides lose ~15% of their units
             const armyLosses = Math.max(1, Math.ceil(army.units.length * 0.15));

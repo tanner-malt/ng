@@ -70,9 +70,17 @@ class VillageDefenseSystem {
             }
         });
         
-        // Garrisoned armies contribute to defense with 100% bonus (2x)
-        const garrisonedArmies = (this.gameState.armies || []).filter(a => a.status === 'garrisoned');
-        garrisonedArmies.forEach(army => {
+        // Garrisoned AND idle armies on capital tile contribute to defense with 100% bonus (2x)
+        const defendingArmies = (this.gameState.armies || []).filter(a => {
+            if (a.status === 'garrisoned') return true;
+            // Idle armies sitting on the capital tile also defend
+            if (a.status === 'idle' && window.worldManager) {
+                return a.position?.y === window.worldManager.capitalRow &&
+                       a.position?.x === window.worldManager.capitalCol;
+            }
+            return false;
+        });
+        defendingArmies.forEach(army => {
             const armyStrength = (army.units || []).reduce((s, u) => s + (u.attack || 10), 0);
             defense += armyStrength * 2; // 100% city defense bonus
         });
@@ -155,8 +163,15 @@ class VillageDefenseSystem {
         // Build defender units from garrisoned armies + guards
         const defenderUnits = [];
 
-        // Add garrisoned army units
-        const garrisonedArmies = (this.gameState.armies || []).filter(a => a.status === 'garrisoned');
+        // Add garrisoned AND idle-at-capital army units
+        const garrisonedArmies = (this.gameState.armies || []).filter(a => {
+            if (a.status === 'garrisoned') return true;
+            if (a.status === 'idle' && window.worldManager) {
+                return a.position?.y === window.worldManager.capitalRow &&
+                       a.position?.x === window.worldManager.capitalCol;
+            }
+            return false;
+        });
         garrisonedArmies.forEach(ga => {
             (ga.units || []).forEach(u => {
                 defenderUnits.push({

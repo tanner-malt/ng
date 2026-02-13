@@ -66,10 +66,10 @@ class AchievementSystem {
 
         this.defineAchievement('sheltering_citizens', {
             title: 'Sheltering Citizens',
-            description: 'Built 3 Houses',
+            description: 'Built 8 Houses',
             icon: '🏠',
             type: 'building',
-            requirement: { houses_built: 3 }, // Requires 3 houses built
+            requirement: { houses_built: 8 },
             reward: { birthRate: 0.03, gold: 40 }
         });
 
@@ -98,14 +98,6 @@ class AchievementSystem {
         });
 
         // Building achievements
-        this.defineAchievement('first_farm', {
-            title: 'Green Thumb',
-            description: 'Built your first farm',
-            icon: '🌾',
-            type: 'building',
-            reward: { gold: 60 }
-        });
-
         this.defineAchievement('build_and_they_will_come', {
             title: 'Build and They Will Come',
             description: 'Built your first Builders Hut',
@@ -118,142 +110,142 @@ class AchievementSystem {
         // Resource achievements with multiple conditions
         this.defineAchievement('wealthy_ruler', {
             title: 'Wealthy Ruler',
-            description: 'Accumulated 1000 gold',
+            description: 'Accumulated 5,000 gold',
             icon: '💰',
             type: 'resource',
-            requirement: { gold: 1000 },
+            requirement: { gold: 5000 },
             reward: { prestige: 25 }
         });
 
         this.defineAchievement('prosperous_kingdom', {
             title: 'Prosperous Kingdom',
-            description: 'Have 500 gold, 200 food, and 50 population',
+            description: 'Have 2,000 gold, 500 food, and 150 population',
             icon: '🏰',
             type: 'resource',
             requirement: {
-                gold: 500,
-                food: 200,
-                population: 50
+                gold: 2000,
+                food: 500,
+                population: 150
             },
             reward: { prestige: 50, influence: 25 }
         });
 
         this.defineAchievement('thriving_dynasty', {
             title: 'Thriving Dynasty',
-            description: 'Reached 50 population',
+            description: 'Reached 150 population',
             icon: '🏘️',
             type: 'resource',
-            requirement: { population: 50 },
+            requirement: { population: 150 },
             reward: { birthRate: 0.03, gold: 150 }
         });
 
         this.defineAchievement('migration_wave', {
             title: 'Migration Wave',
-            description: 'Your dynasty attracts settlers from afar',
+            description: 'Reach 75 population — your dynasty attracts settlers from afar',
             icon: '🚶‍♂️🚶‍♀️',
             type: 'special',
-            requirement: { population: 25 },
+            requirement: { population: 75 },
             reward: { birthRate: 0.05, gold: 300 }
         });
 
         // Additional population achievements
         this.defineAchievement('growing_settlement', {
             title: 'Growing Settlement',
-            description: 'Reached 10 population - your dynasty takes root',
+            description: 'Reached 40 population — your dynasty takes root',
             icon: '🏡',
             type: 'population',
-            requirement: { population: 10 },
+            requirement: { population: 40 },
             reward: { gold: 100 }
         });
 
         this.defineAchievement('great_city', {
             title: 'Great City',
-            description: 'Reached 200 population - a true urban center',
+            description: 'Reached 750 population — a true urban center',
             icon: '🏙️',
             type: 'population',
-            requirement: { population: 200 },
+            requirement: { population: 750 },
             reward: { gold: 300, influence: 100 }
         });
 
         this.defineAchievement('metropolis', {
             title: 'Metropolis',
-            description: 'Reached 500 population - a massive dynastic center',
+            description: 'Reached 1,500 population — a massive dynastic center',
             icon: '🌆',
             type: 'population',
-            requirement: { population: 500 },
+            requirement: { population: 1500 },
             reward: { gold: 1500, influence: 500, prestige: 200 }
         });
 
         this.defineAchievement('welcoming_refuge', {
             title: 'Welcoming Refuge',
-            description: 'Welcomed 10 immigrants to your dynasty',
+            description: 'Welcomed 30 immigrants to your dynasty',
             icon: '🤝',
             type: 'immigration',
-            requirement: { total_immigrants: 10 },
+            requirement: { total_immigrants: 30 },
             reward: { birthRate: 0.02, happiness: 15 }
         });
 
         this.defineAchievement('immigration_hub', {
             title: 'Immigration Hub',
-            description: 'Welcomed 50 immigrants - your dynasty is renowned',
+            description: 'Welcomed 150 immigrants — your dynasty is renowned',
             icon: '🌍',
             type: 'immigration',
-            requirement: { total_immigrants: 50 },
+            requirement: { total_immigrants: 150 },
             reward: { birthRate: 0.04, gold: 250 }
         });
 
         this.defineAchievement('baby_boom', {
             title: 'Baby Boom',
-            description: 'Celebrated 25 births in your dynasty',
+            description: 'Celebrated 75 births in your dynasty',
             icon: '👶',
             type: 'births',
-            requirement: { total_births: 25 },
+            requirement: { total_births: 75 },
             reward: { gold: 200, happiness: 15 }
         });
 
         this.defineAchievement('generational_legacy', {
             title: 'Generational Legacy',
-            description: 'Celebrated 100 births - multiple generations thrive',
+            description: 'Celebrated 350 births — multiple generations thrive',
             icon: '👨‍👩‍👧‍👦',
             type: 'births',
-            requirement: { total_births: 100 },
+            requirement: { total_births: 350 },
             reward: { gold: 500, influence: 100, prestige: 100 }
         });
 
         this.defineAchievement('content_populace', {
             title: 'Content Populace',
-            description: 'Maintained 85% average happiness with 20+ population',
+            description: 'Maintained 85% average happiness with 50+ population',
             icon: '😊',
             type: 'happiness',
-            requirement: { avg_happiness: 85, min_population: 20 },
+            requirement: { avg_happiness: 85, min_population: 50 },
             reward: { happiness: 20, gold: 100 }
         });
 
         this.defineAchievement('utopian_society', {
             title: 'Utopian Society',
-            description: 'Achieved 95% average happiness with 50+ population',
+            description: 'Achieved 95% average happiness with 150+ population',
             icon: '🌟',
             type: 'happiness',
-            requirement: { avg_happiness: 95, min_population: 50 },
+            requirement: { avg_happiness: 95, min_population: 150 },
             reward: { happiness: 30, gold: 300, influence: 200, prestige: 150 }
         });
 
         this.defineAchievement('dynasty_pinnacle', {
             title: 'Dynasty Pinnacle',
-            description: 'Reached a peak population of 1000 - legendary status',
+            description: 'Reached a peak population of 2,500 — legendary status',
             icon: '👑',
             type: 'peak_population',
-            requirement: { peak_population: 1000 },
+            requirement: { peak_population: 2500 },
             reward: { gold: 2500, influence: 1000, prestige: 500 }
         });
 
         // Combat achievements
         this.defineAchievement('warrior_king', {
             title: 'Warrior King',
-            description: 'Won 10 battles',
+            description: 'Won 25 battles',
             icon: '🗡️',
             type: 'combat',
-            requirement: { battles_won: 10 },
+            requirement: { battles_won: 25 },
             reward: { military_exp: 200, prestige: 100 }
         });
 
@@ -322,19 +314,19 @@ class AchievementSystem {
         // High-priority achievements from wiki analysis
         this.defineAchievement('master_builder', {
             title: 'Master Builder',
-            description: 'Build 10 different types of buildings',
+            description: 'Build 18 different types of buildings',
             icon: '🏗️',
             type: 'building',
-            requirement: { building_types_built: 10 },
+            requirement: { building_types_built: 18 },
             reward: { constructionSpeed: 0.05 }
         });
 
         this.defineAchievement('population_boom', {
             title: 'Population Boom',
-            description: 'Reach 100 total population',
+            description: 'Reach 300 total population',
             icon: '👥',
             type: 'population',
-            requirement: { total_population: 100 },
+            requirement: { total_population: 300 },
             reward: { gold: 150 }
         });
 
@@ -358,10 +350,10 @@ class AchievementSystem {
 
         this.defineAchievement('seasonal_master', {
             title: 'Seasonal Master',
-            description: 'Successfully navigate through all 8 seasonal periods',
+            description: 'Successfully navigate through 32 seasonal periods',
             icon: '🌸',
             type: 'survival',
-            requirement: { seasons_survived: 8 },
+            requirement: { seasons_survived: 32 },
             reward: { gold: 1000 }
         });
 
@@ -376,25 +368,25 @@ class AchievementSystem {
 
         this.defineAchievement('multi_generational', {
             title: 'Multi-Generational',
-            description: 'Rule for 3+ consecutive generations',
+            description: 'Rule for 5+ consecutive generations',
             icon: '⏳',
             type: 'dynasty',
-            requirement: { generations_ruled: 3 },
+            requirement: { generations_ruled: 5 },
             reward: { prestige: 300, influence: 150 }
         });
 
         this.defineAchievement('map_explorer', {
             title: 'Map Explorer',
-            description: 'Reveal 50% of the world map through exploration',
+            description: 'Reveal 75% of the world map through exploration',
             icon: '🗺️',
             type: 'exploration',
-            requirement: { map_revealed_percent: 50 },
+            requirement: { map_revealed_percent: 75 },
             reward: { gold: 200, influence: 100 }
         });
 
         this.defineAchievement('balanced_economy', {
             title: 'Balanced Economy',
-            description: 'Have 1,000+ of all basic resources simultaneously',
+            description: 'Have 3,000+ of all basic resources simultaneously',
             icon: '💰',
             type: 'economic',
             requirement: { balanced_resources: true },
@@ -456,12 +448,12 @@ class AchievementSystem {
         }
 
         // Check master builder achievement
-        if (this.stats.buildings_built >= 10 && !this.isUnlocked('master_builder')) {
+        if (this.stats.buildings_built >= 18 && !this.isUnlocked('master_builder')) {
             this.unlock('master_builder');
         }
 
         // Check houses requirements for house-related achievements
-        if (this.stats.houses_built >= 3 && !this.isUnlocked('sheltering_citizens')) {
+        if (this.stats.houses_built >= 8 && !this.isUnlocked('sheltering_citizens')) {
             this.unlock('sheltering_citizens');
         }
 
@@ -988,10 +980,6 @@ class AchievementSystem {
 
         // Check for "All Things End" ultimate achievement
         this.checkUltimateAchievement();
-        
-        // Check for "Become King" if not already unlocked
-        // This provides alternative paths beyond just tutorial completion
-        this.checkBecomeKingAchievement();
 
         this.isCheckingRequirements = false;
     }
@@ -1009,7 +997,7 @@ class AchievementSystem {
         const day = gs.day || 0;
         const buildings = gs.buildings?.length || 0;
         
-        if (pop >= 30 && day >= 20 && buildings >= 5) {
+        if (pop >= 75 && day >= 20 && buildings >= 12) {
             console.log('[Achievements] Become King conditions met via gameplay progression');
             this.triggerBecomeKing();
         }
@@ -1027,11 +1015,11 @@ class AchievementSystem {
 
         // Check if player has reached multiple significant milestones
         const majorAchievements = [
-            'population_boom',     // 100 population
-            'prosperous_kingdom',  // 500 gold, 200 food, 50 population
-            'warrior_king',        // 10 battles won
-            'master_builder',      // 10 buildings built
-            'wealthy_ruler'        // 1000 gold
+            'population_boom',     // 300 population
+            'prosperous_kingdom',  // 2000 gold, 500 food, 150 population
+            'warrior_king',        // 25 battles won
+            'master_builder',      // 18 building types
+            'wealthy_ruler'        // 5000 gold
         ];
 
         const unlockedMajorAchievements = majorAchievements.filter(id => this.isUnlocked(id));
@@ -1291,7 +1279,7 @@ class AchievementSystem {
     startPeriodicCheck() {
         setInterval(() => {
             this.checkRequirements();
-        }, 5000); // Check every 5 seconds
+        }, 30000); // Check every 30 seconds
     }
 
     // Debug function to see current achievement states
