@@ -8,6 +8,8 @@ class RoyalFamilyManager {
         this.currentMonarch = null;
         this.marriageOffers = [];
         this.successionOrder = [];
+        this._lastBirthCooldowns = {};   // royalId → day of last birth
+        this._lastLineageWarningDay = 0; // throttle heir warnings
     }
 
     // Initialize royal family with starting monarch
@@ -19,7 +21,8 @@ class RoyalFamilyManager {
         this.currentMonarch = {
             id: `royal_${Date.now()}`,
             name: name,
-            age: 25, // Age in years
+            age: 25, // Age in days
+            gender: 'male',
             status: 'monarch',
             // When governing, the monarch enables village management and does not take normal jobs
             isGoverning: true,
@@ -90,10 +93,13 @@ class RoyalFamilyManager {
             id: `spouse_${Date.now()}`,
             name: spouseData.name,
             age: spouseData.age || royal.age + Math.floor(Math.random() * 6) - 3, // Similar age
+            gender: spouseData.gender || 'female',
             status: 'royal_spouse',
             traits: this.generateRoyalTraits(),
             skills: this.generateRoyalSkills(),
-            origin: spouseData.origin || 'local_nobility'
+            origin: spouseData.origin || 'local_nobility',
+            children: [],
+            spouse: null  // linked below
         };
 
         // Link marriage
@@ -105,40 +111,85 @@ class RoyalFamilyManager {
 
         console.log(`[RoyalFamily] ${royal.name} married to ${spouse.name}`);
 
-        // Marriage may produce children over time
-        this.scheduleChildBirth(royal, spouse);
-
         try { this.gameState.save?.(); } catch (_) { }
         return true;
     }
 
-    // Schedule potential child birth
-    scheduleChildBirth(parent1, parent2) {
-        // Random chance for children over time
-        const childChance = 0.3; // 30% chance per year
+    // Daily royal birth processing — game-tick driven (replaces broken setTimeout)
+    processRoyalBirths() {
+        const currentDay = this.gameState?.day || 0;
+        const FERTILITY_MIN_AGE = 16;   // days
+        const FERTILITY_MAX_AGE = 160;  // days
+        const BIRTH_COOLDOWN = 30;      // days between births
+        const MAX_CHILDREN = 5;         // per parent
+        const BASE_BIRTH_CHANCE = 0.02; // 2% per day
 
-        setTimeout(() => {
-            if (Math.random() < childChance && parent1.age < 45) {
-                this.createChild(parent1, parent2);
+        // Snapshot to avoid issues if royalFamily is mutated during iteration
+        const snapshot = [...this.royalFamily];
+        const processed = new Set();
 
-                // Schedule another potential child
-                if (parent1.children.length < 4) { // Max 4 children
-                    this.scheduleChildBirth(parent1, parent2);
-                }
+        for (const royal of snapshot) {
+            if (!royal.spouse || processed.has(royal.id)) continue;
+
+            const spouse = this.findRoyalById(royal.spouse);
+            if (!spouse) continue;
+
+            processed.add(royal.id);
+            processed.add(spouse.id);
+
+            // Both must be alive and in fertility range
+            if (royal.age < FERTILITY_MIN_AGE || royal.age > FERTILITY_MAX_AGE) continue;
+            if (spouse.age < FERTILITY_MIN_AGE || spouse.age > FERTILITY_MAX_AGE) continue;
+
+            // Check max children for either parent
+            const royalChildren = royal.children?.length || 0;
+            const spouseChildren = spouse.children?.length || 0;
+            if (royalChildren >= MAX_CHILDREN || spouseChildren >= MAX_CHILDREN) continue;
+
+            // Check cooldown (days since last birth)
+            const lastBirthDay = Math.max(
+                this._lastBirthCooldowns[royal.id] || 0,
+                this._lastBirthCooldowns[spouse.id] || 0
+            );
+            if (currentDay - lastBirthDay < BIRTH_COOLDOWN) continue;
+
+            // Calculate birth chance with trait bonuses
+            let birthChance = BASE_BIRTH_CHANCE;
+            const allTraits = [...(royal.traits || []), ...(spouse.traits || [])];
+            if (allTraits.includes('healthy')) birthChance += 0.005;
+            if (allTraits.includes('strong')) birthChance += 0.003;
+
+            // Food surplus bonus
+            try {
+                const gs = this.gameState;
+                const food = gs?.resources?.food || 0;
+                const storageCap = gs?.storageCap || gs?.getStorageCap?.() || 100;
+                if (food > storageCap * 0.5) birthChance += 0.005;
+            } catch (_) { /* no bonus */ }
+
+            // Roll for birth
+            if (Math.random() < birthChance) {
+                this.createChild(royal, spouse);
+                this._lastBirthCooldowns[royal.id] = currentDay;
+                this._lastBirthCooldowns[spouse.id] = currentDay;
             }
-        }, (365 * 1000) + Math.random() * 365000); // 1-2 years
+        }
     }
 
     // Create a child heir
     createChild(parent1, parent2) {
+        const gender = Math.random() < 0.5 ? 'male' : 'female';
         const child = {
-            id: `heir_${Date.now()}`,
-            name: this.generateHeirName(),
+            id: `heir_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            name: this.generateHeirName(gender),
             age: 0,
+            gender: gender,
             status: 'heir',
             traits: this.inheritTraits(parent1, parent2),
             skills: { leadership: 0, military: 0, diplomacy: 0, economics: 0 },
             parents: [parent1.id, parent2.id],
+            children: [],
+            spouse: null,
             education: {
                 focus: null, // Player can choose specialization
                 tutors: [],
@@ -146,7 +197,9 @@ class RoyalFamilyManager {
             }
         };
 
-        // Add to parent's children list
+        // Add to parent's children list (defensive — ensure arrays exist)
+        if (!Array.isArray(parent1.children)) parent1.children = [];
+        if (!Array.isArray(parent2.children)) parent2.children = [];
         parent1.children.push(child.id);
         parent2.children.push(child.id);
 
@@ -162,13 +215,14 @@ class RoyalFamilyManager {
         if (window.showModal) {
             window.showModal(
                 '👶 Royal Birth!',
-                `<p>A new heir has been born to the royal family!</p>
+                `<p>A new ${gender === 'male' ? 'prince' : 'princess'} has been born to the royal family!</p>
                  <p><strong>${child.name}</strong> joins the line of succession.</p>
-                 <p>Inherited Traits: ${child.traits.join(', ') || 'None'}</p>`,
+                 <p>Inherited Traits: ${child.traits.join(', ') || 'None yet'}</p>`,
                 { type: 'success', icon: '👑' }
             );
         }
 
+        try { window.eventBus?.emit?.('royal_birth', { child, parent1Id: parent1.id, parent2Id: parent2.id }); } catch (_) { }
         try { this.gameState.save?.(); } catch (_) { }
         return child;
     }
@@ -415,6 +469,44 @@ class RoyalFamilyManager {
         }
     }
 
+    // Warn player when dynasty lineage is at risk
+    checkLineageWarnings() {
+        const currentDay = this.gameState?.day || 0;
+        const WARNING_INTERVAL = 30; // days between warnings
+
+        if (currentDay - this._lastLineageWarningDay < WARNING_INTERVAL) return;
+
+        const monarch = this.currentMonarch;
+        if (!monarch) return;
+
+        const heirs = this.royalFamily.filter(r => r.status === 'heir');
+        const adultHeirs = heirs.filter(r => r.age >= 16);
+        const hasSpouse = !!monarch.spouse;
+
+        // Critical: Monarch aging with no heirs at all
+        if (monarch.age >= 120 && heirs.length === 0) {
+            const msg = hasSpouse
+                ? `${monarch.name} grows old with no heirs. The dynasty's future is uncertain.`
+                : `${monarch.name} has no spouse and no heirs. Arrange a marriage in the Monarch view before it's too late!`;
+            try { window.eventBus?.emit?.('toast', { message: `\u26A0\uFE0F ${msg}`, type: 'warning' }); } catch (_) { }
+            this._lastLineageWarningDay = currentDay;
+            return;
+        }
+
+        // Warning: Monarch very old with only underage heirs
+        if (monarch.age >= 150 && adultHeirs.length === 0 && heirs.length > 0) {
+            const youngest = heirs.reduce((min, h) => h.age < min.age ? h : min, heirs[0]);
+            const daysToAdult = Math.max(0, 16 - youngest.age);
+            try {
+                window.eventBus?.emit?.('toast', {
+                    message: `\u26A0\uFE0F ${monarch.name} is aging \u2014 the eldest heir won't come of age for ${daysToAdult} more days.`,
+                    type: 'warning'
+                });
+            } catch (_) { }
+            this._lastLineageWarningDay = currentDay;
+        }
+    }
+
     // Find royal family member by ID
     findRoyalById(id) {
         return this.royalFamily.find(royal => royal.id === id);
@@ -462,6 +554,12 @@ class RoyalFamilyManager {
             }
         });
 
+        // Process potential royal births
+        this.processRoyalBirths();
+
+        // Check for lineage warnings
+        this.checkLineageWarnings();
+
         // Update succession after aging
         this.updateSuccessionOrder();
     }
@@ -500,12 +598,14 @@ class RoyalFamilyManager {
     serialize() {
         try {
             return {
-                version: 1,
+                version: 2,
                 royalFamily: this.royalFamily,
                 currentMonarchId: this.currentMonarch ? this.currentMonarch.id : null,
                 marriageOffers: this.marriageOffers,
                 // successionOrder can be recomputed; include for visibility only
-                successionOrderIds: Array.isArray(this.successionOrder) ? this.successionOrder.map(m => m.id) : []
+                successionOrderIds: Array.isArray(this.successionOrder) ? this.successionOrder.map(m => m.id) : [],
+                birthCooldowns: this._lastBirthCooldowns || {},
+                lastLineageWarningDay: this._lastLineageWarningDay || 0
             };
         } catch (_) {
             return null;
@@ -535,6 +635,20 @@ class RoyalFamilyManager {
                 this.currentMonarch.isGoverning = true;
             }
             this.marriageOffers = Array.isArray(data.marriageOffers) ? data.marriageOffers : [];
+
+            // Restore procreation state
+            this._lastBirthCooldowns = data.birthCooldowns || {};
+            this._lastLineageWarningDay = data.lastLineageWarningDay || 0;
+
+            // Backfill missing fields for older saves
+            this.royalFamily.forEach(r => {
+                if (!Array.isArray(r.children)) r.children = [];
+                if (r.gender === undefined) {
+                    r.gender = r.status === 'royal_spouse' ? 'female' : (Math.random() < 0.5 ? 'male' : 'female');
+                }
+                if (r.spouse === undefined) r.spouse = null;
+            });
+
             // Recompute succession to ensure consistency
             this.updateSuccessionOrder();
         } catch (e) {
