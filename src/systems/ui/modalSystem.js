@@ -1454,53 +1454,15 @@ class ModalSystem {
     }
 
     /**
-     * End Run - kills current run and lets you start fresh (preserves legacy data)
+     * End Run - triggers the full legacy/prestige flow (same as End Dynasty).
+     * Calculates legacy points, preserves gold, shows breakdown modal.
      */
     endRun() {
         // Close settings modal first  
         this.closeAllModals();
         
         setTimeout(() => {
-            this.showConfirmation(
-                '<p>This will end your current run and return you to the home screen.</p><p>Your legacy data and achievements will be preserved.</p>',
-                {
-                    title: '🔄 End Current Run?',
-                    confirmText: 'End Run',
-                    cancelText: 'Cancel',
-                    type: 'warning',
-                    onConfirm: () => {
-                        console.log('[ModalSystem] End Run confirmed - clearing run data only');
-                        
-                        // Keys to preserve (legacy and achievements)
-                        const preserveKeys = [
-                            'dynastyBuilder_legacy',
-                            'dynastyHistory',
-                            'dynastyName',
-                            'dynastyBuilder_achievements',
-                            'idleDynastyBuilder_achievements'
-                        ];
-                        
-                        // Store preserved data
-                        const preserved = {};
-                        preserveKeys.forEach(key => {
-                            const data = localStorage.getItem(key);
-                            if (data) preserved[key] = data;
-                        });
-                        
-                        // Clear all localStorage
-                        localStorage.clear();
-                        sessionStorage.clear();
-                        
-                        // Restore preserved data
-                        Object.entries(preserved).forEach(([key, value]) => {
-                            localStorage.setItem(key, value);
-                        });
-                        
-                        // Force reload to home screen
-                        window.location.href = window.location.origin + window.location.pathname;
-                    }
-                }
-            );
+            this.endDynasty();
         }, 150);
     }
 

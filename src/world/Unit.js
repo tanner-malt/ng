@@ -32,6 +32,7 @@ const UnitType = {
     SCOUT_PARTY: 'scout_party',
     TRADE_CARAVAN: 'trade_caravan',
     SETTLERS: 'settlers',
+    CITY: 'city',
     
     // Allied units
     ALLIED_ARMY: 'allied_army',
@@ -119,6 +120,7 @@ class Unit {
             [UnitType.SCOUT_PARTY]: '🔭',
             [UnitType.TRADE_CARAVAN]: '🛒',
             [UnitType.SETTLERS]: '👨‍👩‍👧‍👦',
+            [UnitType.CITY]: '🏰',
             
             // Allied units
             [UnitType.ALLIED_ARMY]: '🤝',

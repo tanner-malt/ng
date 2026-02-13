@@ -247,6 +247,27 @@ class UnitManager {
             ...config
         });
     }
+
+    /**
+     * Create a city unit (stationary, high defense, represents a settlement)
+     * @param {object} config - { row, col, name, data: { level, governor, founded, isCapital } }
+     */
+    createCityUnit(config) {
+        return this.createUnit({
+            type: UnitType.CITY,
+            allegiance: UnitAllegiance.PLAYER,
+            mode: UnitMode.IDLE,
+            movementSpeed: 0,      // Cities don't move
+            icon: '🏰',
+            color: '#f1c40f',
+            combat: {
+                attack: 0,
+                defense: 50,
+                morale: 100
+            },
+            ...config
+        });
+    }
     
     /**
      * Destroy a unit

@@ -210,7 +210,7 @@ class VillageDefenseSystem {
         }
 
         // Try to use BattleViewer for animated combat
-        if (window.BattleViewer) {
+        if (window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
             const playerArmy = {
                 name: 'Village Defense',
                 units: defenderUnits
@@ -220,7 +220,7 @@ class VillageDefenseSystem {
                 units: enemyUnits
             };
 
-            const viewer = new window.BattleViewer((result) => {
+            window.battleViewer.showBattle(playerArmy, enemyArmy, 'plains', (result) => {
                 // Process battle outcome
                 if (result?.victory) {
                     this.handleDefenseSuccess(battle, army);
@@ -246,8 +246,7 @@ class VillageDefenseSystem {
                     window.worldManager.removeEnemy?.(army.id);
                 }
             });
-
-            viewer.startBattle(playerArmy, enemyArmy, 'plains');
+            return;
         } else {
             // Fallback: original dice-roll resolution
             const defenderAdvantage = 1.2;
@@ -309,33 +308,40 @@ class VillageDefenseSystem {
         
         window.eventBus?.emit('defenseDefeat', { battle, army });
         
-        // Village is destroyed — trigger dynasty end
-        const dynastyName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
-        
-        if (window.legacySystem) {
-            window.legacySystem.performEndDynasty(this.gameState, dynastyName, 'village_destroyed');
+        // Destroy the capital city unit — the unit_destroyed event handler triggers dynasty end
+        const cityUnitId = window.worldManager?.cityUnitId;
+        if (cityUnitId && window.unitManager) {
+            console.log('[VillageDefense] Destroying capital city unit:', cityUnitId);
+            window.unitManager.destroyUnit(cityUnitId);
         } else {
-            // Fallback: show modal then reload
-            if (window.modalSystem?.showModal) {
-                window.modalSystem.showModal({
-                    title: '🗡️ Village Destroyed!',
-                    content: `<div style="text-align:center;padding:20px;">
-                        <div style="font-size:64px;margin-bottom:16px;">🔥</div>
-                        <p>Your village has been overrun by <strong>${army.name}</strong>.</p>
-                        <p>The dynasty has fallen...</p>
-                        <button id="destruction-restart" style="margin-top:16px;padding:12px 24px;background:#c0392b;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1em;font-weight:bold;">Start Over</button>
-                    </div>`,
-                    closable: false,
-                    showCloseButton: false
-                });
-                setTimeout(() => {
-                    document.getElementById('destruction-restart')?.addEventListener('click', () => {
-                        localStorage.clear();
-                        location.reload();
-                    });
-                }, 50);
+            // Fallback: trigger dynasty end directly if UnitManager isn't available
+            const dynastyName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
+            
+            if (window.legacySystem) {
+                window.legacySystem.performEndDynasty(this.gameState, dynastyName, 'village_destroyed');
             } else {
-                setTimeout(() => location.reload(), 2000);
+                // Emergency fallback: show modal then reload
+                if (window.modalSystem?.showModal) {
+                    window.modalSystem.showModal({
+                        title: '🗡️ Village Destroyed!',
+                        content: `<div style="text-align:center;padding:20px;">
+                            <div style="font-size:64px;margin-bottom:16px;">🔥</div>
+                            <p>Your village has been overrun by <strong>${army.name}</strong>.</p>
+                            <p>The dynasty has fallen...</p>
+                            <button id="destruction-restart" style="margin-top:16px;padding:12px 24px;background:#c0392b;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1em;font-weight:bold;">Start Over</button>
+                        </div>`,
+                        closable: false,
+                        showCloseButton: false
+                    });
+                    setTimeout(() => {
+                        document.getElementById('destruction-restart')?.addEventListener('click', () => {
+                            localStorage.clear();
+                            location.reload();
+                        });
+                    }, 50);
+                } else {
+                    setTimeout(() => location.reload(), 2000);
+                }
             }
         }
     }

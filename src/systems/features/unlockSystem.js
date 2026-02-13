@@ -27,6 +27,7 @@ class UnlockSystem {
 
         this.initializeUnlockConditions();
         this.loadFromStorage();
+        this.reapplyViewUnlocks();
 
         console.log('[UnlockSystem] Achievement-based unlock system initialized');
     }
@@ -265,9 +266,9 @@ class UnlockSystem {
         this.registerUnlock('throne_view', {
             type: 'view',
             name: 'Throne Room',
-            description: 'Access the throne\'s full power and royal family management',
+            description: 'Build the Keep to access the throne\'s full power',
             conditions: [
-                { type: 'achievement', achievement: 'all_things_end' }
+                { type: 'building_count', building: 'keep', count: 1 }
             ],
             autoUnlock: true,
             callback: () => this.unlockView('throne')
@@ -974,6 +975,22 @@ class UnlockSystem {
             console.warn('[UnlockSystem] Error loading from storage:', error);
             this.unlockedContent = new Set(['townCenter', 'village_view']);
         }
+    }
+
+    /**
+     * After loading saved unlocks, re-fire any view unlock callbacks
+     * so the DOM nav buttons and content divs reflect the saved state.
+     */
+    reapplyViewUnlocks() {
+        const viewUnlocks = ['monarch_view', 'throne_view', 'world_view'];
+        viewUnlocks.forEach(unlockId => {
+            if (this.unlockedContent.has(unlockId)) {
+                const viewName = unlockId.replace('_view', '');
+                // Re-fire the DOM unlock without notifications
+                this.unlockView(viewName);
+                console.log(`[UnlockSystem] Re-applied saved view unlock: ${viewName}`);
+            }
+        });
     }
 
     // Manual unlock methods for special cases

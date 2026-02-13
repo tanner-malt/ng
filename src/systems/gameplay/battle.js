@@ -352,10 +352,10 @@ class BattleViewer {
             <strong>Your Army:</strong> ${playerAlive} retreated, ${this.result.playerLosses} lost covering retreat<br>
             <strong>Enemy:</strong> ${this.result.enemySurvivors} remaining
         `;
+        // Hide battle controls and show result
+        const controls = document.querySelector('.battle-controls');
+        if (controls) controls.style.display = 'none';
         document.getElementById('battle-result').style.display = 'block';
-        // Disable retreat button
-        const retreatBtn = document.getElementById('battle-retreat');
-        if (retreatBtn) retreatBtn.disabled = true;
         this.render();
     }
     
@@ -506,6 +506,9 @@ class BattleViewer {
             <strong>Your Army:</strong> ${playerAlive} survived, ${this.result.playerLosses} lost<br>
             <strong>Enemy Army:</strong> ${enemyAlive} survived, ${this.result.enemyLosses} lost
         `;
+        // Hide battle controls and show result
+        const controls = document.querySelector('.battle-controls');
+        if (controls) controls.style.display = 'none';
         document.getElementById('battle-result').style.display = 'block';
         this.render();
     }

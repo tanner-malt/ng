@@ -33,6 +33,10 @@ class WorldManager {
         // Enemy groups advancing toward the village
         this.enemies = [];
 
+        // UnitManager — entity system for cities and future army migration
+        this.unitManager = null;
+        this.cityUnitId = null;   // ID of the capital city unit
+
         // Active multi-day battles (resolved partially each day)
         this.activeBattles = [];
 
@@ -67,6 +71,9 @@ class WorldManager {
         if (!this.restoreFromSave()) {
             this.generateMap();
         }
+
+        // Bootstrap UnitManager
+        this.initUnitManager();
 
         // Build DOM
         this.setupWorldUI();
@@ -112,6 +119,71 @@ class WorldManager {
         this.revealAround(this.capitalRow, this.capitalCol, baseRadius + scoutBonus + legacyScoutBonus);
 
         console.log('[WorldManager] Map generated with', noise ? 'simplex noise' : 'fallback random');
+    }
+
+    /**
+     * Initialize the UnitManager and ensure a capital city unit exists.
+     * Called once during init(), after hexMap is ready.
+     */
+    initUnitManager() {
+        if (window.UnitManager) {
+            this.unitManager = new UnitManager();
+            this.unitManager.gameState = this.gameState;
+            this.unitManager.worldManager = this;
+            this.unitManager.init();  // loads saved units from localStorage
+            window.unitManager = this.unitManager;
+
+            // Ensure capital city unit exists (may already be loaded from save)
+            this.ensureCityUnit();
+
+            // Listen for city unit destruction → dynasty end
+            window.eventBus?.on('unit_destroyed', (data) => {
+                if (data?.unit?.type === 'city' && data.unit.data?.isCapital) {
+                    console.log('[WorldManager] Capital city unit destroyed — triggering dynasty end');
+                    const dynastyName = localStorage.getItem('dynastyName') || this.gameState?.dynastyName || 'Unknown';
+                    if (window.legacySystem) {
+                        window.legacySystem.performEndDynasty(this.gameState, dynastyName, 'village_destroyed');
+                    }
+                }
+            });
+
+            console.log('[WorldManager] UnitManager bootstrapped, city unit:', this.cityUnitId);
+        } else {
+            console.warn('[WorldManager] UnitManager not available — Unit.js / UnitManager.js may not be loaded');
+        }
+    }
+
+    /**
+     * Ensure the capital city has a corresponding Unit entity.
+     * If one already exists (from save), re-link it. Otherwise create it.
+     */
+    ensureCityUnit() {
+        if (!this.unitManager) return;
+
+        // Check if a capital city unit already exists (loaded from save)
+        const existingCity = this.unitManager.getAllUnits().find(
+            u => u.type === 'city' && u.data?.isCapital && !u.destroyed
+        );
+
+        if (existingCity) {
+            this.cityUnitId = existingCity.id;
+            return;
+        }
+
+        // Create the capital city unit
+        const dynastyName = this.gameState?.dynastyName || localStorage.getItem('dynastyName') || 'Kingdom';
+        const cityUnit = this.unitManager.createCityUnit({
+            row: this.capitalRow,
+            col: this.capitalCol,
+            name: dynastyName + ' Capital',
+            data: {
+                isCapital: true,
+                level: 1,
+                governor: null,
+                founded: this.gameState?.day || 1
+            }
+        });
+        this.cityUnitId = cityUnit.id;
     }
 
     /**
@@ -1077,6 +1149,20 @@ class WorldManager {
         // Army becomes city garrison
         army.status = 'city';
 
+        // Create a city unit entity for the established city
+        if (this.unitManager) {
+            this.unitManager.createCityUnit({
+                row, col,
+                name: cityName,
+                data: {
+                    isCapital: false,
+                    level: 1,
+                    governor: null,
+                    founded: this.gameState.day || 0
+                }
+            });
+        }
+
         window.showToast?.(`🏛️ ${cityName} established at ${coords}!`, { type: 'success' });
         window.eventBus?.emit?.('city_established', { row, col, name: cityName, armyId });
 
@@ -1628,6 +1714,12 @@ class WorldManager {
         this.processActiveBattles();
         this.processEnemies();
         this.processCityIncome();
+
+        // Process UnitManager daily (travel, supplies, encounters)
+        if (this.unitManager) {
+            this.unitManager.processDaily();
+        }
+
         this.refreshUI();
         this.saveWorldData();
     }
