@@ -77,6 +77,10 @@ class VillageDefenseSystem {
             defense += armyStrength * 2; // 100% city defense bonus
         });
         
+        // Apply Fortification investment bonus from monarch
+        const fortInvestMult = window.monarchManager?.getFortificationMultiplier?.() || 1.0;
+        defense *= fortInvestMult;
+
         // Apply tech bonuses
         const guardEfficiency = this.gameState.techBonuses?.guardEfficiency || 0;
         defense *= (1 + guardEfficiency);

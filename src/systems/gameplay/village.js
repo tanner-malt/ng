@@ -1838,20 +1838,27 @@ class VillageManager {
                 }
             }
 
-            // Construction progress bar (bottom)
+            // Construction progress bar (bottom) + percentage label
             if (isUnderConstruction) {
                 const progress = this.gameState.constructionManager?.getConstructionProgress(building.id);
-                if (progress) {
-                    const progressBar = document.createElement('div');
-                    progressBar.className = 'building-progress-bar';
-                    const fill = document.createElement('div');
-                    fill.className = 'building-progress-fill';
-                    fill.style.width = `${progress.progressPercent}%`;
-                    progressBar.appendChild(fill);
-                    buildingEl.appendChild(progressBar);
+                const pct = progress ? progress.progressPercent : 0;
 
-                    buildingEl.title = `${displayName} - ${progress.progressPercent}% (${progress.assignedBuilders} builders)`;
-                }
+                const progressBar = document.createElement('div');
+                progressBar.className = 'building-progress-bar';
+                const fill = document.createElement('div');
+                fill.className = 'building-progress-fill';
+                fill.style.width = `${pct}%`;
+                progressBar.appendChild(fill);
+                buildingEl.appendChild(progressBar);
+
+                // Percentage text above bar
+                const pctLabel = document.createElement('span');
+                pctLabel.className = 'building-progress-pct';
+                pctLabel.textContent = `${pct}%`;
+                buildingEl.appendChild(pctLabel);
+
+                const builders = progress ? progress.assignedBuilders : 0;
+                buildingEl.title = `${displayName} — ${pct}% (${builders} builder${builders !== 1 ? 's' : ''})`;
             }
 
             // Add hover effect
@@ -2456,8 +2463,68 @@ class VillageManager {
             }
         }
 
+        // Update construction panel
+        this.updateConstructionPanel();
+
         // Update production tab display
         this.updateProductionTabDisplay();
+    }
+
+    updateConstructionPanel() {
+        const panel = document.getElementById('construction-progress-panel');
+        const list = document.getElementById('construction-sites-list');
+        const countEl = document.getElementById('construction-count');
+        if (!panel || !list) return;
+
+        const cm = this.gameState?.constructionManager;
+        const queue = this.gameState?.buildQueue || [];
+
+        // Gather active construction sites
+        const sites = [];
+        if (cm?.constructionSites) {
+            cm.constructionSites.forEach((site, id) => {
+                const pct = site.totalPoints > 0 ? Math.round((site.currentPoints / site.totalPoints) * 100) : 0;
+                const dp = site.dailyProgress || 0;
+                const remaining = (site.totalPoints || 0) - (site.currentPoints || 0);
+                const eta = dp > 0 ? Math.ceil(remaining / dp) : '—';
+                const name = window.GameData?.buildingInfo?.[site.buildingType]?.name || site.buildingType;
+                const icon = this.getBuildingSymbol(site.buildingType, 0);
+                sites.push({ id, name, icon, pct, builders: (site.assignedBuilders || []).length, eta, status: 'active' });
+            });
+        }
+
+        // Gather queued buildings
+        queue.forEach(item => {
+            const name = window.GameData?.buildingInfo?.[item.type]?.name || item.type;
+            const icon = this.getBuildingSymbol(item.type, 0);
+            sites.push({ id: item.id, name, icon, pct: 0, builders: 0, eta: '—', status: 'queued' });
+        });
+
+        if (sites.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.style.display = 'block';
+        if (countEl) countEl.textContent = sites.length;
+
+        let html = '';
+        sites.forEach(s => {
+            const etaText = s.status === 'queued' ? 'Queued' : (s.eta === '—' ? 'No builders' : `~${s.eta}d`);
+            const barColor = s.status === 'queued' ? 'rgba(149,165,166,0.3)' : '';
+            html += `
+                <div class="construction-site-row" onclick="window.villageManager?.showConstructionPriorityModal('${s.id}')" title="${s.name} — ${s.pct}% complete">
+                    <div class="construction-site-icon">${s.icon}</div>
+                    <div class="construction-site-info">
+                        <div class="construction-site-name">${s.name}${s.builders > 0 ? ` <span style="color:#95a5a6;font-weight:normal;">(${s.builders}👷)</span>` : ''}</div>
+                        <div class="construction-site-bar"${barColor ? ` style="background:${barColor}"` : ''}>
+                            <div class="construction-site-fill" style="width:${s.pct}%"></div>
+                        </div>
+                    </div>
+                    <div class="construction-site-pct">${s.status === 'queued' ? '<span style="color:#95a5a6;font-size:10px;">queued</span>' : s.pct + '%'}</div>
+                </div>`;
+        });
+        list.innerHTML = html;
     }
 
     updateProductionTabDisplay() {
@@ -3018,126 +3085,153 @@ class VillageManager {
         if (!this.gameState.jobManager) {
             this.gameState.ensureJobManager();
         }
-
-        // Update available jobs
         this.gameState.jobManager.updateAvailableJobs();
 
-        const availableJobs = this.gameState.jobManager.getAllAvailableJobs();
-        const availableWorkers = this.gameState.jobManager.getAvailableWorkers();
-        const jobSummary = this.gameState.jobManager.getJobSummary();
-        const jobStats = this.gameState.jobManager.getJobDistributionStats();
+        // Pull live data from the production engine
+        const registry = this.gameState.jobManager;
+        const detail = registry.calculateDetailedDailyProduction();
+        const workerStats = registry.getWorkerStats();
+        const empStats = registry.getEmploymentStats();
+        const jobDist = registry.getJobDistributionStats();
+        const crisisLevel = registry._detectFoodCrisis();
+        const foodDays = registry._getFoodDaysRemaining();
+        const season = this.gameState.season || 'Spring';
 
-        let contentHTML = `
-            <div style="padding: 20px; max-width: 1000px;">
-                <h2 style="color: #3498db; margin-bottom: 20px; text-align: center;">🔨 Jobs Management</h2>
-                
-                <!-- Job Distribution Visualization -->
-                ${this.generateJobVisualization(jobStats)}
-                
-                <!-- Summary Stats -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
-                    <div style="background: rgba(52, 152, 219, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
-                        <div style="color: #3498db; font-weight: bold;">Total Jobs</div>
-                        <div style="color: #ecf0f1; font-size: 18px;">${jobSummary.totalJobs}</div>
+        const seasonIcons = { Spring: '🌱', Summer: '☀️', Autumn: '🍂', Winter: '❄️' };
+        const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(1);
+        const resIcons = { food:'🌾', wood:'🪵', stone:'🪨', metal:'⛏️', planks:'🪓', weapons:'⚔️', tools:'🔧', gold:'💰', production:'🏗️' };
+
+        // ── Crisis banner ──
+        let crisisBanner = '';
+        if (crisisLevel >= 2) {
+            crisisBanner = `<div style="background:rgba(231,76,60,0.25);border:1px solid #e74c3c;border-radius:8px;padding:10px;margin-bottom:14px;text-align:center;">
+                <span style="font-size:18px;">🚨</span> <strong style="color:#e74c3c;">Food Emergency</strong> — ${foodDays < 1 ? 'Starvation!' : foodDays.toFixed(1) + ' days of food left'}. All non-food workers released.
+            </div>`;
+        } else if (crisisLevel === 1) {
+            crisisBanner = `<div style="background:rgba(241,196,15,0.2);border:1px solid #f1c40f;border-radius:8px;padding:10px;margin-bottom:14px;text-align:center;">
+                <span style="font-size:18px;">⚠️</span> <strong style="color:#f1c40f;">Food Warning</strong> — ${foodDays.toFixed(1)} days of food remaining.
+            </div>`;
+        }
+
+        // ── Top stat cards ──
+        const statCard = (label, value, color) =>
+            `<div style="background:rgba(${color},0.15);padding:10px 6px;border-radius:8px;text-align:center;min-width:0;">
+                <div style="color:rgb(${color});font-weight:bold;font-size:12px;">${label}</div>
+                <div style="color:#ecf0f1;font-size:20px;font-weight:bold;">${value}</div>
+            </div>`;
+
+        const empPct = empStats.employmentRate;
+        const empColor = empPct >= 80 ? '46,204,113' : empPct >= 50 ? '241,196,15' : '231,76,60';
+
+        // ── Production table ──
+        let prodRows = '';
+        const resources = Object.keys(detail.production).filter(r => {
+            const bd = detail.breakdown[r];
+            return bd && (bd.income.length > 0 || bd.expense.length > 0);
+        });
+        resources.forEach(r => {
+            const bd = detail.breakdown[r];
+            const totalIncome = bd.income.reduce((s, e) => s + e.amount, 0);
+            const totalExpense = bd.expense.reduce((s, e) => s + e.amount, 0);
+            const net = totalIncome + totalExpense;
+            const netColor = net > 0 ? '#2ecc71' : net < 0 ? '#e74c3c' : '#95a5a6';
+            const icon = resIcons[r] || '📦';
+
+            // Expandable breakdown
+            let breakdownHTML = '';
+            [...bd.income, ...bd.expense].forEach(line => {
+                const lc = line.amount >= 0 ? '#2ecc71' : '#e74c3c';
+                breakdownHTML += `<div style="display:flex;justify-content:space-between;padding:2px 12px;font-size:12px;color:#bdc3c7;">
+                    <span>${line.label}</span><span style="color:${lc};">${fmt(line.amount)}</span>
+                </div>`;
+            });
+
+            const rowId = `prod-row-${r}`;
+            prodRows += `
+                <div style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div onclick="document.getElementById('${rowId}').style.display = document.getElementById('${rowId}').style.display==='none'?'block':'none'"
+                         style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:8px 6px;cursor:pointer;align-items:center;">
+                        <span>${icon} ${r.charAt(0).toUpperCase() + r.slice(1)}</span>
+                        <span style="text-align:right;color:#2ecc71;">${totalIncome > 0 ? '+' + totalIncome.toFixed(1) : '—'}</span>
+                        <span style="text-align:right;color:#e74c3c;">${totalExpense < 0 ? totalExpense.toFixed(1) : '—'}</span>
+                        <span style="text-align:right;font-weight:bold;color:${netColor};">${fmt(net)}</span>
                     </div>
-                    <div style="background: rgba(46, 204, 113, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
-                        <div style="color: #2ecc71; font-weight: bold;">Filled Jobs</div>
-                        <div style="color: #ecf0f1; font-size: 18px;">${jobSummary.totalWorkers}</div>
+                    <div id="${rowId}" style="display:none;background:rgba(0,0,0,0.2);padding:4px 0;">${breakdownHTML}</div>
+                </div>`;
+        });
+
+        // ── Workforce cards ──
+        let workforceHTML = '';
+        const sortedJobs = Object.entries(jobDist.jobCounts).sort((a, b) => b[1] - a[1]);
+        sortedJobs.forEach(([jobType, count]) => {
+            const icon = this.getJobIcon(jobType);
+            const levels = jobDist.experienceLevels[jobType] || {};
+            const dots = ['master', 'expert', 'journeyman', 'apprentice', 'novice']
+                .filter(lv => levels[lv] > 0)
+                .map(lv => {
+                    const colors = { master: '#e74c3c', expert: '#e67e22', journeyman: '#f1c40f', apprentice: '#3498db', novice: '#95a5a6' };
+                    return `<span title="${lv}: ${levels[lv]}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${colors[lv]};margin-right:2px;"></span>`.repeat(levels[lv]);
+                }).join('');
+
+            workforceHTML += `
+                <div style="background:rgba(52,152,219,0.08);border:1px solid rgba(52,152,219,0.25);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:18px;">${icon}</span>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#ecf0f1;font-weight:bold;font-size:13px;">${jobType.charAt(0).toUpperCase() + jobType.slice(1)}</div>
+                        <div style="margin-top:2px;">${dots}</div>
                     </div>
-                    <div style="background: rgba(241, 196, 15, 0.2); padding: 10px; border-radius: 8px; text-align: center;">
-                        <div style="color: #f1c40f; font-weight: bold;">Available Workers</div>
-                        <div style="color: #ecf0f1; font-size: 18px;">${availableWorkers.length}</div>
-                    </div>
+                    <div style="text-align:right;color:#bdc3c7;font-size:14px;font-weight:bold;">${count}</div>
+                </div>`;
+        });
+
+        // ── Assemble ──
+        const contentHTML = `
+        <div style="padding:20px;max-width:1000px;color:#ecf0f1;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+            <h2 style="color:#3498db;margin:0 0 4px;text-align:center;">📊 Jobs & Economy</h2>
+            <div style="text-align:center;color:#95a5a6;font-size:13px;margin-bottom:16px;">${seasonIcons[season] || '🌱'} ${season} — Day ${this.gameState.day || 1}</div>
+
+            ${crisisBanner}
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px;">
+                ${statCard('Workers', workerStats.total, '52,152,219')}
+                ${statCard('Job Slots', empStats.totalSlots, '155,89,182')}
+                ${statCard('Employment', empPct + '%', empColor)}
+                ${statCard('Idle', workerStats.idle, workerStats.idle > 0 ? '231,76,60' : '46,204,113')}
+            </div>
+
+            <h3 style="color:#ecf0f1;margin:0 0 8px;font-size:15px;">Daily Production <span style="color:#95a5a6;font-size:12px;">(click row to expand)</span></h3>
+            <div style="background:rgba(0,0,0,0.2);border-radius:8px;overflow:hidden;margin-bottom:18px;">
+                <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:6px;font-size:12px;color:#95a5a6;border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <span>Resource</span><span style="text-align:right;">Income</span><span style="text-align:right;">Cost</span><span style="text-align:right;">Net</span>
                 </div>
-        `;
+                ${prodRows || '<div style="padding:12px;text-align:center;color:#95a5a6;">No production — assign workers to buildings</div>'}
+            </div>
 
-        // Available Jobs Section
-        if (availableJobs.length > 0) {
-            contentHTML += `
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #2ecc71; margin-bottom: 15px;">📋 Available Job Positions</h3>
-                    <div style="display: grid; gap: 10px;">
-            `;
+            <h3 style="color:#ecf0f1;margin:0 0 8px;font-size:15px;">Workforce</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:18px;">
+                ${workforceHTML || '<div style="color:#95a5a6;grid-column:1/-1;text-align:center;padding:12px;">No workers assigned</div>'}
+            </div>
+            <div style="text-align:center;font-size:11px;color:#7f8c8d;margin-bottom:10px;">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e74c3c;margin-right:2px;"></span>Master
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e67e22;margin:0 2px 0 8px;"></span>Expert
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f1c40f;margin:0 2px 0 8px;"></span>Journeyman
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3498db;margin:0 2px 0 8px;"></span>Apprentice
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#95a5a6;margin:0 2px 0 8px;"></span>Novice
+            </div>
 
-            availableJobs.forEach(job => {
-                const jobIcon = this.getJobIcon(job.jobType);
-                contentHTML += `
-                    <div style="background: rgba(39, 174, 96, 0.1); border: 1px solid #27ae60; border-radius: 8px; padding: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span style="font-size: 20px;">${job.buildingIcon}</span>
-                                <div>
-                                    <div style="color: #2ecc71; font-weight: bold;">${jobIcon} ${job.jobType.charAt(0).toUpperCase() + job.jobType.slice(1)}</div>
-                                    <div style="color: #bdc3c7; font-size: 12px;">${job.buildingType} (${job.position.x}, ${job.position.y})</div>
-                                </div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: #ecf0f1; font-size: 14px;">${job.currentWorkers}/${job.maxWorkers} filled</div>
-                                <div style="color: #f39c12; font-size: 12px;">${job.availableSlots} available</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            contentHTML += `</div></div>`;
-        }
-
-        // Available Workers Section
-        if (availableWorkers.length > 0) {
-            contentHTML += `
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: #e74c3c; margin-bottom: 15px;">👥 Available Workers</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
-            `;
-
-            availableWorkers.slice(0, 8).forEach(worker => { // Show first 8 workers
-                const bestSkill = this.getBestSkill(worker.skills);
-                contentHTML += `
-                    <div style="background: rgba(231, 76, 60, 0.1); border: 1px solid #e74c3c; border-radius: 8px; padding: 10px;">
-                        <div style="color: #e74c3c; font-weight: bold; margin-bottom: 5px;">${worker.name}</div>
-                        <div style="color: #bdc3c7; font-size: 12px; margin-bottom: 3px;">Age: ${worker.age}</div>
-                        <div style="color: #bdc3c7; font-size: 12px; margin-bottom: 3px;">Health: ${worker.health}%</div>
-                        ${bestSkill ? `<div style="color: #f39c12; font-size: 12px;">Best: ${bestSkill.name} (${bestSkill.level})</div>` : ''}
-                    </div>
-                `;
-            });
-
-            if (availableWorkers.length > 8) {
-                contentHTML += `
-                    <div style="background: rgba(149, 165, 166, 0.1); border: 1px solid #95a5a6; border-radius: 8px; padding: 10px; display: flex; align-items: center; justify-content: center;">
-                        <div style="color: #95a5a6; text-align: center;">
-                            <div style="font-weight: bold;">+${availableWorkers.length - 8} more</div>
-                            <div style="font-size: 12px;">workers available</div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            contentHTML += `</div></div>`;
-        }
-
-        // Auto-assign button
-        contentHTML += `
-            <div style="text-align: center; margin-top: 20px;">
+            <div style="text-align:center;">
                 <button onclick="window.villageManager.autoAssignAllWorkers()" 
-                        style="background: linear-gradient(45deg, #3498db, #2ecc71); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;">
+                        style="background:linear-gradient(45deg,#3498db,#2ecc71);color:white;border:none;padding:12px 24px;border-radius:8px;font-weight:bold;cursor:pointer;font-size:14px;">
                     🔄 Auto-Assign Workers
                 </button>
             </div>
-        `;
+        </div>`;
 
-        contentHTML += `</div>`;
-
-        // Show the modal with expanded width
-        if (window.showModal) {
-            window.showModal('Jobs Management', contentHTML, {
-                maxWidth: '900px',
-                width: '90vw'
-            });
-        } else {
-            console.warn('[Village] showModal function not available');
-        }
+        window.modalSystem.showModal({
+            title: 'Jobs & Economy',
+            content: contentHTML,
+            options: { maxWidth: '900px', width: '90vw' }
+        });
     }
 
     showEffectsManagement() {

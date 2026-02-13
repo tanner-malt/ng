@@ -102,6 +102,36 @@ class MonarchManager {
                 costMult: 2.5,
                 maxLevel: 8
             },
+            {
+                id: 'supplyWagons',
+                name: 'Supply Wagons',
+                icon: '🛒',
+                category: 'military',
+                description: '+1 food carry capacity per soldier per level',
+                baseCost: 400,
+                costMult: 2.5,
+                maxLevel: 3
+            },
+            {
+                id: 'forcedMarch',
+                name: 'Forced March',
+                icon: '🏃',
+                category: 'military',
+                description: '10% chance per level for extra move step per day',
+                baseCost: 600,
+                costMult: 3.0,
+                maxLevel: 5
+            },
+            {
+                id: 'supplyLines',
+                name: 'Supply Lines',
+                icon: '📜',
+                category: 'military',
+                description: '-10% daily army food consumption per level (max 50%)',
+                baseCost: 350,
+                costMult: 2.0,
+                maxLevel: 5
+            },
             // Infrastructure
             {
                 id: 'productionSize',
@@ -310,8 +340,8 @@ class MonarchManager {
         this.setupDynastyButtons();
         this.renderActiveTab();
 
-        // Show monarch tutorial on first view entry
-        if (!localStorage.getItem('monarchTutorialShown')) {
+        // Show monarch tutorial on first view entry (only if view is unlocked)
+        if (isUnlocked && !localStorage.getItem('monarchTutorialShown')) {
             localStorage.setItem('monarchTutorialShown', 'true');
             setTimeout(() => {
                 if (window.modalSystem?.showModal) {
@@ -574,6 +604,15 @@ class MonarchManager {
             case 'veteranTraining':
                 window.showToast?.(`Veteran Training level ${level}: -${level * 5}% army casualties`, { type: 'success' });
                 break;
+            case 'supplyWagons':
+                window.showToast?.(`Supply Wagons level ${level}: armies carry ${2 + level} food per soldier`, { type: 'success' });
+                break;
+            case 'forcedMarch':
+                window.showToast?.(`Forced March level ${level}: ${level * 10}% chance for extra move step`, { type: 'success' });
+                break;
+            case 'supplyLines':
+                window.showToast?.(`Supply Lines level ${level}: -${level * 10}% daily army food consumption`, { type: 'success' });
+                break;
             case 'royalEducation':
                 window.showToast?.(`Royal Academy level ${level}: +${level * 10}% skill growth`, { type: 'success' });
                 break;
@@ -633,6 +672,23 @@ class MonarchManager {
     getStorageExpansionMultiplier() {
         const level = this.getInvestmentLevel('storageExpansion');
         return 1 + level * 0.10;
+    }
+
+    /** Bonus carry capacity per soldier from Supply Wagons (base 2 + level) */
+    getSupplyWagonsBonus() {
+        return this.getInvestmentLevel('supplyWagons');
+    }
+
+    /** Chance (0..1) for an extra move step per day from Forced March */
+    getForcedMarchChance() {
+        const level = this.getInvestmentLevel('forcedMarch');
+        return Math.min(0.50, level * 0.10);
+    }
+
+    /** Reduction in daily army food consumption from Supply Lines (0..0.5) */
+    getSupplyLinesReduction() {
+        const level = this.getInvestmentLevel('supplyLines');
+        return Math.min(0.50, level * 0.10);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1331,6 +1387,9 @@ class MonarchManager {
             { icon: '🌾', value: `+${(inv.agriculturalReform || 0) * 10}%`, label: 'Agriculture', color: '#27ae60' },
             { icon: '🏰', value: `+${(inv.fortifications || 0) * 15}%`, label: 'Defense', color: '#8e44ad' },
             { icon: '📦', value: `+${(inv.storageExpansion || 0) * 10}%`, label: 'Storage', color: '#2980b9' },
+            { icon: '🛒', value: `+${inv.supplyWagons || 0}`, label: 'Supply Cap', color: '#27ae60' },
+            { icon: '🏃', value: `${(inv.forcedMarch || 0) * 10}%`, label: 'March Speed', color: '#d35400' },
+            { icon: '📜', value: `-${(inv.supplyLines || 0) * 10}%`, label: 'Consumption', color: '#16a085' },
         ];
         if (hasWise) {
             statItems.push({ icon: '📖', value: '+5%', label: 'Wise Bonus', color: '#1abc9c' });
@@ -1991,6 +2050,9 @@ class MonarchManager {
         if (inv.agriculturalReform > 0) effects.push({ icon: '🌾', label: 'Agriculture', value: `+${inv.agriculturalReform * 10}%`, color: '#2ecc71', source: 'investment' });
         if (inv.fortifications > 0) effects.push({ icon: '🏰', label: 'Fortifications', value: `+${inv.fortifications * 15}%`, color: '#8e44ad', source: 'investment' });
         if (inv.veteranTraining > 0) effects.push({ icon: '🎖️', label: 'Veterans', value: `-${inv.veteranTraining * 5}% casualties`, color: '#e67e22', source: 'investment' });
+        if (inv.supplyWagons > 0) effects.push({ icon: '🛒', label: 'Supply Wagons', value: `${2 + inv.supplyWagons} food/soldier`, color: '#27ae60', source: 'investment' });
+        if (inv.forcedMarch > 0) effects.push({ icon: '🏃', label: 'Forced March', value: `${inv.forcedMarch * 10}% extra step`, color: '#d35400', source: 'investment' });
+        if (inv.supplyLines > 0) effects.push({ icon: '📜', label: 'Supply Lines', value: `-${inv.supplyLines * 10}% consumption`, color: '#16a085', source: 'investment' });
         if (inv.royalEducation > 0) effects.push({ icon: '📚', label: 'Education', value: `+${inv.royalEducation * 10}%`, color: '#1abc9c', source: 'investment' });
         if (inv.storageExpansion > 0) effects.push({ icon: '📦', label: 'Storage', value: `+${inv.storageExpansion * 10}%`, color: '#3498db', source: 'investment' });
 

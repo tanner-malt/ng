@@ -352,6 +352,11 @@ class WorldManager {
         if (this.moveMode && this.selectedArmyId) {
             const hex = this.hexMap[row]?.[col];
             if (hex && hex.visibility !== 'hidden') {
+                // Patrol mode — confirm patrol waypoint instead of normal move
+                if (this.patrolPending) {
+                    this.confirmPatrol(row, col);
+                    return;
+                }
                 this.moveArmy(this.selectedArmyId, row, col);
                 this.moveMode = false;
                 // Keep army selected, update panels
@@ -526,7 +531,7 @@ class WorldManager {
             // Supply bar with visual indicator
             if (selectedArmy.supplies) {
                 const food = selectedArmy.supplies.food || 0;
-                const maxFood = (selectedArmy.units?.length || 1) * 10; // estimate: 10 days per soldier
+                const maxFood = this.getArmyMaxSupply(selectedArmy);
                 const pct = Math.min(100, Math.round((food / Math.max(maxFood, 1)) * 100));
                 const barColor = pct > 50 ? '#27ae60' : pct > 20 ? '#f39c12' : '#c0392b';
                 html += `<div style="margin:4px 0;">`;
@@ -561,15 +566,43 @@ class WorldManager {
                 html += `<p style="color:#c9a84c;font-size:0.85em;text-align:center;">📍 Click a tile to move</p>`;
                 html += `<button class="world-btn" onclick="window.worldManager.cancelMoveMode()">✖ Cancel Move</button>`;
             } else if (selectedArmy.status === 'garrisoned') {
-                const maxSupply = (selectedArmy.units?.length || 1) * 5;
+                const maxSupply = this.getArmyMaxSupply(selectedArmy);
                 const curSupply = selectedArmy.supplies?.food ?? 0;
-                const supplyPct = Math.round((curSupply / maxSupply) * 100);
+                const supplyPct = Math.round((curSupply / Math.max(maxSupply, 1)) * 100);
                 html += `<p style="color:#27ae60;font-size:0.8em;text-align:center;margin:2px 0;">🔄 Resupplying daily (${supplyPct}% supplied)</p>`;
+                // Resupply slider
+                html += `<div style="margin:6px 0;font-size:0.8em;">`;
+                html += `<label>🍖 Supply to carry: <span id="resupply-val">${curSupply}</span>/${maxSupply}</label>`;
+                html += `<input type="range" min="0" max="${maxSupply}" value="${curSupply}" style="width:100%;" oninput="document.getElementById('resupply-val').textContent=this.value" id="resupply-slider">`;
+                html += `<button class="world-btn" onclick="window.worldManager.resupplyArmy('${selectedArmy.id}', parseInt(document.getElementById('resupply-slider').value))" style="margin-top:2px;">📦 Set Supplies</button>`;
+                html += `</div>`;
+                // Auto-resupply toggle
+                const garAutoOn = selectedArmy.autoResupply;
+                html += `<button class="world-btn" onclick="window.worldManager.toggleAutoResupply('${selectedArmy.id}')" style="${garAutoOn ? 'background:linear-gradient(135deg,#1a4a2a,#2a6a3a);border-color:#4a8a4a;' : ''}">${garAutoOn ? '✅' : '⬜'} Auto-Resupply</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.deployArmy('${selectedArmy.id}')">🚶 Deploy</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
             } else if (selectedArmy.status === 'idle') {
                 html += `<button class="world-btn" onclick="window.worldManager.enterMoveMode()">🚶 Move</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Return Home</button>`;
+                // Patrol
+                if (selectedArmy.patrol) {
+                    html += `<button class="world-btn" onclick="window.worldManager.cancelPatrol('${selectedArmy.id}')" style="background:linear-gradient(135deg,#6a3a1a,#8a5a2a);border-color:#c9a84c;">🔁 Stop Patrol</button>`;
+                } else {
+                    html += `<button class="world-btn" onclick="window.worldManager.enterPatrolMode('${selectedArmy.id}')">🔁 Patrol</button>`;
+                }
+                // Auto-resupply toggle
+                const autoOn = selectedArmy.autoResupply;
+                html += `<button class="world-btn" onclick="window.worldManager.toggleAutoResupply('${selectedArmy.id}')" style="${autoOn ? 'background:linear-gradient(135deg,#1a4a2a,#2a6a3a);border-color:#4a8a4a;' : ''}">${autoOn ? '✅' : '⬜'} Auto-Resupply</button>`;
+                // Manual resupply (only at capital)
+                if (this.isArmyAtCapital(selectedArmy)) {
+                    const maxS = this.getArmyMaxSupply(selectedArmy);
+                    const curS = selectedArmy.supplies?.food ?? 0;
+                    html += `<div style="margin:6px 0;font-size:0.8em;">`;
+                    html += `<label>🍖 Resupply: <span id="resupply-val">${curS}</span>/${maxS}</label>`;
+                    html += `<input type="range" min="0" max="${maxS}" value="${curS}" style="width:100%;" oninput="document.getElementById('resupply-val').textContent=this.value" id="resupply-slider">`;
+                    html += `<button class="world-btn" onclick="window.worldManager.resupplyArmy('${selectedArmy.id}', parseInt(document.getElementById('resupply-slider').value))" style="margin-top:2px;">📦 Resupply</button>`;
+                    html += `</div>`;
+                }
                 // Explore Ruins — only when army is on a ruins tile
                 const armyPosForRuins = selectedArmy.position;
                 const tileTerrainForRuins = this.hexMap[armyPosForRuins.y]?.[armyPosForRuins.x]?.terrain;
@@ -585,7 +618,14 @@ class WorldManager {
                 }
                 html += `<button class="world-btn" onclick="window.worldManager.disbandArmy('${selectedArmy.id}')" style="opacity:0.8;">❌ Disband</button>`;
             } else if (selectedArmy.status === 'traveling') {
-                html += `<p style="opacity:0.7;font-size:0.8em;text-align:center;">Army is on the move...</p>`;
+                if (selectedArmy.patrol) {
+                    html += `<p style="color:#c9a84c;font-size:0.8em;text-align:center;">🔁 Patrolling</p>`;
+                    html += `<button class="world-btn" onclick="window.worldManager.cancelPatrol('${selectedArmy.id}')" style="background:linear-gradient(135deg,#6a3a1a,#8a5a2a);border-color:#c9a84c;">🔁 Stop Patrol</button>`;
+                } else if (selectedArmy._autoResupplyReturn) {
+                    html += `<p style="color:#f39c12;font-size:0.8em;text-align:center;">📦 Returning for resupply...</p>`;
+                } else {
+                    html += `<p style="opacity:0.7;font-size:0.8em;text-align:center;">Army is on the move...</p>`;
+                }
                 html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Recall</button>`;
             }
 
@@ -996,8 +1036,12 @@ class WorldManager {
             originalRole: u.originalRole,
             originalStatus: u.originalStatus
         }));
-        army.supplies = { food: Math.min(units.length * 5, this.gameState.resources?.food || 0) };
+        const wagonsBonus = window.monarchManager?.getSupplyWagonsBonus?.() || 0;
+        const carryPerSoldier = 2 + wagonsBonus;
+        army.supplies = { food: Math.min(units.length * carryPerSoldier, this.gameState.resources?.food || 0) };
         army.cohesion = 50; // New armies start at 50% cohesion — improves while idle
+        army.autoResupply = false;
+        army.patrol = null;
 
         // Deduct food for supplies
         if (this.gameState.resources) {
@@ -1099,6 +1143,121 @@ class WorldManager {
         this.moveArmy(armyId, this.capitalRow, this.capitalCol);
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  RESUPPLY — manual & automatic
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** Max food an army can carry: (2 + supplyWagons bonus) food per soldier */
+    getArmyMaxSupply(army) {
+        const wagonsBonus = window.monarchManager?.getSupplyWagonsBonus?.() || 0;
+        return (army.units?.length || 1) * (2 + wagonsBonus);
+    }
+
+    /** Is this army sitting on the capital tile (regardless of status)? */
+    isArmyAtCapital(army) {
+        return army.position?.y === this.capitalRow && army.position?.x === this.capitalCol;
+    }
+
+    /**
+     * Resupply an army from village food stores.
+     * @param {string} armyId
+     * @param {number} [amount] — how much food to take. Defaults to fill to max.
+     */
+    resupplyArmy(armyId, amount) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+        if (!this.isArmyAtCapital(army) && army.status !== 'garrisoned') {
+            window.showToast?.('Army must be at the capital to resupply.', { type: 'warning' });
+            return;
+        }
+        if (!army.supplies) army.supplies = { food: 0 };
+        const max = this.getArmyMaxSupply(army);
+        const needed = max - army.supplies.food;
+        if (needed <= 0) { window.showToast?.('Already fully supplied.', { type: 'info' }); return; }
+        const available = this.gameState.resources?.food ?? 0;
+        const transfer = Math.min(amount ?? needed, needed, available);
+        if (transfer <= 0) { window.showToast?.('Not enough village food to resupply.', { type: 'warning' }); return; }
+        army.supplies.food += transfer;
+        this.gameState.resources.food -= transfer;
+        window.eventBus?.emit('resources-updated');
+        window.showToast?.(`${army.name} resupplied with ${transfer} food.`, { type: 'success' });
+        this.refreshUI();
+    }
+
+    /** Toggle auto-resupply on an army */
+    toggleAutoResupply(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+        army.autoResupply = !army.autoResupply;
+        window.showToast?.(`Auto-resupply ${army.autoResupply ? 'enabled' : 'disabled'} for ${army.name}.`, { type: 'info' });
+        this.refreshUI();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  PATROL — oscillate between two tiles
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * Start patrol between the army's current position and a target tile.
+     * Enters move-mode so the player clicks the second waypoint.
+     */
+    enterPatrolMode(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army || army.status !== 'idle') return;
+        this.patrolPending = armyId;
+        this.moveMode = true;
+        window.showToast?.('Click a tile to set the patrol destination.', { type: 'info' });
+        this.refreshUI();
+    }
+
+    /** Called when a tile is clicked while patrolPending is set */
+    confirmPatrol(targetRow, targetCol) {
+        const armyId = this.patrolPending;
+        this.patrolPending = null;
+        this.moveMode = false;
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) { this.refreshUI(); return; }
+        army.patrol = {
+            pointA: { row: army.position.y, col: army.position.x },
+            pointB: { row: targetRow, col: targetCol },
+            goingToB: true
+        };
+        this.moveArmy(armyId, targetRow, targetCol);
+        window.showToast?.(`${army.name} now patrolling.`, { type: 'success' });
+    }
+
+    /** Stop patrol for an army */
+    cancelPatrol(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army) return;
+        army.patrol = null;
+        window.showToast?.(`${army.name} patrol canceled.`, { type: 'info' });
+        this.refreshUI();
+    }
+
+    /** Silently resupply army from village food (used at capital) */
+    _performAutoResupply(army) {
+        if (!army.supplies) army.supplies = { food: 0 };
+        const max = this.getArmyMaxSupply(army);
+        const needed = max - army.supplies.food;
+        if (needed <= 0) return;
+        const available = this.gameState.resources?.food ?? 0;
+        const transfer = Math.min(needed, Math.floor(available * 0.3), available);
+        if (transfer > 0) {
+            army.supplies.food += transfer;
+            this.gameState.resources.food -= transfer;
+            window.eventBus?.emit('resources-updated');
+        }
+        // Recover morale while at capital
+        if ((army.morale || 100) < 100) {
+            army.morale = Math.min(100, (army.morale || 100) + 5);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  DAILY ARMY PROCESSING
+    // ═══════════════════════════════════════════════════════════════════
+
     processArmyMovement() {
         const armies = this.gameState.getAllArmies?.() || [];
         armies.forEach(army => {
@@ -1112,7 +1271,13 @@ class WorldManager {
 
                 // Tech travel speed bonus: extra steps per day
                 const travelBonus = window.gameState?.techBonuses?.travelSpeed || 0;
-                const extraSteps = Math.floor(travelBonus);
+                let extraSteps = Math.floor(travelBonus);
+
+                // Forced March investment: chance for +1 extra step
+                const marchChance = window.monarchManager?.getForcedMarchChance?.() || 0;
+                if (marchChance > 0 && Math.random() < marchChance) {
+                    extraSteps++;
+                }
                 for (let s = 0; s < extraSteps && plan.index < plan.path.length - 1; s++) {
                     plan.index++;
                     const midStep = plan.path[plan.index];
@@ -1127,8 +1292,19 @@ class WorldManager {
                     army.status = 'idle';
                     army.travelPlan = null;
 
-                    // If arrived at capital, garrison the army
+                    // If arrived at capital
                     if (dest.row === this.capitalRow && dest.col === this.capitalCol) {
+                        // Auto-resupply return: resupply and resume patrol
+                        if (army._autoResupplyReturn) {
+                            army._autoResupplyReturn = false;
+                            this._performAutoResupply(army);
+                            if (army.patrol) {
+                                army.patrol.goingToB = true;
+                                this.moveArmy(army.id, army.patrol.pointB.row, army.patrol.pointB.col);
+                            }
+                            window.showToast?.(`${army.name} auto-resupplied at capital.`, { type: 'success' });
+                            return;
+                        }
                         army.status = 'garrisoned';
                         window.showToast?.(`${army.name} garrisoned at the capital! 🏰`, { type: 'success' });
                         this.refreshUI();
@@ -1137,6 +1313,18 @@ class WorldManager {
 
                     // Explore the tile we arrived at
                     this.exploreTile(dest.row, dest.col);
+
+                    // Patrol: if arrived at waypoint, turn around
+                    if (army.patrol) {
+                        if (army.patrol.goingToB) {
+                            army.patrol.goingToB = false;
+                            this.moveArmy(army.id, army.patrol.pointA.row, army.patrol.pointA.col);
+                        } else {
+                            army.patrol.goingToB = true;
+                            this.moveArmy(army.id, army.patrol.pointB.row, army.patrol.pointB.col);
+                        }
+                        return;
+                    }
 
                     window.showToast?.(`${army.name} arrived at ${this.formatCoords(dest.row, dest.col)}`, { type: 'info' });
                 } else {
@@ -1149,9 +1337,18 @@ class WorldManager {
                 }
             }
 
+            // Armies on the capital tile get free resupply (never starve at home)
+            if (this.isArmyAtCapital(army)) {
+                this._performAutoResupply(army);
+                return;   // skip starvation check
+            }
+
             // All non-garrisoned armies consume their own supplies daily
             if (army.supplies) {
-                army.supplies.food -= (army.units?.length || 1);
+                const soldierCount = army.units?.length || 1;
+                const supplyLinesReduction = window.monarchManager?.getSupplyLinesReduction?.() || 0;
+                const dailyConsumption = Math.max(1, Math.floor(soldierCount * (1 - supplyLinesReduction)));
+                army.supplies.food -= dailyConsumption;
                 if (army.supplies.food <= 0) {
                     army.supplies.food = 0;
                     // Starvation: lose morale
@@ -1159,7 +1356,21 @@ class WorldManager {
                     if (army.morale <= 0) {
                         window.showToast?.(`${army.name} disbanded from starvation!`, { type: 'error' });
                         this.performDisband(army.id);
+                        return;
                     }
+                }
+            }
+
+            // Auto-resupply: if enabled and food is running low, head home
+            if (army.autoResupply && army.status !== 'traveling' && !army._autoResupplyReturn) {
+                const food = army.supplies?.food || 0;
+                const soldiers = army.units?.length || 1;
+                const daysLeft = food / soldiers;
+                const distToCapital = Math.abs(army.position.y - this.capitalRow) + Math.abs(army.position.x - this.capitalCol);
+                if (daysLeft <= distToCapital + 1) {
+                    army._autoResupplyReturn = true;
+                    this.moveArmy(army.id, this.capitalRow, this.capitalCol);
+                    window.showToast?.(`${army.name} returning home for resupply.`, { type: 'warning' });
                 }
             }
         });
@@ -1711,8 +1922,10 @@ class WorldManager {
         const enemyRoll = enemyStrength * (0.8 + Math.random() * 0.4);
 
         if (armyRoll >= enemyRoll) {
-            // Player wins
-            const casualties = Math.floor(Math.random() * Math.ceil(army.units.length * 0.3));
+            // Player wins — apply veteran training reduction
+            const vetReduction = window.monarchManager?.getVeteranTrainingReduction?.() || 0;
+            const baseCasualtyRate = 0.3;
+            const casualties = Math.floor(Math.random() * Math.ceil(army.units.length * Math.max(0.05, baseCasualtyRate - vetReduction)));
             for (let i = 0; i < casualties && army.units.length > 0; i++) {
                 const deadIdx = Math.floor(Math.random() * army.units.length);
                 const dead = army.units.splice(deadIdx, 1)[0];
@@ -1740,8 +1953,9 @@ class WorldManager {
                 this.performDisband(army.id);
             }
         } else {
-            // Enemy wins — army takes heavy casualties
-            const casualties = Math.ceil(army.units.length * 0.5);
+            // Enemy wins — veteran training still reduces casualties somewhat
+            const vetReductionLoss = window.monarchManager?.getVeteranTrainingReduction?.() || 0;
+            const casualties = Math.ceil(army.units.length * Math.max(0.15, 0.5 - vetReductionLoss));
             for (let i = 0; i < casualties && army.units.length > 0; i++) {
                 const deadIdx = Math.floor(Math.random() * army.units.length);
                 const dead = army.units.splice(deadIdx, 1)[0];
@@ -1888,7 +2102,7 @@ class WorldManager {
             if (!army.supplies) army.supplies = { food: 0 };
 
             const unitCount = army.units?.length || 1;
-            const maxSupply = unitCount * 5;  // Same as draft supply formula
+            const maxSupply = this.getArmyMaxSupply(army);  // 2 food per soldier
             const currentFood = army.supplies.food;
 
             if (currentFood >= maxSupply) return; // Already full

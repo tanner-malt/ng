@@ -1282,21 +1282,128 @@ body {
 
 .building-progress-bar {
     position: absolute;
-    bottom: 0;
+    bottom: 2px;
     left: 2px;
     right: 2px;
-    height: 4px;
-    background: rgba(0,0,0,0.5);
-    border-radius: 2px;
+    height: 6px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 3px;
     overflow: hidden;
     z-index: 12;
+    border: 1px solid rgba(241,196,15,0.4);
 }
 
 .building-progress-fill {
     height: 100%;
     background: linear-gradient(90deg, #f1c40f, #2ecc71);
-    border-radius: 2px;
+    border-radius: 3px;
     transition: width 0.3s ease;
+    box-shadow: 0 0 4px rgba(46,204,113,0.5);
+}
+
+.building-progress-pct {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 3px rgba(0,0,0,0.9);
+    z-index: 13;
+    pointer-events: none;
+}
+
+/* ─── Construction Progress Panel (Overview Tab) ─── */
+.construction-progress-panel {
+    margin: 8px 0;
+    background: rgba(241,196,15,0.06);
+    border: 1px solid rgba(241,196,15,0.25);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.construction-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #f1c40f;
+    border-bottom: 1px solid rgba(241,196,15,0.15);
+}
+
+.construction-count {
+    background: rgba(241,196,15,0.2);
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.construction-sites-list {
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.construction-site-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 8px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.construction-site-row:hover {
+    background: rgba(241,196,15,0.12);
+}
+
+.construction-site-icon {
+    font-size: 16px;
+    width: 24px;
+    text-align: center;
+}
+
+.construction-site-info {
+    min-width: 0;
+}
+
+.construction-site-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ecf0f1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.construction-site-bar {
+    height: 6px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 3px;
+}
+
+.construction-site-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f1c40f, #2ecc71);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+.construction-site-pct {
+    font-size: 11px;
+    font-weight: bold;
+    color: #f1c40f;
+    min-width: 36px;
+    text-align: right;
 }
 
 /* ─── Building Popover (inline info panel) ─── */
