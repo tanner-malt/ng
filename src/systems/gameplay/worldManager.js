@@ -1664,7 +1664,7 @@ class WorldManager {
             let nextRow = from.row;
             let nextCol = from.col;
 
-            if (pathfind) {
+            if (pathfind && this.hexMap.length > 0) {
                 const path = pathfind(
                     this.hexMap,
                     { row: from.row, col: from.col },
@@ -2088,13 +2088,16 @@ class WorldManager {
     // ===================================================================
 
     onDayEnded() {
+        // Note: processEnemies() is called from gameState.processEnemySpawns()
+        // during endDay(), BEFORE this event fires. No need to call it again here.
+
+        // Everything below requires full map initialization (hexMap, renderer, etc.)
         if (!this.initialized) return;
 
         this.processArmyMovement();
         this.resupplyGarrisonedArmies();
         this.updateArmyCohesion();
         this.processActiveBattles();
-        this.processEnemies();
         this.processCityIncome();
 
         // Process UnitManager daily (travel, supplies, encounters)
