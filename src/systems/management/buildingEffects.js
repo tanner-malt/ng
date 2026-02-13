@@ -404,8 +404,8 @@ class BuildingEffectsManager {
         const currentLevel = this.buildingLevels.get(bonusKey) || 1;
         const nextLevel = currentLevel + 1;
         
-        // Base cost from gameData, increased by level
-        const baseCost = window.gameData?.buildingCosts?.[buildingType] || {};
+        // Base cost from GameData, increased by level
+        const baseCost = window.GameData?.buildingCosts?.[buildingType] || {};
         const upgradeCost = {};
         
         Object.keys(baseCost).forEach(resource => {

@@ -55,7 +55,9 @@ class PopulationManager {
 
         const birthResult = this.calculateDailyGrowth({
             foodAbundant: foodAbundant,
-            foodScarce: foodScarce
+            foodScarce: foodScarce,
+            food: gameState?.resources?.food || 0,
+            populationCount: this.population.length
         });
 
 
@@ -315,6 +317,15 @@ class PopulationManager {
         // Apply achievement bonus for birth rate
         const achieveBirthBonus = window.gameState?.achievementBonuses?.birthRate || 0;
         if (achieveBirthBonus) finalChance *= (1 + achieveBirthBonus);
+
+        // Food surplus birthrate boost: 2x pop→×1.05, 3x→×1.06, 4x→×1.07, no cap
+        const food = options.food || 0;
+        const popCount = options.populationCount || this.population.length;
+        if (popCount > 0 && food >= popCount * 2) {
+            const ratio = Math.floor(food / popCount);
+            const surplusMultiplier = 1 + (ratio + 3) / 100; // 2x→1.05, 3x→1.06, 4x→1.07 ...
+            finalChance *= surplusMultiplier;
+        }
 
         let births = 0;
         let twins = 0;
@@ -1243,15 +1254,16 @@ class PopulationManager {
         target = Math.max(0, Math.min(100, target));
 
         // --- Drift each villager toward target ---
-        const maxDrift = 3; // Max points per day
         this.population.forEach(v => {
             const current = v.happiness ?? 75;
             const diff = target - current;
+            // Recover faster (5 pts/day) than decay (3 pts/day) so restoring food feels responsive
+            const maxDrift = diff > 0 ? 5 : 3;
 
             if (Math.abs(diff) <= 1) {
                 v.happiness = target;
             } else {
-                // Move 1-3 points toward target (faster when far away)
+                // Move toward target (faster when far away)
                 const step = Math.sign(diff) * Math.min(maxDrift, Math.ceil(Math.abs(diff) * 0.15));
                 v.happiness = Math.max(0, Math.min(100, current + step));
             }

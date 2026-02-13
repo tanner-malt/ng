@@ -2687,8 +2687,8 @@ class VillageManager {
             taxIncome = taxSummary.income || 0;
             taxPop = taxSummary.population || 0;
 
-            const upkeepSummary = economySystem.getUpkeepSummary?.() || { total: 0 };
-            upkeep = upkeepSummary.total || 0;
+            const upkeepSummary = economySystem.getUpkeepSummary?.() || { total: 0, buildingUpkeep: 0 };
+            upkeep = (upkeepSummary.total || 0) + (upkeepSummary.buildingUpkeep || 0);
         }
 
         // Calculate market income (traders * 3 gold per day)
@@ -2717,9 +2717,10 @@ class VillageManager {
             const lines = [];
             if (taxIncome > 0) lines.push(`Taxes (${taxPop} citizens): +${taxIncome}`);
             if (marketIncome > 0) lines.push(`Markets: +${marketIncome}`);
-            if (upkeep > 0) lines.push(`Military Upkeep: -${upkeep}`);
-            // Building upkeep
-            const bldUpkeep = this.gameState.economySystem?.lastBuildingUpkeep || 0;
+            // Separate military and building upkeep labels
+            const milUpkeep = economySystem?.getUpkeepSummary?.()?.total || 0;
+            const bldUpkeep = economySystem?.getUpkeepSummary?.()?.buildingUpkeep || 0;
+            if (milUpkeep > 0) lines.push(`Military Upkeep: -${milUpkeep}`);
             if (bldUpkeep > 0) lines.push(`Building Upkeep: -${bldUpkeep.toFixed(1)}`);
             if (lines.length === 0) lines.push('Build Town Center to collect taxes');
             goldSourcesEl.textContent = lines.join(', ');
@@ -3241,6 +3242,7 @@ class VillageManager {
         </div>`;
 
         window.modalSystem.showModal({
+            id: 'job-manager-modal',
             title: 'Jobs & Economy',
             content: contentHTML,
             options: { maxWidth: '900px', width: '90vw' }

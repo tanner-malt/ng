@@ -193,6 +193,8 @@ class EconomySystem {
                 window.showToast?.(`⚠️ Cannot afford military upkeep! Units losing morale.`, { type: 'warning' });
             }
         }
+
+        this.lastUpkeep = totalUpkeep;
     }
     
     // Count guards in barracks and fortifications
@@ -373,18 +375,14 @@ class EconomySystem {
         const logisticsBonus = this.gameState.techBonuses?.armyUpkeep || 0;
         totalUpkeep = Math.floor(totalUpkeep * (1 + logisticsBonus));
 
-        // Building upkeep
+        // Building upkeep returned separately — NOT added to military total
         const buildingUpkeep = this.lastBuildingUpkeep || 0;
-        if (buildingUpkeep > 0) {
-            totalUpkeep += buildingUpkeep;
-            breakdown.buildings = buildingUpkeep;
-        }
         
         return {
             total: totalUpkeep,
             breakdown,
             buildingUpkeep,
-            canAfford: (this.gameState.resources?.gold || 0) >= totalUpkeep
+            canAfford: (this.gameState.resources?.gold || 0) >= (totalUpkeep + buildingUpkeep)
         };
     }
     
