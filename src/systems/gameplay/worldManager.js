@@ -293,6 +293,57 @@ class WorldManager {
     }
 
     // ===================================================================
+    // RUINS EXPLORATION — Relic Discovery + Gold
+    // ===================================================================
+
+    exploreRuins(armyId) {
+        const army = this.gameState.getArmy?.(armyId);
+        if (!army || army.status !== 'idle') return;
+
+        const row = army.position.y;
+        const col = army.position.x;
+        const hex = this.hexMap[row]?.[col];
+        if (!hex || hex.terrain !== 'ruins') {
+            window.showToast?.('No ruins to explore here.', { type: 'warning' });
+            return;
+        }
+
+        // Mark ruins as explored (change terrain to plains so they can't be re-explored)
+        hex.terrain = 'plains';
+
+        // Gold reward: 50-200 gold
+        const goldReward = 50 + Math.floor(Math.random() * 151);
+        if (this.gameState.resources) {
+            this.gameState.resources.gold = (this.gameState.resources.gold || 0) + goldReward;
+            this.gameState.gold = this.gameState.resources.gold;
+        }
+
+        // Supply bonus: army finds some provisions
+        const foodFound = 10 + Math.floor(Math.random() * 21);
+        if (army.supplies) {
+            army.supplies.food = (army.supplies.food || 0) + foodFound;
+        }
+
+        // Roll for relic discovery
+        let relicFound = null;
+        if (window.game?.monarchManager?.rollRelicFromRuins) {
+            relicFound = window.game.monarchManager.rollRelicFromRuins();
+        }
+
+        // Build result message
+        let msg = `🏚️ ${army.name} explored ancient ruins! Found ${goldReward} gold and ${foodFound} food.`;
+        if (relicFound) {
+            msg = `🏚️ ${army.name} explored ancient ruins! Found ${goldReward} gold, ${foodFound} food, and discovered ${relicFound.icon} ${relicFound.name}!`;
+        }
+        window.showToast?.(msg, { type: relicFound ? 'legendary' : 'success' });
+
+        window.eventBus?.emit('ruins_explored', { armyId, row, col, goldReward, relicFound });
+        window.eventBus?.emit('resources-updated');
+        this.refreshUI();
+        this.gameState.save?.();
+    }
+
+    // ===================================================================
     // SELECTION & INFO PANEL
     // ===================================================================
 
@@ -519,6 +570,12 @@ class WorldManager {
             } else if (selectedArmy.status === 'idle') {
                 html += `<button class="world-btn" onclick="window.worldManager.enterMoveMode()">🚶 Move</button>`;
                 html += `<button class="world-btn" onclick="window.worldManager.returnArmy('${selectedArmy.id}')">🏠 Return Home</button>`;
+                // Explore Ruins — only when army is on a ruins tile
+                const armyPosForRuins = selectedArmy.position;
+                const tileTerrainForRuins = this.hexMap[armyPosForRuins.y]?.[armyPosForRuins.x]?.terrain;
+                if (tileTerrainForRuins === 'ruins') {
+                    html += `<button class="world-btn" onclick="window.worldManager.exploreRuins('${selectedArmy.id}')" style="background:linear-gradient(135deg,#4a2a6a,#6a3a8a);border-color:#8a5aaa;">🏚️ Explore Ruins</button>`;
+                }
                 // Establish city — only on explored non-capital tiles without existing city
                 const armyPos = selectedArmy.position;
                 const isOnCapital = armyPos.y === this.capitalRow && armyPos.x === this.capitalCol;
@@ -1045,50 +1102,54 @@ class WorldManager {
     processArmyMovement() {
         const armies = this.gameState.getAllArmies?.() || [];
         armies.forEach(army => {
-            if (army.status !== 'traveling' || !army.travelPlan) return;
+            // Garrisoned armies are fed by the city (resupplyGarrisonedArmies)
+            if (army.status === 'garrisoned') return;
 
-            const plan = army.travelPlan;
-            plan.index++;
-
-            // Tech travel speed bonus: extra steps per day
-            const travelBonus = window.gameState?.techBonuses?.travelSpeed || 0;
-            const extraSteps = Math.floor(travelBonus);
-            for (let s = 0; s < extraSteps && plan.index < plan.path.length - 1; s++) {
+            // Process travel movement for traveling armies
+            if (army.status === 'traveling' && army.travelPlan) {
+                const plan = army.travelPlan;
                 plan.index++;
-                const midStep = plan.path[plan.index];
-                army.position = { x: midStep.col, y: midStep.row };
-                this.exploreTile(midStep.row, midStep.col);
-            }
 
-            if (plan.index >= plan.path.length) {
-                // Arrived at destination
-                const dest = plan.path[plan.path.length - 1];
-                army.position = { x: dest.col, y: dest.row };
-                army.status = 'idle';
-                army.travelPlan = null;
-
-                // If arrived at capital, garrison the army
-                if (dest.row === this.capitalRow && dest.col === this.capitalCol) {
-                    army.status = 'garrisoned';
-                    window.showToast?.(`${army.name} garrisoned at the capital! 🏰`, { type: 'success' });
-                    this.refreshUI();
-                    return;
+                // Tech travel speed bonus: extra steps per day
+                const travelBonus = window.gameState?.techBonuses?.travelSpeed || 0;
+                const extraSteps = Math.floor(travelBonus);
+                for (let s = 0; s < extraSteps && plan.index < plan.path.length - 1; s++) {
+                    plan.index++;
+                    const midStep = plan.path[plan.index];
+                    army.position = { x: midStep.col, y: midStep.row };
+                    this.exploreTile(midStep.row, midStep.col);
                 }
 
-                // Explore the tile we arrived at
-                this.exploreTile(dest.row, dest.col);
+                if (plan.index >= plan.path.length) {
+                    // Arrived at destination
+                    const dest = plan.path[plan.path.length - 1];
+                    army.position = { x: dest.col, y: dest.row };
+                    army.status = 'idle';
+                    army.travelPlan = null;
 
-                window.showToast?.(`${army.name} arrived at ${this.formatCoords(dest.row, dest.col)}`, { type: 'info' });
-            } else {
-                // Move one step
-                const step = plan.path[plan.index];
-                army.position = { x: step.col, y: step.row };
+                    // If arrived at capital, garrison the army
+                    if (dest.row === this.capitalRow && dest.col === this.capitalCol) {
+                        army.status = 'garrisoned';
+                        window.showToast?.(`${army.name} garrisoned at the capital! 🏰`, { type: 'success' });
+                        this.refreshUI();
+                        return;
+                    }
 
-                // Explore tiles as army moves through
-                this.exploreTile(step.row, step.col);
+                    // Explore the tile we arrived at
+                    this.exploreTile(dest.row, dest.col);
+
+                    window.showToast?.(`${army.name} arrived at ${this.formatCoords(dest.row, dest.col)}`, { type: 'info' });
+                } else {
+                    // Move one step
+                    const step = plan.path[plan.index];
+                    army.position = { x: step.col, y: step.row };
+
+                    // Explore tiles as army moves through
+                    this.exploreTile(step.row, step.col);
+                }
             }
 
-            // Consume supplies
+            // All non-garrisoned armies consume their own supplies daily
             if (army.supplies) {
                 army.supplies.food -= (army.units?.length || 1);
                 if (army.supplies.food <= 0) {
@@ -1552,8 +1613,9 @@ class WorldManager {
         // Determine terrain for this battle
         const battleTerrain = this.hexMap[enemy.position.row]?.[enemy.position.col]?.terrain || 'plains';
 
-        // Show BattleViewer if available (animated combat)
-        if (window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
+        // Show BattleViewer if available (animated combat) — skip during autoplay
+        const autoPlayActive = this.gameState.autoPlayActive || window.gameState?.autoPlayActive;
+        if (!autoPlayActive && window.battleViewer && typeof window.battleViewer.showBattle === 'function') {
             const playerArmy = {
                 name: army.name,
                 units: (army.units || []).map(u => ({

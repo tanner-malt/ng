@@ -148,7 +148,7 @@ class EventBusIntegrations {
 
     handleAchievementUnlocked(data) {
         console.log('[EventBusIntegrations] Achievement unlocked:', data);
-        
+
         // Emit UI update
         window.eventBus.emit('ui-update-needed');
     }

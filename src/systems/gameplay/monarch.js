@@ -135,6 +135,155 @@ class MonarchManager {
             }
         ];
 
+        // ── Relic Catalog ──
+        // Fixed definitions — only IDs are stored in localStorage (~50 bytes)
+        // All relics are discovered by exploring ruins on the world map
+        this.relicCatalog = [
+            {
+                id: 'crown_of_ages',
+                name: 'Crown of Ages',
+                icon: '👑',
+                rarity: 'legendary',
+                description: 'A crown worn by the first dynasty to endure beyond mortal memory.',
+                lore: 'Said to grant visions of ages yet to pass.',
+                effect: '+15% all production',
+                effectKey: 'productionBonus',
+                effectValue: 0.15
+            },
+            {
+                id: 'scepter_of_command',
+                name: 'Scepter of Command',
+                icon: '🏛️',
+                rarity: 'epic',
+                description: 'A scepter passed down through lines of strong rulers.',
+                lore: 'Its wielder\'s voice carries the weight of authority.',
+                effect: '+20% combat effectiveness',
+                effectKey: 'combatBonus',
+                effectValue: 0.20
+            },
+            {
+                id: 'founders_seal',
+                name: 'Founder\'s Seal',
+                icon: '📜',
+                rarity: 'rare',
+                description: 'The official seal of the dynasty\'s founding charter.',
+                lore: 'Every new beginning draws strength from this mark.',
+                effect: '+50 starting food & wood',
+                effectKey: 'startingResources',
+                effectValue: 50
+            },
+            {
+                id: 'tome_of_knowledge',
+                name: 'Tome of Knowledge',
+                icon: '📖',
+                rarity: 'epic',
+                description: 'An ancient codex containing the wisdom of master craftsmen.',
+                lore: 'Each page reveals secrets lost to time.',
+                effect: '+20% research speed',
+                effectKey: 'researchSpeed',
+                effectValue: 0.20
+            },
+            {
+                id: 'warlords_banner',
+                name: 'Warlord\'s Banner',
+                icon: '🚩',
+                rarity: 'epic',
+                description: 'A battle-torn banner that rallies troops with unyielding fervor.',
+                lore: 'The sight of it turns fear into fury.',
+                effect: '+15 army morale recovery/day',
+                effectKey: 'moraleBoost',
+                effectValue: 15
+            },
+            {
+                id: 'cornucopia',
+                name: 'Horn of Plenty',
+                icon: '🎺',
+                rarity: 'rare',
+                description: 'A magical horn that ensures bountiful harvests.',
+                lore: 'When blown at dawn, the fields yield double.',
+                effect: '+15% food production',
+                effectKey: 'foodBonus',
+                effectValue: 0.15
+            },
+            {
+                id: 'heart_of_the_people',
+                name: 'Heart of the People',
+                icon: '❤️',
+                rarity: 'epic',
+                description: 'A ruby amulet symbolizing the bond between ruler and people.',
+                lore: 'It pulses with the heartbeat of your kingdom.',
+                effect: '+10% population growth',
+                effectKey: 'populationGrowth',
+                effectValue: 0.10
+            },
+            {
+                id: 'golden_coffer',
+                name: 'Golden Coffer',
+                icon: '💰',
+                rarity: 'rare',
+                description: 'An enchanted chest that multiplies stored wealth.',
+                lore: 'Each coin placed inside begets another.',
+                effect: '+10% gold income',
+                effectKey: 'goldBonus',
+                effectValue: 0.10
+            },
+            {
+                id: 'eternal_flame',
+                name: 'Eternal Flame',
+                icon: '🔥',
+                rarity: 'legendary',
+                description: 'A flame that never dies — symbol of an undying legacy.',
+                lore: 'Lit at the founding of the realm, it burns through the ages.',
+                effect: '+25% legacy points earned',
+                effectKey: 'legacyBonus',
+                effectValue: 0.25
+            },
+            {
+                id: 'builders_compass',
+                name: 'Builder\'s Compass',
+                icon: '🧭',
+                rarity: 'rare',
+                description: 'An enchanted compass that guides perfect construction.',
+                lore: 'It always points toward where the foundation must be laid.',
+                effect: '+15% build speed',
+                effectKey: 'buildSpeed',
+                effectValue: 0.15
+            },
+            {
+                id: 'explorers_astrolabe',
+                name: 'Explorer\'s Astrolabe',
+                icon: '🌟',
+                rarity: 'epic',
+                description: 'A celestial instrument revealing hidden paths across the realm.',
+                lore: 'Stars align to show the way forward.',
+                effect: '+1 army sight range',
+                effectKey: 'sightRange',
+                effectValue: 1
+            },
+            {
+                id: 'ancestral_shield',
+                name: 'Ancestral Shield',
+                icon: '🛡️',
+                rarity: 'legendary',
+                description: 'A shield inscribed with the names of every past ruler.',
+                lore: 'Each name adds to its strength. It has never been broken.',
+                effect: '+25% village defense',
+                effectKey: 'defenseBonus',
+                effectValue: 0.25
+            }
+        ];
+
+        // Relic discovery chances by rarity (when exploring ruins)
+        this.relicDiscoveryChance = {
+            base: 0.30,        // 30% base chance to find ANY relic at ruins
+            rare: 0.55,        // 55% of finds are rare
+            epic: 0.35,        // 35% of finds are epic
+            legendary: 0.10    // 10% of finds are legendary
+        };
+
+        // Load collected relics from localStorage (just an array of IDs)
+        this.collectedRelics = this._loadRelics();
+
         // ── Staff hiring costs ──
         this.generalBaseCost = 1200;
         this.generalCostMult = 3;
@@ -182,6 +331,10 @@ class MonarchManager {
                                 <div style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:8px;">
                                     <h4 style="color:#f39c12;margin:0 0 6px;">🏛️ Legacy</h4>
                                     <p style="color:#bdc3c7;margin:0;font-size:0.85em;">Permanent bonuses that persist across dynasties.</p>
+                                </div>
+                                <div style="background:#2c3e50;border-radius:8px;padding:12px;margin-bottom:8px;">
+                                    <h4 style="color:#f39c12;margin:0 0 6px;">🏺 Relics</h4>
+                                    <p style="color:#bdc3c7;margin:0;font-size:0.85em;">Powerful artifacts discovered through legendary deeds.</p>
                                 </div>
                                 <div style="background:#2c3e50;border-radius:8px;padding:12px;">
                                     <h4 style="color:#f39c12;margin:0 0 6px;">⚰️ Dynasty</h4>
@@ -248,6 +401,9 @@ class MonarchManager {
                 break;
             case 'investments':
                 this.renderInvestments();
+                break;
+            case 'relics':
+                this.renderRelics();
                 break;
             case 'legacy':
                 this.renderLegacyBonuses();
@@ -1663,6 +1819,158 @@ class MonarchManager {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  RELICS — Persistence & Discovery
+    // ═══════════════════════════════════════════════════════════════
+
+    _loadRelics() {
+        try {
+            const saved = localStorage.getItem('dynastyRelics');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    _saveRelics() {
+        try {
+            localStorage.setItem('dynastyRelics', JSON.stringify(this.collectedRelics));
+        } catch (e) {
+            console.warn('[Relics] Save failed:', e);
+        }
+    }
+
+    hasRelic(relicId) {
+        return this.collectedRelics.includes(relicId);
+    }
+
+    collectRelic(relicId) {
+        if (this.hasRelic(relicId)) return false;
+        const def = this.relicCatalog.find(r => r.id === relicId);
+        if (!def) return false;
+        this.collectedRelics.push(relicId);
+        this._saveRelics();
+        window.showToast?.(`${def.icon} Relic Discovered: ${def.name}!`, { type: 'legendary' });
+        window.eventBus?.emit('relic_discovered', { relicId, name: def.name });
+        return true;
+    }
+
+    /**
+     * Roll for a relic discovery when exploring ruins.
+     * Returns the relic def if found, or null.
+     */
+    rollRelicFromRuins() {
+        // Base chance to find any relic
+        if (Math.random() > this.relicDiscoveryChance.base) return null;
+
+        // Determine rarity tier
+        const roll = Math.random();
+        let targetRarity;
+        if (roll < this.relicDiscoveryChance.legendary) {
+            targetRarity = 'legendary';
+        } else if (roll < this.relicDiscoveryChance.legendary + this.relicDiscoveryChance.epic) {
+            targetRarity = 'epic';
+        } else {
+            targetRarity = 'rare';
+        }
+
+        // Find undiscovered relics of this rarity
+        let candidates = this.relicCatalog.filter(r => r.rarity === targetRarity && !this.hasRelic(r.id));
+
+        // Fall back to any undiscovered relic if no candidates at target rarity
+        if (candidates.length === 0) {
+            candidates = this.relicCatalog.filter(r => !this.hasRelic(r.id));
+        }
+
+        // All relics already found
+        if (candidates.length === 0) return null;
+
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        this.collectRelic(chosen.id);
+        return chosen;
+    }
+
+    // ── Relic effect getters ──
+
+    getRelicEffect(effectKey) {
+        let total = 0;
+        for (const relic of this.relicCatalog) {
+            if (this.hasRelic(relic.id) && relic.effectKey === effectKey) {
+                total += relic.effectValue;
+            }
+        }
+        return total;
+    }
+
+    getRelicProductionBonus() { return this.getRelicEffect('productionBonus'); }
+    getRelicCombatBonus() { return this.getRelicEffect('combatBonus'); }
+    getRelicFoodBonus() { return this.getRelicEffect('foodBonus'); }
+    getRelicResearchSpeed() { return this.getRelicEffect('researchSpeed'); }
+    getRelicBuildSpeed() { return this.getRelicEffect('buildSpeed'); }
+    getRelicGoldBonus() { return this.getRelicEffect('goldBonus'); }
+    getRelicDefenseBonus() { return this.getRelicEffect('defenseBonus'); }
+    getRelicMoraleBoost() { return this.getRelicEffect('moraleBoost'); }
+    getRelicPopulationGrowth() { return this.getRelicEffect('populationGrowth'); }
+    getRelicLegacyBonus() { return this.getRelicEffect('legacyBonus'); }
+    getRelicSightRange() { return this.getRelicEffect('sightRange'); }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  RENDER RELICS TAB
+    // ═══════════════════════════════════════════════════════════════
+
+    renderRelics() {
+        const container = document.getElementById('relics-display');
+        if (!container) return;
+
+        const collected = this.collectedRelics.length;
+        const total = this.relicCatalog.length;
+
+        const rarityColors = {
+            rare: '#3498db',
+            epic: '#9b59b6',
+            legendary: '#f39c12'
+        };
+
+        const rarityGlow = {
+            rare: 'rgba(52,152,219,0.15)',
+            epic: 'rgba(155,89,182,0.15)',
+            legendary: 'rgba(243,156,18,0.15)'
+        };
+
+        let html = `<div class="relics-header">
+            <div class="relics-counter">
+                <span class="relics-count">${collected}</span> / <span class="relics-total">${total}</span> Relics Discovered
+            </div>
+            <div class="relics-progress-bar">
+                <div class="relics-progress-fill" style="width:${total ? (collected/total*100) : 0}%;"></div>
+            </div>
+            <p style="color:#95a5a6;font-size:0.8em;margin-top:6px;">Send armies to explore 🏚️ Ancient Ruins on the world map to discover relics.</p>
+        </div>`;
+
+        html += `<div class="relic-grid">`;
+        this.relicCatalog.forEach(relic => {
+            const owned = this.hasRelic(relic.id);
+            const rColor = rarityColors[relic.rarity] || '#95a5a6';
+            const rGlow = rarityGlow[relic.rarity] || 'transparent';
+
+            html += `
+                <div class="relic-card ${owned ? 'owned' : 'locked'} rarity-${relic.rarity}" 
+                     style="--relic-color:${rColor};--relic-glow:${rGlow};"
+                     title="${owned ? relic.lore : 'Explore Ancient Ruins to discover this relic'}">
+                    <div class="relic-card-icon">${owned ? relic.icon : '❓'}</div>
+                    <div class="relic-card-body">
+                        <div class="relic-card-name">${owned ? relic.name : '???'}</div>
+                        <div class="relic-card-rarity" style="color:${rColor};">${relic.rarity.charAt(0).toUpperCase() + relic.rarity.slice(1)}</div>
+                        <div class="relic-card-desc">${owned ? relic.description : 'Found in Ancient Ruins'}</div>
+                        ${owned ? `<div class="relic-card-effect">${relic.effect}</div>` : ''}
+                    </div>
+                </div>`;
+        });
+        html += `</div>`;
+
+        container.innerHTML = html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  ACTIVE EFFECTS SUMMARY (Overview tab)
     // ═══════════════════════════════════════════════════════════════
 
@@ -1713,6 +2021,13 @@ class MonarchManager {
         if (activeGov) {
             const govSkill = activeGov.skills?.economics || 0;
             effects.push({ icon: '🏛️', label: `Gov. ${activeGov.name}`, value: `+${Math.round(govSkill / 2)}% prod`, color: '#2ecc71', source: 'staff' });
+        }
+
+        // Relic effects
+        for (const relic of this.relicCatalog) {
+            if (this.hasRelic(relic.id)) {
+                effects.push({ icon: relic.icon, label: relic.name, value: relic.effect, color: '#f39c12', source: 'relic' });
+            }
         }
 
         if (effects.length === 0) {
