@@ -11,10 +11,14 @@ class RoyalFamilyManager {
     }
 
     // Initialize royal family with starting monarch
-    initializeRoyalFamily(monarchName = "Dynasty Founder") {
+    initializeRoyalFamily(monarchName) {
+        // Generate a proper personal name if none provided or if given the dynasty name
+        const name = monarchName && monarchName !== 'Dynasty Founder' && monarchName !== 'New Dynasty'
+            ? monarchName
+            : this.generateFounderName();
         this.currentMonarch = {
             id: `royal_${Date.now()}`,
-            name: monarchName,
+            name: name,
             age: 25, // Age in years
             status: 'monarch',
             // When governing, the monarch enables village management and does not take normal jobs
@@ -196,11 +200,28 @@ class RoyalFamilyManager {
     }
 
     // Generate heir names
-    generateHeirName() {
-        const maleNames = ['Alexander', 'William', 'Henry', 'Richard', 'Edward', 'Arthur', 'Charles'];
-        const femaleNames = ['Isabella', 'Eleanor', 'Margaret', 'Catherine', 'Elizabeth', 'Victoria', 'Arabella'];
+    generateHeirName(gender) {
+        const maleNames = ['Alexander', 'William', 'Henry', 'Richard', 'Edward', 'Arthur', 'Charles',
+                           'Frederick', 'Edmund', 'Geoffrey', 'Baldwin', 'Raymond', 'Conrad', 'Leopold',
+                           'Aldric', 'Cedric', 'Godric', 'Leofric', 'Oswin', 'Theodric', 'Wulfstan'];
+        const femaleNames = ['Isabella', 'Eleanor', 'Margaret', 'Catherine', 'Elizabeth', 'Victoria', 'Arabella',
+                             'Matilda', 'Beatrice', 'Constance', 'Adelaide', 'Judith', 'Rosalind', 'Elspeth',
+                             'Guinevere', 'Rowena', 'Seraphina', 'Isolde', 'Heloise', 'Brunhild', 'Sigrid'];
+        if (gender === 'male') return maleNames[Math.floor(Math.random() * maleNames.length)];
+        if (gender === 'female') return femaleNames[Math.floor(Math.random() * femaleNames.length)];
         const allNames = [...maleNames, ...femaleNames];
         return allNames[Math.floor(Math.random() * allNames.length)];
+    }
+
+    // Generate a name for the founding monarch
+    generateFounderName() {
+        const names = [
+            'Aldric', 'Baldwin', 'Cedric', 'Edmund', 'Frederick',
+            'Godric', 'Harald', 'Leofric', 'Oswin', 'Theodric',
+            'Conrad', 'Leopold', 'Raymond', 'Sigmund', 'Wulfstan',
+            'Alaric', 'Clovis', 'Draven', 'Emeric', 'Gareth'
+        ];
+        return names[Math.floor(Math.random() * names.length)];
     }
 
     // ===================================================================

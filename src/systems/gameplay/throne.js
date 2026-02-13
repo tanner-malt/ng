@@ -563,9 +563,8 @@ class ThroneManager {
         if (!this.gameState.royalFamily) {
             this.gameState.royalFamily = new RoyalFamilyManager(this.gameState);
             
-            // Get dynasty name from game state or use default
-            const dynastyName = this.gameState.dynastyName || "Dynasty Founder";
-            this.gameState.royalFamily.initializeRoyalFamily(dynastyName);
+            // Ruler gets a randomly generated personal name
+            this.gameState.royalFamily.initializeRoyalFamily();
             
             console.log('[Throne] Dynasty initialized');
         }

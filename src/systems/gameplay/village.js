@@ -353,6 +353,17 @@ class VillageManager {
                 }
             });
 
+            // Refresh employment indicator dots when workers change (debounced)
+            let empDotRefreshTimer = null;
+            const scheduleEmpDotRefresh = () => {
+                if (empDotRefreshTimer) clearTimeout(empDotRefreshTimer);
+                empDotRefreshTimer = setTimeout(() => {
+                    try { this.renderBuildings(); } catch (_) { }
+                }, 200);
+            };
+            window.eventBus.on('job:assigned', scheduleEmpDotRefresh);
+            window.eventBus.on('job:unassigned', scheduleEmpDotRefresh);
+
             console.log('[Village] Event listeners setup complete');
         }
     }
@@ -1819,9 +1830,10 @@ class VillageManager {
             // Employment indicator (bottom-left dot)
             if (!isUnderConstruction) {
                 const slots = this.getWorkerSlotsForBuilding(building);
+                const assigned = this.getAssignedWorkers(building);
+                const assignedCount = Array.isArray(assigned) ? assigned.length : 0;
+                console.log(`[Village] Emp dot: ${building.type} id=${building.id} slots=${slots} assigned=${assignedCount} built=${building.built} level=${building.level}`);
                 if (slots > 0) {
-                    const assigned = this.getAssignedWorkers(building);
-                    const assignedCount = Array.isArray(assigned) ? assigned.length : 0;
                     const empDot = document.createElement('span');
                     empDot.className = 'building-emp-dot';
                     if (assignedCount >= slots) {
@@ -1835,6 +1847,7 @@ class VillageManager {
                         empDot.title = `Unstaffed (0/${slots})`;
                     }
                     buildingEl.appendChild(empDot);
+                    console.log(`[Village] Emp dot CREATED: ${building.type} class=${empDot.className}`);
                 }
             }
 
