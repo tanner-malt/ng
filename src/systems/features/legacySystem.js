@@ -41,12 +41,17 @@ class LegacySystem {
             bonuses: {
                 startingGold: 0,           // +X gold at start
                 startingFood: 0,           // +X food at start
+                startingWood: 0,           // +X wood at start
+                startingStone: 0,          // +X stone at start
                 startingPopulation: 0,     // +X starting villagers
                 productionBonus: 0,        // +X% all production
                 buildSpeedBonus: 0,        // +X% construction speed
                 combatBonus: 0,            // +X% combat effectiveness
                 explorationBonus: 0,       // +X% exploration speed
-                startingScout: 0           // +X world map sight at start
+                startingScout: 0,          // +X world map sight at start
+                taxEfficiency: 0,          // +X% gold income
+                populationGrowth: 0,       // +X% birth rate
+                researchSpeed: 0           // +X% research speed
             },
             
             // Titles earned (cosmetic + minor bonuses)
@@ -215,12 +220,17 @@ class LegacySystem {
     purchaseBonus(bonusType, baseCost) {
         const bonusAmounts = {
             startingFood: 25,        // +25 food per purchase
+            startingWood: 50,        // +50 wood per purchase
+            startingStone: 25,       // +25 stone per purchase
             startingPopulation: 1,   // +1 villager per purchase
             productionBonus: 5,      // +5% per purchase
             buildSpeedBonus: 5,      // +5% per purchase
             combatBonus: 5,          // +5% per purchase
             explorationBonus: 10,    // +10% per purchase
-            startingScout: 1         // +1 sight radius per purchase
+            startingScout: 1,        // +1 sight radius per purchase
+            taxEfficiency: 5,        // +5% gold income per purchase
+            populationGrowth: 5,     // +5% birth rate per purchase
+            researchSpeed: 10        // +10% research speed per purchase
         };
         
         if (!bonusAmounts[bonusType]) {
@@ -271,12 +281,17 @@ class LegacySystem {
         return {
             gold: 0,  // No starting gold from legacy — gold carries over via preserved gold instead
             food: this.legacy.bonuses.startingFood,
+            wood: this.legacy.bonuses.startingWood,
+            stone: this.legacy.bonuses.startingStone,
             population: this.legacy.bonuses.startingPopulation,
             productionMultiplier: 1 + (this.legacy.bonuses.productionBonus / 100),
             buildSpeedMultiplier: 1 + (this.legacy.bonuses.buildSpeedBonus / 100),
             combatMultiplier: 1 + (this.legacy.bonuses.combatBonus / 100),
             explorationMultiplier: 1 + (this.legacy.bonuses.explorationBonus / 100),
-            scoutRange: this.legacy.bonuses.startingScout || 0
+            scoutRange: this.legacy.bonuses.startingScout || 0,
+            taxMultiplier: 1 + ((this.legacy.bonuses.taxEfficiency || 0) / 100),
+            birthRateMultiplier: 1 + ((this.legacy.bonuses.populationGrowth || 0) / 100),
+            researchMultiplier: 1 + ((this.legacy.bonuses.researchSpeed || 0) / 100)
         };
     }
 
@@ -294,6 +309,14 @@ class LegacySystem {
         if (bonuses.food > 0 && gameState.resources) {
             gameState.resources.food = (gameState.resources.food || 0) + bonuses.food;
             console.log(`[Legacy] Applied starting food bonus: +${bonuses.food}`);
+        }
+        if (bonuses.wood > 0 && gameState.resources) {
+            gameState.resources.wood = (gameState.resources.wood || 0) + bonuses.wood;
+            console.log(`[Legacy] Applied starting wood bonus: +${bonuses.wood}`);
+        }
+        if (bonuses.stone > 0 && gameState.resources) {
+            gameState.resources.stone = (gameState.resources.stone || 0) + bonuses.stone;
+            console.log(`[Legacy] Applied starting stone bonus: +${bonuses.stone}`);
         }
         
         // Population bonus is handled by PopulationManager on init

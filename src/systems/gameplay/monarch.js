@@ -19,16 +19,7 @@ class MonarchManager {
 
         // ── Investment Definitions (no longer includes general/governor/betrothal) ──
         this.investmentDefs = [
-            {
-                id: 'combatTraining',
-                name: 'Combat Training',
-                icon: '🛡️',
-                category: 'kingdom',
-                description: '+10% combat effectiveness per level',
-                baseCost: 400,
-                costMult: 2.5,
-                maxLevel: 10
-            },
+            // Kingdom
             {
                 id: 'leadershipMultiplier',
                 name: 'Leadership Multiplier',
@@ -40,15 +31,78 @@ class MonarchManager {
                 maxLevel: 10
             },
             {
+                id: 'royalEducation',
+                name: 'Royal Academy',
+                icon: '📚',
+                category: 'kingdom',
+                description: '+10% skill growth for royal children per level',
+                baseCost: 450,
+                costMult: 2.5,
+                maxLevel: 5
+            },
+            // Economy
+            {
+                id: 'taxCollection',
+                name: 'Tax Collection',
+                icon: '💰',
+                category: 'economy',
+                description: '+5% gold income per level',
+                baseCost: 300,
+                costMult: 2.0,
+                maxLevel: 10
+            },
+            {
+                id: 'agriculturalReform',
+                name: 'Agricultural Reform',
+                icon: '🌾',
+                category: 'economy',
+                description: '+10% food production per level',
+                baseCost: 350,
+                costMult: 2.0,
+                maxLevel: 10
+            },
+            // Military
+            {
+                id: 'combatTraining',
+                name: 'Combat Training',
+                icon: '🛡️',
+                category: 'military',
+                description: '+10% combat effectiveness per level',
+                baseCost: 400,
+                costMult: 2.5,
+                maxLevel: 10
+            },
+            {
                 id: 'armyScouts',
                 name: 'Army Scouts',
                 icon: '🔍',
-                category: 'kingdom',
+                category: 'military',
                 description: '+1 sight range on the world map',
                 baseCost: 1500,
                 costMult: 25,
                 maxLevel: Infinity
             },
+            {
+                id: 'fortifications',
+                name: 'Fortifications',
+                icon: '🏰',
+                category: 'military',
+                description: '+15% village defense per level',
+                baseCost: 500,
+                costMult: 2.5,
+                maxLevel: 10
+            },
+            {
+                id: 'veteranTraining',
+                name: 'Veteran Training',
+                icon: '🎖️',
+                category: 'military',
+                description: '-5% army casualties per level (max 40%)',
+                baseCost: 600,
+                costMult: 2.5,
+                maxLevel: 8
+            },
+            // Infrastructure
             {
                 id: 'productionSize',
                 name: 'Increase Production Size',
@@ -68,6 +122,16 @@ class MonarchManager {
                 baseCost: 200,
                 costMult: 12,
                 maxLevel: Infinity
+            },
+            {
+                id: 'storageExpansion',
+                name: 'Royal Warehouses',
+                icon: '📦',
+                category: 'infrastructure',
+                description: '+10% storage capacity per level',
+                baseCost: 300,
+                costMult: 2.0,
+                maxLevel: 10
             }
         ];
 
@@ -173,6 +237,7 @@ class MonarchManager {
                 this.updateMonarchCard();
                 this.displayInvestmentStatus();
                 this.updateDynastyStats();
+                this.renderActiveEffects();
                 break;
             case 'family':
                 this.renderFamilyTreeTab();
@@ -186,6 +251,7 @@ class MonarchManager {
                 break;
             case 'legacy':
                 this.renderLegacyBonuses();
+                this.renderTitles();
                 break;
             case 'dynasty':
                 this.updatePrestigeButton();
@@ -225,7 +291,9 @@ class MonarchManager {
         if (!container) return;
 
         const categories = {
-            kingdom: { title: '👑 Kingdom Development', defs: [] },
+            kingdom: { title: '👑 Kingdom', defs: [] },
+            economy: { title: '💰 Economy', defs: [] },
+            military: { title: '⚔️ Military', defs: [] },
             infrastructure: { title: '🏗️ Infrastructure', defs: [] }
         };
 
@@ -338,6 +406,26 @@ class MonarchManager {
                     window.worldManager.refreshUI?.();
                 }
                 break;
+            case 'taxCollection':
+                window.showToast?.(`Tax Collection level ${level}: +${level * 5}% gold income`, { type: 'success' });
+                break;
+            case 'agriculturalReform':
+                window.showToast?.(`Agricultural Reform level ${level}: +${level * 10}% food production`, { type: 'success' });
+                break;
+            case 'fortifications':
+                window.showToast?.(`Fortifications level ${level}: +${level * 15}% village defense`, { type: 'success' });
+                break;
+            case 'veteranTraining':
+                window.showToast?.(`Veteran Training level ${level}: -${level * 5}% army casualties`, { type: 'success' });
+                break;
+            case 'royalEducation':
+                window.showToast?.(`Royal Academy level ${level}: +${level * 10}% skill growth`, { type: 'success' });
+                break;
+            case 'storageExpansion':
+                this.gameState.updatePopulationCap?.();
+                this.gameState.updateUI?.();
+                window.showToast?.(`Royal Warehouses level ${level}: +${level * 10}% storage`, { type: 'success' });
+                break;
         }
     }
 
@@ -359,6 +447,36 @@ class MonarchManager {
     getCombatTrainingMultiplier() {
         const level = this.getInvestmentLevel('combatTraining');
         return 1 + level * 0.1;
+    }
+
+    getTaxCollectionMultiplier() {
+        const level = this.getInvestmentLevel('taxCollection');
+        return 1 + level * 0.05;
+    }
+
+    getAgriculturalReformMultiplier() {
+        const level = this.getInvestmentLevel('agriculturalReform');
+        return 1 + level * 0.10;
+    }
+
+    getFortificationMultiplier() {
+        const level = this.getInvestmentLevel('fortifications');
+        return 1 + level * 0.15;
+    }
+
+    getVeteranTrainingReduction() {
+        const level = this.getInvestmentLevel('veteranTraining');
+        return Math.min(0.40, level * 0.05);
+    }
+
+    getRoyalEducationMultiplier() {
+        const level = this.getInvestmentLevel('royalEducation');
+        return 1 + level * 0.10;
+    }
+
+    getStorageExpansionMultiplier() {
+        const level = this.getInvestmentLevel('storageExpansion');
+        return 1 + level * 0.10;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -808,34 +926,64 @@ class MonarchManager {
         if (pointsEl) pointsEl.textContent = `${legacy.totalPoints} Legacy Points`;
 
         const bonusDefs = [
-            { type: 'startingFood',       name: 'Starting Food',       icon: '🍖', perLevel: '+25 food',         baseCost: 10 },
-            { type: 'startingPopulation', name: 'Starting Population', icon: '👤', perLevel: '+1 villager',      baseCost: 25 },
-            { type: 'productionBonus',    name: 'Production Bonus',    icon: '⚡', perLevel: '+5% production',   baseCost: 20 },
-            { type: 'buildSpeedBonus',    name: 'Build Speed',         icon: '🔨', perLevel: '+5% build speed',  baseCost: 20 },
-            { type: 'combatBonus',        name: 'Combat Bonus',        icon: '⚔️', perLevel: '+5% combat',       baseCost: 20 },
-            { type: 'explorationBonus',   name: 'Exploration Bonus',   icon: '🗺️', perLevel: '+10% map reveal',  baseCost: 15 },
-            { type: 'startingScout',      name: 'Scouting Intel',      icon: '🔍', perLevel: '+1 reveal radius', baseCost: 30 }
+            // Starting resources group
+            { type: 'startingFood',       name: 'Starting Food',       icon: '🍖', perLevel: '+25 food',         baseCost: 10,  group: 'resources' },
+            { type: 'startingWood',       name: 'Starting Wood',       icon: '🪵', perLevel: '+50 wood',         baseCost: 15,  group: 'resources' },
+            { type: 'startingStone',      name: 'Starting Stone',      icon: '🪨', perLevel: '+25 stone',        baseCost: 20,  group: 'resources' },
+            { type: 'startingPopulation', name: 'Starting Population', icon: '👤', perLevel: '+1 villager',      baseCost: 25,  group: 'resources' },
+            // Multiplier bonuses group
+            { type: 'productionBonus',    name: 'Production Bonus',    icon: '⚡', perLevel: '+5% production',   baseCost: 20,  group: 'multipliers' },
+            { type: 'buildSpeedBonus',    name: 'Build Speed',         icon: '🔨', perLevel: '+5% build speed',  baseCost: 20,  group: 'multipliers' },
+            { type: 'combatBonus',        name: 'Combat Bonus',        icon: '⚔️', perLevel: '+5% combat',       baseCost: 20,  group: 'multipliers' },
+            { type: 'explorationBonus',   name: 'Exploration Bonus',   icon: '🗺️', perLevel: '+10% map reveal',  baseCost: 15,  group: 'multipliers' },
+            { type: 'startingScout',      name: 'Scouting Intel',      icon: '🔍', perLevel: '+1 reveal radius', baseCost: 30,  group: 'multipliers' },
+            // Advanced bonuses group
+            { type: 'taxEfficiency',      name: 'Tax Efficiency',      icon: '💰', perLevel: '+5% gold income',  baseCost: 25,  group: 'advanced' },
+            { type: 'populationGrowth',   name: 'Population Growth',   icon: '👶', perLevel: '+5% birth rate',   baseCost: 30,  group: 'advanced' },
+            { type: 'researchSpeed',      name: 'Research Speed',      icon: '🔬', perLevel: '+10% research',    baseCost: 25,  group: 'advanced' }
         ];
 
+        const groupLabels = {
+            resources: '🌱 Starting Resources',
+            multipliers: '📊 Production & Combat',
+            advanced: '🌟 Advanced Bonuses'
+        };
+
         let html = '';
+        const groups = {};
         bonusDefs.forEach(bd => {
-            const current = legacy.bonuses[bd.type] || 0;
-            const actualCost = window.legacySystem.getLegacyBonusCost
-                ? window.legacySystem.getLegacyBonusCost(bd.baseCost, bd.type)
-                : bd.baseCost;
-            const canAfford = legacy.totalPoints >= actualCost;
-            html += `
-                <div class="legacy-bonus-item">
-                    <div class="legacy-bonus-icon">${bd.icon}</div>
-                    <div class="legacy-bonus-details">
-                        <h5>${bd.name}</h5>
-                        <p>${bd.perLevel} per purchase</p>
-                        <div class="legacy-bonus-level">Current: ${this.formatLegacyBonusValue(bd, current)}</div>
-                    </div>
-                    <button class="legacy-buy-btn" data-type="${bd.type}" data-base-cost="${bd.baseCost}" ${canAfford ? '' : 'disabled'}>
-                        ${actualCost} pts
-                    </button>
-                </div>`;
+            if (!groups[bd.group]) groups[bd.group] = [];
+            groups[bd.group].push(bd);
+        });
+
+        Object.entries(groups).forEach(([groupKey, defs]) => {
+            html += `<div class="legacy-group">`;
+            html += `<div class="legacy-group-header">${groupLabels[groupKey] || groupKey}</div>`;
+            html += `<div class="legacy-group-items">`;
+            defs.forEach(bd => {
+                const current = legacy.bonuses[bd.type] || 0;
+                const purchases = window.legacySystem.getBonusPurchaseCount?.(bd.type) || 0;
+                const actualCost = window.legacySystem.getLegacyBonusCost
+                    ? window.legacySystem.getLegacyBonusCost(bd.baseCost, bd.type)
+                    : bd.baseCost;
+                const canAfford = legacy.totalPoints >= actualCost;
+                html += `
+                    <div class="legacy-bonus-item">
+                        <div class="legacy-bonus-icon">${bd.icon}</div>
+                        <div class="legacy-bonus-details">
+                            <h5>${bd.name}</h5>
+                            <p>${bd.perLevel} per purchase</p>
+                            <div class="legacy-bonus-level">
+                                ${this.formatLegacyBonusValue(bd, current)}
+                                ${purchases > 0 ? `<span class="legacy-purchase-count">(Lv ${purchases})</span>` : ''}
+                            </div>
+                        </div>
+                        <button class="legacy-buy-btn" data-type="${bd.type}" data-base-cost="${bd.baseCost}" ${canAfford ? '' : 'disabled'}>
+                            ${actualCost} pts
+                        </button>
+                    </div>`;
+            });
+            html += `</div></div>`;
         });
         container.innerHTML = html;
 
@@ -848,12 +996,17 @@ class MonarchManager {
 
     formatLegacyBonusValue(def, value) {
         if (def.type === 'startingFood') return `+${value} food`;
+        if (def.type === 'startingWood') return `+${value} wood`;
+        if (def.type === 'startingStone') return `+${value} stone`;
         if (def.type === 'startingPopulation') return `+${value} villagers`;
         if (def.type === 'productionBonus') return `+${value}%`;
         if (def.type === 'buildSpeedBonus') return `+${value}%`;
         if (def.type === 'combatBonus') return `+${value}%`;
         if (def.type === 'explorationBonus') return `+${value}%`;
         if (def.type === 'startingScout') return `+${value} radius`;
+        if (def.type === 'taxEfficiency') return `+${value}%`;
+        if (def.type === 'populationGrowth') return `+${value}%`;
+        if (def.type === 'researchSpeed') return `+${value}%`;
         return `${value}`;
     }
 
@@ -1018,6 +1171,10 @@ class MonarchManager {
             { icon: '🔍', value: `+${inv.armyScouts || 0}`, label: 'Scout Range', color: '#3498db' },
             { icon: '🔨', value: `+${inv.productionSize || 0}`, label: 'Job Slots', color: '#f39c12' },
             { icon: '🏠', value: `+${inv.moPeople || 0}`, label: 'Housing', color: '#9b59b6' },
+            { icon: '💰', value: `+${(inv.taxCollection || 0) * 5}%`, label: 'Tax Rate', color: '#f1c40f' },
+            { icon: '🌾', value: `+${(inv.agriculturalReform || 0) * 10}%`, label: 'Agriculture', color: '#27ae60' },
+            { icon: '🏰', value: `+${(inv.fortifications || 0) * 15}%`, label: 'Defense', color: '#8e44ad' },
+            { icon: '📦', value: `+${(inv.storageExpansion || 0) * 10}%`, label: 'Storage', color: '#2980b9' },
         ];
         if (hasWise) {
             statItems.push({ icon: '📖', value: '+5%', label: 'Wise Bonus', color: '#1abc9c' });
@@ -1503,6 +1660,114 @@ class MonarchManager {
         `;
 
         window.showModal?.('🧬 Royal Genetics — ' + member.name, body, { type: 'info', icon: '🧬' });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  ACTIVE EFFECTS SUMMARY (Overview tab)
+    // ═══════════════════════════════════════════════════════════════
+
+    renderActiveEffects() {
+        const el = document.getElementById('active-effects-summary');
+        if (!el) return;
+
+        const effects = [];
+        const inv = this.gameState.investments;
+
+        // Investment effects
+        if (inv.combatTraining > 0) effects.push({ icon: '🛡️', label: 'Combat Training', value: `+${inv.combatTraining * 10}%`, color: '#e74c3c', source: 'investment' });
+        if (inv.leadershipMultiplier > 0) effects.push({ icon: '👑', label: 'Leadership', value: `${this.getLeadershipProductionMultiplier().toFixed(2)}x`, color: '#e67e22', source: 'investment' });
+        if (inv.armyScouts > 0) effects.push({ icon: '🔍', label: 'Scout Range', value: `+${inv.armyScouts}`, color: '#3498db', source: 'investment' });
+        if (inv.productionSize > 0) effects.push({ icon: '🔨', label: 'Job Slots', value: `+${inv.productionSize}`, color: '#f39c12', source: 'investment' });
+        if (inv.moPeople > 0) effects.push({ icon: '🏠', label: 'Housing', value: `+${inv.moPeople}`, color: '#9b59b6', source: 'investment' });
+        if (inv.taxCollection > 0) effects.push({ icon: '💰', label: 'Tax Collection', value: `+${inv.taxCollection * 5}%`, color: '#f1c40f', source: 'investment' });
+        if (inv.agriculturalReform > 0) effects.push({ icon: '🌾', label: 'Agriculture', value: `+${inv.agriculturalReform * 10}%`, color: '#2ecc71', source: 'investment' });
+        if (inv.fortifications > 0) effects.push({ icon: '🏰', label: 'Fortifications', value: `+${inv.fortifications * 15}%`, color: '#8e44ad', source: 'investment' });
+        if (inv.veteranTraining > 0) effects.push({ icon: '🎖️', label: 'Veterans', value: `-${inv.veteranTraining * 5}% casualties`, color: '#e67e22', source: 'investment' });
+        if (inv.royalEducation > 0) effects.push({ icon: '📚', label: 'Education', value: `+${inv.royalEducation * 10}%`, color: '#1abc9c', source: 'investment' });
+        if (inv.storageExpansion > 0) effects.push({ icon: '📦', label: 'Storage', value: `+${inv.storageExpansion * 10}%`, color: '#3498db', source: 'investment' });
+
+        // Legacy effects
+        const legacy = window.legacySystem?.legacy?.bonuses;
+        if (legacy) {
+            if (legacy.productionBonus > 0) effects.push({ icon: '⚡', label: 'Legacy Production', value: `+${legacy.productionBonus}%`, color: '#f39c12', source: 'legacy' });
+            if (legacy.buildSpeedBonus > 0) effects.push({ icon: '🔨', label: 'Legacy Build', value: `+${legacy.buildSpeedBonus}%`, color: '#e67e22', source: 'legacy' });
+            if (legacy.combatBonus > 0) effects.push({ icon: '⚔️', label: 'Legacy Combat', value: `+${legacy.combatBonus}%`, color: '#e74c3c', source: 'legacy' });
+            if (legacy.explorationBonus > 0) effects.push({ icon: '🗺️', label: 'Legacy Explore', value: `+${legacy.explorationBonus}%`, color: '#2ecc71', source: 'legacy' });
+            if (legacy.taxEfficiency > 0) effects.push({ icon: '💰', label: 'Legacy Tax', value: `+${legacy.taxEfficiency}%`, color: '#f1c40f', source: 'legacy' });
+            if (legacy.populationGrowth > 0) effects.push({ icon: '👶', label: 'Legacy Growth', value: `+${legacy.populationGrowth}%`, color: '#e8b4c8', source: 'legacy' });
+            if (legacy.researchSpeed > 0) effects.push({ icon: '🔬', label: 'Legacy Research', value: `+${legacy.researchSpeed}%`, color: '#1abc9c', source: 'legacy' });
+        }
+
+        // Trait effects from current monarch
+        const monarch = this.gameState.royalFamily?.currentMonarch;
+        if (monarch?.traits) {
+            monarch.traits.forEach(t => {
+                const info = this.traitInfo[t];
+                if (info) effects.push({ icon: info.icon, label: info.label, value: info.desc, color: '#d4a7e8', source: 'trait' });
+            });
+        }
+
+        // Governor bonuses
+        const staff = this.gameState.hiredStaff || [];
+        const activeGov = staff.find(s => s.role === 'governor' && s.assignedTo);
+        if (activeGov) {
+            const govSkill = activeGov.skills?.economics || 0;
+            effects.push({ icon: '🏛️', label: `Gov. ${activeGov.name}`, value: `+${Math.round(govSkill / 2)}% prod`, color: '#2ecc71', source: 'staff' });
+        }
+
+        if (effects.length === 0) {
+            el.innerHTML = '<p style="color:#7f8c8d;font-style:italic;padding:0.5rem 0;">No active effects yet. Purchase investments or earn legacy bonuses to see them here.</p>';
+            return;
+        }
+
+        el.innerHTML = `
+            <div class="active-effects-grid">
+                ${effects.map(e => `
+                    <div class="active-effect-item ${e.source}">
+                        <span class="effect-icon">${e.icon}</span>
+                        <span class="effect-label">${e.label}</span>
+                        <span class="effect-value" style="color:${e.color};">${e.value}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  DYNASTY TITLES (Legacy tab)
+    // ═══════════════════════════════════════════════════════════════
+
+    renderTitles() {
+        const el = document.getElementById('dynasty-titles-display');
+        if (!el) return;
+
+        const legacy = window.legacySystem?.legacy;
+        const earnedTitles = legacy?.titles || [];
+
+        const allTitles = [
+            { name: 'Founder', icon: '🏠', desc: 'Completed your first dynasty', req: '1 dynasty completed' },
+            { name: 'Veteran Ruler', icon: '⚔️', desc: 'Seasoned ruler of many lands', req: '5 dynasties completed' },
+            { name: 'Eternal Dynasty', icon: '♾️', desc: 'Your legacy spans the ages', req: '10 dynasties completed' },
+            { name: 'Year King', icon: '📅', desc: 'Survived a full year of rule', req: 'Survive 365 days' },
+            { name: 'People\'s Monarch', icon: '👥', desc: 'Beloved by the masses', req: 'Reach 50 population' },
+            { name: 'Legacy Builder', icon: '🏛️', desc: 'A legacy worth remembering', req: 'Accumulate 500 legacy pts' },
+            { name: 'Immortal Legacy', icon: '✨', desc: 'Transcended mortal achievement', req: 'Accumulate 2000 legacy pts' },
+        ];
+
+        let html = '<div class="titles-grid">';
+        allTitles.forEach(t => {
+            const earned = earnedTitles.includes(t.name);
+            html += `
+                <div class="title-card ${earned ? 'earned' : 'locked'}">
+                    <div class="title-icon">${earned ? t.icon : '🔒'}</div>
+                    <div class="title-info">
+                        <div class="title-name">${t.name}</div>
+                        <div class="title-desc">${earned ? t.desc : t.req}</div>
+                    </div>
+                </div>`;
+        });
+        html += '</div>';
+        el.innerHTML = html;
     }
 
     // ═══════════════════════════════════════════════════════════════

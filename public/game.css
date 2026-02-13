@@ -2650,6 +2650,7 @@ body {
 .monarch-content {
     height: calc(100% - 100px);
     overflow-y: auto;
+    padding: 0 0.25rem;
 }
 
 /* ── Monarch Sub-tab Navigation ── */
@@ -2705,6 +2706,7 @@ body {
 .monarch-tab-content.active {
     display: block;
     animation: fadeInTab 0.3s ease;
+    padding-bottom: 2rem;
 }
 @keyframes fadeInTab {
     from { opacity: 0; transform: translateY(4px); }
@@ -2722,13 +2724,14 @@ body {
 .section-subtitle {
     color: #7f8c8d;
     font-size: 0.85em;
-    margin: -0.5rem 0 1rem 0;
+    margin: -0.25rem 0 1.25rem 0;
+    line-height: 1.4;
 }
 
 .investment-categories {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
 }
 
 .investment-category {
@@ -2737,6 +2740,10 @@ body {
     padding: 1.25rem;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.3s ease;
+}
+.investment-category:hover {
+    border-color: rgba(241,196,15,0.15);
 }
 
 .investment-category h3,
@@ -2777,7 +2784,7 @@ body {
 .monarch-overview-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
 }
 
 @media (max-width: 768px) {
@@ -2811,8 +2818,8 @@ body {
 .monarch-section {
     background: linear-gradient(135deg, #1a1a2e, #222240);
     border-radius: 10px;
-    padding: 1.25rem;
-    margin-bottom: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
     border: 1px solid rgba(255,255,255,0.06);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
 }
@@ -2889,7 +2896,9 @@ body {
 
 /* Legacy Bonuses section */
 .legacy-bonuses-header {
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(142,68,173,0.15);
 }
 
 .legacy-points-badge {
@@ -2904,9 +2913,9 @@ body {
 }
 
 .legacy-bonuses-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 .legacy-bonus-item {
@@ -2985,6 +2994,131 @@ body {
     color: #f39c12;
     margin-top: 0.15rem;
     font-style: italic;
+}
+
+/* ── Active Effects Grid (Overview tab) ── */
+.active-effects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.4rem;
+}
+.active-effect-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border-left: 3px solid rgba(243,156,18,0.4);
+    font-size: 0.82rem;
+    transition: all 0.2s ease;
+}
+.active-effect-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+.active-effect-item.legacy {
+    border-left-color: rgba(142,68,173,0.5);
+}
+.active-effect-item.trait {
+    border-left-color: rgba(155,89,182,0.5);
+}
+.active-effect-item.staff {
+    border-left-color: rgba(46,204,113,0.5);
+}
+.effect-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+}
+.effect-label {
+    flex: 1;
+    color: #bdc3c7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.effect-value {
+    font-weight: 700;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* ── Legacy Bonus Groups ── */
+.legacy-group {
+    margin-bottom: 1.25rem;
+}
+.legacy-group:last-child {
+    margin-bottom: 0;
+}
+.legacy-group-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #b8a9c9;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(184,169,201,0.15);
+    letter-spacing: 0.3px;
+}
+.legacy-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.5rem;
+}
+.legacy-purchase-count {
+    color: #8e44ad;
+    font-size: 0.7rem;
+    margin-left: 4px;
+    font-weight: 700;
+}
+
+/* ── Dynasty Titles ── */
+.titles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.5rem;
+}
+.title-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: all 0.2s ease;
+}
+.title-card.earned {
+    border-color: rgba(241,196,15,0.3);
+    background: rgba(241,196,15,0.05);
+}
+.title-card.locked {
+    opacity: 0.45;
+}
+.title-card:hover {
+    background: rgba(255,255,255,0.06);
+}
+.title-icon {
+    font-size: 1.4rem;
+    width: 36px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.title-info {
+    flex: 1;
+}
+.title-name {
+    font-weight: 700;
+    color: #ecf0f1;
+    font-size: 0.9rem;
+}
+.title-card.earned .title-name {
+    color: #f1c40f;
+}
+.title-desc {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    margin-top: 2px;
 }
 
 /* Kingdom Summary Grid (Overview tab) */
